@@ -30,6 +30,9 @@ FEATURED = "la-metro-rail"
 # /maps/<city>.html, so a relative "index.html" would resolve to /maps/.
 ATLAS_URL = "/atlas/"
 
+# Where the animation pages find the favicon, once served from the site root.
+ICONS_URL = "/assets/favicon"
+
 # Networks the essay shows without labels, to compare their shapes. At the size
 # a side-by-side figure allows, station names are unreadable anyway, and having
 # them on one map but not the other would make the two incomparable.
@@ -126,7 +129,8 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
 
     entries: list[NetworkEntry] = []
     for key in keys:
-        result = pipeline.run(key, width=width, out_dir=MAPS_DIR, back=ATLAS_URL)
+        result = pipeline.run(key, width=width, out_dir=MAPS_DIR,
+                              back=ATLAS_URL, icons=ICONS_URL)
         entries.append(NetworkEntry(
             key=key,
             name=feeds.FEEDS[key].name,

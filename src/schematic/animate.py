@@ -280,10 +280,17 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
                      linear=layout_json)
 
 
+# Emitted only when the caller says where the icons live, so a page written for
+# standalone use does not link assets that are not beside it.
+_ICON_LINKS = """<link rel="icon" href="{base}/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{base}/favicon-96x96.png" type="image/png" sizes="96x96">
+<link rel="apple-touch-icon" href="{base}/apple-touch-icon.png">"""
+
+
 def write(animation: Animation, svg: str, out_dir: Path, *,
           stem: str = "animation", title: str = "Transit animation",
           name: str | None = None, subtitle: str = "",
-          back: str = "index.html") -> tuple[Path, Path]:
+          back: str = "index.html", icons: str | None = None) -> tuple[Path, Path]:
     """Write ``<stem>.positions.json`` and a self-contained ``<stem>.html``.
 
     The stem is per-city: with a fixed filename, generating a second network
@@ -297,7 +304,8 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
 
     html_path = out_dir / f"{stem}.html"
     html_path.write_text(
-        _HTML.replace("__TITLE__", html_escape(title))
+        _HTML.replace("__ICONS__", _ICON_LINKS.format(base=icons) if icons else "")
+             .replace("__TITLE__", html_escape(title))
              .replace("__NAME__", html_escape(name or title))
              .replace("__SUBTITLE__", html_escape(subtitle))
              .replace("__BACK__", html_escape(back))
@@ -311,6 +319,7 @@ _HTML = r"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
+__ICONS__
 <script>
   // Applied before paint so the page never flashes the wrong theme. Shares the
   // rc-theme key with the rest of the site.

@@ -102,7 +102,7 @@ class Result:
 def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
         style: Style | None = None, line_order: list[str] | None = None,
         force: bool = False, out_dir: Path | None = None,
-        back: str = "index.html") -> Result:
+        back: str = "index.html", icons: str | None = None) -> Result:
     """Everything: fetch, schematize, draw, schedule, animate, write.
 
     ``back`` is the href the animation page's back-link points at. The default
@@ -138,7 +138,7 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
     out = out_dir or OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{key}.svg").write_text(r.svg)
-    animate.write(anim, r.svg, out, stem=key, back=back,
+    animate.write(anim, r.svg, out, stem=key, back=back, icons=icons,
                   title=f"{name} — {date:%A %-d %B %Y}", name=name,
                   subtitle=f"{len(trips):,} trips · {date:%A %-d %B %Y}")
 

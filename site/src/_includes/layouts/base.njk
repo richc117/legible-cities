@@ -6,6 +6,13 @@
     <title>{% if title %}{{ title }} | {% endif %}{{ site.title }}</title>
     <meta name="description" content="{{ description or site.description }}">
     <meta name="theme-color" content="{{ site.themeColor }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="{{ site.shortTitle }}">
+    <link rel="icon" href="{{ '/favicon.ico' | url }}" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="{{ '/assets/favicon/favicon.svg' | url }}">
+    <link rel="icon" type="image/png" sizes="96x96" href="{{ '/assets/favicon/favicon-96x96.png' | url }}">
+    <link rel="apple-touch-icon" href="{{ '/assets/favicon/apple-touch-icon.png' | url }}">
+    <link rel="manifest" href="{{ '/assets/favicon/site.webmanifest' | url }}">
     <link rel="stylesheet" href="{{ '/assets/style.css' | url }}">
     <script src="{{ '/assets/theme.js' | url }}"></script>
   </head>
