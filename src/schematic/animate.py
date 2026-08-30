@@ -263,7 +263,15 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
             keys.append([call.arrival, i])
             if call.departure > call.arrival:
                 keys.append([call.departure, i])
-        out_trips.append({"p": idx, "r": trip.route_label, "h": trip.headsign, "k": keys})
+        # LA publishes an empty trip_headsign for all 8,561 of its trips, so
+        # "where is this train going" -- the one thing a viewer actually wants
+        # from a moving dot -- has to fall back to naming its last stop.
+        where = trip.headsign.strip()
+        if not where:
+            last = graph.nodes.get(calls[-1].node_id)
+            if last and last.station_label:
+                where = display_name(last.station_label)
+        out_trips.append({"p": idx, "r": trip.route_label, "h": where, "k": keys})
 
     out_trips.sort(key=lambda t: t["k"][0][0])
     return Animation(date=date, paths=paths, trips=out_trips, lines=colors,
@@ -371,8 +379,8 @@ _HTML = r"""<!doctype html>
   .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
   .chip[aria-pressed="true"] { color: var(--text); }
   .chip[aria-pressed="false"] .dot { opacity: 0.3; }
-  .sort { color: var(--muted); font-size: 0.86rem; display: inline-flex;
-          align-items: baseline; gap: 0.45rem; }
+  .sort, .views { color: var(--muted); font-size: 0.86rem; display: inline-flex;
+                  align-items: baseline; gap: 0.45rem; }
   .sort[hidden] { display: none; }
   #stage { padding: 1.4rem; }
   /* Row labels in the linear view's gutter, in each line's own colour. */
@@ -411,7 +419,11 @@ _HTML = r"""<!doctype html>
   </div>
   <div class="group" id="speeds"></div>
   <div class="group">
-    <button id="view-toggle" aria-pressed="false">Linear</button>
+    <span class="views" role="group" aria-label="View">
+      <button id="view-map" aria-pressed="true">Map</button>
+      <button id="view-linear" aria-pressed="false">Linear</button>
+      <button id="view-string" aria-pressed="false">Time</button>
+    </span>
     <span class="sort" id="sort-group" hidden>
       sort
       <button id="sort-line" aria-pressed="true">line</button>
@@ -460,7 +472,20 @@ _HTML = r"""<!doctype html>
   const ROW_H = 150;
   const nLines = Math.max(layout.lines.length, 1);
   const linH = Math.max(vbH, LABEL_RISE + nLines * ROW_H);
-  const GUTTER = Math.max(vbW * 0.075, 74);
+  // The gutter has to hold the widest terminus name the time chart will print
+  // there, or the left-hand end of it is sliced off by the viewBox.
+  const terminusWidth = (() => {
+    let longest = 0;
+    for (const line of layout.lines) {
+      const spine = (line.rows[0] || {}).nodes || [];
+      for (const pair of [spine[0], spine[spine.length - 1]]) {
+        const nm = pair && (layout.names || {})[pair[0]];
+        if (nm) longest = Math.max(longest, nm.length);
+      }
+    }
+    return longest * 7.0 + 24;      // 11px Palatino runs wide on capitals
+  })();
+  const GUTTER = Math.max(vbW * 0.075, 74, terminusWidth);
   const RIGHT = Math.max(vbW * 0.02, 96);
   const colW = (vbW - GUTTER - RIGHT) / Math.max(layout.columns - 1, 1);
   const band = (linH - LABEL_RISE) / nLines;
@@ -497,6 +522,27 @@ _HTML = r"""<!doctype html>
 
   const lerp = (a, b, t) => a + (b - a) * t;
   const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  // ------------------------------------------------------- stringline layout
+  // A Marey chart: time across, stops down, every trip a diagonal. It reuses
+  // the linear layout's columns as its vertical axis, so a station is at the
+  // same position in the sequence in both views -- the row simply stands up.
+  const lineWidth = new Map(layout.lines.map(l => [l.label, Math.max(l.stations, 2)]));
+  const lineSpan = new Map(layout.lines.map(l => {
+    let max = 1;
+    for (const row of l.rows) for (const pair of row.nodes) max = Math.max(max, pair[1]);
+    return [l.label, max];
+  }));
+
+  const bandTop = label => vbY + LABEL_RISE + band * (rowPos.get(label) || 0) + 4;
+  const bandInner = () => band * 0.80;
+
+  // Vertical position of a station within its line's band, band-local.
+  const stopY = (label, node) => {
+    const c = cell.get(label + " " + node);
+    if (!c) return null;
+    return (c.col / (lineSpan.get(label) || 1)) * bandInner();
+  };
 
   // ------------------------------------------------------------ linear layer
   // An interchange is one dot on the map but appears once per line in the
@@ -580,6 +626,17 @@ _HTML = r"""<!doctype html>
   svg.insertBefore(dotLayer, trainsGroup);
   svg.insertBefore(textLayer, trainsGroup);
 
+  // ------------------------------------------------------------- stringline
+  // Each route's trips are concatenated into one path in band-local space, so
+  // re-sorting only moves a group transform rather than rebuilding 8,000
+  // subpaths. Drawn faintly: where the diagonals crowd, that is frequency.
+  const stringLayer = document.createElementNS(NS, "g");
+  stringLayer.setAttribute("id", "stringline");
+  stringLayer.setAttribute("opacity", "0");
+  const stringGroups = new Map();
+  const axisLayer = document.createElementNS(NS, "g");
+  axisLayer.setAttribute("id", "stringline-axis");
+
   // ------------------------------------------------------------ track morph
   const tracks = [];
   svg.querySelectorAll("#lines path[data-src]").forEach(el => {
@@ -631,13 +688,111 @@ _HTML = r"""<!doctype html>
   const nodes = new Map();
 
   let now = 7 * 3600, speed = 60, playing = true, last = performance.now();
-  let view = 0, viewTarget = 0;     // 0 = map, 1 = linear
+  // Two tweens rather than one three-way switch: m unfolds the map into rows,
+  // s stands those rows up into a time chart. A jump from map to stringline
+  // simply runs both at once.
+  let view = 0, viewTarget = 0;     // m: 0 = map, 1 = linear rows
+  let str = 0, strTarget = 0;       // s: 0 = network, 1 = stringline
+  let mode = "map";                 // map | linear | string
   let dirty = true;
 
   const clock = document.getElementById("clock");
   const count = document.getElementById("count");
   const scrub = document.getElementById("scrub");
   scrub.min = t0; scrub.max = t1; scrub.value = now;
+
+  const timeX = t =>
+    vbX + GUTTER + ((t - t0) / Math.max(t1 - t0, 1)) * (vbW - GUTTER - RIGHT);
+
+  (function buildStringline() {
+    const byRoute = new Map();
+    for (const trip of trips) {
+      const path = data.paths[trip.p];
+      let d = "";
+      for (let i = 0; i < trip.k.length; i++) {
+        const f = trip.k[i][1];
+        const lo = Math.min(Math.floor(f), path.nodes.length - 1);
+        const hi = Math.min(lo + 1, path.nodes.length - 1);
+        const ya = stopY(trip.r, path.nodes[lo]), yb = stopY(trip.r, path.nodes[hi]);
+        if (ya === null || yb === null) continue;
+        const y = lerp(ya, yb, f - lo);
+        d += (d ? "L" : "M") + timeX(trip.k[i][0]).toFixed(1) + " " + y.toFixed(1);
+      }
+      if (d.indexOf("L") < 0) continue;   // a single point draws nothing
+      if (!byRoute.has(trip.r)) byRoute.set(trip.r, []);
+      byRoute.get(trip.r).push(d);
+    }
+    for (const line of layout.lines) {
+      const g = document.createElementNS(NS, "g");
+      const el = document.createElementNS(NS, "path");
+      el.setAttribute("d", (byRoute.get(line.label) || []).join(""));
+      el.setAttribute("fill", "none");
+      el.setAttribute("stroke", data.lines[line.label] || "#888");
+      el.setAttribute("stroke-width", "1.4");
+      el.setAttribute("stroke-linecap", "round");
+      // Busy lines would otherwise fill in solid; thinning them lets density
+      // read as density rather than as a block of colour.
+      const busy = (byRoute.get(line.label) || []).length;
+      el.setAttribute("opacity", (busy > 180 ? 0.28 : busy > 90 ? 0.4 : 0.55).toFixed(2));
+      g.appendChild(el);
+
+      // Without the two termini the vertical axis has no reference: you can see
+      // that a train is climbing but not what it is climbing towards.
+      const spine = line.rows[0] ? line.rows[0].nodes : [];
+      if (spine.length > 1) {
+        const ends = [spine[0], spine[spine.length - 1]];
+        ends.forEach((pair, i) => {
+          const nm = (layout.names || {})[pair[0]];
+          if (!nm) return;
+          const t = document.createElementNS(NS, "text");
+          t.setAttribute("x", (vbX + GUTTER - 14).toFixed(1));
+          t.setAttribute("y", (i === 0 ? 4 : bandInner() + 4).toFixed(1));
+          t.setAttribute("text-anchor", "end");
+          t.setAttribute("font-size", "11");
+          t.setAttribute("fill", "var(--map-label, #111)");
+          t.setAttribute("opacity", "0.6");
+          t.textContent = nm;
+          g.appendChild(t);
+        });
+      }
+
+      stringLayer.appendChild(g);
+      stringGroups.set(line.label, g);
+    }
+    // Hour gridlines, so the time axis can actually be read.
+    const step = (t1 - t0) > 12 * 3600 ? 3 * 3600 : 3600;
+    for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) {
+      const x = timeX(t);
+      const tick = document.createElementNS(NS, "line");
+      tick.setAttribute("x1", x.toFixed(1)); tick.setAttribute("x2", x.toFixed(1));
+      tick.setAttribute("y1", (vbY + LABEL_RISE - 26).toFixed(1));
+      tick.setAttribute("y2", (vbY + LABEL_RISE + band * nLines).toFixed(1));
+      tick.setAttribute("stroke", "var(--map-label, #111)");
+      tick.setAttribute("stroke-width", "0.6");
+      tick.setAttribute("opacity", "0.16");
+      axisLayer.appendChild(tick);
+      const lab = document.createElementNS(NS, "text");
+      lab.setAttribute("x", x.toFixed(1));
+      lab.setAttribute("y", (vbY + LABEL_RISE - 32).toFixed(1));
+      lab.setAttribute("text-anchor", "middle");
+      lab.setAttribute("font-size", "13");
+      lab.setAttribute("fill", "var(--map-label, #111)");
+      lab.setAttribute("opacity", "0.55");
+      lab.textContent = String(Math.floor(t / 3600) % 24).padStart(2, "0") + ":00";
+      axisLayer.appendChild(lab);
+    }
+    stringLayer.appendChild(axisLayer);
+    // The playhead ties the chart to the clock: it is the same instant the
+    // network views are showing.
+    const head = document.createElementNS(NS, "line");
+    head.setAttribute("id", "playhead");
+    head.setAttribute("stroke", "var(--map-label, #111)");
+    head.setAttribute("stroke-width", "1.2");
+    head.setAttribute("opacity", "0.75");
+    stringLayer.appendChild(head);
+    svg.insertBefore(stringLayer, trainsGroup);
+  })();
+  const playhead = svg.querySelector("#playhead");
 
   const fmt = s => {
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -669,7 +824,18 @@ _HTML = r"""<!doctype html>
     return lo;
   };
 
-  function geometry(m) {
+  function geometry(m, sf) {
+    // Network layers dim as the chart takes over; both are positioned every
+    // frame so a re-sort moves them together.
+    const networkOpacity = (1 - sf).toFixed(3);
+    for (const g of [dotLayer, textLayer, svg.querySelector("#lines")]) {
+      if (g) g.setAttribute("opacity", networkOpacity);
+    }
+    stringLayer.setAttribute("opacity", sf.toFixed(3));
+    for (const line of layout.lines) {
+      const g = stringGroups.get(line.label);
+      if (g) g.setAttribute("transform", "translate(0," + bandTop(line.label).toFixed(1) + ")");
+    }
     if (linH !== vbH) {
       const h = lerp(vbH, linH, m);
       svg.setAttribute("viewBox", vbX + " " + vbY + " " + vbW + " " + h.toFixed(1));
@@ -706,14 +872,24 @@ _HTML = r"""<!doctype html>
     for (const n of names) {
       const base = rowPos.get(n.label) || 0;
       n.el.setAttribute("x", (vbX + GUTTER - 14).toFixed(1));
-      n.el.setAttribute("y", (vbY + LABEL_RISE + band * (base + 0.15)).toFixed(1));
-      n.el.setAttribute("opacity", m.toFixed(2));
+      // In the chart a line occupies a whole band, so its name centres on it.
+      const rowLine = vbY + LABEL_RISE + band * (base + 0.15);
+      const rowBand = bandTop(n.label) + bandInner() / 2;
+      n.el.setAttribute("y", lerp(rowLine, rowBand, sf).toFixed(1));
+      n.el.setAttribute("opacity", Math.max(m, sf).toFixed(2));
     }
   }
 
   function draw() {
-    const m = ease(view);
-    if (dirty) { geometry(m); dirty = false; }
+    const m = ease(view), sf = ease(str);
+    if (dirty) { geometry(m, sf); dirty = false; }
+    if (sf > 0) {
+      const hx = timeX(now);
+      playhead.setAttribute("x1", hx.toFixed(1));
+      playhead.setAttribute("x2", hx.toFixed(1));
+      playhead.setAttribute("y1", (vbY + LABEL_RISE - 24).toFixed(1));
+      playhead.setAttribute("y2", (vbY + LABEL_RISE + band * nLines).toFixed(1));
+    }
 
     const alive = new Set();
     let shown = 0;
@@ -744,6 +920,17 @@ _HTML = r"""<!doctype html>
           y = m < 1 ? lerp(y, ly, m) : ly;
         } else if (m >= 1) {
           continue;   // no row for this stop; hide rather than draw a lie
+        }
+      }
+      if (sf > 0) {
+        // On the chart a train rides its own diagonal, at the playhead.
+        const ya = stopY(trip.r, path.nodes[lo]), yb = stopY(trip.r, path.nodes[hi]);
+        if (ya === null || yb === null) { if (sf >= 1) continue; }
+        else {
+          const sx = timeX(now);
+          const sy = bandTop(trip.r) + lerp(ya, yb, frac);
+          x = sf < 1 ? lerp(x, sx, sf) : sx;
+          y = sf < 1 ? lerp(y, sy, sf) : sy;
         }
       }
 
@@ -786,6 +973,11 @@ _HTML = r"""<!doctype html>
       if (Math.abs(viewTarget - view) < 0.001) view = viewTarget;
       dirty = true;
     }
+    if (str !== strTarget) {
+      str += (strTarget - str) * (reduced ? 1 : Math.min(dt * 3.2, 1));
+      if (Math.abs(strTarget - str) < 0.001) str = strTarget;
+      dirty = true;
+    }
     for (const entry of rowTarget) {
       const label = entry[0], target = entry[1];
       const cur = rowPos.get(label);
@@ -813,9 +1005,9 @@ _HTML = r"""<!doctype html>
   const tightBox = svg.getAttribute("data-viewbox-nolabels");
   let labelsOn = true;
   const syncBox = () => {
-    // Tightening the box only makes sense for the map. In the linear view the
-    // height is owned by the morph, so leave it alone there.
-    if (viewTarget) { dirty = true; return; }
+    // Tightening the box only makes sense for the map. Elsewhere the height is
+    // owned by the morph, so leave it alone.
+    if (mode !== "map") { dirty = true; return; }
     if (tightBox) svg.setAttribute("viewBox", labelsOn ? fullBox : tightBox);
   };
   labelsBtn.onclick = () => {
@@ -825,16 +1017,25 @@ _HTML = r"""<!doctype html>
     syncBox();
   };
 
-  const viewBtn = document.getElementById("view-toggle");
   const sortGroup = document.getElementById("sort-group");
-  viewBtn.onclick = () => {
-    viewTarget = viewTarget ? 0 : 1;
-    viewBtn.textContent = viewTarget ? "Map" : "Linear";
-    viewBtn.setAttribute("aria-pressed", String(!!viewTarget));
-    sortGroup.hidden = !viewTarget;
+  const viewBtns = {
+    map: document.getElementById("view-map"),
+    linear: document.getElementById("view-linear"),
+    string: document.getElementById("view-string"),
+  };
+  const setMode = next => {
+    mode = next;
+    viewTarget = next === "map" ? 0 : 1;
+    strTarget = next === "string" ? 1 : 0;
+    Object.keys(viewBtns).forEach(k =>
+      viewBtns[k].setAttribute("aria-pressed", String(k === next)));
+    // Station names belong to the network views; the chart has its own axis.
+    sortGroup.hidden = next === "map";
+    labelsBtn.hidden = next === "string";
     syncBox();
     dirty = true;
   };
+  Object.keys(viewBtns).forEach(k => { viewBtns[k].onclick = () => setMode(k); });
 
   const sortBtns = {
     line: document.getElementById("sort-line"),
@@ -871,12 +1072,15 @@ _HTML = r"""<!doctype html>
       for (const d of dots) if (d.label === r) d.el.style.display = on ? "none" : "";
       for (const t of texts) if (t.label === r) t.el.style.display = on ? "none" : "";
       for (const n of names) if (n.label === r) n.el.style.display = on ? "none" : "";
+      const sg = stringGroups.get(r);
+      if (sg) sg.style.display = on ? "none" : "";
       draw();
     };
     lines.appendChild(chip);
   }
 
-  geometry(0);
+  setMode("map");
+  geometry(0, 0);
   requestAnimationFrame(frame);
 })();
 </script>
