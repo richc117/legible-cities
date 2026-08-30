@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Rasterise an SVG for visual inspection at true aspect ratio.
+# qlmanage forces a square thumbnail and silently crops, which makes a correct
+# map look clipped -- always check renders through this instead.
+set -euo pipefail
+src="$1"; out="${2:-${src%.svg}.png}"; width="${3:-1600}"
+rsvg-convert -w "$width" -f png -o "$out" "$src"
+python3 -c "
+import struct,sys
+d=open('$out','rb').read(33); w,h=struct.unpack('>II',d[16:24])
+print(f'$out  {w} x {h}')
+"

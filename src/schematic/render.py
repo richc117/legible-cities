@@ -1,0 +1,292 @@
+"""Render a schematic line graph to SVG.
+
+LOOM ships ``transitmap``, which draws a perfectly good map -- but the animation
+needs geometry it can address: one ``<path>`` per (line, edge) with a stable id,
+so a train dot can be placed with ``path.getPointAtLength()``. So we draw it
+ourselves from the post-``octi`` graph, reusing LOOM's solved line ordering via
+``offsets.py`` and its labels via ``labels.py``.
+
+Reproject the graph before rendering (see ``crs.to_mercator``) -- LOOM emits
+lon/lat, where its 45-degree edges are not 45 degrees any more.
+"""
+
+from __future__ import annotations
+
+import html
+import math
+from dataclasses import dataclass, field
+
+from .labels import Placement, Quad, Station, place, polyline_quads
+from .names import display_name
+from .linegraph import Coord, LineGraph
+from .offsets import cumulative_lengths, dedupe, offset_polyline, track_offset
+
+@dataclass
+class Style:
+    line_width: float = 7.0
+    line_gap: float = 1.6           # parallel track pitch, as a multiple of width
+    station_radius: float = 4.2
+    interchange_radius: float = 6.0
+    station_stroke: float = 2.2
+    label_size: float = 11.0
+    label_offset: float = 9.0
+    # Rough advance width per character as a fraction of font size.
+    label_char_width: float = 0.56
+    background: str = "#ffffff"
+    station_fill: str = "#ffffff"
+    station_stroke_color: str = "#111111"
+    label_color: str = "#111111"
+    default_line_color: str = "#888888"
+    padding: float = 24.0
+
+    @property
+    def spacing(self) -> float:
+        return self.line_width * self.line_gap
+
+
+@dataclass
+class Projection:
+    """Maps graph coordinates to SVG pixel coordinates (y flipped)."""
+
+    scale: float
+    min_x: float
+    max_y: float
+
+    @classmethod
+    def fit(cls, graph: LineGraph, width: float) -> Projection:
+        min_x, min_y, max_x, max_y = graph.bounds()
+        span_x = max(max_x - min_x, 1e-9)
+        # Uniform scale in both axes: octi output is schematic, and squashing one
+        # axis would break the 45-degree angles it worked to produce.
+        return cls(width / span_x, min_x, max_y)
+
+    def __call__(self, c: Coord) -> Coord:
+        return ((c[0] - self.min_x) * self.scale, (self.max_y - c[1]) * self.scale)
+
+
+def _path_d(points: list[Coord]) -> str:
+    pts = dedupe(points)
+    return (f"M {pts[0][0]:.2f} {pts[0][1]:.2f}"
+            + "".join(f" L {x:.2f} {y:.2f}" for x, y in pts[1:]))
+
+
+def _color(hexish: str | None, fallback: str) -> str:
+    if not hexish:
+        return fallback
+    return hexish if hexish.startswith("#") else f"#{hexish}"
+
+
+def _safe(token: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in token)
+
+
+@dataclass
+class TrackPath:
+    """One line's drawn geometry across one edge -- the animation's atom."""
+
+    element_id: str
+    label: str
+    src: str
+    dst: str
+    points: list[Coord]
+
+    @property
+    def length(self) -> float:
+        return cumulative_lengths(self.points)[-1]
+
+
+@dataclass
+class RenderResult:
+    svg: str
+    width: float
+    height: float
+    projection: Projection
+    tracks: dict[tuple[str, str, str], TrackPath] = field(default_factory=dict)
+    node_xy: dict[str, Coord] = field(default_factory=dict)
+    dropped_labels: list[str] = field(default_factory=list)
+
+    def track(self, label: str, src: str, dst: str) -> TrackPath | None:
+        """Look up a track path in either direction."""
+        return self.tracks.get((label, src, dst)) or self.tracks.get((label, dst, src))
+
+
+def build_tracks(graph: LineGraph, proj: Projection,
+                 style: Style) -> dict[tuple[str, str, str], TrackPath]:
+    tracks: dict[tuple[str, str, str], TrackPath] = {}
+    for ei, edge in enumerate(graph.edges):
+        centre = [proj(c) for c in edge.geometry]
+        n = len(edge.lines)
+        for i, line in enumerate(edge.lines):
+            pts = offset_polyline(centre, track_offset(i, n, style.spacing))
+            tracks[(line.label, edge.src, edge.dst)] = TrackPath(
+                element_id=f"t{ei}_{_safe(line.label)}",
+                label=line.label, src=edge.src, dst=edge.dst, points=pts)
+    return tracks
+
+
+def _horizontal_run(graph: LineGraph, node_id: str, proj: Projection) -> bool:
+    """True when the lines through this node run roughly east-west.
+
+    That is the case where an east-pinned label lands on top of its neighbours',
+    so the placer should reach for the rotated candidates first.
+    """
+    here = proj(graph.nodes[node_id].coord)
+    for e in graph.edges:
+        if node_id not in (e.src, e.dst):
+            continue
+        far = proj(graph.nodes[e.dst if e.src == node_id else e.src].coord)
+        dx, dy = far[0] - here[0], far[1] - here[1]
+        if math.hypot(dx, dy) < 1e-6:
+            continue
+        if abs(math.degrees(math.atan2(dy, dx))) % 180 < 30 or abs(math.degrees(math.atan2(dy, dx))) % 180 > 150:
+            return True
+    return False
+
+
+def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = None,
+           labels: bool = True, title: str | None = None,
+           line_order: list[str] | None = None) -> RenderResult:
+    """Draw the graph. ``width`` sizes the network; the canvas grows for labels."""
+    style = style or Style()
+    proj = Projection.fit(graph, width)
+    tracks = build_tracks(graph, proj, style)
+    node_xy = {nid: proj(n.coord) for nid, n in graph.nodes.items()}
+
+    colors: dict[str, str] = {}
+    routes_at: dict[str, set[str]] = {}
+    for e in graph.edges:
+        for ln in e.lines:
+            colors.setdefault(ln.label, _color(ln.color, style.default_line_color))
+        for end in (e.src, e.dst):
+            routes_at.setdefault(end, set()).update(ln.label for ln in e.lines)
+
+    order = line_order or sorted(colors)
+
+    # --- labels ---------------------------------------------------------
+    placements: list[Placement] = []
+    dropped: list[str] = []
+    if labels:
+        obstacles: list[Quad] = []
+        for tp in tracks.values():
+            obstacles += polyline_quads(tp.points, style.line_width)
+        # How wide the track bundle reaches at each station, so its label can
+        # clear it. An interchange where five lines run together needs a lot
+        # more room than a single-track outer stop.
+        bundle: dict[str, int] = {}
+        for e in graph.edges:
+            for end in (e.src, e.dst):
+                bundle[end] = max(bundle.get(end, 0), len(e.lines))
+
+        stations = []
+        for node in graph.stations:
+            if not node.station_label:
+                continue
+            x, y = node_xy[node.id]
+            n = bundle.get(node.id, 1)
+            stations.append(Station(
+                text=display_name(node.station_label), x=x, y=y,
+                importance=len(routes_at.get(node.id, ())),
+                on_horizontal_run=_horizontal_run(graph, node.id, proj),
+                clearance=(n - 1) / 2 * style.spacing + style.line_width / 2,
+            ))
+        placements, dropped_stations = place(
+            stations, obstacles, size=style.label_size,
+            char_width=style.label_char_width, offset=style.label_offset,
+            marker_radius=style.interchange_radius)
+        dropped = [s.text for s in dropped_stations]
+
+    # --- canvas: derive from what is actually drawn ----------------------
+    xs: list[float] = []
+    ys: list[float] = []
+    for tp in tracks.values():
+        for x, y in tp.points:
+            xs += [x - style.line_width, x + style.line_width]
+            ys += [y - style.line_width, y + style.line_width]
+    for x, y in node_xy.values():
+        xs += [x - style.interchange_radius, x + style.interchange_radius]
+        ys += [y - style.interchange_radius, y + style.interchange_radius]
+    for p in placements:
+        xs += [p.quad.aabb[0], p.quad.aabb[2]]
+        ys += [p.quad.aabb[1], p.quad.aabb[3]]
+
+    pad = style.padding
+    min_x, max_x = min(xs) - pad, max(xs) + pad
+    min_y, max_y = min(ys) - pad, max(ys) + pad
+    w, h = max_x - min_x, max_y - min_y
+
+    out: list[str] = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0f}" height="{h:.0f}" '
+        f'viewBox="{min_x:.2f} {min_y:.2f} {w:.2f} {h:.2f}" '
+        f'font-family="Helvetica Neue, Helvetica, Arial, sans-serif">',
+    ]
+    if title:
+        out.append(f"<title>{html.escape(title)}</title>")
+    out.append(f'<rect x="{min_x:.2f}" y="{min_y:.2f}" width="{w:.2f}" height="{h:.2f}" '
+               f'fill="{style.background}"/>')
+
+    out.append('<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">')
+    for label in order:
+        if label not in colors:
+            continue
+        out.append(f'<g class="line" data-line="{html.escape(label)}" '
+                   f'stroke="{colors[label]}" stroke-width="{style.line_width:.2f}">')
+        for tp in tracks.values():
+            if tp.label == label:
+                out.append(f'<path id="{tp.element_id}" d="{_path_d(tp.points)}"/>')
+        out.append("</g>")
+    out.append("</g>")
+
+    out.append('<g id="stations">')
+    for node in graph.stations:
+        x, y = node_xy[node.id]
+        r = style.interchange_radius if len(routes_at.get(node.id, ())) > 1 else style.station_radius
+        out.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{r:.2f}" '
+                   f'fill="{style.station_fill}" stroke="{style.station_stroke_color}" '
+                   f'stroke-width="{style.station_stroke:.2f}" '
+                   f'data-node="{html.escape(node.id)}" '
+                   f'data-station-id="{html.escape(node.station_id or "")}"/>')
+    out.append("</g>")
+
+    if placements:
+        out.append(f'<g id="labels" font-size="{style.label_size:.1f}" fill="{style.label_color}">')
+        for p in placements:
+            transform = (f' transform="rotate({p.rotate:.0f} {p.x:.2f} {p.y:.2f})"'
+                         if p.rotate else "")
+            # A haloed label sits over a line; the stroke is painted behind the
+            # glyphs so the name stays legible against the colour.
+            halo = (f' stroke="{style.background}" stroke-width="3.2"'
+                    f' paint-order="stroke" stroke-linejoin="round"' if p.haloed else "")
+            out.append(f'<text x="{p.x:.2f}" y="{p.y:.2f}" text-anchor="{p.anchor}"'
+                       f'{transform}{halo}>{html.escape(p.text)}</text>')
+        out.append("</g>")
+
+    out.append('<g id="trains"></g>')
+    out.append("</svg>")
+
+    return RenderResult(svg="\n".join(out), width=w, height=h, projection=proj,
+                        tracks=tracks, node_xy=node_xy, dropped_labels=dropped)
+
+
+def octilinearity(graph: LineGraph, tol_deg: float = 1.0,
+                  min_length: float = 0.0) -> tuple[float, float]:
+    """(length on a 45-degree multiple, total length) -- the octi sanity check.
+
+    Weighted by length rather than counted per segment. LOOM writes lon/lat at
+    six decimals, which leaves a scatter of metre-scale stubs around station
+    nodes whose angles are pure rounding noise; counting segments lets those
+    dominate, while they are invisible on the drawn map.
+
+    Measure this on a projected graph -- see ``crs.to_mercator``.
+    """
+    ok = total = 0.0
+    for e in graph.edges:
+        pts = dedupe(list(e.geometry))
+        for a, b in zip(pts, pts[1:]):
+            length = math.dist(a, b)
+            if length < min_length:
+                continue
+            total += length
+            ang = math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])) % 45.0
+            if min(ang, 45.0 - ang) <= tol_deg:
+                ok += length
+    return ok, total

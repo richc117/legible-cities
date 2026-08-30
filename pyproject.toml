@@ -1,0 +1,25 @@
+[project]
+name = "openschematicmaps"
+version = "0.1.0"
+description = "Schematic transit maps from open data (GTFS + OpenStreetMap)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.2",
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "networkx>=3.3",
+    "requests>=2.32",
+    "jupyterlab>=4.2",
+    "matplotlib>=3.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/schematic"]
+
+[tool.ruff]
+line-length = 100
