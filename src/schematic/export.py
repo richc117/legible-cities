@@ -317,7 +317,7 @@ def alt_text(key: str, view: str, *, stations: int = 0, lines: int = 0) -> str:
 
 def line_labels(key: str) -> list[str]:
     """Every line label on this network, from the atlas's own data."""
-    return _provenance(key).get("_labels", []) or _labels_from_svg(key)
+    return _provenance(key).get("labels") or _labels_from_svg(key)
 
 
 def _labels_from_svg(key: str) -> list[str]:
@@ -560,6 +560,7 @@ def _provenance(key: str) -> dict:
             return {"service_date": entry["date"],
                     "stations": entry["stations"],
                     "lines": len(entry["lines"]),
+                    "labels": list(entry["lines"]),
                     "trips": entry["trips"],
                     "caveats": entry["caveats"]}
     return {}

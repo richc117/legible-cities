@@ -20,8 +20,6 @@ try {
 }
 
 const job = JSON.parse(process.argv[2] || "{}");
-const hms = t => { const p = String(t).split(":").map(Number);
-                   return (p[0] || 0) * 3600 + (p[1] || 0) * 60 + (p[2] || 0); };
 
 (async () => {
   const browser = await chromium.launch();
