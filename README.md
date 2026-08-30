@@ -43,6 +43,39 @@ feed has poor or missing shapes, run it through
 [pfaedle](https://github.com/ad-freiburg/pfaedle) first (note that makes the
 result ODbL).
 
+## Networks
+
+Twenty-one US rail networks are registered and build from their live feeds
+(2,411 stations, 27,486 trips between them). `bin/run-all` rebuilds the lot in
+about fifteen seconds once the feeds are cached; `bin/gallery` writes
+`out/index.html`, a contact sheet linking every map and animation.
+
+| Network | Stations | Lines |
+|---|--:|--:|
+| New York City Subway | 402 | 27 |
+| Metra | 240 | 11 |
+| NJ Transit Rail | 229 | 17 |
+| Muni Metro | 160 | 7 |
+| TriMet MAX | 159 | 8 |
+| SEPTA Regional Rail | 156 | 13 |
+| Chicago 'L' | 144 | 8 |
+| MBTA Subway | 126 | 8 |
+| Long Island Rail Road | 126 | 12 |
+| LA Metro Rail | 110 | 6 |
+| RTD Denver Rail | 89 | 10 |
+| UTA TRAX & FrontRunner | 77 | 5 |
+| Valley Metro Rail | 76 | 4 |
+| DART Light Rail | 67 | 4 |
+| Sound Transit Link & Sounder | 62 | 5 |
+| Pittsburgh Light Rail | 58 | 5 |
+| Cleveland RTA Rapid | 54 | 4 |
+| BART | 51 | 8 |
+| Miami Metrorail & Metromover | 43 | 3 |
+| MARTA Rail | 38 | 4 |
+| Metro Transit Light Rail | 38 | 3 |
+
+Not registered: **WMATA** (Washington DC) publishes GTFS only behind an API key.
+
 ## Setup
 
 ```bash
@@ -63,9 +96,11 @@ result = pipeline.run("la-metro-rail")
 print(result.summary())
 ```
 
-Writes `out/la-metro-rail.svg`, `out/animation.html` and `out/positions.json`.
-Open the HTML in a browser: a clock, a time-of-day scrubber, playback speeds and
-per-line toggles.
+Writes `out/la-metro-rail.svg`, `out/la-metro-rail.html` and
+`out/la-metro-rail.positions.json`. Open the HTML in a browser: a clock, a
+time-of-day scrubber, playback speeds and per-line toggles.
+
+`bin/run-all` runs every registered feed and prints a table of what worked.
 
 The notebooks in `notebooks/` walk the same pipeline one stage at a time, and
 are the place to start if you want to see what each tool does.
@@ -93,4 +128,4 @@ One entry in `FEEDS` in `src/schematic/feeds.py`:
 combined bus-and-rail feed, this is what keeps the map to rail. `label_pattern`
 and `label_strip` clean up route labels; most feeds need neither.
 
-Currently registered: `la-metro-rail`, `bart`, `trimet-max`.
+`bin/run-all <key>` runs one; with no argument it runs the lot.

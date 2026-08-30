@@ -108,6 +108,11 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
     # Match stops against the unprojected graph -- station_id is what matters
     # there, and reprojecting is only needed for geometry.
     graph_ll = LineGraph.from_geojson(paths["octi"])
+    if not graph_ll.edges:
+        raise ValueError(
+            f"{key}: the line graph is empty -- gtfs2graph -m {feeds.FEEDS[key].mode!r} "
+            f"matched no routes. Check the feed's route_type values; agencies "
+            f"disagree about which of tram/subway/rail their network is.")
     graph = graph_ll.reproject(to_mercator)
 
     tables = feeds.tables(key)
@@ -123,7 +128,7 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
     out = out_dir or OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{key}.svg").write_text(r.svg)
-    animate.write(anim, r.svg, out, title=f"{name} — {date:%A %-d %B %Y}")
+    animate.write(anim, r.svg, out, stem=key, title=f"{name} — {date:%A %-d %B %Y}")
 
     return Result(key=key, date=date, graph=graph, render=r, trips=trips,
                   match=match, animation=anim, paths=paths)

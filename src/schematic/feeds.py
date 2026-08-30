@@ -16,6 +16,26 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+# A GTFS zip is only *mostly* GTFS. Agencies drop license agreements, readmes
+# and spreadsheets in alongside the tables, and reading every .txt as CSV then
+# fails on prose (SFMTA ships a license agreement that pandas chokes on).
+GTFS_TABLES = frozenset({
+    "agency", "stops", "routes", "trips", "stop_times", "calendar",
+    "calendar_dates", "fare_attributes", "fare_rules", "shapes", "frequencies",
+    "transfers", "pathways", "levels", "feed_info", "translations",
+    "attributions", "areas", "stop_areas", "networks", "route_networks",
+    "fare_products", "fare_leg_rules", "fare_transfer_rules", "fare_media",
+    "timeframes", "booking_rules", "location_groups", "location_group_stops",
+})
+
+# Tables a line graph never needs, and which LOOM's strict parser rejects on
+# real feeds -- MBTA's pathways.txt uses a negative stair_count, which the spec
+# allows for descending stairs but LOOM reads as a non-negative integer.
+#
+# levels.txt deliberately stays: stops.txt references it by level_id, and
+# dropping it turns one parse error into a dangling-reference error.
+LOOM_SKIP = frozenset({"pathways", "translations", "attributions"})
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
 FEED_DIR = DATA_DIR / "feeds"
@@ -71,7 +91,131 @@ FEEDS: dict[str, Feed] = {
         # TriMet publishes bus and rail in one feed; MAX is light rail.
         mode="tram",
     ),
+
+    # --- heavy rail / metro --------------------------------------------------
+    "nyc-subway": Feed(
+        key="nyc-subway",
+        name="New York City Subway",
+        url="http://web.mta.info/developers/data/nyct/subway/google_transit.zip",
+        mode="all",
+    ),
+    "chicago-l": Feed(
+        key="chicago-l",
+        name="Chicago 'L'",
+        url="https://www.transitchicago.com/downloads/sch_data/google_transit.zip",
+        mode="subway",
+    ),
+    "boston-t": Feed(
+        key="boston-t",
+        name="MBTA Subway",
+        url="https://cdn.mbta.com/MBTA_GTFS.zip",
+        # Red/Orange/Blue are heavy rail; the Green Line and Mattapan are light rail.
+        mode="tram,subway",
+    ),
+    "marta": Feed(
+        key="marta",
+        name="MARTA Rail",
+        url="https://www.itsmarta.com/google_transit_feed/google_transit.zip",
+        mode="subway",
+    ),
+    "miami-metrorail": Feed(
+        key="miami-metrorail",
+        name="Miami Metrorail & Metromover",
+        url="http://www.miamidade.gov/transit/googletransit/current/google_transit.zip",
+        # Metrorail is published as route_type 2 (rail), not subway; Metromover
+        # and the airport people mover are light rail.
+        mode="tram,rail",
+    ),
+    "cleveland-rta": Feed(
+        key="cleveland-rta",
+        name="Cleveland RTA Rapid",
+        url="https://www.riderta.com/sites/default/files/gtfs/latest/google_transit.zip",
+        mode="tram,subway",
+    ),
+
+    # --- light rail ----------------------------------------------------------
+    "sf-muni-metro": Feed(
+        key="sf-muni-metro",
+        name="Muni Metro",
+        url="https://muni-gtfs.apps.sfmta.com/data/muni_gtfs-current.zip",
+        mode="tram",
+    ),
+    "denver-rtd": Feed(
+        key="denver-rtd",
+        name="RTD Denver Rail",
+        url="https://www.rtd-denver.com/files/gtfs/google_transit.zip",
+        mode="tram,rail",
+    ),
+    "seattle-link": Feed(
+        key="seattle-link",
+        name="Sound Transit Link & Sounder",
+        url="https://gtfs.sound.obaweb.org/prod/40_gtfs.zip",
+        mode="tram,rail",
+    ),
+    "dallas-dart": Feed(
+        key="dallas-dart",
+        name="DART Light Rail",
+        url="http://www.dart.org/transitdata/latest/google_transit.zip",
+        mode="tram",
+    ),
+    "minneapolis-metro": Feed(
+        key="minneapolis-metro",
+        name="Metro Transit Light Rail",
+        url="https://svc.metrotransit.org/mtgtfs/gtfs.zip",
+        mode="tram",
+    ),
+    "phoenix-valley-metro": Feed(
+        key="phoenix-valley-metro",
+        name="Valley Metro Rail",
+        url="https://phoenixopendata.com/dataset/3eae9a4a-98b9-40c8-8df7-8c00c1756235/"
+            "resource/28ccc0a5-49c8-495c-b91f-193de5ce2cb7/download/googletransit.zip",
+        mode="tram",
+    ),
+    "salt-lake-uta": Feed(
+        key="salt-lake-uta",
+        name="UTA TRAX & FrontRunner",
+        url="https://gtfsfeed.rideuta.com/GTFS.zip",
+        mode="tram,rail",
+    ),
+    "pittsburgh-t": Feed(
+        key="pittsburgh-t",
+        name="Pittsburgh Light Rail",
+        url="https://www.portauthority.org/developerresources/GTFS.zip",
+        # The T is published as route_type 2 (rail); route_type 7 is the
+        # Duquesne and Monongahela inclines, which are their own funiculars.
+        mode="rail,funicular",
+    ),
+
+    # --- commuter rail -------------------------------------------------------
+    "metra": Feed(
+        key="metra",
+        name="Metra",
+        url="https://schedules.metrarail.com/gtfs/schedule.zip",
+        mode="all",
+    ),
+    "septa-regional-rail": Feed(
+        key="septa-regional-rail",
+        name="SEPTA Regional Rail",
+        url="https://www3.septa.org/developer/google_rail.zip",
+        mode="all",
+    ),
+    "nj-transit-rail": Feed(
+        key="nj-transit-rail",
+        name="NJ Transit Rail",
+        url="https://www.njtransit.com/rail_data.zip",
+        mode="all",
+    ),
+    "lirr": Feed(
+        key="lirr",
+        name="Long Island Rail Road",
+        url="http://web.mta.info/developers/data/lirr/google_transit.zip",
+        mode="all",
+    ),
 }
+
+# Not registered: WMATA (Washington DC Metro) publishes GTFS only behind an API
+# key, at https://api.wmata.com/gtfs/rail-gtfs-static.zip. Add a Feed for it once
+# ``fetch`` learns to send a key header.
 
 
 def fetch(key: str, *, force: bool = False) -> Path:
@@ -81,7 +225,10 @@ def fetch(key: str, *, force: bool = False) -> Path:
     if feed.zip_path.exists() and not force:
         return feed.zip_path
 
-    resp = requests.get(feed.url, timeout=120)
+    # Some agencies (MARTA) return 403 to a bare requests user-agent.
+    resp = requests.get(feed.url, timeout=180, headers={
+        "User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)",
+    })
     resp.raise_for_status()
     # Fail loudly rather than caching an HTML error page as a "feed".
     if not zipfile.is_zipfile(io.BytesIO(resp.content)):
@@ -90,6 +237,11 @@ def fetch(key: str, *, force: bool = False) -> Path:
     return feed.zip_path
 
 
+
+
+# Not registered: WMATA (Washington DC Metro) publishes GTFS only behind an API
+# key at https://api.wmata.com/gtfs/rail-gtfs-static.zip. Add a Feed for it once
+# ``fetch`` learns to send a key header.
 
 
 # --------------------------------------------------------------------------
@@ -143,8 +295,9 @@ def normalize(key: str, *, force: bool = False) -> Path:
         return dst
 
     with zipfile.ZipFile(src) as zin:
-        names = zin.namelist()
-        routes = pd.read_csv(io.BytesIO(zin.read("routes.txt")), dtype=str)
+        routes = pd.read_csv(io.BytesIO(zin.read("routes.txt")), dtype=str,
+                             skipinitialspace=True)
+        routes.columns = [c.strip().lstrip("\ufeff") for c in routes.columns]
         routes["route_short_name"] = route_labels(key, routes)
         buf = io.StringIO()
         routes.to_csv(buf, index=False)
@@ -152,8 +305,12 @@ def normalize(key: str, *, force: bool = False) -> Path:
 
         tmp = dst.with_suffix(".tmp")
         with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
-            for name in names:
-                zout.writestr(name, patched if name.endswith("routes.txt") else zin.read(name))
+            for name in zin.namelist():
+                stem = Path(name).stem
+                # Keep only real GTFS tables, minus the ones LOOM trips over.
+                if not name.endswith(".txt") or stem not in GTFS_TABLES or stem in LOOM_SKIP:
+                    continue
+                zout.writestr(name, patched if stem == "routes" else zin.read(name))
     shutil.move(tmp, dst)
     return dst
 
@@ -167,8 +324,14 @@ def tables(key: str, *, normalized: bool = True) -> dict[str, pd.DataFrame]:
     out: dict[str, pd.DataFrame] = {}
     with zipfile.ZipFile(path) as zf:
         for name in zf.namelist():
-            if not name.endswith(".txt"):
+            stem = Path(name).stem
+            if not name.endswith(".txt") or stem not in GTFS_TABLES:
                 continue
             with zf.open(name) as fh:
-                out[Path(name).stem] = pd.read_csv(fh, dtype=str, low_memory=False)
+                # skipinitialspace and the header strip handle feeds that pad
+                # their CSV with spaces after commas -- Metra's headers come
+                # through as " trip_id", which breaks every join downstream.
+                df = pd.read_csv(fh, dtype=str, low_memory=False, skipinitialspace=True)
+            df.columns = [c.strip().lstrip("\ufeff") for c in df.columns]
+            out[stem] = df
     return out

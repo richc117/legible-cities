@@ -63,6 +63,39 @@ def active_services(tables: dict[str, pd.DataFrame], date: dt.date) -> set[str]:
     return active
 
 
+def _parse_date(stamp: str) -> dt.date:
+    return dt.datetime.strptime(str(stamp), "%Y%m%d").date()
+
+
+def service_window(tables: dict[str, pd.DataFrame]) -> tuple[dt.date, dt.date]:
+    """The date range the feed covers.
+
+    ``calendar.txt`` is optional in GTFS: a feed may express its whole schedule
+    as ``calendar_dates.txt`` exceptions, one row per service day. Several US
+    agencies do exactly that, so the window has to come from whichever of the
+    two tables is present.
+    """
+    starts: list[dt.date] = []
+    ends: list[dt.date] = []
+
+    cal = tables.get("calendar")
+    if cal is not None and len(cal):
+        starts.append(_parse_date(cal["start_date"].min()))
+        ends.append(_parse_date(cal["end_date"].max()))
+
+    exc = tables.get("calendar_dates")
+    if exc is not None and len(exc):
+        added = exc[exc["exception_type"] == "1"]["date"]
+        if len(added):
+            starts.append(_parse_date(added.min()))
+            ends.append(_parse_date(added.max()))
+
+    if not starts:
+        raise ValueError("feed has neither calendar.txt nor calendar_dates.txt; "
+                         "pass an explicit date")
+    return min(starts), max(ends)
+
+
 def busiest_weekday(tables: dict[str, pd.DataFrame],
                     lines: set[str] | None = None) -> dt.date:
     """A representative service date: the weekday in the feed window with the most trips."""
@@ -70,22 +103,44 @@ def busiest_weekday(tables: dict[str, pd.DataFrame],
     if lines is not None:
         trips = trips[trips["route_id"].isin(routes_matching(tables, lines))]
     per_service = trips.groupby("service_id").size()
-    cal = tables.get("calendar")
-    if cal is None or not len(cal):
-        raise ValueError("feed has no calendar.txt; pass an explicit date")
-    start = dt.datetime.strptime(cal["start_date"].min(), "%Y%m%d").date()
-    end = dt.datetime.strptime(cal["end_date"].max(), "%Y%m%d").date()
-    # Scan at most a month; feed windows are usually a season and the pattern repeats.
-    best, best_n = None, -1
-    for i in range((min(end, start + dt.timedelta(days=30)) - start).days + 1):
-        day = start + dt.timedelta(days=i)
-        if day.weekday() > 4:
-            continue
-        n = int(per_service.reindex(list(active_services(tables, day))).fillna(0).sum())
-        if n > best_n:
-            best, best_n = day, n
-    if best is None:
-        raise ValueError("no weekday with service found in the feed window")
+    start, end = service_window(tables)
+
+    def scan(first: dt.date, days: int) -> tuple[dt.date | None, int]:
+        best, best_n = None, -1
+        for i in range(days + 1):
+            day = first + dt.timedelta(days=i)
+            if day > end or day.weekday() > 4:
+                continue
+            n = int(per_service.reindex(list(active_services(tables, day))).fillna(0).sum())
+            if n > best_n:
+                best, best_n = day, n
+        return best, best_n
+
+    # Anchor near today when the feed covers today: some feeds keep a window
+    # spanning years (Miami's runs 2021-2027) whose opening weeks are long dead,
+    # and scanning from the start finds nothing running.
+    today = dt.date.today()
+    anchor = min(max(today, start), end)
+    best, best_n = scan(anchor, 30)
+
+    # Then the window's start, for a feed published ahead of its own season.
+    if best_n <= 0 and anchor != start:
+        best, best_n = scan(start, 30)
+
+    # Last resort: sample the whole window rather than give up on it.
+    if best_n <= 0:
+        span = (end - start).days
+        step = max(1, span // 200)
+        for i in range(0, span + 1, step):
+            day = start + dt.timedelta(days=i)
+            if day.weekday() > 4:
+                continue
+            n = int(per_service.reindex(list(active_services(tables, day))).fillna(0).sum())
+            if n > best_n:
+                best, best_n = day, n
+
+    if best is None or best_n <= 0:
+        raise ValueError(f"no weekday with service between {start} and {end}")
     return best
 
 

@@ -246,15 +246,19 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
 
 
 def write(animation: Animation, svg: str, out_dir: Path, *,
-          title: str = "Transit animation") -> tuple[Path, Path]:
-    """Write positions.json and a self-contained animation.html."""
+          stem: str = "animation", title: str = "Transit animation") -> tuple[Path, Path]:
+    """Write ``<stem>.positions.json`` and a self-contained ``<stem>.html``.
+
+    The stem is per-city: with a fixed filename, generating a second network
+    silently overwrites the first one's animation.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     data = animation.to_json()
 
-    json_path = out_dir / "positions.json"
+    json_path = out_dir / f"{stem}.positions.json"
     json_path.write_text(json.dumps(data, separators=(",", ":")))
 
-    html_path = out_dir / "animation.html"
+    html_path = out_dir / f"{stem}.html"
     html_path.write_text(_HTML.replace("__TITLE__", title)
                               .replace("__SVG__", svg)
                               .replace("__DATA__", json.dumps(data, separators=(",", ":"))))

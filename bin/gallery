@@ -1,0 +1,94 @@
+#!/usr/bin/env python
+"""Build out/index.html -- a contact sheet of every map generated so far.
+
+Scans out/ rather than the registry, so it only lists what actually built.
+"""
+from __future__ import annotations
+
+import html
+import json
+import re
+from pathlib import Path
+
+from schematic import feeds
+
+OUT = Path(__file__).resolve().parents[1] / "out"
+
+
+def main() -> int:
+    cards = []
+    for svg_path in sorted(OUT.glob("*.svg")):
+        key = svg_path.stem
+        feed = feeds.FEEDS.get(key)
+        name = feed.name if feed else key
+        svg = svg_path.read_text()
+        stations = svg.count("<circle")
+        lines = len(set(re.findall(r'data-line="([^"]+)"', svg)))
+
+        anim = OUT / f"{key}.html"
+        payload = OUT / f"{key}.positions.json"
+        trips = date = None
+        if payload.exists():
+            data = json.loads(payload.read_text())
+            trips, date = len(data["trips"]), data["date"]
+
+        # Inline the SVG so the page is self-contained and needs no server.
+        body = svg[svg.index(">", svg.index("<svg")) + 1:svg.rindex("</svg>")]
+        viewbox = re.search(r'viewBox="([^"]+)"', svg).group(1)
+
+        meta = f"{stations} stations &middot; {lines} lines"
+        if trips:
+            meta += f" &middot; {trips:,} trips on {date}"
+        link = (f'<a href="{key}.html">animation</a> &middot; ' if anim.exists() else "")
+        cards.append(f"""
+    <figure>
+      <a class="thumb" href="{key}.svg">
+        <svg viewBox="{viewbox}" preserveAspectRatio="xMidYMid meet"
+             xmlns="http://www.w3.org/2000/svg">{body}</svg>
+      </a>
+      <figcaption>
+        <strong>{html.escape(name)}</strong>
+        <span>{meta}</span>
+        <span>{link}<a href="{key}.svg">svg</a></span>
+      </figcaption>
+    </figure>""")
+
+    page = f"""<!doctype html>
+<html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schematic transit maps</title>
+<style>
+  :root {{ --bg:#f6f6f4; --panel:#fff; --ink:#16181d; --muted:#6b7280; --border:#e2e2df; }}
+  @media (prefers-color-scheme: dark) {{
+    :root {{ --bg:#14161a; --panel:#1c1f25; --ink:#f2f3f5; --muted:#9aa1ac; --border:#2c313a; }}
+  }}
+  body {{ margin:0; background:var(--bg); color:var(--ink); padding:28px;
+         font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }}
+  h1 {{ font-size:19px; margin:0 0 4px; letter-spacing:-0.01em; }}
+  p.lede {{ color:var(--muted); margin:0 0 26px; max-width:60ch; }}
+  .grid {{ display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); }}
+  figure {{ margin:0; background:var(--panel); border:1px solid var(--border);
+            border-radius:11px; overflow:hidden; }}
+  .thumb {{ display:block; height:230px; padding:12px; }}
+  .thumb svg {{ width:100%; height:100%; }}
+  @media (prefers-color-scheme: dark) {{ .thumb svg {{ filter:invert(1) hue-rotate(180deg); }} }}
+  figcaption {{ display:flex; flex-direction:column; gap:2px; padding:11px 14px 13px;
+                border-top:1px solid var(--border); }}
+  figcaption span {{ color:var(--muted); font-size:12.5px; }}
+  a {{ color:inherit; }}
+  figcaption a {{ text-decoration:underline; text-underline-offset:2px; }}
+</style>
+<h1>Schematic transit maps</h1>
+<p class="lede">Generated from each agency's public GTFS feed by the LOOM pipeline.
+Click a map for the SVG, or open its animation to watch a day of service run.</p>
+<div class="grid">{"".join(cards)}
+</div>
+</html>
+"""
+    (OUT / "index.html").write_text(page)
+    print(f"out/index.html  {len(cards)} maps  {len(page)/1024:.0f} KB")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

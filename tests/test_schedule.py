@@ -45,3 +45,50 @@ def test_blank_intermediate_times_are_interpolated_evenly():
              Call("c", "n3", None, None), Call("d", "n4", 300, 300)]
     out = interpolate_calls(calls)
     assert [c.arrival for c in out] == [0, 100, 200, 300]
+
+
+def test_service_window_from_calendar_dates_only():
+    """calendar.txt is optional; some feeds are all exceptions."""
+    from schematic.schedule import service_window
+    tables = {
+        "calendar_dates": pd.DataFrame([
+            {"service_id": "a", "date": "20260302", "exception_type": "1"},
+            {"service_id": "b", "date": "20260315", "exception_type": "1"},
+            {"service_id": "c", "date": "20260401", "exception_type": "2"},
+        ]),
+    }
+    assert service_window(tables) == (dt.date(2026, 3, 2), dt.date(2026, 3, 15))
+
+
+def test_service_window_spans_both_tables():
+    from schematic.schedule import service_window
+    tables = {
+        "calendar": pd.DataFrame([{
+            "service_id": "wk", "monday": "1", "tuesday": "1", "wednesday": "1",
+            "thursday": "1", "friday": "1", "saturday": "0", "sunday": "0",
+            "start_date": "20260401", "end_date": "20260630"}]),
+        "calendar_dates": pd.DataFrame([
+            {"service_id": "x", "date": "20260315", "exception_type": "1"}]),
+    }
+    assert service_window(tables) == (dt.date(2026, 3, 15), dt.date(2026, 6, 30))
+
+
+def test_service_window_needs_at_least_one_table():
+    from schematic.schedule import service_window
+    with pytest.raises(ValueError, match="neither calendar"):
+        service_window({})
+
+
+def test_busiest_weekday_from_calendar_dates_only():
+    from schematic.schedule import busiest_weekday
+    tables = {
+        "trips": pd.DataFrame([{"trip_id": f"t{i}", "route_id": "r", "service_id": "wk"}
+                               for i in range(5)]
+                              + [{"trip_id": "q", "route_id": "r", "service_id": "sat"}]),
+        "calendar_dates": pd.DataFrame([
+            # 2026-03-05 is a Thursday, 2026-03-07 a Saturday.
+            {"service_id": "wk", "date": "20260305", "exception_type": "1"},
+            {"service_id": "sat", "date": "20260307", "exception_type": "1"},
+        ]),
+    }
+    assert busiest_weekday(tables) == dt.date(2026, 3, 5)
