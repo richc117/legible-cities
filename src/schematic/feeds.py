@@ -57,6 +57,14 @@ class Feed:
     # direction (BART's "Yellow-N" / "Yellow-S"), which would otherwise draw
     # every line twice, side by side, as two separate colours of the same hue.
     label_strip: str | None = None
+    # Keep only this agency_id. A city-wide feed can carry several operators,
+    # and route_type alone cannot separate them: Mexico City's feed has both
+    # Metro Linea 1 and a Ferrocarriles Suburbanos line numbered "1", both
+    # route_type 1, which merge into a single line without this.
+    agency: str | None = None
+    # Facts about the feed that the pipeline cannot work out for itself, shown
+    # beside the computed caveats on the atlas.
+    notes: tuple[str, ...] = ()
 
     @property
     def zip_path(self) -> Path:
@@ -211,6 +219,32 @@ FEEDS: dict[str, Feed] = {
         url="http://web.mta.info/developers/data/lirr/google_transit.zip",
         mode="all",
     ),
+
+    # --- outside the US ------------------------------------------------------
+    "cdmx-metro": Feed(
+        key="cdmx-metro",
+        name="Mexico City Metro",
+        # The city's own open-data host does not respond and its S3 mirror
+        # 403s; this is MobilityData's copy of the same SEMOVI feed.
+        url="https://storage.googleapis.com/storage/v1/b/mdb-latest/o/"
+            "mx-unknown-pumabus-gtfs-1830.zip?alt=media",
+        mode="subway",
+        # Eight operators share this feed, and Suburbano also has a route
+        # numbered 1 at route_type 1.
+        agency="METRO",
+        notes=(
+            "This is a 2025 snapshot: the published feed's service period ran "
+            "to December 2025, so the date above is from its own calendar "
+            "rather than this week.",
+            "The operator publishes headways rather than timetabled times, so "
+            "the trains here run at the scheduled interval for each period of "
+            "the day, evenly spaced. It shows: on the time chart this network "
+            "is a solid band rather than the peaks and troughs the timetabled "
+            "cities draw, because the published interval barely varies.",
+            "The station icons the Metro is known for are not in the data, and "
+            "are the thing this pipeline cannot generate.",
+        ),
+    ),
 }
 
 # Not registered: WMATA (Washington DC Metro) publishes GTFS only behind an API
@@ -294,23 +328,47 @@ def normalize(key: str, *, force: bool = False) -> Path:
     if dst.exists() and not force and dst.stat().st_mtime >= src.stat().st_mtime:
         return dst
 
+    def read(zf: zipfile.ZipFile, name: str) -> pd.DataFrame:
+        df = pd.read_csv(io.BytesIO(zf.read(name)), dtype=str, skipinitialspace=True)
+        df.columns = [c.strip().lstrip("\ufeff") for c in df.columns]
+        return df
+
     with zipfile.ZipFile(src) as zin:
-        routes = pd.read_csv(io.BytesIO(zin.read("routes.txt")), dtype=str,
-                             skipinitialspace=True)
-        routes.columns = [c.strip().lstrip("\ufeff") for c in routes.columns]
+        names = [n for n in zin.namelist()
+                 if n.endswith(".txt") and Path(n).stem in GTFS_TABLES
+                 and Path(n).stem not in LOOM_SKIP]
+        routes = read(zin, "routes.txt")
         routes["route_short_name"] = route_labels(key, routes)
-        buf = io.StringIO()
-        routes.to_csv(buf, index=False)
-        patched = buf.getvalue().encode()
+
+        # Rewritten tables, by stem. Only what the agency filter touches.
+        rewritten: dict[str, pd.DataFrame] = {"routes": routes}
+        if feed.agency and "agency_id" in routes.columns:
+            # Dropping routes leaves orphan trips and stop_times behind, which
+            # is worse than not filtering, so cascade through the references.
+            rewritten["routes"] = routes = routes[routes["agency_id"] == feed.agency]
+            keep_routes = set(routes["route_id"])
+            if any(Path(n).stem == "trips" for n in names):
+                trips = read(zin, "trips.txt")
+                trips = trips[trips["route_id"].isin(keep_routes)]
+                rewritten["trips"] = trips
+                keep_trips = set(trips["trip_id"])
+                for stem in ("stop_times", "frequencies"):
+                    match = next((n for n in names if Path(n).stem == stem), None)
+                    if match:
+                        df = read(zin, match)
+                        rewritten[stem] = df[df["trip_id"].isin(keep_trips)]
+
+        def encode(df: pd.DataFrame) -> bytes:
+            buf = io.StringIO()
+            df.to_csv(buf, index=False)
+            return buf.getvalue().encode()
 
         tmp = dst.with_suffix(".tmp")
         with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
-            for name in zin.namelist():
+            for name in names:
                 stem = Path(name).stem
-                # Keep only real GTFS tables, minus the ones LOOM trips over.
-                if not name.endswith(".txt") or stem not in GTFS_TABLES or stem in LOOM_SKIP:
-                    continue
-                zout.writestr(name, patched if stem == "routes" else zin.read(name))
+                zout.writestr(name, encode(rewritten[stem]) if stem in rewritten
+                              else zin.read(name))
     shutil.move(tmp, dst)
     return dst
 

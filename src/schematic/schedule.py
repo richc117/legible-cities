@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import pandas as pd
@@ -119,8 +120,16 @@ def busiest_weekday(tables: dict[str, pd.DataFrame],
     # Anchor near today when the feed covers today: some feeds keep a window
     # spanning years (Miami's runs 2021-2027) whose opening weeks are long dead,
     # and scanning from the start finds nothing running.
+    #
+    # When today is outside the window the feed has expired (or has not started),
+    # and clamping to the nearest edge lands on it exactly -- New Year's Eve, for
+    # Mexico City, which is a holiday and a poor sample. Take the middle of the
+    # window instead, which is an ordinary week by construction.
     today = dt.date.today()
-    anchor = min(max(today, start), end)
+    if start <= today <= end:
+        anchor = today
+    else:
+        anchor = start + dt.timedelta(days=(end - start).days // 2)
     best, best_n = scan(anchor, 30)
 
     # Then the window's start, for a feed published ahead of its own season.
@@ -346,6 +355,69 @@ def interpolate_calls(calls: list[Call]) -> list[Call]:
     return calls
 
 
+@dataclass(frozen=True)
+class Window:
+    """One ``frequencies.txt`` row: run this trip every so often, between these."""
+
+    start: int
+    end: int
+    headway: int
+
+
+def frequency_windows(tables: dict[str, pd.DataFrame]) -> dict[str, list[Window]]:
+    """trip_id -> its frequency windows, empty when the feed has none."""
+    freq = tables.get("frequencies")
+    if freq is None or not len(freq):
+        return {}
+    out: dict[str, list[Window]] = {}
+    for trip_id, start, end, headway in zip(
+            freq["trip_id"], freq["start_time"], freq["end_time"], freq["headway_secs"]):
+        a, b = parse_gtfs_time(start), parse_gtfs_time(end)
+        try:
+            h = int(headway)
+        except (TypeError, ValueError):
+            continue
+        if a is None or b is None or h <= 0 or b <= a:
+            continue
+        out.setdefault(trip_id, []).append(Window(a, b, h))
+    return out
+
+
+def expand_trip(trip_id: str, calls: list[Call],
+                windows: Sequence[Window]) -> list[tuple[str, list[Call]]]:
+    """Turn one template trip into the runs its headways describe.
+
+    Plenty of operators publish no timetable at all: Mexico City ships 72
+    template trips whose stop times begin at 00:00:00 and act as offsets, plus
+    a headway for each period of the day. Left unexpanded every train departs
+    at midnight and the animation shows nothing.
+
+    A trip with no window keeps its own absolute times, because feeds mix the
+    two styles freely.
+    """
+    if not windows:
+        return [(trip_id, calls)]
+
+    base = calls[0].departure
+    offsets = [(c.arrival - base, c.departure - base) for c in calls]
+
+    runs: list[tuple[str, list[Call]]] = []
+    n = 0
+    for window in sorted(windows, key=lambda w: w.start):
+        # Departures at start, start + headway, ... strictly before end, which
+        # is how GTFS defines the last run of a window.
+        t = window.start
+        while t < window.end:
+            runs.append((f"{trip_id}#{n}", [
+                Call(stop_id=c.stop_id, node_id=c.node_id,
+                     arrival=t + a, departure=t + d)
+                for c, (a, d) in zip(calls, offsets)
+            ]))
+            n += 1
+            t += window.headway
+    return runs
+
+
 def trips_on(tables: dict[str, pd.DataFrame], date: dt.date, match: StopMatch,
              lines: set[str] | None = None) -> list[Trip]:
     """Every trip running on ``date``, with times resolved and stops mapped.
@@ -381,6 +453,8 @@ def trips_on(tables: dict[str, pd.DataFrame], date: dt.date, match: StopMatch,
             departure=None if pd.isna(d) else int(d),
         ))
 
+    windows = frequency_windows(tables)
+
     out: list[Trip] = []
     for trip_id, calls in grouped.items():
         calls = interpolate_calls(calls)
@@ -388,13 +462,12 @@ def trips_on(tables: dict[str, pd.DataFrame], date: dt.date, match: StopMatch,
         if len(calls) < 2:
             continue
         row = meta.loc[trip_id]
+        label = labels.get(row["route_id"], str(row["route_id"]))
         headsign = row.get("trip_headsign")
-        out.append(Trip(
-            trip_id=trip_id,
-            route_label=labels.get(row["route_id"], str(row["route_id"])),
-            headsign=headsign if isinstance(headsign, str) else "",
-            calls=calls,
-        ))
+        headsign = headsign if isinstance(headsign, str) else ""
+        for expanded_id, expanded in expand_trip(trip_id, calls, windows.get(trip_id, ())):
+            out.append(Trip(trip_id=expanded_id, route_label=label,
+                            headsign=headsign, calls=expanded))
     out.sort(key=lambda t: t.start)
     return out
 

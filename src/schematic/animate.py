@@ -850,7 +850,8 @@ _HTML = r"""<!doctype html>
       // Busy lines would otherwise fill in solid; thinning them lets density
       // read as density rather than as a block of colour.
       const busy = (byRoute.get(line.label) || []).length;
-      el.setAttribute("opacity", (busy > 180 ? 0.28 : busy > 90 ? 0.4 : 0.55).toFixed(2));
+      el.setAttribute("opacity", (busy > 400 ? 0.16 : busy > 180 ? 0.28
+                                 : busy > 90 ? 0.4 : 0.55).toFixed(2));
       g.appendChild(el);
 
       // Without the two termini the vertical axis has no reference: you can see

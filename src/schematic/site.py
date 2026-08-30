@@ -46,6 +46,8 @@ class NetworkEntry:
     feed_url: str
     # Anything the pipeline had to fudge, stated rather than buried.
     caveats: list[str]
+    # Facts about the feed itself, which no amount of computing would reveal.
+    notes: list[str]
 
 
 def _caveats(result: pipeline.Result) -> list[str]:
@@ -133,6 +135,7 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
             animation=f"{key}.html",
             feed_url=feeds.FEEDS[key].url,
             caveats=_caveats(result),
+            notes=list(feeds.FEEDS[key].notes),
         ))
 
     export_comparison(FEATURED)

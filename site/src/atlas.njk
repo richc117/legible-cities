@@ -42,8 +42,9 @@ description: Schematic maps and running timetables for 21 US rail networks, gene
           <a href="{{ '/maps/' + n.svg | url }}">SVG</a> ·
           <a href="{{ n.feed_url }}" target="_blank" rel="noopener noreferrer">Source feed</a>
         </p>
-        {% if n.caveats.length %}
+        {% if n.notes.length or n.caveats.length %}
           <ul class="caveats">
+            {% for c in n.notes %}<li>{{ c }}</li>{% endfor %}
             {% for c in n.caveats %}<li>{{ c }}</li>{% endfor %}
           </ul>
         {% endif %}

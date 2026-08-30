@@ -45,14 +45,16 @@ result ODbL).
 
 ## Networks
 
-Twenty-one US rail networks are registered and build from their live feeds
-(2,411 stations, 27,486 trips between them). `bin/run-all` rebuilds the lot in
+22 rail networks are registered and build from their feeds
+(2,670 stations, 38,273 trips between them) — twenty-one in
+the US, plus the Mexico City Metro from an archived 2025 snapshot. `bin/run-all` rebuilds the lot in
 about fifteen seconds once the feeds are cached; `bin/gallery` writes
 `out/index.html`, a contact sheet linking every map and animation.
 
 | Network | Stations | Lines |
 |---|--:|--:|
 | New York City Subway | 402 | 27 |
+| Mexico City Metro | 165 | 12 |
 | Metra | 240 | 11 |
 | NJ Transit Rail | 229 | 17 |
 | Muni Metro | 160 | 7 |
@@ -75,6 +77,8 @@ about fifteen seconds once the feeds are cached; `bin/gallery` writes
 | Metro Transit Light Rail | 38 | 3 |
 
 Not registered: **WMATA** (Washington DC) publishes GTFS only behind an API key.
+Mexico City's own open-data host does not answer, so that feed comes from
+MobilityData's mirror and its service period ended in December 2025.
 
 ## The site
 

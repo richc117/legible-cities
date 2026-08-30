@@ -92,3 +92,92 @@ def test_busiest_weekday_from_calendar_dates_only():
         ]),
     }
     assert busiest_weekday(tables) == dt.date(2026, 3, 5)
+
+
+# --------------------------------------------------------------------------
+# Frequency-based feeds
+# --------------------------------------------------------------------------
+
+def _calls():
+    from schematic.schedule import Call
+    return [Call("a", "n1", 0, 0), Call("b", "n2", 120, 150), Call("c", "n3", 300, 300)]
+
+
+def test_a_trip_with_no_window_is_left_alone():
+    """Feeds mix timetabled and headway-based trips, so absolute times survive."""
+    from schematic.schedule import expand_trip
+    calls = _calls()
+    out = expand_trip("T", calls, [])
+    assert out == [("T", calls)]
+
+
+def test_expansion_spaces_runs_by_the_headway():
+    from schematic.schedule import Window, expand_trip
+    runs = expand_trip("T", _calls(), [Window(3600, 3600 + 900, 300)])
+    starts = [c[0].departure for _, c in runs]
+    assert starts == [3600, 3900, 4200], starts
+    # Nothing at or after end_time, which is how GTFS defines the last run.
+    assert all(s < 3600 + 900 for s in starts)
+
+
+def test_expansion_preserves_the_template_offsets():
+    from schematic.schedule import Window, expand_trip
+    template = _calls()
+    _, calls = expand_trip("T", template, [Window(7200, 7500, 300)])[0]
+    assert len(calls) == len(template)
+    base = template[0].departure
+    for a, b in zip(template, calls):
+        assert b.arrival - 7200 == a.arrival - base
+        assert b.departure - 7200 == a.departure - base
+        assert b.stop_id == a.stop_id and b.node_id == a.node_id
+
+
+def test_runs_get_unique_ids_across_windows():
+    from schematic.schedule import Window, expand_trip
+    runs = expand_trip("T", _calls(), [Window(0, 600, 300), Window(3600, 4200, 300)])
+    ids = [tid for tid, _ in runs]
+    assert len(ids) == len(set(ids)) == 4
+
+
+def test_windows_are_expanded_in_time_order():
+    from schematic.schedule import Window, expand_trip
+    runs = expand_trip("T", _calls(), [Window(3600, 3900, 300), Window(0, 300, 300)])
+    starts = [c[0].departure for _, c in runs]
+    assert starts == sorted(starts)
+
+
+def test_malformed_frequency_rows_are_ignored():
+    from schematic.schedule import frequency_windows
+    tables = {"frequencies": pd.DataFrame([
+        {"trip_id": "ok", "start_time": "05:00:00", "end_time": "06:00:00", "headway_secs": "300"},
+        {"trip_id": "zero", "start_time": "05:00:00", "end_time": "06:00:00", "headway_secs": "0"},
+        {"trip_id": "backwards", "start_time": "06:00:00", "end_time": "05:00:00", "headway_secs": "300"},
+        {"trip_id": "junk", "start_time": "05:00:00", "end_time": "06:00:00", "headway_secs": "x"},
+    ])}
+    w = frequency_windows(tables)
+    assert set(w) == {"ok"}
+
+
+def test_no_frequencies_table_is_fine():
+    from schematic.schedule import frequency_windows
+    assert frequency_windows({}) == {}
+    assert frequency_windows({"frequencies": pd.DataFrame()}) == {}
+
+
+def test_expired_feed_picks_a_date_inside_its_own_window():
+    """Clamping to the nearest edge lands exactly on it -- New Year's Eve, for
+    Mexico City. The middle of the window is an ordinary week by construction."""
+    from schematic.schedule import busiest_weekday
+    tables = {
+        "trips": pd.DataFrame([{"trip_id": f"t{i}", "route_id": "r", "service_id": "wk"}
+                               for i in range(3)]),
+        "calendar": pd.DataFrame([{
+            "service_id": "wk", "monday": "1", "tuesday": "1", "wednesday": "1",
+            "thursday": "1", "friday": "1", "saturday": "0", "sunday": "0",
+            "start_date": "20241201", "end_date": "20251231"}]),
+    }
+    d = busiest_weekday(tables)
+    assert dt.date(2024, 12, 1) <= d <= dt.date(2025, 12, 31)
+    assert d.weekday() < 5
+    # Not pinned to either edge.
+    assert d not in (dt.date(2024, 12, 1), dt.date(2025, 12, 31))
