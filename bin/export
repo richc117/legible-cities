@@ -1,0 +1,151 @@
+#!/usr/bin/env python
+"""Export a built network as platform-ready assets.
+
+    bin/export la-metro-rail --preset instagram-reel
+    bin/export cdmx-metro --preset instagram-post --view time --no-labels
+    bin/export nyc-subway --preset portfolio-svg
+    bin/export la-metro-rail --preset instagram-reel --dry-run
+
+Everything lands on the Desktop, under ~/Desktop/legible-cities/<feed>/, never
+in the repository. Each file gets a .json beside it recording what it is, the
+network's caveats, and alt text to paste.
+
+This is the one script here that uses argparse rather than bare argv -- there
+are a dozen options and they do not order themselves.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+# Re-exec under the project venv when run from a plain shell, the same
+# resolution bin/build-site does. Without it the shebang finds a system python
+# with none of the dependencies.
+#
+# The test is sys.prefix, not the executable path: .venv/bin/python is a symlink
+# to the interpreter the venv was built from, so comparing resolved executables
+# cannot tell "inside the venv" from "outside" at all.
+_VENV = Path(__file__).resolve().parents[1] / ".venv"
+if (_VENV / "bin" / "python").exists() and Path(sys.prefix).resolve() != _VENV.resolve():
+    _py = str(_VENV / "bin" / "python")
+    os.execv(_py, [_py, str(Path(__file__).resolve()), *sys.argv[1:]])
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from schematic import export, feeds  # noqa: E402
+
+
+def main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(
+        prog="bin/export", description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("feed", nargs="?", help="feed key, e.g. la-metro-rail")
+    ap.add_argument("--preset", "-p", action="append", default=[],
+                    help="repeatable; 'all' for every preset")
+    ap.add_argument("--view", choices=["map", "linear", "time"])
+    ap.add_argument("--labels", dest="labels", action="store_true", default=None)
+    ap.add_argument("--no-labels", dest="labels", action="store_false")
+    ap.add_argument("--no-title", dest="title", action="store_false", default=True,
+                    help="drop the city/network overlay")
+    ap.add_argument("--theme", choices=["dark", "light"], default="dark")
+    ap.add_argument("--at", help="clock to start at, e.g. 07:30")
+    ap.add_argument("--lines", help="comma-separated line labels to keep")
+    ap.add_argument("--storyboard", choices=sorted(export.STORYBOARDS),
+                    help="override the preset's sequence")
+    ap.add_argument("--quality", choices=["draft", "standard", "high"], default="standard",
+                    help="draft: 1x and fast. standard: 2x, resampled to the "
+                         "preset's exact size. high: 2x, kept.")
+    ap.add_argument("--fade", type=float, default=0.0, help="seconds, for looping video")
+    ap.add_argument("--safe-area", action="store_true",
+                    help="also write a preview showing where the platform's UI sits")
+    ap.add_argument("--out", type=Path, help="destination root (default: Desktop)")
+    ap.add_argument("--sheet", action="store_true", help="contact sheet of the run")
+    ap.add_argument("--open", action="store_true", help="reveal the folder when done")
+    ap.add_argument("--list", action="store_true", help="list presets and exit")
+    ap.add_argument("--dry-run", action="store_true", help="print URLs, write nothing")
+    args = ap.parse_args(argv)
+
+    if args.list:
+        print(f"{'preset':20} {'platform':11} {'size':>11}  kind")
+        for p in export.PRESETS.values():
+            size = f"{p.width}x{p.height}" if p.width else "native"
+            print(f"  {p.name:18} {p.platform:11} {size:>11}  {p.kind}"
+                  + (f"  -- {p.note}" if p.note else ""))
+        print("\nstoryboards: " + ", ".join(sorted(export.STORYBOARDS)))
+        return 0
+
+    if not args.feed:
+        ap.error("a feed key is required (or --list)")
+    if args.feed not in feeds.FEEDS:
+        print(f"unknown feed {args.feed!r}. Known: {', '.join(sorted(feeds.FEEDS))}")
+        return 1
+
+    names = args.preset or ["instagram-reel"]
+    if "all" in names:
+        names = list(export.PRESETS)
+    unknown = [n for n in names if n not in export.PRESETS]
+    if unknown:
+        print(f"unknown preset(s): {unknown}. Try --list.")
+        return 1
+
+    if not (export.MAPS_DIR / f"{args.feed}.html").exists():
+        print(f"{args.feed} has not been built yet -- run bin/build-site first")
+        return 1
+
+    lines = tuple(args.lines.split(",")) if args.lines else ()
+    kwargs = dict(theme=args.theme, view=args.view, labels=args.labels,
+                  title=args.title, at=args.at, lines=lines,
+                  storyboard=args.storyboard, quality=args.quality,
+                  fade=args.fade, out=args.out)
+
+    if args.dry_run:
+        for name in names:
+            preset = export.PRESETS[name]
+            print(f"  {name}")
+            if preset.kind == "vector":
+                print("    (no browser; resolves the built SVG into both palettes)")
+                continue
+            print("    " + export.url_for(args.feed, preset, view=args.view,
+                                          labels=args.labels, title=args.title,
+                                          theme=args.theme, at=args.at, lines=lines))
+        return 0
+
+    written: list[Path] = []
+    failed = 0
+    for name in names:
+        print(f"{name}:")
+        try:
+            written += export.run(args.feed, name, **kwargs)
+        except Exception as exc:                       # noqa: BLE001
+            failed += 1
+            print(f"  FAIL  {type(exc).__name__}: {exc}")
+
+    if args.safe_area:
+        for name in names:
+            preset = export.PRESETS[name]
+            if preset.kind == "vector":
+                continue
+            try:
+                written += export.safe_preview(args.feed, preset, out=args.out,
+                                               theme=args.theme, view=args.view)
+            except Exception as exc:                   # noqa: BLE001
+                print(f"  FAIL  safe-area: {exc}")
+
+    if args.sheet and written:
+        dest = export.desktop_dir(args.feed, args.out) / "contact-sheet.png"
+        export.contact_sheet(written, dest)
+        print(f"  sheet {dest}")
+
+    for path in written:
+        print(f"  {path.stat().st_size/1024:8.0f} KB  {path}")
+    if written and args.open:
+        import subprocess
+        subprocess.run(["open", str(written[0].parent)])
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

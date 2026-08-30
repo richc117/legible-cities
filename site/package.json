@@ -8,6 +8,7 @@
     "build": "eleventy --input=src --output=dist"
   },
   "devDependencies": {
-    "@11ty/eleventy": "^3.0.0"
+    "@11ty/eleventy": "^3.0.0",
+    "playwright": "^1.62.1"
   }
 }

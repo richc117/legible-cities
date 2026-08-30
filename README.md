@@ -138,6 +138,38 @@ pytest                                  # unit tests, plus end-to-end checks
 bin/preview out/la-metro-rail.svg       # rasterise an SVG to look at it
 ```
 
+## Making assets
+
+`bin/export` turns a built network into files sized for somewhere specific — a
+reel, a post, a figure in an essay — with the visualization on its own and none
+of the site's interface around it.
+
+```bash
+bin/export --list                                    # presets and storyboards
+bin/export la-metro-rail --preset instagram-reel
+bin/export cdmx-metro -p instagram-post --view time --no-labels
+bin/export nyc-subway -p portfolio-svg               # the theme pair essays use
+bin/export la-metro-rail -p instagram-reel --dry-run # print the URL, write nothing
+```
+
+Everything lands in `~/Desktop/legible-cities/<feed>/` — never in the repo — with
+a `.json` beside each file recording what it is, the network's own caveats, and
+alt text to paste. `--quality draft|standard|high`, `--theme`, `--at 07:30`,
+`--lines A,B`, `--storyboard`, `--fade`, `--safe-area` and `--sheet` are the
+rest of it; `--list` prints the presets.
+
+The same thing is reachable by hand. Every animation page takes presentation
+parameters, so you can open one clean in a browser to present from or to record
+yourself:
+
+```
+site/dist/maps/cdmx-metro.html?present=1&view=time&clock=1&title=1&frame=9:16
+```
+
+Exports are reproducible: the page's clock is stepped by hand, one frame at a
+time, so running the same command twice produces byte-identical output.
+`notebooks/06_export_assets.ipynb` walks through it.
+
 ## Adding a city
 
 One entry in `FEEDS` in `src/schematic/feeds.py`:

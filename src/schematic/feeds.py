@@ -48,6 +48,14 @@ class Feed:
     key: str
     name: str
     url: str
+    # Where it runs, and what the network is called there. `name` cannot serve
+    # both: it is inconsistent about whether the city is in it ("BART" and
+    # "Metra" have none, "LA Metro Rail" and "Mexico City Metro" already do), so
+    # composing city + name mechanically yields "Chicago - Chicago 'L'". These
+    # two are what an exported title is built from; `name` stays as the atlas
+    # label. Defaulted so the registry stays valid while they are filled in.
+    city: str = ""
+    network: str = ""
     # LOOM's -m flag: tram, bus, coach, rail, subway, ferry, funicular, gondola, all
     mode: str = "all"
     # Applied to route_long_name when route_short_name is blank; group 1 becomes
@@ -79,6 +87,8 @@ FEEDS: dict[str, Feed] = {
     "la-metro-rail": Feed(
         key="la-metro-rail",
         name="LA Metro Rail",
+        city="Los Angeles",
+        network="Metro Rail",
         url="https://gitlab.com/LACMTA/gtfs_rail/-/raw/master/gtfs_rail.zip",
         mode="all",
         # LA leaves route_short_name blank and names routes "Metro A Line".
@@ -87,6 +97,8 @@ FEEDS: dict[str, Feed] = {
     "bart": Feed(
         key="bart",
         name="BART",
+        city="San Francisco Bay Area",
+        network="BART",
         url="https://www.bart.gov/dev/schedules/google_transit.zip",
         mode="all",
         # BART splits each line by direction: Yellow-N, Yellow-S, ...
@@ -95,6 +107,8 @@ FEEDS: dict[str, Feed] = {
     "trimet-max": Feed(
         key="trimet-max",
         name="TriMet MAX",
+        city="Portland",
+        network="MAX Light Rail",
         url="https://developer.trimet.org/schedule/gtfs.zip",
         # TriMet publishes bus and rail in one feed; MAX is light rail.
         mode="tram",
@@ -104,18 +118,24 @@ FEEDS: dict[str, Feed] = {
     "nyc-subway": Feed(
         key="nyc-subway",
         name="New York City Subway",
+        city="New York",
+        network="Subway",
         url="http://web.mta.info/developers/data/nyct/subway/google_transit.zip",
         mode="all",
     ),
     "chicago-l": Feed(
         key="chicago-l",
         name="Chicago 'L'",
+        city="Chicago",
+        network="The 'L'",
         url="https://www.transitchicago.com/downloads/sch_data/google_transit.zip",
         mode="subway",
     ),
     "boston-t": Feed(
         key="boston-t",
         name="MBTA Subway",
+        city="Boston",
+        network="MBTA Subway",
         url="https://cdn.mbta.com/MBTA_GTFS.zip",
         # Red/Orange/Blue are heavy rail; the Green Line and Mattapan are light rail.
         mode="tram,subway",
@@ -123,12 +143,16 @@ FEEDS: dict[str, Feed] = {
     "marta": Feed(
         key="marta",
         name="MARTA Rail",
+        city="Atlanta",
+        network="MARTA Rail",
         url="https://www.itsmarta.com/google_transit_feed/google_transit.zip",
         mode="subway",
     ),
     "miami-metrorail": Feed(
         key="miami-metrorail",
         name="Miami Metrorail & Metromover",
+        city="Miami",
+        network="Metrorail & Metromover",
         url="http://www.miamidade.gov/transit/googletransit/current/google_transit.zip",
         # Metrorail is published as route_type 2 (rail), not subway; Metromover
         # and the airport people mover are light rail.
@@ -137,6 +161,8 @@ FEEDS: dict[str, Feed] = {
     "cleveland-rta": Feed(
         key="cleveland-rta",
         name="Cleveland RTA Rapid",
+        city="Cleveland",
+        network="RTA Rapid Transit",
         url="https://www.riderta.com/sites/default/files/gtfs/latest/google_transit.zip",
         mode="tram,subway",
     ),
@@ -145,36 +171,48 @@ FEEDS: dict[str, Feed] = {
     "sf-muni-metro": Feed(
         key="sf-muni-metro",
         name="Muni Metro",
+        city="San Francisco",
+        network="Muni Metro",
         url="https://muni-gtfs.apps.sfmta.com/data/muni_gtfs-current.zip",
         mode="tram",
     ),
     "denver-rtd": Feed(
         key="denver-rtd",
         name="RTD Denver Rail",
+        city="Denver",
+        network="RTD Rail",
         url="https://www.rtd-denver.com/files/gtfs/google_transit.zip",
         mode="tram,rail",
     ),
     "seattle-link": Feed(
         key="seattle-link",
         name="Sound Transit Link & Sounder",
+        city="Seattle",
+        network="Link & Sounder",
         url="https://gtfs.sound.obaweb.org/prod/40_gtfs.zip",
         mode="tram,rail",
     ),
     "dallas-dart": Feed(
         key="dallas-dart",
         name="DART Light Rail",
+        city="Dallas",
+        network="DART Light Rail",
         url="http://www.dart.org/transitdata/latest/google_transit.zip",
         mode="tram",
     ),
     "minneapolis-metro": Feed(
         key="minneapolis-metro",
         name="Metro Transit Light Rail",
+        city="Minneapolis",
+        network="Metro Light Rail",
         url="https://svc.metrotransit.org/mtgtfs/gtfs.zip",
         mode="tram",
     ),
     "phoenix-valley-metro": Feed(
         key="phoenix-valley-metro",
         name="Valley Metro Rail",
+        city="Phoenix",
+        network="Valley Metro Rail",
         url="https://phoenixopendata.com/dataset/3eae9a4a-98b9-40c8-8df7-8c00c1756235/"
             "resource/28ccc0a5-49c8-495c-b91f-193de5ce2cb7/download/googletransit.zip",
         mode="tram",
@@ -182,12 +220,16 @@ FEEDS: dict[str, Feed] = {
     "salt-lake-uta": Feed(
         key="salt-lake-uta",
         name="UTA TRAX & FrontRunner",
+        city="Salt Lake City",
+        network="TRAX & FrontRunner",
         url="https://gtfsfeed.rideuta.com/GTFS.zip",
         mode="tram,rail",
     ),
     "pittsburgh-t": Feed(
         key="pittsburgh-t",
         name="Pittsburgh Light Rail",
+        city="Pittsburgh",
+        network="The T",
         url="https://www.portauthority.org/developerresources/GTFS.zip",
         # The T is published as route_type 2 (rail); route_type 7 is the
         # Duquesne and Monongahela inclines, which are their own funiculars.
@@ -198,24 +240,32 @@ FEEDS: dict[str, Feed] = {
     "metra": Feed(
         key="metra",
         name="Metra",
+        city="Chicago",
+        network="Metra",
         url="https://schedules.metrarail.com/gtfs/schedule.zip",
         mode="all",
     ),
     "septa-regional-rail": Feed(
         key="septa-regional-rail",
         name="SEPTA Regional Rail",
+        city="Philadelphia",
+        network="SEPTA Regional Rail",
         url="https://www3.septa.org/developer/google_rail.zip",
         mode="all",
     ),
     "nj-transit-rail": Feed(
         key="nj-transit-rail",
         name="NJ Transit Rail",
+        city="New Jersey",
+        network="NJ Transit Rail",
         url="https://www.njtransit.com/rail_data.zip",
         mode="all",
     ),
     "lirr": Feed(
         key="lirr",
         name="Long Island Rail Road",
+        city="New York",
+        network="Long Island Rail Road",
         url="http://web.mta.info/developers/data/lirr/google_transit.zip",
         mode="all",
     ),
@@ -224,6 +274,8 @@ FEEDS: dict[str, Feed] = {
     "cdmx-metro": Feed(
         key="cdmx-metro",
         name="Mexico City Metro",
+        city="Mexico City",
+        network="Metro",
         # The city's own open-data host does not respond and its S3 mirror
         # 403s; this is MobilityData's copy of the same SEMOVI feed.
         url="https://storage.googleapis.com/storage/v1/b/mdb-latest/o/"
