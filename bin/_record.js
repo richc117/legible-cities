@@ -92,13 +92,20 @@ const hms = t => { const p = String(t).split(":").map(Number);
         P.setPlaying(!b.sweep && b.speed !== 0);
       }, beat);
 
+      // A sweep given `hours` starts wherever the clock already is, so the
+      // storyboard never jumps backwards between beats.
+      let lo = beat.lo, hi = beat.hi;
+      if (beat.sweep && beat.hours) {
+        lo = (await page.evaluate(() => window.__present.state())).now;
+        hi = Math.min(lo + beat.hours * 3600, bounds.t1);
+      }
+
       for (let i = 0; i < frames; i++) {
         if (beat.sweep) {
           // The sweep owns the clock outright, so a whole day can pass in a few
           // seconds without the playback rate having to be absurd.
           const p = frames > 1 ? i / (frames - 1) : 1;
-          await page.evaluate(s => window.__present.seek(s),
-                              beat.lo + (beat.hi - beat.lo) * p);
+          await page.evaluate(s => window.__present.seek(s), lo + (hi - lo) * p);
         } else {
           await page.evaluate(dt => window.__present.advance(dt), 1 / fps);
         }

@@ -177,28 +177,33 @@ class Beat:
     at: str | None = None          # hard-set the clock, "07:00"
     speed: float | None = None     # simulated seconds per video second
     sweep: bool = False            # run the clock across the beat's whole span
-    span: tuple[str, str] | None = None   # what to sweep; defaults to the service day
+    # What a sweep covers. `hours` runs forward from wherever the clock already
+    # is, which is what keeps a storyboard continuous -- a fixed span earlier
+    # than the preceding beats made the clock jump backwards on screen. `span`
+    # pins absolute times when that is what you want.
+    hours: float | None = None
+    span: tuple[str, str] | None = None
     tween: float | None = None     # transition length; defaults to min(secs, 1.2)
 
 
 STORYBOARDS: dict[str, tuple[Beat, ...]] = {
     # The three views, in the order that explains them.
     "tour": (
-        Beat(6, view="map", at="07:30", speed=240),
+        Beat(6, view="map", at="05:30", speed=240),
         Beat(6, view="linear"),
         Beat(3, view="time"),
         # A whole service day stepped over ten seconds moves the clock ~150s per
         # frame, and trains teleport. Sweeping the morning instead keeps the
         # motion readable; see `sweep_rate` below, which warns when it will not.
-        Beat(10, sweep=True, span=("06:00", "10:00")),
+        Beat(10, sweep=True, hours=4),
     ),
     # Mexico City's shape: the names are the point, and then their absence is.
     "reveal": (
-        Beat(4, view="map", labels=True, at="07:30", speed=240),
+        Beat(4, view="map", labels=True, at="05:30", speed=240),
         Beat(6, labels=False),
         Beat(6, view="linear"),
         Beat(3, view="time"),
-        Beat(10, sweep=True, span=("06:00", "10:00")),
+        Beat(10, sweep=True, hours=4),
     ),
     # Just the morphs, for a short looping figure.
     "morph": (
@@ -222,8 +227,12 @@ READABLE_SWEEP = 60.0
 
 def sweep_rate(beat: Beat, fps: int, bounds: tuple[float, float]) -> float:
     """Simulated seconds advanced per frame. Above READABLE_SWEEP it breaks up."""
-    lo, hi = _span_seconds(beat, bounds)
-    return (hi - lo) / max(beat.secs * fps, 1)
+    if beat.hours:
+        covered = beat.hours * 3600
+    else:
+        lo, hi = _span_seconds(beat, bounds)
+        covered = hi - lo
+    return covered / max(beat.secs * fps, 1)
 
 
 def _hms(text: str) -> float:
@@ -304,6 +313,30 @@ def alt_text(key: str, view: str, *, stations: int = 0, lines: int = 0) -> str:
 
 
 # ---------------------------------------------------------------------- output
+
+
+def line_labels(key: str) -> list[str]:
+    """Every line label on this network, from the atlas's own data."""
+    return _provenance(key).get("_labels", []) or _labels_from_svg(key)
+
+
+def _labels_from_svg(key: str) -> list[str]:
+    svg = MAPS_DIR / f"{key}.svg"
+    if not svg.exists():
+        return []
+    return sorted(set(re.findall(r'data-line="([^"]+)"', svg.read_text())))
+
+
+def keep_except(key: str, drop: tuple[str, ...]) -> tuple[str, ...]:
+    """Everything but these. A single outlying line can dominate the frame --
+    New York's Staten Island Railway is genuinely disconnected from the rest of
+    the system and sits off on its own diagonal, roughly doubling the bounding
+    box and shrinking the subway to fit beside it."""
+    labels = line_labels(key)
+    unknown = [d for d in drop if d not in labels]
+    if unknown:
+        raise ValueError(f"{key} has no line(s) {unknown}. It has: {', '.join(labels)}")
+    return tuple(l for l in labels if l not in drop)
 
 
 def desktop_dir(key: str, out: Path | None = None) -> Path:
@@ -465,7 +498,9 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
                     payload.append({
                         "secs": b.secs, "view": b.view, "labels": b.labels,
                         "at": _hms(b.at) if b.at else None, "speed": b.speed,
-                        "sweep": b.sweep, "lo": lo, "hi": hi,
+                        "sweep": b.sweep, "hours": b.hours,
+                        "lo": None if b.hours else lo,
+                        "hi": None if b.hours else hi,
                         "tween": b.tween if b.tween is not None else min(b.secs, 1.2),
                     })
                 _run_recorder({**job, "mode": "video", "frames": str(frames),
@@ -485,7 +520,8 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
     """What this file is, beside the file. Includes the caveats the atlas shows:
     an image travels further than the page it came from."""
     feed = feeds.FEEDS[key]
-    stats = _network_stats(key)
+    prov = _provenance(key)
+    stats = {k: prov[k] for k in ("stations", "lines") if k in prov} or _network_stats(key)
     for path in written:
         meta = {
             "file": path.name,
@@ -499,10 +535,34 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
             "view": view,
             "theme": theme,
             "alt": alt_text(key, view, **stats),
+            "service_date": prov.get("service_date"),
+            "trips": prov.get("trips"),
+            # What the atlas says about this network, carried with the picture.
+            "caveats": prov.get("caveats", []),
             "notes": list(feed.notes),
             "source": feed.url,
         }
         path.with_suffix(path.suffix + ".json").write_text(json.dumps(meta, indent=2) + "\n")
+
+
+def _provenance(key: str) -> dict:
+    """The atlas's own numbers and caveats for this network.
+
+    Read from the generated networks.json rather than recomputed: it is already
+    the single source the site uses, and an image travels further than the page
+    it came from, so whatever the atlas admits should travel with it.
+    """
+    path = REPO_ROOT / "site" / "src" / "_data" / "networks.json"
+    if not path.exists():
+        return {}
+    for entry in json.loads(path.read_text()).get("networks", []):
+        if entry["key"] == key:
+            return {"service_date": entry["date"],
+                    "stations": entry["stations"],
+                    "lines": len(entry["lines"]),
+                    "trips": entry["trips"],
+                    "caveats": entry["caveats"]}
+    return {}
 
 
 def _network_stats(key: str) -> dict:

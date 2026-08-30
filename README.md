@@ -155,8 +155,11 @@ bin/export la-metro-rail -p instagram-reel --dry-run # print the URL, write noth
 Everything lands in `~/Desktop/legible-cities/<feed>/` — never in the repo — with
 a `.json` beside each file recording what it is, the network's own caveats, and
 alt text to paste. `--quality draft|standard|high`, `--theme`, `--at 07:30`,
-`--lines A,B`, `--storyboard`, `--fade` and `--sheet` are the rest of it;
-`--list` prints the presets.
+`--lines A,B`, `--exclude SIR`, `--storyboard`, `--fade` and `--sheet` are the
+rest of it; `--list` prints the presets. `--exclude` matters more than it
+sounds: New York's Staten Island Railway is genuinely disconnected from the
+rest of the system, so it sits off on its own diagonal and roughly doubles
+the bounding box, shrinking the subway to fit beside it.
 
 `--safe-area` writes an extra preview showing where Instagram draws its own
 interface over a reel or story. It goes in a `safe-area/` subfolder and is

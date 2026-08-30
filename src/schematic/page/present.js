@@ -34,8 +34,11 @@
     var parts = frame.split(":").map(Number);
     if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
       // Slightly more of the added height goes above the network, because that
-      // is where the name sits and a title wants air above it.
-      P.setFrame(parts[0] / parts[1], num("frametop", 0.46));
+      // is where the name sits and a title wants air above it. The margin is
+      // wider when there is an overlay, so the text has ground of its own.
+      var titled = q.get("title") === "1" || q.get("clock") === "1";
+      P.setFrame(parts[0] / parts[1], num("frametop", 0.46),
+                 num("margin", titled ? 0.085 : 0.025));
     }
   }
 

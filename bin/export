@@ -53,6 +53,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--theme", choices=["dark", "light"], default="dark")
     ap.add_argument("--at", help="clock to start at, e.g. 07:30")
     ap.add_argument("--lines", help="comma-separated line labels to keep")
+    ap.add_argument("--exclude", help="comma-separated line labels to drop; useful "
+                                      "when one outlying line dominates the frame")
     ap.add_argument("--storyboard", choices=sorted(export.STORYBOARDS),
                     help="override the preset's sequence")
     ap.add_argument("--quality", choices=["draft", "standard", "high"], default="standard",
@@ -96,6 +98,12 @@ def main(argv: list[str]) -> int:
         return 1
 
     lines = tuple(args.lines.split(",")) if args.lines else ()
+    if args.exclude:
+        try:
+            lines = export.keep_except(args.feed, tuple(args.exclude.split(",")))
+        except ValueError as exc:
+            print(f"  {exc}")
+            return 1
     kwargs = dict(theme=args.theme, view=args.view, labels=args.labels,
                   title=args.title, at=args.at, lines=lines,
                   storyboard=args.storyboard, quality=args.quality,

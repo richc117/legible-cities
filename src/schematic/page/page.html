@@ -447,6 +447,7 @@ __ICONS__
   let labelsOn = true;
   let frameAspect = 0;    // present mode target w/h; 0 leaves the box alone
   let frameTop = 0.5;     // share of added height taken above the network
+  let frameMargin = 0;    // breathing room once the aspect is reached
   let lastBox = vb.slice();
 
   function setBox(m) {
@@ -469,6 +470,16 @@ __ICONS__
       } else {
         const grow = w / frameAspect - h;
         y -= grow * frameTop; h += grow;
+      }
+      // Then hold the whole thing off the edges. Inflating both axes by the
+      // same fraction keeps the aspect exactly. This is what stops the title
+      // landing on the artwork: a view that fills its frame -- the linear one
+      // does, on a tall crop -- otherwise runs a line straight through the
+      // city's name.
+      if (frameMargin > 0) {
+        const mx = w * frameMargin, my = h * frameMargin;
+        x -= mx; w += 2 * mx;
+        y -= my; h += 2 * my;
       }
     }
 
@@ -1132,9 +1143,10 @@ __ICONS__
       for (const r of routes) setRoute(r, !keep || keep.indexOf(r) >= 0);
       draw();
     },
-    setFrame(aspect, top) {
+    setFrame(aspect, top, margin) {
       frameAspect = aspect || 0;
       if (typeof top === "number") frameTop = top;
+      if (typeof margin === "number") frameMargin = margin;
       dirty = true; draw();
     },
     // Snap every tween to its target: a still should never catch a transition
