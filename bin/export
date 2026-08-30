@@ -126,18 +126,25 @@ def main(argv: list[str]) -> int:
     if args.safe_area:
         for name in names:
             preset = export.PRESETS[name]
-            if preset.kind == "vector":
+            if preset.kind == "vector" or not preset.safe_zones:
                 continue
             try:
                 written += export.safe_preview(args.feed, preset, out=args.out,
                                                theme=args.theme, view=args.view)
             except Exception as exc:                   # noqa: BLE001
                 print(f"  FAIL  safe-area: {exc}")
+        if not any(export.PRESETS[n].safe_zones for n in names):
+            print("  note: --safe-area applies to Instagram's portrait surfaces "
+                  "(instagram-reel, instagram-story); nothing else overlays the image.")
 
     if args.sheet and written:
-        dest = export.desktop_dir(args.feed, args.out) / "contact-sheet.png"
-        export.contact_sheet(written, dest)
-        print(f"  sheet {dest}")
+        # Deliverables only. A sheet is for judging what you made, and a preview
+        # covered in magenta guides tells you nothing about it.
+        deliverables = [p for p in written if p.parent.name != "safe-area"]
+        if deliverables:
+            dest = export.desktop_dir(args.feed, args.out) / "contact-sheet.png"
+            export.contact_sheet(deliverables, dest)
+            print(f"  sheet {dest}")
 
     for path in written:
         print(f"  {path.stat().st_size/1024:8.0f} KB  {path}")

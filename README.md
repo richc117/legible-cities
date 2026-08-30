@@ -155,8 +155,14 @@ bin/export la-metro-rail -p instagram-reel --dry-run # print the URL, write noth
 Everything lands in `~/Desktop/legible-cities/<feed>/` — never in the repo — with
 a `.json` beside each file recording what it is, the network's own caveats, and
 alt text to paste. `--quality draft|standard|high`, `--theme`, `--at 07:30`,
-`--lines A,B`, `--storyboard`, `--fade`, `--safe-area` and `--sheet` are the
-rest of it; `--list` prints the presets.
+`--lines A,B`, `--storyboard`, `--fade` and `--sheet` are the rest of it;
+`--list` prints the presets.
+
+`--safe-area` writes an extra preview showing where Instagram draws its own
+interface over a reel or story. It goes in a `safe-area/` subfolder and is
+never a deliverable -- it is covered in magenta guides. Only Instagram's
+portrait surfaces have such an overlay; other platforms show the image in a
+card with nothing on top of it.
 
 The same thing is reachable by hand. Every animation page takes presentation
 parameters, so you can open one clean in a browser to present from or to record

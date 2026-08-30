@@ -39,6 +39,25 @@ def test_every_video_preset_names_a_real_storyboard():
             assert p.storyboard in export.STORYBOARDS, p.name
 
 
+def test_safe_zones_only_where_the_platform_overlays_the_image():
+    """Instagram draws its interface over a full-bleed portrait. A Bluesky or
+    LinkedIn image sits in a card with nothing on top of it, so a "safe area"
+    there is just Instagram's geometry on someone else's canvas -- and a preview
+    covered in magenta guides is easy to mistake for the deliverable."""
+    for p in export.PRESETS.values():
+        if p.safe_zones:
+            assert p.platform == "Instagram", p.name
+            assert p.height > p.width, p.name          # portrait, full-bleed
+    assert any(p.safe_zones for p in export.PRESETS.values())
+    for name in ["bluesky", "linkedin", "x", "instagram-post"]:
+        assert not export.PRESETS[name].safe_zones, name
+
+
+def test_safe_preview_refuses_where_it_would_be_meaningless():
+    with pytest.raises(ValueError, match="does not draw its interface"):
+        export.safe_preview("la-metro-rail", export.PRESETS["bluesky"])
+
+
 def test_size_limits_are_set_where_the_platform_has_one():
     # These are the two that reject an upload rather than re-encode it.
     assert export.PRESETS["bluesky"].max_bytes

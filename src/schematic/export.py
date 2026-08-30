@@ -117,6 +117,11 @@ class Preset:
     fps: int = 30
     max_bytes: int | None = None
     frame_top: float = 0.46
+    # Whether the platform draws its own interface over the image. Only true
+    # for Instagram's full-bleed portrait surfaces; a Bluesky or LinkedIn image
+    # sits in a card with nothing on top of it, so a "safe area" there is a
+    # meaningless overlay of somebody else's geometry.
+    safe_zones: bool = False
     note: str = ""
 
     @property
@@ -128,7 +133,8 @@ PRESETS: dict[str, Preset] = {p.name: p for p in [
     # --- stills --------------------------------------------------------------
     Preset("instagram-post", "Instagram", 1080, 1350, "still", "png"),
     Preset("instagram-square", "Instagram", 1080, 1080, "still", "png"),
-    Preset("instagram-story", "Instagram", 1080, 1920, "still", "png"),
+    Preset("instagram-story", "Instagram", 1080, 1920, "still", "png",
+           safe_zones=True),
     Preset("linkedin", "LinkedIn", 1200, 1200, "still", "png"),
     Preset("linkedin-link", "LinkedIn", 1200, 627, "still", "png",
            note="link-preview shape; the map gets very little height"),
@@ -139,7 +145,7 @@ PRESETS: dict[str, Preset] = {p.name: p for p in [
 
     # --- video ---------------------------------------------------------------
     Preset("instagram-reel", "Instagram", 1080, 1920, "video", "mp4",
-           storyboard="tour"),
+           storyboard="tour", safe_zones=True),
     Preset("bluesky-video", "Bluesky", 1080, 1350, "video", "mp4",
            storyboard="tour", max_bytes=50_000_000),
     Preset("linkedin-video", "LinkedIn", 1200, 1200, "video", "mp4",
@@ -588,7 +594,16 @@ def safe_preview(key: str, preset: Preset, *, out: Path | None = None,
     """
     if preset.kind == "vector":
         return []
-    dest = desktop_dir(key, out)
+    if not preset.safe_zones:
+        raise ValueError(
+            f"{preset.platform} does not draw its interface over the image, so a "
+            f"safe-area preview for {preset.name} would just be Instagram's "
+            f"geometry on someone else's canvas. Try instagram-reel or "
+            f"instagram-story.")
+    # Its own folder, and never beside a deliverable: the whole failure mode is
+    # picking up the one with the guides on it.
+    dest = desktop_dir(key, out) / "safe-area"
+    dest.mkdir(parents=True, exist_ok=True)
     path = dest / f"{key}-{preset.name}-safe.png"
     url = url_for(key, preset, view=view, theme=theme, safe=True)
     _run_recorder({"url": url, "width": preset.width, "height": preset.height,
