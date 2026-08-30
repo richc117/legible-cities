@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Serve site/dist for local review. Kills any previous instance first -- a
+# leaked server holding the port will silently serve a stale build.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+PORT="${PORT:-4321}"
+lsof -ti :"$PORT" | xargs -r kill -9 2>/dev/null || true
+cd site/dist
+echo "serving site/dist on http://localhost:$PORT"
+exec python3 -m http.server "$PORT"

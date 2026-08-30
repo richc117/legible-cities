@@ -122,13 +122,19 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
     trips = trips_on(tables, date, match, lines)
 
     name = feeds.FEEDS[key].name
-    r = render(graph, width=width, style=style, title=name, line_order=line_order)
+    # Themed by default: the CSS variables carry literal fallbacks, so a
+    # standalone SVG is unchanged, while an embedding page can theme the
+    # furniture without resorting to an invert filter over the line colours.
+    r = render(graph, width=width, style=style or Style(themed=True),
+               title=name, line_order=line_order)
     anim = animate.build(r, graph, trips, date)
 
     out = out_dir or OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{key}.svg").write_text(r.svg)
-    animate.write(anim, r.svg, out, stem=key, title=f"{name} — {date:%A %-d %B %Y}")
+    animate.write(anim, r.svg, out, stem=key,
+                  title=f"{name} — {date:%A %-d %B %Y}", name=name,
+                  subtitle=f"{len(trips):,} trips · {date:%A %-d %B %Y}")
 
     return Result(key=key, date=date, graph=graph, render=r, trips=trips,
                   match=match, animation=anim, paths=paths)

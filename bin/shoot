@@ -1,0 +1,61 @@
+#!/usr/bin/env node
+// Screenshot built pages for visual review.
+// Expects a static server already running (see bin/preview-site), because a
+// hand-rolled one is a source of bugs that look like site bugs.
+const fs = require("fs");
+const path = require("path");
+
+let chromium;
+try {
+  ({ chromium } = require(path.join(__dirname, "..", "site", "node_modules", "playwright")));
+} catch (e) {
+  console.error("playwright missing. cd site && npm install --no-save playwright && npx playwright install chromium");
+  process.exit(1);
+}
+
+const BASE = process.env.BASE_URL || "http://localhost:4321";
+const OUT = process.env.SHOT_DIR || path.join(__dirname, "..", "out", "shots");
+
+(async () => {
+  fs.mkdirSync(OUT, { recursive: true });
+  const browser = await chromium.launch();
+  const jobs = JSON.parse(process.argv[2] || "[]");
+  let failed = 0;
+
+  for (const job of jobs) {
+    const ctx = await browser.newContext({
+      viewport: { width: job.w || 1440, height: job.h || 1000 },
+      deviceScaleFactor: 2,
+    });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on("pageerror", e => problems.push("JS: " + e));
+    page.on("console", m => { if (m.type() === "error") problems.push("console: " + m.text()); });
+    page.on("response", r => {
+      if (r.status() >= 400) problems.push(r.status() + " " + r.url().replace(BASE, ""));
+    });
+    if (job.theme === "sepia") {
+      await page.addInitScript(() => localStorage.setItem("rc-theme", "sepia"));
+    }
+    const resp = await page.goto(BASE + job.url, { waitUntil: "networkidle" });
+    if (job.wait) await page.waitForTimeout(job.wait);
+    await page.screenshot({ path: path.join(OUT, job.name + ".png"), fullPage: !!job.full });
+
+    const info = await page.evaluate(() => ({
+      theme: document.documentElement.getAttribute("data-theme") || "warm-dark",
+      bg: getComputedStyle(document.body).backgroundColor,
+      overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+      title: document.title,
+    }));
+    const bad = problems.length || resp.status() >= 400 || info.overflow;
+    if (bad) failed++;
+    console.log(
+      `${job.name.padEnd(24)} ${String(resp.status()).padEnd(4)} ${info.theme.padEnd(10)} ${info.bg.padEnd(20)}` +
+      (info.overflow ? " H-SCROLL" : "") +
+      (problems.length ? "  " + problems.slice(0, 2).join(" | ") : "")
+    );
+    await ctx.close();
+  }
+  await browser.close();
+  process.exit(failed ? 1 : 0);
+})();

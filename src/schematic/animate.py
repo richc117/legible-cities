@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime as dt
 import heapq
 import json
+from html import escape as html_escape
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -246,7 +247,9 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
 
 
 def write(animation: Animation, svg: str, out_dir: Path, *,
-          stem: str = "animation", title: str = "Transit animation") -> tuple[Path, Path]:
+          stem: str = "animation", title: str = "Transit animation",
+          name: str | None = None, subtitle: str = "",
+          back: str = "index.html") -> tuple[Path, Path]:
     """Write ``<stem>.positions.json`` and a self-contained ``<stem>.html``.
 
     The stem is per-city: with a fixed filename, generating a second network
@@ -259,9 +262,13 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
     json_path.write_text(json.dumps(data, separators=(",", ":")))
 
     html_path = out_dir / f"{stem}.html"
-    html_path.write_text(_HTML.replace("__TITLE__", title)
-                              .replace("__SVG__", svg)
-                              .replace("__DATA__", json.dumps(data, separators=(",", ":"))))
+    html_path.write_text(
+        _HTML.replace("__TITLE__", html_escape(title))
+             .replace("__NAME__", html_escape(name or title))
+             .replace("__SUBTITLE__", html_escape(subtitle))
+             .replace("__BACK__", html_escape(back))
+             .replace("__SVG__", svg)
+             .replace("__DATA__", json.dumps(data, separators=(",", ":"))))
     return json_path, html_path
 
 
@@ -270,50 +277,99 @@ _HTML = r"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
+<script>
+  // Applied before paint so the page never flashes the wrong theme. Shares the
+  // rc-theme key with the rest of the site.
+  (function () {
+    var stored = null;
+    try { stored = localStorage.getItem("rc-theme"); } catch (e) {}
+    if ((stored || "warm-dark") === "sepia") {
+      document.documentElement.setAttribute("data-theme", "sepia");
+    }
+  })();
+</script>
 <style>
   :root {
-    --bg: #f6f6f4; --panel: #ffffff; --ink: #16181d; --muted: #6b7280;
-    --border: #e2e2df; --accent: #16181d;
+    --bg: #15120f; --bg-soft: #1f1915; --text: #f2ede6; --muted: #c3b8aa;
+    --border: #3a2f27; --link-hover: #ded5c8; --focus: #81a5ff;
+    /* Consumed by the inlined SVG. Only page furniture -- never a line colour,
+       which belongs to the agency and is drawn literally. */
+    --map-bg: #1f1915; --map-station-fill: #f2ede6;
+    --map-station-stroke: #15120f; --map-label: #f2ede6;
+    --train-halo: #15120f;
   }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #14161a; --panel: #1c1f25; --ink: #f2f3f5; --muted: #9aa1ac;
-            --border: #2c313a; --accent: #f2f3f5; }
+  :root[data-theme="sepia"] {
+    --bg: #f7efe1; --bg-soft: #f0e2cf; --text: #2d241d; --muted: #655748;
+    --border: #cab9a2; --link-hover: #1f1812; --focus: #4068cf;
+    --map-bg: #f7efe1; --map-station-fill: #f7efe1;
+    --map-station-stroke: #2d241d; --map-label: #2d241d;
+    --train-halo: #f7efe1;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
-  header { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: center;
-           padding: 12px 18px; background: var(--panel);
-           border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
-  h1 { font-size: 15px; font-weight: 600; margin: 0 12px 0 0; letter-spacing: -0.01em; }
-  .clock { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 600;
-           min-width: 5.5ch; letter-spacing: -0.02em; }
-  .sub { color: var(--muted); font-size: 12px; }
-  .group { display: flex; align-items: center; gap: 8px; }
-  button { font: inherit; color: var(--ink); background: var(--panel);
-           border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px;
-           cursor: pointer; }
-  button:hover { border-color: var(--muted); }
-  button[aria-pressed="true"] { background: var(--accent); color: var(--panel);
-                                border-color: var(--accent); }
-  input[type=range] { width: min(420px, 42vw); accent-color: var(--accent); }
-  .lines { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
-          border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
-          background: var(--panel); user-select: none; }
-  .chip .dot { width: 10px; height: 10px; border-radius: 50%; }
-  .chip[aria-pressed="false"] { opacity: 0.38; }
-  #stage { padding: 16px; }
-  svg { width: 100%; height: auto; display: block;
-        background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
-  .train { paint-order: stroke; stroke: #fff; stroke-width: 1.6; }
-  @media (prefers-color-scheme: dark) {
-    svg { filter: invert(1) hue-rotate(180deg); }
-    .train { stroke: #000; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-size: 18px; line-height: 1.72;
+  }
+  a { color: var(--text); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { color: var(--link-hover); }
+  a:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px;
+  }
+  header {
+    display: flex; flex-wrap: wrap; gap: 0.7rem 1.4rem; align-items: baseline;
+    padding: 0.9rem 1.4rem; background: var(--bg);
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5;
+  }
+  h1 { font-size: 1.05rem; font-weight: 700; margin: 0; }
+  .back { font-size: 0.86rem; color: var(--muted); text-decoration: none;
+          white-space: nowrap; }
+  .back:hover { color: var(--text); }
+  .clock { font-variant-numeric: tabular-nums; font-size: 1.35rem; min-width: 5.5ch; }
+  .sub { color: var(--muted); font-size: 0.86rem; }
+  .group { display: flex; align-items: center; gap: 0.6rem; }
+  button {
+    font: inherit; font-size: 0.86rem; color: var(--muted); background: none;
+    border: 0; border-bottom: 1px solid transparent; padding: 0.1rem 0;
+    cursor: pointer;
+  }
+  button:hover { color: var(--text); }
+  button[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text); }
+  input[type=range] { width: min(380px, 40vw); accent-color: var(--text); }
+  .lines { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer;
+    user-select: none; font-size: 0.86rem; color: var(--muted);
+  }
+  .chip:hover { color: var(--text); }
+  .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .chip[aria-pressed="true"] { color: var(--text); }
+  .chip[aria-pressed="false"] .dot { opacity: 0.3; }
+  #stage { padding: 1.4rem; }
+  svg { width: 100%; height: auto; display: block; }
+  @media (max-width: 900px) {
+    /* A wide network squeezed into a phone is unreadable. Let the map keep a
+       usable size and pan inside its own container instead -- the page itself
+       must never scroll sideways. */
+    #stage { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    #stage svg { width: auto; height: 62vh; min-width: 100%; }
+  }
+  /* Painted behind the glyph so a train reads against its own line colour. */
+  .train { paint-order: stroke; stroke: var(--train-halo); stroke-width: 1.6; }
+  @media (max-width: 640px) {
+    html, body { font-size: 17px; }
+    header { padding: 0.8rem 1rem; gap: 0.5rem 1rem; }
+    h1 { font-size: 1rem; }
+    .clock { font-size: 1.15rem; }
+    #stage { padding: 0.9rem 0; }
   }
 </style>
 <header>
-  <h1>__TITLE__</h1>
+  <div class="group">
+    <a class="back" href="__BACK__">&larr; Atlas</a>
+    <h1>__NAME__</h1>
+    <span class="sub">__SUBTITLE__</span>
+  </div>
   <div class="group">
     <button id="play" aria-pressed="true">Pause</button>
     <div class="clock" id="clock">--:--</div>

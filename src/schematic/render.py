@@ -39,9 +39,22 @@ class Style:
     default_line_color: str = "#888888"
     padding: float = 24.0
 
+    # Emit the page furniture -- background, station markers, labels -- as CSS
+    # custom properties so an embedding page can theme them, keeping the literal
+    # values as fallbacks so a standalone SVG is unchanged.
+    #
+    # Line strokes are deliberately never themed. They are the agencies' own
+    # colours, and the alternative an embedding page reaches for is a CSS
+    # invert filter, which turns LA's A Line from #0072bc into orange.
+    themed: bool = False
+
     @property
     def spacing(self) -> float:
         return self.line_width * self.line_gap
+
+    def var(self, name: str, literal: str) -> str:
+        """``var(--map-x, #fff)`` when themed, otherwise just the literal."""
+        return f"var(--map-{name}, {literal})" if self.themed else literal
 
 
 @dataclass
@@ -236,7 +249,7 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     if title:
         out.append(f"<title>{html.escape(title)}</title>")
     out.append(f'<rect x="{min_x:.2f}" y="{min_y:.2f}" width="{w:.2f}" height="{h:.2f}" '
-               f'fill="{style.background}"/>')
+               f'fill="{style.var("bg", style.background)}"/>')
 
     out.append('<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">')
     for label in order:
@@ -255,20 +268,22 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
         x, y = node_xy[node.id]
         r = style.interchange_radius if len(routes_at.get(node.id, ())) > 1 else style.station_radius
         out.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{r:.2f}" '
-                   f'fill="{style.station_fill}" stroke="{style.station_stroke_color}" '
+                   f'fill="{style.var("station-fill", style.station_fill)}" '
+                   f'stroke="{style.var("station-stroke", style.station_stroke_color)}" '
                    f'stroke-width="{style.station_stroke:.2f}" '
                    f'data-node="{html.escape(node.id)}" '
                    f'data-station-id="{html.escape(node.station_id or "")}"/>')
     out.append("</g>")
 
     if placements:
-        out.append(f'<g id="labels" font-size="{style.label_size:.1f}" fill="{style.label_color}">')
+        out.append(f'<g id="labels" font-size="{style.label_size:.1f}" '
+                   f'fill="{style.var("label", style.label_color)}">')
         for p in placements:
             transform = (f' transform="rotate({p.rotate:.0f} {p.x:.2f} {p.y:.2f})"'
                          if p.rotate else "")
             # A haloed label sits over a line; the stroke is painted behind the
             # glyphs so the name stays legible against the colour.
-            halo = (f' stroke="{style.background}" stroke-width="3.2"'
+            halo = (f' stroke="{style.var("bg", style.background)}" stroke-width="3.2"'
                     f' paint-order="stroke" stroke-linejoin="round"' if p.haloed else "")
             out.append(f'<text x="{p.x:.2f}" y="{p.y:.2f}" text-anchor="{p.anchor}"'
                        f'{transform}{halo}>{html.escape(p.text)}</text>')

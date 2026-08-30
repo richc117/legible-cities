@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Build the standalone site: regenerate every map, export it plus its
+# provenance into the Eleventy source tree, then build the site.
+#
+#   bin/build-site            all networks
+#   bin/build-site --serve    ...and watch
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+python=".venv/bin/python"
+[ -x "$python" ] || python="python3"
+
+echo "==> generating maps"
+"$python" -c "
+from schematic import site
+entries = site.export()
+print(f'{len(entries)} networks -> site/src/maps/')
+"
+
+echo "==> building site"
+cd site
+[ -d node_modules ] || npm install --silent
+if [ "${1:-}" = "--serve" ]; then
+  npx @11ty/eleventy --serve --input=src --output=dist
+else
+  npx @11ty/eleventy --input=src --output=dist
+fi

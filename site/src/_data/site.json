@@ -1,0 +1,13 @@
+{
+  "title": "Legible Cities",
+  "shortTitle": "Legible Cities",
+  "tagline": "Schematic transit maps, generated from open data",
+  "description": "Generating schematic transit maps and timetable animations for 21 US rail networks from open GTFS data, and what transit maps teach us about GIS, information architecture, and user experience.",
+  "author": "Richard Caballero",
+  "themeColor": "#15120f",
+  "links": {
+    "repo": "",
+    "linkedin": "https://www.linkedin.com/in/ricaball/",
+    "github": "https://github.com/richc117"
+  }
+}

@@ -1,0 +1,175 @@
+---
+layout: layouts/base.njk
+permalink: /colophon/
+title: Colophon
+description: How the schematic maps are generated, the tools involved, and credit to the people whose work this project rests on.
+---
+<section class="wrap">
+  <header class="essay-header">
+    <h1>Colophon</h1>
+    <p class="lead">
+      How the maps are made, what they are made with, and who actually did the
+      hard parts.
+    </p>
+  </header>
+</section>
+
+<section class="wrap">
+  <h2>The pipeline</h2>
+  <p>
+    Every map on this site comes from one input: the agency’s published GTFS
+    feed, the same open format that powers transit directions in most journey
+    planners. A feed is a zip of tables describing routes, stops, trips and
+    stop times. Turning that into a diagram takes six stages, and each one
+    makes a decision.
+  </p>
+
+  <ul class="pipeline">
+    <li>
+      <code>gtfs2graph</code>
+      <p>Reads the feed and builds a line graph: stations as nodes, track as
+      edges, each edge knowing which routes use it. Geographic, still.</p>
+    </li>
+    <li>
+      <code>topo</code>
+      <p>Merges track that several routes share, and folds an interchange’s
+      separate platforms into a single station.</p>
+    </li>
+    <li>
+      <code>loom</code>
+      <p>Decides the left-to-right order of lines running together, so parallel
+      routes do not cross each other pointlessly at every junction.</p>
+    </li>
+    <li>
+      <code>octi</code>
+      <p>The Beck step. Snaps the whole network onto a grid of 45° angles,
+      trading geographic truth for legibility.</p>
+    </li>
+    <li>
+      <code>render</code>
+      <p>Draws the SVG: parallel tracks offset onto their own lines, stations
+      marked, and station names placed by a solver that rotates them off the
+      line and tests real collisions rather than bounding boxes.</p>
+    </li>
+    <li>
+      <code>animate</code>
+      <p>Walks every trip in the timetable across the drawn network and emits
+      the times and distances the browser interpolates between.</p>
+    </li>
+  </ul>
+
+  <p>
+    The first four stages are <a href="https://github.com/ad-freiburg/loom" target="_blank" rel="noopener noreferrer">LOOM</a>.
+    The last two I wrote, mostly because the animation needs geometry it can
+    address by name: one path per line per segment, so a train can be placed
+    along it by distance.
+  </p>
+  <p>
+    Adding a city is one entry in a registry — a name, a feed URL, and which
+    modes to include. Everything else is the same code. That was the point of
+    building it this way, and the twenty-one networks in the
+    <a href="{{ '/atlas/' | url }}">atlas</a> are the test of whether it worked.
+  </p>
+</section>
+
+<hr class="rule">
+
+<section class="wrap credits">
+  <h2>Credit</h2>
+  <p>
+    This project is a thin layer over other people’s work. The interesting
+    problems here — schematisation, line ordering, the idea itself — were solved
+    by others, and it would be dishonest to present the result without saying
+    so clearly.
+  </p>
+
+  <h3>LOOM — Hannah Bast, Patrick Brosi and Sabine Storandt</h3>
+  <p>
+    <a href="https://github.com/ad-freiburg/loom" target="_blank" rel="noopener noreferrer">LOOM</a>,
+    from the Chair of Algorithms and Data Structures at the University of
+    Freiburg, does the genuinely hard computation: it takes a geographic
+    network and produces a schematic one, solving both the line ordering and the
+    octilinear layout. Their paper,
+    <a href="https://www.tandfonline.com/doi/full/10.1080/00087041.2024.2325761" target="_blank" rel="noopener noreferrer">Large-scale Generation of Transit Maps from OpenStreetMap Data</a>,
+    describes the approach. LOOM is released under the GPL-3.0. Without it this
+    project would be an essay with no maps in it.
+  </p>
+
+  <h3>Harry Beck, and Transport for London</h3>
+  <p>
+    The 1933 Underground diagram is the original argument that a transit map
+    should be judged by how well it serves a journey rather than how faithfully
+    it reproduces geography. Every schematic map since, including all of these,
+    is a variation on what Beck established.
+  </p>
+
+  <h3>Thomas van Dijk — mooey</h3>
+  <p>
+    <a href="https://github.com/tcvdijk/mooey" target="_blank" rel="noopener noreferrer">mooey</a>
+    is where this started. I went looking for a way to generate a schematic map
+    and found it first; reading it is what led me to LOOM, which mooey itself
+    builds on. Its core idea — that a designer fixing the direction of edges by
+    hand, with the layout recomputed instantly, beats full automation — is the
+    most likely next step for this project.
+  </p>
+
+  <h3>Lance Wyman, Arturo Quiñones and Francisco Gallardo</h3>
+  <p>
+    The Mexico City Metro’s station icon system, designed in 1969 under
+    architect Pedro Ramírez Vázquez. It remains the clearest demonstration that
+    cultural specificity and accessibility can be the same design decision, and
+    it is the standard the maps here fall short of.
+  </p>
+
+  <h3>Jorge Luis Borges</h3>
+  <p>
+    <em>On Exactitude in Science</em>, one paragraph long, which settled the
+    question of whether more detail means more understanding.
+  </p>
+
+  <h3>The transit agencies</h3>
+  <p>
+    Twenty-one agencies publish the schedule data these maps are built from,
+    openly and for free: LA Metro, the MTA, Metra, NJ Transit, SFMTA, TriMet,
+    SEPTA, the CTA, the MBTA, BART, RTD Denver, UTA, Valley Metro, DART, Sound
+    Transit, Pittsburgh Regional Transit, Cleveland RTA, Miami-Dade Transit,
+    MARTA, and Metro Transit in Minneapolis. Each map derives from that agency’s
+    feed and remains subject to that agency’s terms; every network in the atlas
+    links back to its source.
+  </p>
+  <p>
+    The <a href="https://mobilitydatabase.org/" target="_blank" rel="noopener noreferrer">Mobility Database</a>
+    catalogues those feeds, which is how I found the current URL for each one
+    instead of guessing. GTFS itself, originally developed by Portland’s TriMet
+    with Google, is the reason a single pipeline can read all of them.
+  </p>
+
+  <h3>OpenStreetMap</h3>
+  <p>
+    Not used for the maps here — every one of these feeds ships its own track
+    geometry — but
+    <a href="https://github.com/ad-freiburg/pfaedle" target="_blank" rel="noopener noreferrer">pfaedle</a>,
+    also from the Freiburg group, can generate that geometry from OSM for feeds
+    that lack it. Anything produced that way inherits the ODbL.
+  </p>
+</section>
+
+<hr class="rule">
+
+<section class="wrap">
+  <h2>This site</h2>
+  <p>
+    Built with <a href="https://www.11ty.dev/" target="_blank" rel="noopener noreferrer">Eleventy</a>,
+    set in Iowan Old Style with Palatino and Georgia behind it, and themed to
+    match the rest of my writing.
+    The maps are inlined as SVG rather than linked as images so they take the
+    page’s colours — though only the background, station markers and labels
+    change with the theme. Line colours are the agencies’ own and are never
+    altered.
+  </p>
+  <p>
+    The pipeline is Python and LOOM runs in Docker. Adding a city takes a name,
+    a feed URL, and the modes to include{% if site.links.repo %} — the source is
+    <a href="{{ site.links.repo }}" target="_blank" rel="noopener noreferrer">here</a>{% endif %}.
+  </p>
+</section>
