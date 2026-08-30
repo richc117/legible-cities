@@ -30,6 +30,11 @@ FEATURED = "la-metro-rail"
 # /maps/<city>.html, so a relative "index.html" would resolve to /maps/.
 ATLAS_URL = "/atlas/"
 
+# Networks the essay shows without labels, to compare their shapes. At the size
+# a side-by-side figure allows, station names are unreadable anyway, and having
+# them on one map but not the other would make the two incomparable.
+PLAIN = (FEATURED, "cdmx-metro")
+
 
 @dataclass
 class NetworkEntry:
@@ -87,32 +92,30 @@ def _caveats(result: pipeline.Result) -> list[str]:
     return out
 
 
-def export_comparison(key: str, width: float = 1100.0) -> tuple[Path, Path]:
-    """Render the network before and after schematisation, for the essay.
+def export_unlabelled(key: str, stage: str, name: str,
+                      width: float = 1100.0) -> Path:
+    """Draw one pipeline stage of a network with no station names.
 
-    Both are drawn without station names and at the same width. The comparison
-    is about what happens to the *shape* of the network; labels at this size are
-    unreadable, and having them on one side but not the other would make the
-    two incomparable anyway.
-
-    The geographic side comes straight off the cached gtfs2graph stage -- the
-    renderer is generic over any line graph, so it is the same code path drawing
-    the same network before ``octi`` touches it.
+    The renderer is generic over any line graph, so this is the same code path
+    that draws the finished map, pointed at an earlier stage or told to leave
+    the labels off.
     """
-    style = Style(themed=True)
-    pairs = [
-        ("00_gtfs2graph.json", f"{key}-geographic.svg"),
-        ("03_octi.json", f"{key}-plain.svg"),
-    ]
-    out: list[Path] = []
-    for stage, name in pairs:
-        graph = LineGraph.from_geojson(pipeline.GRAPH_DIR / key / stage)
-        svg = render(graph.reproject(to_mercator), width=width, style=style,
-                     labels=False).svg
-        path = MAPS_DIR / name
-        path.write_text(svg)
-        out.append(path)
-    return out[0], out[1]
+    graph = LineGraph.from_geojson(pipeline.GRAPH_DIR / key / stage)
+    svg = render(graph.reproject(to_mercator), width=width,
+                 style=Style(themed=True), labels=False).svg
+    path = MAPS_DIR / name
+    path.write_text(svg)
+    return path
+
+
+def export_comparison(key: str, width: float = 1100.0) -> tuple[Path, Path]:
+    """The before and after that carries the essay's Beck section.
+
+    The geographic side comes straight off the cached gtfs2graph stage, so the
+    pair differs only in whether ``octi`` has run.
+    """
+    return (export_unlabelled(key, "00_gtfs2graph.json", f"{key}-geographic.svg", width),
+            export_unlabelled(key, "03_octi.json", f"{key}-plain.svg", width))
 
 
 def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[NetworkEntry]:
@@ -139,6 +142,9 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
         ))
 
     export_comparison(FEATURED)
+    for key in PLAIN:
+        if key != FEATURED and (pipeline.GRAPH_DIR / key / "03_octi.json").exists():
+            export_unlabelled(key, "03_octi.json", f"{key}-plain.svg")
 
     # Largest first: the atlas should open on New York.
     entries.sort(key=lambda e: -e.stations)

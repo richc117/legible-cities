@@ -70,8 +70,9 @@ description: What transit maps teach us about GIS, information architecture, and
     Metro rail in Los Angeles: six lines, 110 stations. This is the object under
     discussion for the rest of this page. It was generated from
     <a href="https://developer.metro.net/gtfs-schedule-data/" target="_blank" rel="noopener noreferrer">LA Metro’s published GTFS feed</a>,
-    and nothing about it is specific to Los Angeles — the same pipeline produced
-    <a href="{{ '/atlas/' | url }}">twenty more networks</a>.
+    and nothing about it is specific to Los Angeles — the same pipeline drew
+    <a href="{{ '/atlas/' | url }}">twenty-one more networks</a>, one of them
+    outside the United States.
   </figcaption>
 </figure>
 
@@ -241,12 +242,26 @@ description: What transit maps teach us about GIS, information architecture, and
     access were not in tension. The same choice served both.
   </p>
   <p>
-    That network is in the <a href="{{ '/atlas/' | url }}#cdmx-metro">atlas</a>
-    now, drawn by the same pipeline as everything else &mdash; twelve lines, 165
-    stations, in the operator&rsquo;s own colours. Which makes the omission
-    easier to point at, because the icons are not in the data and no amount of
-    reading a timetable would produce them.
+    Here is that network, drawn by the same code as everything else on this
+    page &mdash; which makes the omission easy to point at, because the icons
+    are not in the data and no amount of reading a timetable would produce
+    them.
   </p>
+</section>
+
+<figure class="figure figure--full">
+  {{ "cdmx-metro.svg" | inlineMap | safe }}
+  <figcaption>
+    The Mexico City Metro: twelve lines, 165 stations, in the operator&rsquo;s
+    own colours. Everything here came out of a schedule file &mdash; the lines,
+    the order of the stations, where they meet. What a schedule file cannot
+    give you is the grasshopper at Chapultepec, and that is the half of the
+    system that lets someone use it without reading it.
+    <a href="{{ '/maps/cdmx-metro.html' | url }}">Watch a day of it run &rarr;</a>
+  </figcaption>
+</figure>
+
+<section class="wrap">
   <p>
     That is the clearest thing my pipeline cannot do. It can resolve a network
     into a legible diagram, but it has no idea what any of these places mean.
@@ -323,8 +338,31 @@ description: What transit maps teach us about GIS, information architecture, and
     A good transit map does not merely describe the city. It makes the city feel
     possible.
   </p>
+</section>
+
+<figure class="figure">
+  <div class="compare">
+    <div>
+      {{ "la-metro-rail-plain.svg" | inlineMap | safe }}
+      <p><strong>Los Angeles.</strong> Six lines, 110 stations.</p>
+    </div>
+    <div>
+      {{ "cdmx-metro-plain.svg" | inlineMap | safe }}
+      <p><strong>Mexico City.</strong> Twelve lines, 165 stations.</p>
+    </div>
+  </div>
+  <figcaption>
+    Two cities, one piece of code, no hand-drawing in either. The shapes differ
+    because the networks do: Los Angeles reaches a long way out along a few
+    corridors, while Mexico City folds a denser grid into the middle of the
+    valley. Neither is a picture of the ground. Both are a claim about which
+    parts of it matter.
+  </figcaption>
+</figure>
+
+<section class="wrap">
   <p class="meta" style="margin-top:2rem">
-    Twenty-one networks are in the
+    Twenty-two networks are in the
     <a href="{{ '/atlas/' | url }}">atlas</a>, and the
     <a href="{{ '/colophon/' | url }}">colophon</a> explains how they were made
     and credits the people whose work this rests on. I gave an earlier version
