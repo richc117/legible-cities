@@ -351,25 +351,70 @@ _HTML = r"""<!doctype html>
     outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px;
   }
   header {
-    display: flex; flex-wrap: wrap; gap: 0.7rem 1.4rem; align-items: baseline;
-    padding: 0.9rem 1.4rem; background: var(--bg);
-    border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 5; padding: 0.7rem 1.4rem 0.6rem;
   }
-  h1 { font-size: 1.05rem; font-weight: 700; margin: 0; }
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem 1.1rem;
+  }
+  .bar + .bar { margin-top: 0.5rem; }
+  .spacer { flex: 1 1 auto; }
+  h1 {
+    font-size: 1.05rem; font-weight: 700; margin: 0;
+    min-width: 0; flex: 0 1 auto;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   .back { font-size: 0.86rem; color: var(--muted); text-decoration: none;
           white-space: nowrap; }
   .back:hover { color: var(--text); }
   .clock { font-variant-numeric: tabular-nums; font-size: 1.35rem; min-width: 5.5ch; }
   .sub { color: var(--muted); font-size: 0.86rem; }
+  #count::after { content: " trains"; }
   .group { display: flex; align-items: center; gap: 0.6rem; }
   button {
     font: inherit; font-size: 0.86rem; color: var(--muted); background: none;
     border: 0; border-bottom: 1px solid transparent; padding: 0.1rem 0;
-    cursor: pointer;
+    cursor: pointer; white-space: nowrap;
   }
   button:hover { color: var(--text); }
   button[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text); }
-  input[type=range] { width: min(380px, 40vw); accent-color: var(--text); }
+  /* Play/pause says which it is in its own label; the pressed underline just
+     reads as a stray rule under the word. */
+  #play[aria-pressed="true"] { border-bottom-color: transparent; }
+
+  /* An exclusive choice should not look like the toggles beside it. Sharing a
+     ground and a border makes "one of these" read at a glance, which the bare
+     words did not. */
+  .segmented {
+    display: inline-flex; border: 1px solid var(--border); border-radius: 999px;
+    overflow: hidden; background: var(--bg-soft);
+  }
+  .segmented button {
+    border: 0; border-radius: 0; padding: 0.28rem 0.85rem; color: var(--muted);
+  }
+  .segmented button + button { border-left: 1px solid var(--border); }
+  .segmented button[aria-pressed="true"] {
+    background: var(--text); color: var(--bg); border-bottom-color: transparent;
+  }
+
+  input[type=range] {
+    flex: 1 1 12rem; min-width: 8rem; max-width: 26rem; accent-color: var(--text);
+  }
+
+  /* Secondary controls: everything you touch once a session rather than once a
+     minute. Open by default where there is room, folded away on a phone. */
+  #more-panel { margin-top: 0.55rem; }
+  #more-panel[hidden] { display: none; }
+  .panel-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem 1.4rem;
+    padding: 0.4rem 0 0.2rem;
+  }
+  /* Clusters stay together when the row wraps, so "All / None" never ends up
+     orphaned from the word Lines. */
+  .panel-group {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+  }
+  .panel-label { color: var(--muted); font-size: 0.86rem; }
   .lines { display: flex; gap: 0.7rem; flex-wrap: wrap; }
   .chip {
     display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer;
@@ -379,59 +424,105 @@ _HTML = r"""<!doctype html>
   .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
   .chip[aria-pressed="true"] { color: var(--text); }
   .chip[aria-pressed="false"] .dot { opacity: 0.3; }
-  .sort, .views { color: var(--muted); font-size: 0.86rem; display: inline-flex;
-                  align-items: baseline; gap: 0.45rem; }
+  .sort { color: var(--muted); font-size: 0.86rem; display: inline-flex;
+          align-items: center; gap: 0.45rem; }
   .sort[hidden] { display: none; }
-  #stage { padding: 1.4rem; }
+
+  /* The stage scrolls, not the page. The inset edge shading is the only hint
+     that there is more chart to the right, so it is worth the two lines. */
+  #stage {
+    padding: 1.4rem; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+  #stage.scrollable-right {
+    -webkit-mask-image: linear-gradient(to right, #000 92%, rgba(0,0,0,0.35));
+            mask-image: linear-gradient(to right, #000 92%, rgba(0,0,0,0.35));
+  }
   /* Row labels in the linear view's gutter, in each line's own colour. */
   .rowname { font-weight: 700; font-size: 13px; dominant-baseline: middle; }
-  svg { width: 100%; height: auto; display: block; }
-  @media (max-width: 900px) {
-    /* A wide network squeezed into a phone is unreadable. Let the map keep a
-       usable size and pan inside its own container instead -- the page itself
-       must never scroll sideways. */
-    #stage { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    #stage svg { width: auto; height: 62vh; min-width: 100%; }
-  }
+  /* Width is set by the script, which is the only thing that knows the view:
+     the map wants to fill the height and pan, while the rows want a legible
+     column width and let the page scroll. A CSS rule cannot tell them apart,
+     and the one that used to try pinned the width to 100% and killed the
+     panning it was meant to enable. */
+  svg { display: block; height: auto; }
   /* Painted behind the glyph so a train reads against its own line colour. */
   .train { paint-order: stroke; stroke: var(--train-halo); stroke-width: 1.6; }
-  @media (max-width: 640px) {
+  @media (max-width: 700px) {
     html, body { font-size: 17px; }
-    header { padding: 0.8rem 1rem; gap: 0.5rem 1rem; }
-    h1 { font-size: 1rem; }
-    .clock { font-size: 1.15rem; }
-    #stage { padding: 0.9rem 0; }
+    /* Two rows, not four. The toolbar was taking a third of the screen before
+       anything of the map appeared. */
+    header { padding: 0.35rem 0.7rem; }
+    /* nowrap, deliberately: a wrapping flex line wraps *before* it shrinks, so
+       with wrap on the title never truncates and the view switcher drops to a
+       row of its own. Everything here can shrink -- the title to an ellipsis,
+       the scrubber to a stub -- so one line is always reachable. */
+    .bar { gap: 0.2rem 0.7rem; flex-wrap: nowrap; }
+    .bar + .bar { margin-top: 0.1rem; }
+    h1 { font-size: 0.95rem; }
+    .clock { font-size: 1rem; min-width: 4.6ch; }
+    /* The service date is on the atlas entry that got you here. */
+    .sub:not(#count) { display: none; }
+    #count { font-size: 0.78rem; }
+    #count::after { content: none; }
+    input[type=range] { min-width: 3.5rem; flex: 1 1 3.5rem; }
+    .spacer { display: none; }
+    .back { font-size: 0; }              /* keeps the arrow, drops the word */
+    .back::before { content: "\2190"; font-size: 1rem; }
+    .segmented button { padding: 0 0.6rem; font-size: 0.8rem; }
+    button { font-size: 0.8rem; }
+    #stage { padding: 0.7rem 0; }
+  }
+
+  /* Both platforms ask for 44px. Scoped to touch so the desktop toolbar keeps
+     its density. */
+  @media (pointer: coarse) {
+    button, .chip, .back {
+      min-height: 44px; display: inline-flex; align-items: center;
+    }
+    .segmented button { padding: 0 0.95rem; }
+    input[type=range] { height: 44px; }
   }
 </style>
 <header>
-  <div class="group">
+  <div class="bar">
     <a class="back" href="__BACK__">&larr; Atlas</a>
     <h1>__NAME__</h1>
     <span class="sub">__SUBTITLE__</span>
-  </div>
-  <div class="group">
-    <button id="play" aria-pressed="true">Pause</button>
-    <div class="clock" id="clock">--:--</div>
-  </div>
-  <div class="group">
-    <input type="range" id="scrub" min="0" max="1" step="1" value="0">
-    <span class="sub" id="count">0 trains</span>
-  </div>
-  <div class="group" id="speeds"></div>
-  <div class="group">
-    <span class="views" role="group" aria-label="View">
+    <span class="spacer"></span>
+    <span class="segmented" role="group" aria-label="View">
       <button id="view-map" aria-pressed="true">Map</button>
       <button id="view-linear" aria-pressed="false">Linear</button>
       <button id="view-string" aria-pressed="false">Time</button>
     </span>
-    <span class="sort" id="sort-group" hidden>
-      sort
-      <button id="sort-line" aria-pressed="true">line</button>
-      <button id="sort-size" aria-pressed="false">stations</button>
-    </span>
-    <button id="labels-toggle" aria-pressed="true">Labels</button>
   </div>
-  <div class="lines" id="line-toggles"></div>
+  <div class="bar">
+    <button id="play" aria-pressed="true">Pause</button>
+    <div class="clock" id="clock">--:--</div>
+    <input type="range" id="scrub" min="0" max="1" step="1" value="0"
+           aria-label="Time of day">
+    <span class="sub" id="count">0 trains</span>
+    <button id="speed" aria-label="Playback speed">60&times;</button>
+    <button id="more" aria-expanded="false" aria-controls="more-panel">More &#9662;</button>
+  </div>
+  <div id="more-panel" hidden>
+    <div class="panel-row">
+      <span class="panel-group">
+        <span class="panel-label">Lines <span id="line-count"></span></span>
+        <button id="lines-all">All</button>
+        <button id="lines-none">None</button>
+      </span>
+      <span class="lines" id="line-toggles"></span>
+      <span class="panel-group">
+        <button id="labels-toggle" aria-pressed="true">Labels</button>
+        <span class="sort" id="sort-group" hidden>
+          <span class="panel-label">Sort</span>
+          <button id="sort-line" aria-pressed="true">A&ndash;Z</button>
+          <button id="sort-size" aria-pressed="false">Stations</button>
+        </span>
+      </span>
+    </div>
+  </div>
 </header>
 <main id="stage">__SVG__</main>
 <script id="data" type="application/json">__DATA__</script>
@@ -519,6 +610,32 @@ _HTML = r"""<!doctype html>
       y: vbY + LABEL_RISE + band * (base + 0.15) + c.depth * branchDrop,
     };
   };
+
+  // A station column narrower than this cannot be read, so on a narrow screen
+  // the rows keep their width and the stage scrolls instead of shrinking.
+  const MIN_COL_PX = 22;
+  const stage = document.querySelector("#stage");
+
+  function sizeStage() {
+    const cs = getComputedStyle(stage);
+    const avail = stage.clientWidth
+      - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const box = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+    const narrow = window.innerWidth <= 900;
+    let w = avail;
+    if (narrow && mode === "map") {
+      // A wide network shrunk to a phone is unreadable: fill the height and
+      // let it pan.
+      w = Math.max(avail, window.innerHeight * 0.62 * (box[2] / box[3]));
+    } else if (narrow) {
+      // Rows keep a legible column width; the page takes the vertical scroll.
+      w = Math.max(avail, layout.columns * MIN_COL_PX);
+    }
+    svg.style.width = w.toFixed(0) + "px";
+    svg.style.height = "auto";
+    stage.classList.toggle("scrollable-right",
+                           stage.scrollWidth > stage.clientWidth + 1);
+  }
 
   const lerp = (a, b, t) => a + (b - a) * t;
   const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -869,6 +986,7 @@ _HTML = r"""<!doctype html>
       t.el.setAttribute("opacity", (t.primary ? 1 : m).toFixed(2));
     }
 
+    sizeStage();
     for (const n of names) {
       const base = rowPos.get(n.label) || 0;
       n.el.setAttribute("x", (vbX + GUTTER - 14).toFixed(1));
@@ -955,7 +1073,9 @@ _HTML = r"""<!doctype html>
       if (!alive.has(entry[0])) { entry[1].remove(); nodes.delete(entry[0]); }
     }
     clock.textContent = fmt(now);
-    count.textContent = shown + (shown === 1 ? " train" : " trains");
+    // The word is appended in CSS so a phone can drop it and keep the number.
+    count.textContent = shown;
+    count.setAttribute("aria-label", shown + (shown === 1 ? " train" : " trains") + " running");
   }
 
   function frame(ts) {
@@ -999,6 +1119,32 @@ _HTML = r"""<!doctype html>
     playBtn.setAttribute("aria-pressed", String(playing));
   };
   scrub.oninput = () => { now = +scrub.value; draw(); };
+
+  // One button showing the current rate, tapped to cycle. Four buttons for a
+  // single value cost four times the width and said no more.
+  const SPEEDS = [1, 60, 240, 900];
+  let speedIdx = SPEEDS.indexOf(speed);
+  if (speedIdx < 0) speedIdx = 1;
+  const speedBtn = document.getElementById("speed");
+  const showSpeed = () => {
+    speed = SPEEDS[speedIdx];
+    speedBtn.textContent = speed + "\u00d7";
+    speedBtn.title = "Playback speed \u2014 tap to cycle";
+  };
+  speedBtn.onclick = () => { speedIdx = (speedIdx + 1) % SPEEDS.length; showSpeed(); };
+  showSpeed();
+
+  // The secondary controls, open where there is room and folded away on a
+  // phone. Same markup either way.
+  const moreBtn = document.getElementById("more");
+  const morePanel = document.getElementById("more-panel");
+  const setMore = open => {
+    morePanel.hidden = !open;
+    moreBtn.setAttribute("aria-expanded", String(open));
+    moreBtn.innerHTML = open ? "Less &#9652;" : "More &#9662;";
+    dirty = true;
+  };
+  moreBtn.onclick = () => setMore(morePanel.hidden);
 
   const labelsBtn = document.getElementById("labels-toggle");
   const fullBox = svg.getAttribute("viewBox");
@@ -1057,29 +1203,57 @@ _HTML = r"""<!doctype html>
   for (const entry of rowTarget) rowPos.set(entry[0], entry[1]);
 
   const lines = document.getElementById("line-toggles");
+  const lineCount = document.getElementById("line-count");
+  const chips = new Map();
+
+  // One place decides what a hidden line means, across all three views.
+  const setRoute = (r, on) => {
+    if (on) hidden.delete(r); else hidden.add(r);
+    const off = on ? "" : "none";
+    const chip = chips.get(r);
+    if (chip) chip.setAttribute("aria-pressed", String(on));
+    svg.querySelectorAll('#lines g.line[data-line="' + r + '"]')
+       .forEach(g => g.style.display = off);
+    for (const d of dots) if (d.label === r) d.el.style.display = off;
+    for (const t of texts) if (t.label === r) t.el.style.display = off;
+    for (const n of names) if (n.label === r) n.el.style.display = off;
+    const sg = stringGroups.get(r);
+    if (sg) sg.style.display = off;
+    lineCount.textContent = (routes.length - hidden.size) + " of " + routes.length;
+  };
+
   for (const r of routes) {
     const chip = document.createElement("span");
     chip.className = "chip";
+    chip.setAttribute("role", "button");
+    chip.setAttribute("tabindex", "0");
     chip.setAttribute("aria-pressed", "true");
     chip.innerHTML = '<span class="dot" style="background:' +
       (data.lines[r] || "#333") + '"></span>' + r;
-    chip.onclick = () => {
-      const on = chip.getAttribute("aria-pressed") === "true";
-      chip.setAttribute("aria-pressed", String(!on));
-      if (on) hidden.add(r); else hidden.delete(r);
-      svg.querySelectorAll('#lines g.line[data-line="' + r + '"]')
-         .forEach(g => g.style.display = on ? "none" : "");
-      for (const d of dots) if (d.label === r) d.el.style.display = on ? "none" : "";
-      for (const t of texts) if (t.label === r) t.el.style.display = on ? "none" : "";
-      for (const n of names) if (n.label === r) n.el.style.display = on ? "none" : "";
-      const sg = stringGroups.get(r);
-      if (sg) sg.style.display = on ? "none" : "";
+    const toggle = () => {
+      setRoute(r, chip.getAttribute("aria-pressed") !== "true");
       draw();
     };
+    chip.onclick = toggle;
+    chip.onkeydown = e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    };
+    chips.set(r, chip);
     lines.appendChild(chip);
   }
+  document.getElementById("lines-all").onclick = () => {
+    for (const r of routes) setRoute(r, true);
+    draw();
+  };
+  document.getElementById("lines-none").onclick = () => {
+    for (const r of routes) setRoute(r, false);
+    draw();
+  };
+  lineCount.textContent = routes.length + " of " + routes.length;
 
   setMode("map");
+  setMore(window.innerWidth > 900);
+  addEventListener("resize", () => { dirty = true; });
   geometry(0, 0);
   requestAnimationFrame(frame);
 })();

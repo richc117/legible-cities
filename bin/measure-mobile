@@ -1,0 +1,104 @@
+#!/usr/bin/env node
+// Measure the built site at phone widths against fixed thresholds.
+// Exists because "looks fine on my laptop" is how the animation pages ended up
+// spending a third of a phone screen on their own toolbar.
+const path = require("path");
+let chromium;
+try {
+  ({ chromium } = require(path.join(__dirname, "..", "site", "node_modules", "playwright")));
+} catch (e) {
+  console.error("playwright missing. cd site && npm install --no-save playwright");
+  process.exit(1);
+}
+
+const BASE = process.env.BASE_URL || "http://localhost:4321";
+const DEVICES = [[390, 844, "iphone"], [360, 780, "android"]];
+const MAX_HEADER_PCT = 15;   // of viewport height
+const MIN_ROW_PX = 60;       // per line in the row-based views
+const MIN_TAP = 44;
+
+(async () => {
+  const browser = await chromium.launch();
+  let failures = 0;
+  const bad = (cond, msg) => { if (!cond) failures++; return cond ? "ok  " : "FAIL"; };
+
+  for (const [w, h, device] of DEVICES) {
+    console.log(`\n--- ${device} ${w}x${h} ---`);
+    const ctx = await browser.newContext({
+      viewport: { width: w, height: h }, deviceScaleFactor: 2,
+      isMobile: true, hasTouch: true,
+    });
+    const page = await ctx.newPage();
+
+    for (const [url, label] of [["/", "essay"], ["/atlas/", "atlas"], ["/colophon/", "colophon"]]) {
+      await page.goto(BASE + url, { waitUntil: "networkidle" });
+      const m = await page.evaluate(() => {
+        const de = document.documentElement;
+        // Controls only. A link inside a sentence is a word, not a button, and
+        // giving it a 44px target would overlap its neighbours; the guideline
+        // is about things you aim at, not about prose.
+        let minTap = 999, smallest = "";
+        document.querySelectorAll("button, .chip, .brand, .site-nav a, .site-footer a, figcaption a, .meta a")
+          .forEach(el => {
+            const r = el.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0 && r.height < minTap) {
+              minTap = Math.round(r.height);
+              smallest = el.textContent.trim().slice(0, 20);
+            }
+          });
+        let overflowing = 0;
+        document.querySelectorAll("svg").forEach(el => {
+          if (el.getBoundingClientRect().width > window.innerWidth + 1) overflowing++;
+        });
+        return { scrollW: de.scrollWidth, innerW: window.innerWidth, minTap, smallest, overflowing };
+      });
+      const noScroll = m.scrollW <= m.innerW + 1;
+      console.log(`${bad(noScroll)}  ${label.padEnd(9)} no page h-scroll` +
+                  `   ${bad(m.overflowing === 0)}  maps fit width (${m.overflowing} overflow)` +
+                  `   ${bad(m.minTap >= MIN_TAP)}  min tap ${m.minTap}px "${m.smallest}"`);
+    }
+
+    for (const city of ["la-metro-rail", "nyc-subway"]) {
+      await page.goto(`${BASE}/maps/${city}.html`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(700);
+      for (const [btn, view] of [["#view-map", "map"], ["#view-linear", "linear"], ["#view-string", "time"]]) {
+        await page.locator(btn).click({ force: true });
+        await page.waitForTimeout(2400);
+        const m = await page.evaluate(() => {
+          const de = document.documentElement;
+          const stage = document.querySelector("#stage");
+          const svg = stage.querySelector("svg");
+          const rows = svg.querySelectorAll("#linear-names text").length;
+          let minTap = 999;
+          document.querySelectorAll("header button, header a, header .chip").forEach(el => {
+            const r = el.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) minTap = Math.min(minTap, Math.round(r.height));
+          });
+          return {
+            headerH: Math.round(document.querySelector("header").getBoundingClientRect().height),
+            vh: window.innerHeight,
+            scrollW: de.scrollWidth, innerW: window.innerWidth,
+            sideScroll: stage.scrollWidth > stage.clientWidth + 1,
+            svgH: Math.round(svg.getBoundingClientRect().height),
+            rows, minTap,
+          };
+        });
+        const pct = Math.round(100 * m.headerH / m.vh);
+        const perRow = m.rows ? Math.round(m.svgH / m.rows) : null;
+        let line = `${bad(pct <= MAX_HEADER_PCT)}  ${(city + " " + view).padEnd(24)} ` +
+                   `header ${String(pct).padStart(2)}%   ` +
+                   `${bad(m.scrollW <= m.innerW + 1)}  no page h-scroll   ` +
+                   `${bad(m.minTap >= MIN_TAP)}  tap ${m.minTap}px`;
+        if (view !== "map") {
+          line += `   ${bad(m.sideScroll)}  side-scroll` +
+                  `   ${bad(perRow >= MIN_ROW_PX)}  ${perRow}px/row`;
+        }
+        console.log(line);
+      }
+    }
+    await ctx.close();
+  }
+  await browser.close();
+  console.log(failures ? `\n${failures} threshold(s) missed` : "\nall thresholds met");
+  process.exit(failures ? 1 : 0);
+})();

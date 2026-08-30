@@ -101,6 +101,7 @@ a:focus-visible {
   text-decoration: none;
   font-size: 1.05rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .site-nav {
@@ -426,20 +427,60 @@ blockquote p:last-child {
 }
 
 @media (max-width: 900px) {
-  /* Wide diagrams pan inside their own container rather than shrinking to
-     illegibility; the page itself never scrolls sideways. */
-  .figure--full,
-  .atlas .thumb {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
+  /* Embedded maps fit the width rather than panning. A thumbnail's job is the
+     shape of a network at a glance -- panning made the atlas open on an empty
+     corner of New York -- and the running map, one tap away, is where
+     exploring belongs. This also keeps the page from becoming 21 nested
+     scroll areas. */
   .figure--full > svg,
   .atlas .thumb svg {
-    width: auto;
-    height: 58vh;
-    max-height: none;
-    min-width: 100%;
+    width: 100%;
+    height: auto;
+    max-height: 70vh;
+  }
+
+  .compare svg {
+    height: auto;
+    max-height: 34vh;
+  }
+}
+
+/* Both platforms ask for a 44px target. Scoped to touch so the desktop
+   layout keeps its density. */
+@media (pointer: coarse) {
+  .brand,
+  .site-nav a,
+  .site-footer a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* Navigation that happens to sit inside a caption or a meta line: grow the
+     hit area with padding and pull it back with a negative margin, so the
+     target reaches 44px without changing where the text sits.
+     Deliberately NOT applied to links inside prose -- a paragraph of credits
+     would end up with overlapping targets, and the guideline is about
+     controls, not about words in a sentence. */
+  figcaption a,
+  .meta a {
+    display: inline-block;
+    padding-block: 0.7rem;
+    margin-block: -0.7rem;
+  }
+
+  .theme-switch .slider {
+    width: 46px;
+    height: 28px;
+  }
+
+  .theme-switch .slider::after {
+    width: 22px;
+    height: 22px;
+  }
+
+  .theme-switch input:checked + .slider::after {
+    transform: translateX(18px);
   }
 }
 
@@ -447,6 +488,15 @@ blockquote p:last-child {
   html,
   body {
     font-size: 17px;
+  }
+
+  /* Keeps "Legible Cities" on one line beside the nav at 360px. */
+  .brand {
+    font-size: 0.95rem;
+  }
+
+  .site-nav {
+    gap: 0.7rem;
   }
 
   main {
