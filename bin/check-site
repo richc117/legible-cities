@@ -1,0 +1,84 @@
+#!/usr/bin/env node
+// Exercise the built site the way a visitor does: follow real links and assert
+// where they land. Checking the markup is not enough -- a back-link whose href
+// is present and wrong looks fine in the HTML and 404s in the browser.
+//
+//   bin/preview-site &   then   node bin/check-site
+const path = require("path");
+let chromium;
+try {
+  ({ chromium } = require(path.join(__dirname, "..", "site", "node_modules", "playwright")));
+} catch (e) {
+  console.error("playwright missing. cd site && npm install --no-save playwright && npx playwright install chromium");
+  process.exit(1);
+}
+
+const BASE = process.env.BASE_URL || "http://localhost:4321";
+const strip = u => u.replace(BASE, "") || "/";
+
+(async () => {
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  const failures = [];
+  const httpErrors = [];
+  page.on("response", r => { if (r.status() >= 400) httpErrors.push(r.status() + " " + strip(r.url())); });
+  page.on("pageerror", e => failures.push("JS error: " + e));
+
+  const expect = (got, want, what) => {
+    const ok = got === want;
+    console.log(`${ok ? "ok  " : "FAIL"}  ${what}: ${got}${ok ? "" : "  (expected " + want + ")"}`);
+    if (!ok) failures.push(what);
+  };
+
+  // Primary nav reaches every page.
+  for (const [label, want] of [["Essay", "/"], ["Atlas", "/atlas/"], ["Colophon", "/colophon/"]]) {
+    await page.goto(BASE + "/", { waitUntil: "networkidle" });
+    await page.locator(`.site-nav a:text-is("${label}")`).click();
+    await page.waitForLoadState("networkidle");
+    expect(strip(page.url()), want, `nav "${label}"`);
+  }
+
+  // Atlas entry opens a running map, and its back-link returns to the atlas.
+  await page.goto(BASE + "/atlas/", { waitUntil: "networkidle" });
+  const count = await page.locator(".atlas > li").count();
+  console.log(`ok    atlas lists ${count} networks`);
+  await page.locator("a.thumb").first().click();
+  await page.waitForLoadState("networkidle");
+  const city = strip(page.url());
+  console.log(`ok    atlas -> ${city}`);
+  await page.locator("a.back").click();
+  await page.waitForLoadState("networkidle");
+  expect(strip(page.url()), "/atlas/", "running map back-link");
+
+  // The animation actually runs: trains appear and the clock advances.
+  await page.goto(BASE + city, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1500);
+  const t1 = await page.locator("#clock").innerText();
+  const trains = await page.locator("#trains circle").count();
+  await page.waitForTimeout(1500);
+  const t2 = await page.locator("#clock").innerText();
+  console.log(`${trains > 0 ? "ok  " : "FAIL"}  ${trains} trains drawn`);
+  console.log(`${t1 !== t2 ? "ok  " : "FAIL"}  clock advances: ${t1} -> ${t2}`);
+  if (!trains) failures.push("no trains drawn");
+  if (t1 === t2) failures.push("clock did not advance");
+
+  // Controls do what they say.
+  const before = await page.locator("#labels\\-toggle").getAttribute("aria-pressed");
+  await page.locator("#labels\\-toggle").click();
+  const after = await page.locator("#labels\\-toggle").getAttribute("aria-pressed");
+  const hidden = await page.locator("#labels").evaluate(el => el.style.display === "none");
+  console.log(`${before !== after && hidden ? "ok  " : "FAIL"}  labels toggle hides the names`);
+  if (!(before !== after && hidden)) failures.push("labels toggle");
+
+  if (httpErrors.length) {
+    console.log("FAIL  HTTP errors:", [...new Set(httpErrors)].slice(0, 6).join(", "));
+    failures.push("http");
+  } else {
+    console.log("ok    no 4xx/5xx during navigation");
+  }
+
+  await browser.close();
+  console.log(failures.length ? `\n${failures.length} failure(s)` : "\nall checks passed");
+  process.exit(failures.length ? 1 : 0);
+})();

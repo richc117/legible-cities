@@ -26,6 +26,10 @@ DATA_DIR = SRC_DIR / "_data"
 # the before/after that carries the Beck section.
 FEATURED = "la-metro-rail"
 
+# Where an animation page's back-link goes. Absolute: the pages live at
+# /maps/<city>.html, so a relative "index.html" would resolve to /maps/.
+ATLAS_URL = "/atlas/"
+
 
 @dataclass
 class NetworkEntry:
@@ -117,7 +121,7 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
 
     entries: list[NetworkEntry] = []
     for key in keys:
-        result = pipeline.run(key, width=width, out_dir=MAPS_DIR)
+        result = pipeline.run(key, width=width, out_dir=MAPS_DIR, back=ATLAS_URL)
         entries.append(NetworkEntry(
             key=key,
             name=feeds.FEEDS[key].name,
