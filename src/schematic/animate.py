@@ -323,6 +323,9 @@ _HTML = r"""<!doctype html>
     <span class="sub" id="count">0 trains</span>
   </div>
   <div class="group" id="speeds"></div>
+  <div class="group">
+    <button id="labels-toggle" aria-pressed="true">Labels</button>
+  </div>
   <div class="lines" id="line-toggles"></div>
 </header>
 <main id="stage">__SVG__</main>
@@ -449,6 +452,29 @@ _HTML = r"""<!doctype html>
     playBtn.setAttribute("aria-pressed", String(playing));
   };
   scrub.oninput = () => { now = +scrub.value; draw(); };
+
+  // Station names crowd a dense network, and following a moving train is much
+  // easier without them. The group is only hidden, never removed, so the labels
+  // the placer solved for come straight back untouched.
+  //
+  // The canvas is sized to fit the labels, which reach outside the track
+  // geometry, so hiding them also tightens the viewBox onto the network alone
+  // -- the renderer supplies both boxes. Worth up to a fifth of the canvas on
+  // networks with long station names.
+  const labelsBtn = document.getElementById("labels-toggle");
+  const labelGroup = svg.querySelector("#labels");
+  const fullBox = svg.getAttribute("viewBox");
+  const tightBox = svg.getAttribute("data-viewbox-nolabels");
+  if (!labelGroup) {
+    labelsBtn.remove();          // map was rendered with labels=False
+  } else {
+    labelsBtn.onclick = () => {
+      const on = labelsBtn.getAttribute("aria-pressed") !== "true";
+      labelsBtn.setAttribute("aria-pressed", String(on));
+      labelGroup.style.display = on ? "" : "none";
+      if (tightBox) svg.setAttribute("viewBox", on ? fullBox : tightBox);
+    };
+  }
 
   const speeds = document.getElementById("speeds");
   for (const [label, mult] of [["1x", 1], ["60x", 60], ["240x", 240], ["900x", 900]]) {

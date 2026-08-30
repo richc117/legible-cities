@@ -196,27 +196,41 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
         dropped = [s.text for s in dropped_stations]
 
     # --- canvas: derive from what is actually drawn ----------------------
-    xs: list[float] = []
-    ys: list[float] = []
+    # Two boxes: the network alone, and the network plus its labels. Labels
+    # reach well outside the track geometry, so a viewer that hides them is
+    # otherwise left staring at a mostly empty canvas.
+    net_xs: list[float] = []
+    net_ys: list[float] = []
     for tp in tracks.values():
         for x, y in tp.points:
-            xs += [x - style.line_width, x + style.line_width]
-            ys += [y - style.line_width, y + style.line_width]
+            net_xs += [x - style.line_width, x + style.line_width]
+            net_ys += [y - style.line_width, y + style.line_width]
     for x, y in node_xy.values():
-        xs += [x - style.interchange_radius, x + style.interchange_radius]
-        ys += [y - style.interchange_radius, y + style.interchange_radius]
+        net_xs += [x - style.interchange_radius, x + style.interchange_radius]
+        net_ys += [y - style.interchange_radius, y + style.interchange_radius]
+
+    xs, ys = list(net_xs), list(net_ys)
     for p in placements:
         xs += [p.quad.aabb[0], p.quad.aabb[2]]
         ys += [p.quad.aabb[1], p.quad.aabb[3]]
 
     pad = style.padding
-    min_x, max_x = min(xs) - pad, max(xs) + pad
-    min_y, max_y = min(ys) - pad, max(ys) + pad
-    w, h = max_x - min_x, max_y - min_y
+
+    def box(bx: list[float], by: list[float]) -> tuple[float, float, float, float]:
+        x0, x1 = min(bx) - pad, max(bx) + pad
+        y0, y1 = min(by) - pad, max(by) + pad
+        return x0, y0, x1 - x0, y1 - y0
+
+    min_x, min_y, w, h = box(xs, ys)
+    net_box = box(net_xs, net_ys)
+    max_x, max_y = min_x + w, min_y + h
 
     out: list[str] = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0f}" height="{h:.0f}" '
         f'viewBox="{min_x:.2f} {min_y:.2f} {w:.2f} {h:.2f}" '
+        # Consumed by the animation's label toggle, inert in a standalone SVG.
+        f'data-viewbox-nolabels="{net_box[0]:.2f} {net_box[1]:.2f} '
+        f'{net_box[2]:.2f} {net_box[3]:.2f}" '
         f'font-family="Helvetica Neue, Helvetica, Arial, sans-serif">',
     ]
     if title:

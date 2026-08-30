@@ -98,7 +98,10 @@ print(result.summary())
 
 Writes `out/la-metro-rail.svg`, `out/la-metro-rail.html` and
 `out/la-metro-rail.positions.json`. Open the HTML in a browser: a clock, a
-time-of-day scrubber, playback speeds and per-line toggles.
+time-of-day scrubber, playback speeds, per-line toggles, and a **Labels**
+button that hides the station names — dense networks read far better without
+them when you are watching the trains, and hiding them also tightens the view
+onto the network.
 
 `bin/run-all` runs every registered feed and prints a table of what worked.
 
