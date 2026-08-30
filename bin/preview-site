@@ -1,10 +1,30 @@
 #!/usr/bin/env bash
-# Serve site/dist for local review. Kills any previous instance first -- a
-# leaked server holding the port will silently serve a stale build.
+# Serve the built site the way GitHub Pages will: under its path prefix, not at
+# the root. Serving it at the root would let absolute links pass locally and
+# 404 once deployed, which is the whole failure this guards against.
+#
+# Kills any previous instance first -- a leaked server holding the port will
+# silently serve a stale build.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
 PORT="${PORT:-4321}"
+PREFIX="$(python3 -c "import json;print((json.load(open('site/src/_data/site.json')).get('pathPrefix') or '/').strip('/'))")"
+
 lsof -ti :"$PORT" | xargs -r kill -9 2>/dev/null || true
-cd site/dist
-echo "serving site/dist on http://localhost:$PORT"
+
+if [ -n "$PREFIX" ]; then
+  # A serve root whose only entry is a link named after the prefix, so the
+  # deployed URL shape is reproduced exactly.
+  rm -rf site/.serve && mkdir -p site/.serve
+  ln -s ../dist "site/.serve/$PREFIX"
+  ROOT="site/.serve"
+  URL="http://localhost:$PORT/$PREFIX/"
+else
+  ROOT="site/dist"
+  URL="http://localhost:$PORT/"
+fi
+
+echo "serving $URL"
+cd "$ROOT"
 exec python3 -m http.server "$PORT"

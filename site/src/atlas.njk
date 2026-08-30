@@ -32,14 +32,14 @@ description: Schematic maps and running timetables for 21 US rail networks, gene
           {{ n.trips | thousands }} trips on {{ n.date | formatDate }}
         </p>
       </div>
-      <a class="thumb" href="{{ '/maps/' + n.animation | url }}"
+      <a class="thumb" href="{{ ('/maps/' + n.animation) | url }}"
          aria-label="Open the running map for {{ n.name }}">
         {{ n.svg | inlineMap | safe }}
       </a>
       <div class="wrap">
         <p class="meta">
-          <a href="{{ '/maps/' + n.animation | url }}">Running map</a> ·
-          <a href="{{ '/maps/' + n.svg | url }}">SVG</a> ·
+          <a href="{{ ('/maps/' + n.animation) | url }}">Running map</a> ·
+          <a href="{{ ('/maps/' + n.svg) | url }}">SVG</a> ·
           <a href="{{ n.feed_url }}" target="_blank" rel="noopener noreferrer">Source feed</a>
         </p>
         {% if n.notes.length or n.caveats.length %}

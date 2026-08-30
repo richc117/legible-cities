@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Publish site/dist to the gh-pages branch on GitHub.
+#
+# The site is deliberately not rebuilt in CI. Generation needs Docker, a LOOM
+# compile and ~300 MB of agency feeds -- and one of those feeds (Mexico City's)
+# no longer answers, so a CI rebuild would fail on a source that is gone. What
+# gets published is a snapshot, which is what this project honestly is.
+#
+# gh-pages is an orphan branch rewritten each time, so the ~31 MB of generated
+# output never accumulates in main's history.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+REPO="$PWD"
+
+REMOTE="${REMOTE:-github}"
+BRANCH="${BRANCH:-gh-pages}"
+
+[ -f site/dist/index.html ] || { echo "site/dist/index.html missing -- run bin/build-site first"; exit 1; }
+
+PREFIX="$(python3 -c "import json;print((json.load(open('site/src/_data/site.json')).get('pathPrefix') or '/').strip('/'))")"
+URL="$(git remote get-url "$REMOTE")"
+NAME="$(git config user.name  || echo deploy)"
+MAIL="$(git config user.email || echo deploy@localhost)"
+SHA="$(git rev-parse --short HEAD)"
+
+echo "==> publishing site/dist to $REMOTE/$BRANCH  (will serve under /$PREFIX/)"
+
+# Jekyll otherwise skips files beginning with an underscore.
+touch site/dist/.nojekyll
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+cp -R site/dist/. "$WORK/"
+
+cd "$WORK"
+git init -q -b "$BRANCH"
+git add -A
+git -c user.name="$NAME" -c user.email="$MAIL" \
+    commit -qm "Publish site built from $SHA"
+git remote add origin "$URL"
+git push -q --force origin "$BRANCH"
+
+echo "==> pushed $(find . -type f | wc -l | tr -d ' ') files"
+echo "    If Pages is not enabled yet: Settings -> Pages -> Deploy from a branch -> $BRANCH / (root)"

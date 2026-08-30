@@ -11,7 +11,10 @@ try {
   process.exit(1);
 }
 
-const BASE = process.env.BASE_URL || "http://localhost:4321";
+// Matches what bin/preview-site serves, which matches what Pages will.
+const PREFIX = (require(path.join(__dirname, "..", "site", "src", "_data", "site.json"))
+                .pathPrefix || "/").replace(/\/+$/, "");
+const BASE = process.env.BASE_URL || ("http://localhost:4321" + PREFIX);
 const DEVICES = [[390, 844, "iphone"], [360, 780, "android"]];
 const MAX_HEADER_PCT = 15;   // of viewport height
 const MIN_ROW_PX = 60;       // per line in the row-based views

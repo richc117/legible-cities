@@ -26,12 +26,28 @@ DATA_DIR = SRC_DIR / "_data"
 # the before/after that carries the Beck section.
 FEATURED = "la-metro-rail"
 
-# Where an animation page's back-link goes. Absolute: the pages live at
-# /maps/<city>.html, so a relative "index.html" would resolve to /maps/.
-ATLAS_URL = "/atlas/"
+def path_prefix() -> str:
+    """The subpath the site is served from, with both slashes.
 
-# Where the animation pages find the favicon, once served from the site root.
-ICONS_URL = "/assets/favicon"
+    Read from the same file Eleventy reads, because the animation pages are
+    generated here rather than templated, and a prefix that disagreed between
+    the two would give a site whose internal links half work.
+    """
+    config = SRC_DIR / "_data" / "site.json"
+    prefix = "/"
+    if config.exists():
+        prefix = json.loads(config.read_text()).get("pathPrefix") or "/"
+    return "/" + prefix.strip("/") + "/" if prefix.strip("/") else "/"
+
+
+# Where an animation page's back-link goes. Absolute: the pages live at
+# <prefix>maps/<city>.html, so a relative "index.html" would resolve to maps/.
+def atlas_url() -> str:
+    return path_prefix() + "atlas/"
+
+
+def icons_url() -> str:
+    return path_prefix() + "assets/favicon"
 
 # Networks the essay shows without labels, to compare their shapes. At the size
 # a side-by-side figure allows, station names are unreadable anyway, and having
@@ -130,7 +146,7 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
     entries: list[NetworkEntry] = []
     for key in keys:
         result = pipeline.run(key, width=width, out_dir=MAPS_DIR,
-                              back=ATLAS_URL, icons=ICONS_URL)
+                              back=atlas_url(), icons=icons_url())
         entries.append(NetworkEntry(
             key=key,
             name=feeds.FEEDS[key].name,

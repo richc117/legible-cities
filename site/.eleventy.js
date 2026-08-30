@@ -39,6 +39,11 @@ module.exports = function (eleventyConfig) {
   });
 
   return {
+    // GitHub Pages serves a project repo from a subpath, so every absolute URL
+    // needs prefixing. The `url` filter used throughout the templates does that
+    // from here; anything built outside Eleventy has to apply it itself, which
+    // is why site.py reads the same value.
+    pathPrefix: require("./src/_data/site.json").pathPrefix || "/",
     dir: { input: "src", includes: "_includes", data: "_data", output: "dist" },
     markdownTemplateEngine: "njk",
     htmlTemplateEngine: "njk",

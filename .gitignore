@@ -11,3 +11,4 @@ site/node_modules/
 site/dist/
 site/src/maps/
 site/src/_data/networks.json
+site/.serve/
