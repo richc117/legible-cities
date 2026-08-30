@@ -82,6 +82,8 @@ MobilityData's mirror and its service period ended in December 2025.
 
 ## The site
 
+Published at **https://richc117.github.io/legible-cities/**
+
 `site/` is an Eleventy build of a standalone site — an essay on why schematic
 maps matter, an atlas of all 22 networks, and a framework page crediting the work this
 rests on. It reuses the design tokens, typography and theme switch from the
