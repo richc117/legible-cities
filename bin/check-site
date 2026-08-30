@@ -71,6 +71,56 @@ const strip = u => u.replace(BASE, "") || "/";
   console.log(`${before !== after && hidden ? "ok  " : "FAIL"}  labels toggle hides the names`);
   if (!(before !== after && hidden)) failures.push("labels toggle");
 
+  // The linear view: unfolds, sorts, folds back to exactly the map it left.
+  await page.goto(BASE + city, { waitUntil: "networkidle" });
+  await page.waitForTimeout(800);
+  const mapD = await page.locator("#lines path").first().getAttribute("d");
+  const mapTrains = await page.locator("#trains circle").count();
+
+  await page.locator("#view-toggle").click();
+  await page.waitForTimeout(2600);
+  const rows = await page.locator("#linear-names text").count();
+  const linDots = await page.locator("#linear-stations circle").count();
+  const linLabels = await page.locator("#linear-labels text").count();
+  const linTrains = await page.locator("#trains circle").count();
+  console.log(`${rows > 0 ? "ok  " : "FAIL"}  linear view: ${rows} rows, ${linDots} stations, ${linTrains} trains`);
+  if (!rows) failures.push("no rows in linear view");
+  expect(linLabels, linDots, "every station in a row is named");
+
+  // A train must sit on its line's row, not somewhere between views.
+  const onRow = await page.evaluate(() => {
+    const rowY = [...document.querySelectorAll("#linear-names text")].map(t => +t.getAttribute("y"));
+    const svg = document.querySelector("#stage svg");
+    const box = svg.getBoundingClientRect();
+    const vb = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+    const scale = box.height / vb[3];
+    return [...document.querySelectorAll("#trains circle")].every(c => {
+      const y = +c.getAttribute("cy");
+      return rowY.some(r => Math.abs(r - y) < 40 / scale + 40);
+    });
+  });
+  console.log(`${onRow ? "ok  " : "FAIL"}  every train sits on a row`);
+  if (!onRow) failures.push("trains off-row in linear view");
+
+  const readOrder = () => [...document.querySelectorAll("#linear-names text")]
+    .map(t => ({ l: t.textContent, y: +t.getAttribute("y") }))
+    .sort((a, b) => a.y - b.y).map(o => o.l);
+  const byLine = await page.evaluate(readOrder);
+  await page.locator("#sort-size").click();
+  await page.waitForTimeout(2400);
+  const bySize = await page.evaluate(readOrder);
+  const reordered = byLine.join() !== bySize.join();
+  console.log(`${reordered ? "ok  " : "FAIL"}  sorting reorders the rows`);
+  if (!reordered) failures.push("sort did nothing");
+
+  await page.locator("#view-toggle").click();
+  await page.waitForTimeout(2800);
+  const backD = await page.locator("#lines path").first().getAttribute("d");
+  expect(backD, mapD, "map geometry restored exactly");
+  const backTrains = await page.locator("#trains circle").count();
+  console.log(`${backTrains > 0 ? "ok  " : "FAIL"}  trains still running after the round trip (${mapTrains} -> ${backTrains})`);
+  if (!backTrains) failures.push("no trains after round trip");
+
   if (httpErrors.length) {
     console.log("FAIL  HTTP errors:", [...new Set(httpErrors)].slice(0, 6).join(", "));
     failures.push("http");

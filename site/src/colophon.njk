@@ -65,6 +65,16 @@ description: How the schematic maps are generated, the tools involved, and credi
     along it by distance.
   </p>
   <p>
+    Each running map also has a second view. The schematic has already thrown
+    away geography, but it is still a map; the linear view throws away the last
+    of it and lays every line out as a row of equally spaced stations. Row
+    length then reads directly as station count, the lines can be compared with
+    each other rather than located in a city, and because the spacing is by
+    stop rather than by distance, a train visibly accelerates wherever it skips
+    one. Lines that branch fork onto a short row of their own, the way the
+    diagram above a carriage door does.
+  </p>
+  <p>
     Adding a city is one entry in a registry — a name, a feed URL, and which
     modes to include. Everything else is the same code. That was the point of
     building it this way, and the twenty-one networks in the

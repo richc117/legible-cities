@@ -197,7 +197,7 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
             x, y = node_xy[node.id]
             n = bundle.get(node.id, 1)
             stations.append(Station(
-                text=display_name(node.station_label), x=x, y=y,
+                text=display_name(node.station_label), x=x, y=y, key=node.id,
                 importance=len(routes_at.get(node.id, ())),
                 on_horizontal_run=_horizontal_run(graph, node.id, proj),
                 clearance=(n - 1) / 2 * style.spacing + style.line_width / 2,
@@ -248,7 +248,9 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     ]
     if title:
         out.append(f"<title>{html.escape(title)}</title>")
-    out.append(f'<rect x="{min_x:.2f}" y="{min_y:.2f}" width="{w:.2f}" height="{h:.2f}" '
+    # Identified so a consumer that changes the viewBox can grow it to match.
+    out.append(f'<rect id="backdrop" x="{min_x:.2f}" y="{min_y:.2f}" '
+               f'width="{w:.2f}" height="{h:.2f}" '
                f'fill="{style.var("bg", style.background)}"/>')
 
     out.append('<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">')
@@ -259,7 +261,12 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
                    f'stroke="{colors[label]}" stroke-width="{style.line_width:.2f}">')
         for tp in tracks.values():
             if tp.label == label:
-                out.append(f'<path id="{tp.element_id}" d="{_path_d(tp.points)}"/>')
+                # The endpoints let a consumer re-aim this segment at a
+                # different layout; inert when the SVG is read on its own.
+                out.append(f'<path id="{tp.element_id}" '
+                           f'data-src="{html.escape(tp.src)}" '
+                           f'data-dst="{html.escape(tp.dst)}" '
+                           f'd="{_path_d(tp.points)}"/>')
         out.append("</g>")
     out.append("</g>")
 
@@ -286,6 +293,7 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
             halo = (f' stroke="{style.var("bg", style.background)}" stroke-width="3.2"'
                     f' paint-order="stroke" stroke-linejoin="round"' if p.haloed else "")
             out.append(f'<text x="{p.x:.2f}" y="{p.y:.2f}" text-anchor="{p.anchor}"'
+                       f' data-node="{html.escape(p.key)}"'
                        f'{transform}{halo}>{html.escape(p.text)}</text>')
         out.append("</g>")
 

@@ -21,7 +21,9 @@ from html import escape as html_escape
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import linear
 from .linegraph import LineGraph
+from .names import display_name
 from .offsets import cumulative_lengths, polyline_length
 from .render import RenderResult, TrackPath
 from .schedule import Trip
@@ -167,6 +169,9 @@ class Animation:
     trips: list[dict]
     lines: dict[str, str]
     unrouted: list[str]
+    # Column assignments for the linear view; rows are placed in the browser,
+    # since their order depends on the sort the reader picks.
+    linear: dict = field(default_factory=dict)
     # Trips that lost at least one call because its stop matched no node.
     trips_with_skipped_calls: int = 0
     # Trips routed over another line's track for at least one hop.
@@ -176,15 +181,24 @@ class Animation:
         return {
             "date": self.date.isoformat(),
             "lines": self.lines,
+            "linear": self.linear,
             "paths": self.paths,
             "trips": self.trips,
         }
 
 
 def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
-          date: dt.date) -> Animation:
+          date: dt.date, line_order: list[str] | None = None) -> Animation:
     """Route every trip and collect the deduplicated paths."""
     net = RouteNetwork.build(render)
+    layout = linear.build(graph, order=line_order)
+    layout_json = layout.to_json()
+    # Every station in the layout gets its name here rather than being read off
+    # the drawn map, whose label placer drops names it cannot fit.
+    layout_json["names"] = {
+        n.id: display_name(n.station_label)
+        for n in graph.stations if n.station_label
+    }
 
     colors: dict[str, str] = {}
     for e in graph.edges:
@@ -223,6 +237,10 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
             path_index[key] = idx
             paths.append({"route": trip.route_label, "d": tp.path_d(),
                           "stops": [round(v, 1) for v in tp.stop_lengths],
+                          # The station behind each stop, so a view that is not
+                          # the map can place the train from the layout instead
+                          # of from arc length.
+                          "nodes": list(nodes),
                           "borrowed": tp.borrowed_hops})
         if paths[idx]["borrowed"]:
             borrowed += 1
@@ -233,17 +251,25 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
 
         # Keyframes: arrive at a stop, then hold there until departure. The dwell
         # pair is what stops trains gliding through stations without pausing.
+        #
+        # The value is the *stop index*, not a distance. Every view then derives
+        # its own geometry from the same fractional index -- arc length along
+        # the drawn path for the map, a position on a row for the linear view --
+        # and the two stay in step by construction. It is also much smaller on
+        # the wire than a float length, which matters at NYC's 257,000
+        # keyframes.
         keys: list[list[float]] = []
-        for call, length in zip(calls, stops):
-            keys.append([call.arrival, length])
+        for i, call in enumerate(calls):
+            keys.append([call.arrival, i])
             if call.departure > call.arrival:
-                keys.append([call.departure, length])
+                keys.append([call.departure, i])
         out_trips.append({"p": idx, "r": trip.route_label, "h": trip.headsign, "k": keys})
 
     out_trips.sort(key=lambda t: t["k"][0][0])
     return Animation(date=date, paths=paths, trips=out_trips, lines=colors,
                      unrouted=unrouted, trips_with_skipped_calls=skipped_calls,
-                     trips_with_borrowed_track=borrowed)
+                     trips_with_borrowed_track=borrowed,
+                     linear=layout_json)
 
 
 def write(animation: Animation, svg: str, out_dir: Path, *,
@@ -345,7 +371,12 @@ _HTML = r"""<!doctype html>
   .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
   .chip[aria-pressed="true"] { color: var(--text); }
   .chip[aria-pressed="false"] .dot { opacity: 0.3; }
+  .sort { color: var(--muted); font-size: 0.86rem; display: inline-flex;
+          align-items: baseline; gap: 0.45rem; }
+  .sort[hidden] { display: none; }
   #stage { padding: 1.4rem; }
+  /* Row labels in the linear view's gutter, in each line's own colour. */
+  .rowname { font-weight: 700; font-size: 13px; dominant-baseline: middle; }
   svg { width: 100%; height: auto; display: block; }
   @media (max-width: 900px) {
     /* A wide network squeezed into a phone is unreadable. Let the map keep a
@@ -380,6 +411,12 @@ _HTML = r"""<!doctype html>
   </div>
   <div class="group" id="speeds"></div>
   <div class="group">
+    <button id="view-toggle" aria-pressed="false">Linear</button>
+    <span class="sort" id="sort-group" hidden>
+      sort
+      <button id="sort-line" aria-pressed="true">line</button>
+      <button id="sort-size" aria-pressed="false">stations</button>
+    </span>
     <button id="labels-toggle" aria-pressed="true">Labels</button>
   </div>
   <div class="lines" id="line-toggles"></div>
@@ -391,9 +428,188 @@ _HTML = r"""<!doctype html>
   const data = JSON.parse(document.getElementById("data").textContent);
   const svg = document.querySelector("#stage svg");
   const NS = "http://www.w3.org/2000/svg";
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // Hidden reference geometry: getPointAtLength() needs real path elements, but
-  // these are the routing paths, not the drawn map, so they must never paint.
+  // ---------------------------------------------------------------- geometry
+  const vb = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+  const [vbX, vbY, vbW, vbH] = vb;
+  // The generated SVG carries width/height attributes, which fix its intrinsic
+  // aspect ratio -- so  would ignore a viewBox that grows for the
+  // linear view. CSS sizes the element here, so drop them.
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
+
+  // Where each station sits on the map, read back off the drawing rather than
+  // shipped a second time in the payload.
+  const mapXY = new Map();
+  svg.querySelectorAll("#stations circle[data-node]").forEach(c => {
+    mapXY.set(c.getAttribute("data-node"), {
+      x: +c.getAttribute("cx"), y: +c.getAttribute("cy"), r: +c.getAttribute("r"),
+    });
+  });
+
+  // The linear layout: one row per line, plus a shallower row per branch.
+  const layout = data.linear || { columns: 1, lines: [] };
+  // Station names sit above their dot at an angle, so a row needs clear space
+  // above it and past its right-hand end or the outermost names get cut off.
+  const LABEL_RISE = 112;
+  // A row needs this much height for its names to be readable. A network with
+  // many lines therefore needs a taller canvas than the map does -- so the
+  // linear view grows the viewBox and the page scrolls, the way a list should,
+  // rather than crushing 27 rows into the map's frame.
+  const ROW_H = 150;
+  const nLines = Math.max(layout.lines.length, 1);
+  const linH = Math.max(vbH, LABEL_RISE + nLines * ROW_H);
+  const GUTTER = Math.max(vbW * 0.075, 74);
+  const RIGHT = Math.max(vbW * 0.02, 96);
+  const colW = (vbW - GUTTER - RIGHT) / Math.max(layout.columns - 1, 1);
+  const band = (linH - LABEL_RISE) / nLines;
+  const branchDrop = Math.min(band * 0.30, 26);
+
+  // Column of every (line, station), and which row of the line it is on.
+  const cell = new Map();                       // "label node" -> {col, depth}
+  const lineStations = new Map();               // label -> [{node, col, depth}]
+  for (const line of layout.lines) {
+    const list = [];
+    for (const row of line.rows) {
+      for (const pair of row.nodes) {
+        cell.set(line.label + " " + pair[0], { col: pair[1], depth: row.depth });
+        list.push({ node: pair[0], col: pair[1], depth: row.depth });
+      }
+    }
+    lineStations.set(line.label, list);
+  }
+
+  // Row order is animated, so a re-sort slides rather than jumps.
+  const order = layout.lines.map(l => l.label);
+  const rowPos = new Map(order.map((l, i) => [l, i]));
+  const rowTarget = new Map(rowPos);
+
+  const linXY = (label, node) => {
+    const c = cell.get(label + " " + node);
+    if (!c) return null;
+    const base = rowPos.get(label) || 0;
+    return {
+      x: vbX + GUTTER + c.col * colW,
+      y: vbY + LABEL_RISE + band * (base + 0.15) + c.depth * branchDrop,
+    };
+  };
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  // ------------------------------------------------------------ linear layer
+  // An interchange is one dot on the map but appears once per line in the
+  // linear view, so stations and labels are rebuilt per (line, station). At
+  // m = 0 every instance sits exactly where the map drew it, which makes the
+  // swap invisible.
+  const backdrop = svg.querySelector("#backdrop");
+  const mapStations = svg.querySelector("#stations");
+  const mapLabels = svg.querySelector("#labels");
+  const labelSpec = new Map();
+  if (mapLabels) {
+    mapLabels.querySelectorAll("text[data-node]").forEach(t => {
+      labelSpec.set(t.getAttribute("data-node"), {
+        text: t.textContent,
+        x: +t.getAttribute("x"), y: +t.getAttribute("y"),
+        anchor: t.getAttribute("text-anchor") || "start",
+        rotate: (t.getAttribute("transform") || "").match(/rotate\(([-\d.]+)/),
+      });
+    });
+  }
+
+  const dotLayer = document.createElementNS(NS, "g");
+  const nameLayer = document.createElementNS(NS, "g");
+  const textLayer = document.createElementNS(NS, "g");
+  dotLayer.setAttribute("id", "linear-stations");
+  textLayer.setAttribute("id", "linear-labels");
+  nameLayer.setAttribute("id", "linear-names");
+  if (mapLabels) {
+    textLayer.setAttribute("font-size", mapLabels.getAttribute("font-size") || "11");
+    textLayer.setAttribute("fill", mapLabels.getAttribute("fill") || "currentColor");
+  }
+
+  const dots = [];      // {el, label, node, mapPt, r}
+  const texts = [];     // {el, label, node, spec, primary}
+  const names = [];     // {el, label}
+  const seenLabel = new Set();
+
+  for (const line of layout.lines) {
+    for (const st of lineStations.get(line.label) || []) {
+      const pt = mapXY.get(st.node);
+      if (!pt) continue;
+
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("r", pt.r);
+      dot.setAttribute("fill", "var(--map-station-fill, #fff)");
+      dot.setAttribute("stroke", "var(--map-station-stroke, #111)");
+      dot.setAttribute("stroke-width", "2.2");
+      dotLayer.appendChild(dot);
+      dots.push({ el: dot, label: line.label, node: st.node, mapPt: pt, r: pt.r });
+
+      const name = (layout.names || {})[st.node];
+      if (name) {
+        const t = document.createElementNS(NS, "text");
+        t.textContent = name;
+        textLayer.appendChild(t);
+        // The map may have had nowhere to put this name. Then there is no
+        // m = 0 pose to hold, so park it on the dot and keep it invisible
+        // until the rows take over.
+        const spec = labelSpec.get(st.node) ||
+          { x: pt.x, y: pt.y, anchor: "start", rotate: null, ghost: true };
+        // Only one instance per station is opaque on the map, or interchange
+        // names would overprint themselves.
+        const primary = !spec.ghost && !seenLabel.has(st.node);
+        seenLabel.add(st.node);
+        texts.push({ el: t, label: line.label, node: st.node, spec: spec, primary: primary });
+      }
+    }
+    const name = document.createElementNS(NS, "text");
+    name.setAttribute("class", "rowname");
+    name.setAttribute("text-anchor", "end");
+    name.setAttribute("fill", data.lines[line.label] || "currentColor");
+    name.textContent = line.label;
+    nameLayer.appendChild(name);
+    names.push({ el: name, label: line.label });
+  }
+
+  if (mapStations) mapStations.style.display = "none";
+  if (mapLabels) mapLabels.style.display = "none";
+  const trainsGroup = svg.querySelector("#trains");
+  svg.insertBefore(nameLayer, trainsGroup);
+  svg.insertBefore(dotLayer, trainsGroup);
+  svg.insertBefore(textLayer, trainsGroup);
+
+  // ------------------------------------------------------------ track morph
+  const tracks = [];
+  svg.querySelectorAll("#lines path[data-src]").forEach(el => {
+    const label = el.parentNode.getAttribute("data-line");
+    const pts = el.getAttribute("d").trim().split(/[ML]\s*/).filter(Boolean)
+      .map(p => {
+        const xy = p.trim().split(/\s+/).map(Number);
+        return { x: xy[0], y: xy[1] };
+      });
+    tracks.push({
+      el: el, label: label, pts: pts, d0: el.getAttribute("d"),
+      src: el.getAttribute("data-src"), dst: el.getAttribute("data-dst"),
+    });
+  });
+
+  const trackD = (t, m) => {
+    const a = linXY(t.label, t.src), b = linXY(t.label, t.dst);
+    if (!a || !b) return t.d0;
+    const n = t.pts.length - 1;
+    let out = "";
+    for (let i = 0; i <= n; i++) {
+      const f = n === 0 ? 0 : i / n;
+      const lx = lerp(a.x, b.x, f), ly = lerp(a.y, b.y, f);
+      const x = lerp(t.pts[i].x, lx, m), y = lerp(t.pts[i].y, ly, m);
+      out += (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+    }
+    return out;
+  };
+
+  // ------------------------------------------------------------------ trains
   const defs = document.createElementNS(NS, "defs");
   const pathEls = data.paths.map(p => {
     const el = document.createElementNS(NS, "path");
@@ -402,24 +618,21 @@ _HTML = r"""<!doctype html>
     return el;
   });
   svg.appendChild(defs);
+  const layer = trainsGroup;
 
-  const layer = svg.querySelector("#trains") || svg.appendChild(document.createElementNS(NS, "g"));
-
-  const t0 = Math.min(...data.trips.map(t => t.k[0][0]));
-  const t1 = Math.max(...data.trips.map(t => t.k[t.k.length - 1][0]));
-
-  // Trips sorted by start time; a moving window keeps the per-frame scan to the
-  // few dozen trains actually running instead of the whole service day.
   const trips = data.trips;
   const starts = trips.map(t => t.k[0][0]);
   const ends = trips.map(t => t.k[t.k.length - 1][0]);
-  const maxSpan = Math.max(...trips.map((t, i) => ends[i] - starts[i]));
+  const maxSpan = Math.max.apply(null, trips.map((t, i) => ends[i] - starts[i]));
+  const t0 = Math.min.apply(null, starts), t1 = Math.max.apply(null, ends);
 
   const routes = [...new Set(trips.map(t => t.r))].sort();
   const hidden = new Set();
-  const nodes = new Map();   // trip index -> <circle>
+  const nodes = new Map();
 
   let now = 7 * 3600, speed = 60, playing = true, last = performance.now();
+  let view = 0, viewTarget = 0;     // 0 = map, 1 = linear
+  let dirty = true;
 
   const clock = document.getElementById("clock");
   const count = document.getElementById("count");
@@ -432,8 +645,9 @@ _HTML = r"""<!doctype html>
          + (h >= 24 ? " +1d" : "");
   };
 
-  // Distance along the path at time t: find the bracketing keyframes and lerp.
-  const lengthAt = (keys, t) => {
+  // Fractional stop index at time t. Both views read this same number, which
+  // is what keeps them in step.
+  const stopAt = (keys, t) => {
     let lo = 0, hi = keys.length - 1;
     if (t <= keys[0][0]) return keys[0][1];
     if (t >= keys[hi][0]) return keys[hi][1];
@@ -441,19 +655,66 @@ _HTML = r"""<!doctype html>
       const mid = (lo + hi) >> 1;
       if (keys[mid][0] <= t) lo = mid; else hi = mid;
     }
-    const [ta, la] = keys[lo], [tb, lb] = keys[hi];
-    return tb === ta ? lb : la + (lb - la) * (t - ta) / (tb - ta);
+    const ka = keys[lo], kb = keys[hi];
+    return kb[0] === ka[0] ? kb[1] : ka[1] + (kb[1] - ka[1]) * (t - ka[0]) / (kb[0] - ka[0]);
   };
 
-  // First trip that could still be running at time t.
   const lowerBound = t => {
     let lo = 0, hi = starts.length;
     const cutoff = t - maxSpan;
-    while (lo < hi) { const mid = (lo + hi) >> 1; if (starts[mid] < cutoff) lo = mid + 1; else hi = mid; }
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (starts[mid] < cutoff) lo = mid + 1; else hi = mid;
+    }
     return lo;
   };
 
+  function geometry(m) {
+    if (linH !== vbH) {
+      const h = lerp(vbH, linH, m);
+      svg.setAttribute("viewBox", vbX + " " + vbY + " " + vbW + " " + h.toFixed(1));
+      // The painted background is sized to the map's box; grow it too, or the
+      // extra rows sit on whatever is behind the SVG.
+      if (backdrop) backdrop.setAttribute("height", h.toFixed(1));
+    }
+    for (const t of tracks) t.el.setAttribute("d", trackD(t, m));
+
+    for (const d of dots) {
+      const lp = linXY(d.label, d.node);
+      if (!lp) continue;
+      d.el.setAttribute("cx", lerp(d.mapPt.x, lp.x, m).toFixed(1));
+      d.el.setAttribute("cy", lerp(d.mapPt.y, lp.y, m).toFixed(1));
+      // Interchanges are drawn larger on the map; on a row every stop is a stop.
+      d.el.setAttribute("r", lerp(d.r, 3.6, m).toFixed(2));
+    }
+
+    for (const t of texts) {
+      const lp = linXY(t.label, t.node);
+      if (!lp) continue;
+      const x = lerp(t.spec.x, lp.x + 7, m);
+      const y = lerp(t.spec.y, lp.y - 9, m);
+      const r0 = t.spec.rotate ? +t.spec.rotate[1] : 0;
+      const rot = lerp(r0, -55, m);
+      t.el.setAttribute("x", x.toFixed(1));
+      t.el.setAttribute("y", y.toFixed(1));
+      t.el.setAttribute("text-anchor", m > 0.5 ? "start" : t.spec.anchor);
+      t.el.setAttribute("transform",
+        "rotate(" + rot.toFixed(1) + " " + x.toFixed(1) + " " + y.toFixed(1) + ")");
+      t.el.setAttribute("opacity", (t.primary ? 1 : m).toFixed(2));
+    }
+
+    for (const n of names) {
+      const base = rowPos.get(n.label) || 0;
+      n.el.setAttribute("x", (vbX + GUTTER - 14).toFixed(1));
+      n.el.setAttribute("y", (vbY + LABEL_RISE + band * (base + 0.15)).toFixed(1));
+      n.el.setAttribute("opacity", m.toFixed(2));
+    }
+  }
+
   function draw() {
+    const m = ease(view);
+    if (dirty) { geometry(m); dirty = false; }
+
     const alive = new Set();
     let shown = 0;
     for (let i = lowerBound(now); i < trips.length; i++) {
@@ -461,10 +722,30 @@ _HTML = r"""<!doctype html>
       if (ends[i] < now) continue;
       const trip = trips[i];
       if (hidden.has(trip.r)) continue;
-      const el = pathEls[trip.p];
-      const total = el.getTotalLength();
-      const len = Math.min(lengthAt(trip.k, now), total);
-      const pt = el.getPointAtLength(len);
+      const path = data.paths[trip.p];
+
+      const f = stopAt(trip.k, now);
+      const lo = Math.min(Math.floor(f), path.stops.length - 1);
+      const hi = Math.min(lo + 1, path.stops.length - 1);
+      const frac = f - lo;
+
+      let x, y;
+      if (m < 1) {
+        const el = pathEls[trip.p];
+        const len = lerp(path.stops[lo], path.stops[hi], frac);
+        const pt = el.getPointAtLength(Math.min(len, el.getTotalLength()));
+        x = pt.x; y = pt.y;
+      }
+      if (m > 0) {
+        const a = linXY(trip.r, path.nodes[lo]), b = linXY(trip.r, path.nodes[hi]);
+        if (a && b) {
+          const lx = lerp(a.x, b.x, frac), ly = lerp(a.y, b.y, frac);
+          x = m < 1 ? lerp(x, lx, m) : lx;
+          y = m < 1 ? lerp(y, ly, m) : ly;
+        } else if (m >= 1) {
+          continue;   // no row for this stop; hide rather than draw a lie
+        }
+      }
 
       let dot = nodes.get(i);
       if (!dot) {
@@ -472,18 +753,20 @@ _HTML = r"""<!doctype html>
         dot.setAttribute("r", 5);
         dot.setAttribute("class", "train");
         dot.setAttribute("fill", data.lines[trip.r] || "#333");
-        const t = document.createElementNS(NS, "title");
-        t.textContent = trip.r + (trip.h ? " to " + trip.h : "");
-        dot.appendChild(t);
+        const title = document.createElementNS(NS, "title");
+        title.textContent = trip.r + (trip.h ? " to " + trip.h : "");
+        dot.appendChild(title);
         layer.appendChild(dot);
         nodes.set(i, dot);
       }
-      dot.setAttribute("cx", pt.x.toFixed(1));
-      dot.setAttribute("cy", pt.y.toFixed(1));
+      dot.setAttribute("cx", x.toFixed(1));
+      dot.setAttribute("cy", y.toFixed(1));
       alive.add(i);
       shown++;
     }
-    for (const [i, el] of nodes) if (!alive.has(i)) { el.remove(); nodes.delete(i); }
+    for (const entry of nodes) {
+      if (!alive.has(entry[0])) { entry[1].remove(); nodes.delete(entry[0]); }
+    }
     clock.textContent = fmt(now);
     count.textContent = shown + (shown === 1 ? " train" : " trains");
   }
@@ -496,11 +779,27 @@ _HTML = r"""<!doctype html>
       if (now > t1) now = t0;
       scrub.value = now;
     }
+    // The view tween and the row tween both mark geometry dirty; once both have
+    // settled the per-frame cost drops back to moving the trains.
+    if (view !== viewTarget) {
+      view += (viewTarget - view) * (reduced ? 1 : Math.min(dt * 3.2, 1));
+      if (Math.abs(viewTarget - view) < 0.001) view = viewTarget;
+      dirty = true;
+    }
+    for (const entry of rowTarget) {
+      const label = entry[0], target = entry[1];
+      const cur = rowPos.get(label);
+      if (cur !== target) {
+        const next = reduced ? target : cur + (target - cur) * Math.min(dt * 6, 1);
+        rowPos.set(label, Math.abs(target - next) < 0.002 ? target : next);
+        dirty = true;
+      }
+    }
     draw();
     requestAnimationFrame(frame);
   }
 
-  // -- controls --
+  // ---------------------------------------------------------------- controls
   const playBtn = document.getElementById("play");
   playBtn.onclick = () => {
     playing = !playing;
@@ -509,60 +808,75 @@ _HTML = r"""<!doctype html>
   };
   scrub.oninput = () => { now = +scrub.value; draw(); };
 
-  // Station names crowd a dense network, and following a moving train is much
-  // easier without them. The group is only hidden, never removed, so the labels
-  // the placer solved for come straight back untouched.
-  //
-  // The canvas is sized to fit the labels, which reach outside the track
-  // geometry, so hiding them also tightens the viewBox onto the network alone
-  // -- the renderer supplies both boxes. Worth up to a fifth of the canvas on
-  // networks with long station names.
   const labelsBtn = document.getElementById("labels-toggle");
-  const labelGroup = svg.querySelector("#labels");
   const fullBox = svg.getAttribute("viewBox");
   const tightBox = svg.getAttribute("data-viewbox-nolabels");
-  if (!labelGroup) {
-    labelsBtn.remove();          // map was rendered with labels=False
-  } else {
-    labelsBtn.onclick = () => {
-      const on = labelsBtn.getAttribute("aria-pressed") !== "true";
-      labelsBtn.setAttribute("aria-pressed", String(on));
-      labelGroup.style.display = on ? "" : "none";
-      if (tightBox) svg.setAttribute("viewBox", on ? fullBox : tightBox);
-    };
-  }
+  let labelsOn = true;
+  const syncBox = () => {
+    // Tightening the box only makes sense for the map. In the linear view the
+    // height is owned by the morph, so leave it alone there.
+    if (viewTarget) { dirty = true; return; }
+    if (tightBox) svg.setAttribute("viewBox", labelsOn ? fullBox : tightBox);
+  };
+  labelsBtn.onclick = () => {
+    labelsOn = !labelsOn;
+    labelsBtn.setAttribute("aria-pressed", String(labelsOn));
+    textLayer.style.display = labelsOn ? "" : "none";
+    syncBox();
+  };
 
-  const speeds = document.getElementById("speeds");
-  for (const [label, mult] of [["1x", 1], ["60x", 60], ["240x", 240], ["900x", 900]]) {
-    const b = document.createElement("button");
-    b.textContent = label;
-    b.setAttribute("aria-pressed", String(mult === speed));
-    b.onclick = () => {
-      speed = mult;
-      [...speeds.children].forEach(c => c.setAttribute("aria-pressed", String(c === b)));
-    };
-    speeds.appendChild(b);
-  }
+  const viewBtn = document.getElementById("view-toggle");
+  const sortGroup = document.getElementById("sort-group");
+  viewBtn.onclick = () => {
+    viewTarget = viewTarget ? 0 : 1;
+    viewBtn.textContent = viewTarget ? "Map" : "Linear";
+    viewBtn.setAttribute("aria-pressed", String(!!viewTarget));
+    sortGroup.hidden = !viewTarget;
+    syncBox();
+    dirty = true;
+  };
 
-  // Named line-toggles, not lines: the inlined SVG already owns that id for
-  // its drawn line group, and duplicate ids in one document are invalid.
+  const sortBtns = {
+    line: document.getElementById("sort-line"),
+    size: document.getElementById("sort-size"),
+  };
+  const sized = new Map(layout.lines.map(l => [l.label, l.stations]));
+  const applySort = how => {
+    const sorted = order.slice().sort((a, b) =>
+      how === "size" ? (sized.get(b) - sized.get(a)) || a.localeCompare(b)
+                     : a.localeCompare(b, undefined, { numeric: true }));
+    sorted.forEach((label, i) => rowTarget.set(label, i));
+    Object.keys(sortBtns).forEach(k =>
+      sortBtns[k].setAttribute("aria-pressed", String(k === how)));
+    dirty = true;
+  };
+  sortBtns.line.onclick = () => applySort("line");
+  sortBtns.size.onclick = () => applySort("size");
+  applySort("line");
+  for (const entry of rowTarget) rowPos.set(entry[0], entry[1]);
+
   const lines = document.getElementById("line-toggles");
   for (const r of routes) {
     const chip = document.createElement("span");
     chip.className = "chip";
     chip.setAttribute("aria-pressed", "true");
-    chip.innerHTML = `<span class="dot" style="background:${data.lines[r] || "#333"}"></span>${r}`;
+    chip.innerHTML = '<span class="dot" style="background:' +
+      (data.lines[r] || "#333") + '"></span>' + r;
     chip.onclick = () => {
       const on = chip.getAttribute("aria-pressed") === "true";
       chip.setAttribute("aria-pressed", String(!on));
       if (on) hidden.add(r); else hidden.delete(r);
-      svg.querySelectorAll(`#lines g.line[data-line="${r}"]`)
+      svg.querySelectorAll('#lines g.line[data-line="' + r + '"]')
          .forEach(g => g.style.display = on ? "none" : "");
+      for (const d of dots) if (d.label === r) d.el.style.display = on ? "none" : "";
+      for (const t of texts) if (t.label === r) t.el.style.display = on ? "none" : "";
+      for (const n of names) if (n.label === r) n.el.style.display = on ? "none" : "";
       draw();
     };
     lines.appendChild(chip);
   }
 
+  geometry(0);
   requestAnimationFrame(frame);
 })();
 </script>

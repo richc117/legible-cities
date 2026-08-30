@@ -133,7 +133,7 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
     # furniture without resorting to an invert filter over the line colours.
     r = render(graph, width=width, style=style or Style(themed=True),
                title=name, line_order=line_order)
-    anim = animate.build(r, graph, trips, date)
+    anim = animate.build(r, graph, trips, date, line_order=line_order)
 
     out = out_dir or OUT_DIR
     out.mkdir(parents=True, exist_ok=True)

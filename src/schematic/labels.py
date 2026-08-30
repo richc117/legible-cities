@@ -94,6 +94,9 @@ class Placement:
     anchor: str
     rotate: float
     quad: Quad
+    # Opaque, passed through from the Station: lets the caller tie a drawn
+    # label back to the node it names.
+    key: str = ""
     # Set when the label had to be allowed over a line to be placed at all. The
     # renderer draws these with a halo so they stay readable against the colour.
     haloed: bool = False
@@ -157,6 +160,7 @@ class Station:
     text: str
     x: float
     y: float
+    key: str = ""
     importance: int = 0
     # True when the station's own lines run roughly east-west, which is when
     # horizontal labels collide with the neighbours.
@@ -209,7 +213,7 @@ def place(
             if not allow_over_lines and any(collide(q, o, pad) for o in soft):
                 continue
             return Placement(s.text, s.x + c.dx, s.y + c.dy, c.anchor, c.rotate, q,
-                             haloed=allow_over_lines)
+                             key=s.key, haloed=allow_over_lines)
         return None
 
     ordered = sorted(stations, key=lambda s: -s.importance)
