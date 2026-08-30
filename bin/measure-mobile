@@ -30,7 +30,7 @@ const MIN_TAP = 44;
     });
     const page = await ctx.newPage();
 
-    for (const [url, label] of [["/", "essay"], ["/atlas/", "atlas"], ["/colophon/", "colophon"]]) {
+    for (const [url, label] of [["/", "essay"], ["/atlas/", "atlas"], ["/framework/", "framework"]]) {
       await page.goto(BASE + url, { waitUntil: "networkidle" });
       const m = await page.evaluate(() => {
         const de = document.documentElement;

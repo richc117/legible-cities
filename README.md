@@ -83,7 +83,7 @@ MobilityData's mirror and its service period ended in December 2025.
 ## The site
 
 `site/` is an Eleventy build of a standalone site — an essay on why schematic
-maps matter, an atlas of all 21 networks, and a colophon crediting the work this
+maps matter, an atlas of all 22 networks, and a framework page crediting the work this
 rests on. It reuses the design tokens, typography and theme switch from the
 personal-site portfolio so the two read as one hand.
 

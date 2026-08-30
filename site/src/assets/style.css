@@ -248,6 +248,14 @@ p {
   color: var(--text);
 }
 
+/* The author's name should read as the credit it is, not as one more link in
+   the row. */
+.site-footer .byline a {
+  color: var(--text);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 .essay-header {
   margin-bottom: 1.4rem;
 }

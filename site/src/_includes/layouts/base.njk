@@ -14,9 +14,8 @@
       <div class="wrap">
         <a class="brand" href="{{ '/' | url }}">{{ site.title }}</a>
         <nav class="site-nav" aria-label="Primary">
-          <a href="{{ '/' | url }}" {% if page.url == "/" %}aria-current="page"{% endif %}>Essay</a>
           <a href="{{ '/atlas/' | url }}" {% if page.url == "/atlas/" %}aria-current="page"{% endif %}>Atlas</a>
-          <a href="{{ '/colophon/' | url }}" {% if page.url == "/colophon/" %}aria-current="page"{% endif %}>Colophon</a>
+          <a href="{{ '/framework/' | url }}" {% if page.url == "/framework/" %}aria-current="page"{% endif %}>Framework</a>
           <label class="theme-switch" aria-label="Toggle color theme">
             <input id="theme-toggle" type="checkbox" role="switch" aria-label="Theme toggle">
             <span class="slider" aria-hidden="true"></span>
@@ -30,11 +29,14 @@
     </main>
 
     <footer class="site-footer wrap">
-      <span>{{ site.author }}</span>
+      <span class="byline">
+        A project by
+        <a href="{{ site.links.portfolio }}" target="_blank" rel="noopener noreferrer">{{ site.author }}</a>
+      </span>
+      <a href="{{ '/framework/' | url }}">Credits</a>
       {% if site.links.repo %}
         <a href="{{ site.links.repo }}" target="_blank" rel="noopener noreferrer">Source</a>
       {% endif %}
-      <a href="{{ '/colophon/' | url }}">Credits</a>
       <a href="{{ site.links.github }}" target="_blank" rel="noopener noreferrer">GitHub</a>
       <a href="{{ site.links.linkedin }}" target="_blank" rel="noopener noreferrer">LinkedIn</a>
     </footer>

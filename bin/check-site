@@ -32,7 +32,7 @@ const strip = u => u.replace(BASE, "") || "/";
   };
 
   // Primary nav reaches every page.
-  for (const [label, want] of [["Essay", "/"], ["Atlas", "/atlas/"], ["Colophon", "/colophon/"]]) {
+  for (const [label, want] of [["Atlas", "/atlas/"], ["Framework", "/framework/"]]) {
     await page.goto(BASE + "/", { waitUntil: "networkidle" });
     await page.locator(`.site-nav a:text-is("${label}")`).click();
     await page.waitForLoadState("networkidle");
