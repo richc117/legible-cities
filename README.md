@@ -167,9 +167,10 @@ never a deliverable -- it is covered in magenta guides. Only Instagram's
 portrait surfaces have such an overlay; other platforms show the image in a
 card with nothing on top of it.
 
-The same thing is reachable by hand. Every animation page takes presentation
-parameters, so you can open one clean in a browser to present from or to record
-yourself:
+The same thing is reachable by hand: every atlas entry has a **Presentation**
+link beside its Running map, which opens that network with no interface around
+it, filling the window. The parameters are just a URL, so you can set them
+yourself too:
 
 ```
 site/dist/maps/cdmx-metro.html?present=1&view=time&clock=1&title=1&frame=9:16

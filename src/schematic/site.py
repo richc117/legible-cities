@@ -61,6 +61,10 @@ class NetworkEntry:
 
     key: str
     name: str
+    # Split out for the presentation-mode link: `name` alone cannot make a
+    # two-line title, since it is inconsistent about carrying the city.
+    city: str
+    network: str
     stations: int
     lines: list[str]
     trips: int
@@ -150,6 +154,8 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
         entries.append(NetworkEntry(
             key=key,
             name=feeds.FEEDS[key].name,
+            city=feeds.FEEDS[key].city,
+            network=feeds.FEEDS[key].network,
             stations=len(result.graph.stations),
             lines=result.graph.labels,
             trips=len(result.trips),

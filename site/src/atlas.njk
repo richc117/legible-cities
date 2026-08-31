@@ -39,6 +39,8 @@ description: Schematic maps and running timetables for 21 US rail networks, gene
       <div class="wrap">
         <p class="meta">
           <a href="{{ ('/maps/' + n.animation) | url }}">Running map</a> ·
+          <a href="{{ ('/maps/' + n.animation + '?present=1&clock=1&title=1&city=' + (n.city | urlencode) + '&network=' + (n.network | urlencode)) | url }}"
+             title="The visualization on its own, with no interface around it">Presentation</a> ·
           <a href="{{ ('/maps/' + n.svg) | url }}">SVG</a> ·
           <a href="{{ n.feed_url }}" target="_blank" rel="noopener noreferrer">Source feed</a>
         </p>

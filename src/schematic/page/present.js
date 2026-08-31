@@ -29,18 +29,28 @@
   // map background are not the same colour in the dark theme, so a letterbox
   // would show a seam -- and only a padded box gives a still and a video of the
   // same preset an identical frame.
+  // Slightly more of the added height goes above the network, because that is
+  // where the name sits and a title wants air above it. The margin is wider
+  // when there is an overlay, so the text has ground of its own.
+  var titled = q.get("title") === "1" || q.get("clock") === "1";
+  var top = num("frametop", 0.46);
+  var margin = num("margin", titled ? 0.085 : 0.025);
+
   var frame = q.get("frame");
+  var fixed = null;
   if (frame) {
     var parts = frame.split(":").map(Number);
-    if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
-      // Slightly more of the added height goes above the network, because that
-      // is where the name sits and a title wants air above it. The margin is
-      // wider when there is an overlay, so the text has ground of its own.
-      var titled = q.get("title") === "1" || q.get("clock") === "1";
-      P.setFrame(parts[0] / parts[1], num("frametop", 0.46),
-                 num("margin", titled ? 0.085 : 0.025));
-    }
+    if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) fixed = parts[0] / parts[1];
   }
+
+  // With no frame given -- someone opening this in a browser to present from,
+  // rather than an export asking for a specific aspect -- fill the window, and
+  // keep filling it when the window changes.
+  function fit() {
+    P.setFrame(fixed || (innerWidth / innerHeight), top, margin);
+  }
+  fit();
+  if (!fixed) addEventListener("resize", fit);
 
   // ------------------------------------------------------------------- state
   var view = q.get("view") || "map";
