@@ -180,6 +180,94 @@ Exports are reproducible: the page's clock is stepped by hand, one frame at a
 time, so running the same command twice produces byte-identical output.
 `notebooks/06_export_assets.ipynb` walks through it.
 
+## What real transit data is like
+
+The pipeline was the straightforward part. Almost every difficult hour went into
+the gap between what the GTFS specification describes and what agencies actually
+publish. These are the ones that cost a debugging round each, and between them
+they are why `feeds.py` looks the way it does.
+
+**A GTFS zip is only mostly GTFS.** SFMTA ships its data licence agreement
+inside the archive as a `.txt` beside the real tables. Reading every text file
+as CSV works fine until you hit a paragraph of legal prose. Only filenames in
+`GTFS_TABLES` are read.
+
+**Not every feed has a timetable.** Mexico City publishes 72 template trips
+whose stop times all begin at `00:00:00` and act as offsets, plus a
+`frequencies.txt` giving a headway per period. Left alone, every train in the
+city departs at midnight. `expand_trip` turns each window into its runs; a trip
+with no window keeps its absolute times, because feeds mix the two conventions
+freely.
+
+**One feed can carry several operators, and `route_type` will not separate
+them.** Mexico City's has Metro Línea 1 and a Ferrocarriles Suburbanos line both
+named "1" at `route_type` 1. Without an agency filter they merge into a line
+that does not exist. The filter has to cascade through trips, stop_times and
+frequencies — dropping routes alone leaves orphans that LOOM rejects.
+
+**A feed can be expired.** Mexico City's calendar ended in December 2025, so
+picking a service day has to anchor mid-window; clamping to the nearest edge
+landed exactly on New Year's Eve.
+
+**Agencies disagree about `route_type` for the same physical thing.** Chicago's
+'L' is `1` (subway), Miami's Metrorail and Pittsburgh's T are both `2` (rail),
+LA's light rail is `0`. Check `routes.txt` before setting `mode`; a `mode` that
+matches nothing yields an empty graph.
+
+**`calendar.txt` is optional.** Phoenix, NJ Transit and LIRR express their whole
+schedule as `calendar_dates.txt` exceptions.
+
+**Headers can carry leading spaces.** Metra's columns arrive as `" trip_id"`,
+and every join fails silently until they are stripped.
+
+**A feed window can span years.** Miami's runs 2021–2027 with nothing alive at
+the start.
+
+**LOOM's parser is stricter than the spec.** It rejects MBTA's `pathways.txt`
+over a negative `stair_count`, which the spec allows for descending stairs — so
+`normalize()` drops that table. It must *not* drop `levels.txt`, which
+`stops.txt` references by `level_id`; removing it trades a parse error for a
+dangling-reference error.
+
+**Some agencies 403 a default user-agent.** MARTA does.
+
+## Design notes
+
+**Measure octilinearity by length, not by segment count.** LOOM writes six
+decimal places, which leaves a scatter of metre-scale stubs at station nodes
+whose angles are rounding noise — over half the segments are under 30 m.
+
+**LOOM emits lon/lat but computes in Web Mercator metres.** A 45° schematic edge
+reads as about 39° at LA's latitude, so a correct map measures as broken:
+octilinearity comes out at 37% instead of 99.9%. Reproject before measuring or
+drawing anything.
+
+**Label placement needs oriented boxes, not bounding boxes.** Two 45° labels are
+thin strips that slide past each other while their axis-aligned boxes overlap
+heavily. Using AABBs drops about 70% of labels, on exactly the horizontal runs
+that most need rotating.
+
+**Line colours are never themed.** The renderer emits page furniture —
+background, station markers, labels — as CSS custom properties, and leaves line
+strokes as literal hex. The obvious way to put a map on a dark page is
+`filter: invert()`, which also inverts the agency's colours: LA's A Line turns
+from `#0072bc` to orange. `tests/test_theming.py` guards this.
+
+**The three views share one interpolation.** A trip's keyframes carry a
+*fractional stop index*, and each view turns that single number into geometry —
+arc length along the drawn path for the map, a position on a row for the linear
+view, a diagonal for the time chart. They cannot drift apart, and the morph
+between them lerps every element between two known positions, so the transition
+is exact at both ends rather than a crossfade.
+
+**The renderer is hand-written rather than LOOM's `transitmap`.** The animation
+needs one `<path>` per (line, edge) with a stable id, so a train can be placed
+along it by distance. Notebook 04 renders both side by side as a cross-check: if
+the topology ever diverges, the offset or ordering logic is wrong.
+
+**Times past midnight stay past midnight.** `25:44:00` is 1:44am. Wrapping it
+teleports the last trains of the night back to dawn.
+
 ## Adding a city
 
 One entry in `FEEDS` in `src/schematic/feeds.py`:
