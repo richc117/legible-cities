@@ -12,3 +12,7 @@ site/dist/
 site/src/maps/
 site/src/_data/networks.json
 site/.serve/
+
+# Working notes for Claude Code. Kept locally, deliberately not published: it is
+# a private log of traps and decisions, not documentation for anyone else.
+CLAUDE.md
