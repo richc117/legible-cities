@@ -75,6 +75,8 @@ def test_size_limits_are_set_where_the_platform_has_one():
     ((0, 0, 1000, 1400), 16 / 9),      # tall network, wide frame
     ((-31, -32, 1717, 1223), 1.0),     # LA's real box
     ((-31, -31, 1692, 1787), 9 / 16),  # Mexico City's real box
+    # The share card: LA's unlabelled box at the 1.91:1 every unfurler wants.
+    ((-31, -31, 1162, 786.39), 1200 / 630),
 ])
 def test_padded_box_reaches_the_aspect_without_cropping(box, aspect):
     x, y, w, h = export.padded_box(box, aspect)

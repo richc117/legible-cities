@@ -11,5 +11,12 @@
     "github": "https://github.com/richc117",
     "portfolio": "https://www.richardcaballero.com"
   },
-  "pathPrefix": "/legible-cities/"
+  "pathPrefix": "/legible-cities/",
+  "origin": "https://richc117.github.io",
+  "card": {
+    "image": "/assets/og-card.png",
+    "width": 1200,
+    "height": 630,
+    "alt": "Schematic map of the Los Angeles Metro Rail, with every segment running horizontally, vertically or at forty-five degrees."
+  }
 }

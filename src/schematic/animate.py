@@ -452,7 +452,8 @@ _ICON_LINKS = """<link rel="icon" href="{base}/favicon.svg" type="image/svg+xml"
 def write(animation: Animation, svg: str, out_dir: Path, *,
           stem: str = "animation", title: str = "Transit animation",
           name: str | None = None, subtitle: str = "",
-          back: str = "index.html", icons: str | None = None) -> tuple[Path, Path]:
+          back: str = "index.html", icons: str | None = None,
+          social: str = "") -> tuple[Path, Path]:
     """Write ``<stem>.positions.json`` and a self-contained ``<stem>.html``.
 
     The stem is per-city: with a fixed filename, generating a second network
@@ -471,6 +472,9 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
              .replace("__ICON_LINEAR__", _VIEW_ICONS["connection-to-connection-16"])
              .replace("__ICON_TIME__", _VIEW_ICONS["clock-16"])
              .replace("__ICONS__", _ICON_LINKS.format(base=icons) if icons else "")
+             # Already escaped by the caller, which is the only thing that knows
+             # the site's origin. Empty for a page written for standalone use.
+             .replace("__SOCIAL__", social)
              .replace("__TITLE__", html_escape(title))
              .replace("__NAME__", html_escape(name or title))
              .replace("__SUBTITLE__", html_escape(subtitle))

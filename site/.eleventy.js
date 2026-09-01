@@ -49,6 +49,16 @@ module.exports = function (eleventyConfig) {
       .replace(/^<svg([^>]*?)\swidth="[^"]*"\sheight="[^"]*"/, "<svg$1");
   });
 
+  // An unfurler -- Slack, Teams, Messenger -- fetches og:image from its own
+  // servers, with no page to resolve a relative path against, so those two tags
+  // are the one place on this site that needs a whole https:// URL. This is
+  // `url` with the origin on the front rather than a second prefix
+  // implementation: the day pathPrefix changes, only one of them has to know.
+  eleventyConfig.addFilter("absolute", function (p) {
+    var origin = (require("./src/_data/site.json").origin || "").replace(/\/$/, "");
+    return origin + eleventyConfig.getFilter("url")(p);
+  });
+
   return {
     // GitHub Pages serves a project repo from a subpath, so every absolute URL
     // needs prefixing. The `url` filter used throughout the templates does that

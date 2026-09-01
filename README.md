@@ -99,6 +99,39 @@ bin/preview-site          # serve site/dist at localhost:4321
 `schematic.site.export()`, never edited by hand, so the numbers on the atlas
 cannot drift from the maps beside them.
 
+### Link previews
+
+Pasting a link into Slack, Teams, Messenger, LinkedIn or Bluesky shows a
+thumbnail because every page carries Open Graph tags pointing at
+`site/src/assets/og-card.png` — the LA schematic without station names, at
+1200×630. Two things about it are easy to get wrong and worth stating:
+
+- **The card is a raster, and its URL is absolute.** None of those clients will
+  render an SVG, and all of them fetch the image from their own servers, with no
+  page to resolve a relative path against — so a root-relative `og:image`
+  unfurls as no picture at all. `origin` in `site.json` is the new half of that
+  fact, and it composes with `pathPrefix` rather than repeating it: Eleventy's
+  `absolute` filter and `site.py`'s `card_url()` both build on the same two keys.
+- **The card is generated but committed.** `site.og_card()` rasterises it from
+  `<featured>-plain.svg` with `rsvg-convert`, resolving the theme variables
+  first (librsvg takes the `var()` fallback, so a naive rasterise puts the dark
+  map on a white ground) and growing `#backdrop` along with the viewBox (grow
+  one without the other and the gutters come out transparent, which every chat
+  client composites onto white). It lives in `assets/` rather than `maps/`
+  because `maps/` is gitignored, and it has to survive a fresh clone: CI never
+  rebuilds this site.
+
+The generated animation pages get the same tags from `site.social_tags()`,
+because `.eleventy.js` copies them byte-for-byte and its layout never reaches
+them. **Slack and Teams cache an unfurl per URL**, so a link pasted before this
+existed may keep showing nothing; test with a fresh URL. For the same reason, a
+redesigned card should be published under a new filename.
+
+The favicon manifest had the same bug and is fixed the same way. It is a
+passthrough asset, so the `url` filter never reaches it either; its members are
+now relative and resolve against the manifest's own URL, which is correct under
+the prefix, at the root, and locally.
+
 ## Setup
 
 ```bash

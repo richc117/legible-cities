@@ -13,6 +13,26 @@
     <link rel="icon" type="image/png" sizes="96x96" href="{{ '/assets/favicon/favicon-96x96.png' | url }}">
     <link rel="apple-touch-icon" href="{{ '/assets/favicon/apple-touch-icon.png' | url }}">
     <link rel="manifest" href="{{ '/assets/favicon/site.webmanifest' | url }}">
+
+    {# What Slack, Teams, Messenger, LinkedIn and Bluesky read when the link is
+       pasted. All of them fetch these from their own servers, so og:image and
+       og:url have to be absolute -- a root-relative path silently unfurls as
+       no picture at all, which is what this site did before. The card is a
+       raster on purpose: none of them will render an SVG. #}
+    <link rel="canonical" href="{{ page.url | absolute }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ site.title }}">
+    <meta property="og:title" content="{% if title %}{{ title }}{% else %}{{ site.title }}{% endif %}">
+    <meta property="og:description" content="{{ description or site.description }}">
+    <meta property="og:url" content="{{ page.url | absolute }}">
+    <meta property="og:image" content="{{ site.card.image | absolute }}">
+    <meta property="og:image:width" content="{{ site.card.width }}">
+    <meta property="og:image:height" content="{{ site.card.height }}">
+    <meta property="og:image:alt" content="{{ site.card.alt }}">
+    {# Not only for X: LinkedIn and several chat clients fall back to these. #}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="{{ site.card.image | absolute }}">
+
     <link rel="stylesheet" href="{{ '/assets/style.css' | url }}">
     <script src="{{ '/assets/theme.js' | url }}"></script>
     <script defer src="{{ '/assets/embed.js' | url }}"></script>
