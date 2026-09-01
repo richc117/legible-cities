@@ -174,7 +174,7 @@ def test_sweeps_stay_slow_enough_to_read():
 def test_every_beat_names_a_real_view():
     for name, beats in export.STORYBOARDS.items():
         for b in beats:
-            assert b.view in (None, "map", "linear", "time"), name
+            assert b.view in (None,) + export.VIEWS, name
 
 
 # ------------------------------------------------------------------- registry
@@ -219,3 +219,52 @@ def test_exports_refuse_to_write_into_the_repo(tmp_path):
     with pytest.raises(ValueError, match="repository"):
         export._guard_outside_repo(feeds.REPO_ROOT / "out" / "somewhere")
     export._guard_outside_repo(tmp_path)      # must not raise
+
+
+# --------------------------------------------------------------- geographic
+
+
+def test_geographic_is_a_view_the_exporter_knows():
+    assert export.GEO_VIEW in export.VIEWS
+    assert export.wants_geographic(view=export.GEO_VIEW)
+    assert not export.wants_geographic(view="map")
+
+
+def test_the_transform_storyboards_open_already_in_their_view():
+    """Every other beat morphs into its view; frame 0 has to already be in one.
+
+    Without tween=0 the clip opens on the schematic map and bends backwards into
+    geography -- the argument told in reverse, and only visible on playback.
+    """
+    for name in ("transform", "transform-loop"):
+        first = export.STORYBOARDS[name][0]
+        assert first.view == export.GEO_VIEW, name
+        assert first.tween == 0, f"{name} would animate into its opening view"
+
+
+def test_a_geographic_export_is_refused_where_there_is_no_geometry():
+    """The page has nothing to raise -- it just shows the schematic map -- so an
+    export would come out looking dull rather than broken."""
+    geo_feeds = [k for k, f in feeds.FEEDS.items() if f.geographic]
+    plain = [k for k, f in feeds.FEEDS.items() if not f.geographic]
+    assert geo_feeds, "no feed carries geographic geometry any more"
+
+    export.check_geographic(geo_feeds[0], storyboard="transform")   # allowed
+    with pytest.raises(ValueError, match="geographic"):
+        export.check_geographic(plain[0], storyboard="transform")
+    with pytest.raises(ValueError, match="geographic"):
+        export.check_geographic(plain[0], view=export.GEO_VIEW)
+    # A storyboard that never asks for it is fine on any feed.
+    export.check_geographic(plain[0], storyboard="tour")
+
+
+def test_a_storyboard_is_described_by_the_views_it_visits():
+    """A four-view clip labelled "schematic map of..." is simply wrong."""
+    assert export.storyboard_views("transform") == "geographic -> map -> linear -> time"
+    alt = export.storyboard_alt("la-metro-rail", "transform", stations=110, lines=6)
+    for phrase in ("where its track actually runs", "45-degree grid", "own row",
+                   "time chart"):
+        assert phrase in alt
+    # One view is not a sequence; fall back to the plain description.
+    assert export.storyboard_alt("la-metro-rail", "run") == export.alt_text(
+        "la-metro-rail", "map")

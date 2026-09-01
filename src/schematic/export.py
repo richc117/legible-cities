@@ -172,7 +172,7 @@ class Beat:
     """A stretch of video with one set of state. Fields left None inherit."""
 
     secs: float
-    view: str | None = None        # map | linear | time
+    view: str | None = None        # geographic | map | linear | time
     labels: bool | None = None
     at: str | None = None          # hard-set the clock, "07:00"
     speed: float | None = None     # simulated seconds per video second
@@ -186,7 +186,39 @@ class Beat:
     tween: float | None = None     # transition length; defaults to min(secs, 1.2)
 
 
+# Views that need the pre-octilinear geometry, which only feeds with
+# Feed.geographic carry. Checked before a browser is launched, because the page
+# degrades quietly to the schematic map and an export would look merely dull
+# rather than wrong.
+GEO_VIEW = "geographic"
+
+# Every view a beat or a preset may name. Single-sourced so adding one cannot
+# drift from what the tests and the CLI accept.
+VIEWS = (GEO_VIEW, "map", "linear", "time")
+
+
 STORYBOARDS: dict[str, tuple[Beat, ...]] = {
+    # The whole argument, in one clip: the network as it sits on the ground,
+    # straightened onto the grid, unfolded into a row per line, then re-read as
+    # time. Each step discards more geography. Needs Feed.geographic.
+    "transform": (
+        # tween=0 on the opening beat: every other beat morphs *into* its view,
+        # but frame 0 has to already be in one. Without it the clip opens on the
+        # schematic map and bends backwards into geography, which is the whole
+        # argument told in reverse.
+        Beat(4, view=GEO_VIEW, at="08:00", speed=120, tween=0),
+        Beat(5, view="map"),
+        Beat(5, view="linear"),
+        Beat(4, view="time"),
+        Beat(9, sweep=True, hours=3),
+    ),
+    # The same shape without the clock beat, for a short looping figure.
+    "transform-loop": (
+        Beat(2.5, view=GEO_VIEW, at="08:00", speed=120, tween=0),
+        Beat(3, view="map"),
+        Beat(3, view="linear"),
+        Beat(3, view=GEO_VIEW),
+    ),
     # The three views, in the order that explains them.
     "tour": (
         Beat(6, view="map", at="05:30", speed=240),
@@ -290,6 +322,85 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
     return (MAPS_DIR / f"{key}.html").as_uri() + "?" + urlencode(q)
 
 
+def wants_geographic(*, view: str | None = None, preset: Preset | None = None,
+                     storyboard: str | None = None) -> bool:
+    """Whether this export asks for the pre-octilinear geometry anywhere."""
+    if view == GEO_VIEW:
+        return True
+    if view is None and preset is not None and preset.view == GEO_VIEW:
+        return True
+    name = storyboard or (preset.storyboard if preset else "")
+    return any(b.view == GEO_VIEW for b in STORYBOARDS.get(name, ()))
+
+
+def check_geographic(key: str, *, view: str | None = None,
+                     preset: Preset | None = None,
+                     storyboard: str | None = None) -> None:
+    """Refuse a geographic export of a feed that has no geographic geometry.
+
+    The page degrades quietly here -- with nothing to raise, it simply shows the
+    schematic map -- so the export would come out looking dull rather than
+    broken, and only on review. Better to say which switch is off.
+    """
+    if not wants_geographic(view=view, preset=preset, storyboard=storyboard):
+        return
+    if feeds.FEEDS[key].geographic:
+        return
+    raise ValueError(
+        f"{key!r} carries no geographic geometry, so the geographic view would "
+        f"silently render as the schematic map. Set geographic=True on its "
+        f"Feed in feeds.py and rebuild it (bin/build-site, or "
+        f"schematic.site.export()); it is off by default because it is a "
+        f"second copy of every track. Feeds that have it: "
+        + ", ".join(sorted(k for k, f in feeds.FEEDS.items() if f.geographic)))
+
+
+VIEW_PHRASE = {
+    GEO_VIEW: "where its track actually runs",
+    "map": "straightened onto a 45-degree grid",
+    "linear": "with every line pulled out into its own row of evenly spaced stations",
+    "time": "as a time chart, every train a diagonal",
+}
+
+
+def storyboard_views(name: str) -> str:
+    """The views a storyboard visits, in order, as one readable field."""
+    seen: list[str] = []
+    for b in STORYBOARDS.get(name, ()):
+        if b.view and b.view not in seen:
+            seen.append(b.view)
+    return " -> ".join(seen)
+
+
+def storyboard_alt(key: str, name: str, *, stations: int = 0, lines: int = 0) -> str:
+    """Alt text for a clip that passes through several views.
+
+    A storyboard video described as its preset's single view is simply wrong --
+    "schematic map of..." for a clip that opens on geography and ends on a
+    chart. The views it visits are the description.
+    """
+    beats = STORYBOARDS.get(name, ())
+    seen: list[str] = []
+    for b in beats:
+        if b.view and b.view not in seen:
+            seen.append(b.view)
+    if len(seen) < 2:
+        return alt_text(key, seen[0] if seen else "map", stations=stations, lines=lines)
+
+    feed = feeds.FEEDS[key]
+    where = f"the {feed.city} {feed.network}".replace("the the ", "the ")
+    steps = [VIEW_PHRASE.get(v, v) for v in seen]
+    joined = ", then ".join(steps)
+    counts = []
+    if lines:
+        counts.append(f"{lines} lines in the operator's own colours")
+    if stations:
+        counts.append(f"{stations} stations")
+    tail = (" " + ", ".join(counts) + ".") if counts else ""
+    return (f"An animation of {where}, running a real day's timetable: drawn "
+            f"{joined}.{tail}").strip()
+
+
 def alt_text(key: str, view: str, *, stations: int = 0, lines: int = 0) -> str:
     """A description worth pasting. The project argues for legibility; an export
     that ships without one undercuts its own point."""
@@ -308,6 +419,9 @@ def alt_text(key: str, view: str, *, stations: int = 0, lines: int = 0) -> str:
         return (f"A chart of a whole service day on {where}: time runs left to "
                 f"right, stations down each line's band, and every diagonal is "
                 f"one train. {tail}").strip()
+    if view == GEO_VIEW:
+        return (f"{where[:1].upper()}{where[1:]} drawn where its track actually runs, "
+                f"before the schematic straightens it. {tail}").strip()
     return (f"Schematic map of {where}, with every segment running horizontally, "
             f"vertically or at forty-five degrees. {tail}").strip()
 
@@ -443,6 +557,7 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
     if key not in feeds.FEEDS:
         raise KeyError(f"unknown feed {key!r}")
     preset = PRESETS[preset_name]
+    check_geographic(key, view=view, preset=preset, storyboard=storyboard)
     dest = desktop_dir(key, out)
     _guard_outside_repo(dest)
 
@@ -511,12 +626,14 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
 
     for path in written:
         check_size(path, preset)
-    _write_sidecar(key, preset, written, theme=theme, view=view or preset.view)
+    _write_sidecar(key, preset, written, theme=theme, view=view or preset.view,
+                   storyboard=(storyboard or preset.storyboard)
+                   if preset.kind == "video" else "")
     return written
 
 
 def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
-                   theme: str, view: str) -> None:
+                   theme: str, view: str, storyboard: str = "") -> None:
     """What this file is, beside the file. Includes the caveats the atlas shows:
     an image travels further than the page it came from."""
     feed = feeds.FEEDS[key]
@@ -532,9 +649,13 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
             "preset": preset.name,
             "platform": preset.platform,
             "size": f"{preset.width}x{preset.height}" if preset.width else "native",
-            "view": view,
+            # A storyboard visits several views, so naming one of them here
+            # would misdescribe the file it sits beside.
+            "view": storyboard_views(storyboard) or view,
+            "storyboard": storyboard or None,
             "theme": theme,
-            "alt": alt_text(key, view, **stats),
+            "alt": (storyboard_alt(key, storyboard, **stats) if storyboard
+                    else alt_text(key, view, **stats)),
             "service_date": prov.get("service_date"),
             "trips": prov.get("trips"),
             # What the atlas says about this network, carried with the picture.

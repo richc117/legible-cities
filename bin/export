@@ -3,6 +3,7 @@
 
     bin/export la-metro-rail --preset instagram-reel
     bin/export cdmx-metro --preset instagram-post --view time --no-labels
+    bin/export la-metro-rail -p portfolio-mp4 --storyboard transform
     bin/export nyc-subway --preset portfolio-svg
     bin/export la-metro-rail --preset instagram-reel --dry-run
 
@@ -45,7 +46,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("feed", nargs="?", help="feed key, e.g. la-metro-rail")
     ap.add_argument("--preset", "-p", action="append", default=[],
                     help="repeatable; 'all' for every preset")
-    ap.add_argument("--view", choices=["map", "linear", "time"])
+    ap.add_argument("--view", choices=list(export.VIEWS),
+                    help="geographic needs Feed.geographic on that feed")
     ap.add_argument("--labels", dest="labels", action="store_true", default=None)
     ap.add_argument("--no-labels", dest="labels", action="store_false")
     ap.add_argument("--no-title", dest="title", action="store_false", default=True,
@@ -76,7 +78,15 @@ def main(argv: list[str]) -> int:
             size = f"{p.width}x{p.height}" if p.width else "native"
             print(f"  {p.name:18} {p.platform:11} {size:>11}  {p.kind}"
                   + (f"  -- {p.note}" if p.note else ""))
-        print("\nstoryboards: " + ", ".join(sorted(export.STORYBOARDS)))
+        print(f"\n{'storyboard':20} beats")
+        for name, beats in sorted(export.STORYBOARDS.items()):
+            shape = " -> ".join(b.view for b in beats if b.view) or "one shot"
+            secs = sum(b.secs for b in beats)
+            geo = "  (needs geographic)" if export.wants_geographic(storyboard=name) else ""
+            print(f"  {name:18} {secs:>4.0f}s  {shape}{geo}")
+        geo_feeds = sorted(k for k, f in feeds.FEEDS.items() if f.geographic)
+        print("\ngeographic geometry: " + (", ".join(geo_feeds) or "no feeds")
+              + "  (set Feed.geographic and rebuild to add one)")
         return 0
 
     if not args.feed:

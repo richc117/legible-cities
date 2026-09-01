@@ -86,7 +86,14 @@ const job = JSON.parse(process.argv[2] || "{}");
         if (b.at != null) P.seek(b.at);
         if (b.labels != null) P.setLabels(b.labels);
         if (b.speed != null) P.setSpeed(b.speed);
-        if (b.view) P.setView(b.view === "time" ? "string" : b.view, b.tween);
+        // "geographic" is the map with the geographic axis raised. Naming any
+        // view sets both axes, so a beat that moves off geographic lowers it
+        // without having to say so.
+        if (b.view) {
+          const geo = b.view === "geographic";
+          P.setGeo(geo, b.tween);
+          P.setView(geo ? "map" : (b.view === "time" ? "string" : b.view), b.tween);
+        }
         P.setPlaying(!b.sweep && b.speed !== 0);
       }, beat);
 
