@@ -42,6 +42,37 @@ const strip = u => u.replace(BASE, "") || "/";
     expect(strip(page.url()), want, `nav "${label}"`);
   }
 
+  // The essay's embedded maps are the animation page in presentation mode,
+  // driven through window.__present from the parent document. That seam is
+  // invisible in the markup -- the iframe looks identical whether or not the
+  // switcher can reach it -- so it has to be exercised.
+  await page.goto(BASE + "/", { waitUntil: "networkidle" });
+  const hero = page.locator(".figure--embed").first();
+  const seam = () => page.evaluate(() => {
+    const f = document.querySelector(".figure--embed .embed-frame");
+    try { return f.contentWindow.__present.state().mode; } catch (e) { return null; }
+  });
+  await page.waitForFunction(() => {
+    const f = document.querySelector(".figure--embed .embed-frame");
+    try { return !!(f && f.contentWindow.__present); } catch (e) { return false; }
+  }, null, { timeout: 20000 });
+  const heroTrains = await page.frameLocator(".figure--embed .embed-frame")
+    .locator("#trains circle").count();
+  console.log(`${heroTrains > 0 ? "ok  " : "FAIL"}  hero embed runs (${heroTrains} trains)`);
+  if (!heroTrains) failures.push("hero embed drew no trains");
+
+  await page.waitForFunction(() =>
+    !document.querySelector('.figure--embed .segmented button[data-view="linear"]').disabled);
+  await hero.locator('.segmented button[data-view="linear"]').click();
+  await page.waitForTimeout(2600);
+  expect(await seam(), "linear", "hero switcher reaches the embedded page");
+  await hero.locator('.segmented button[data-view="time"]').click();
+  await page.waitForTimeout(2800);
+  expect(await seam(), "string", 'hero "Time" maps to the internal view name');
+  await hero.locator('.segmented button[data-view="map"]').click();
+  await page.waitForTimeout(2800);
+  expect(await seam(), "map", "hero switcher returns to the map");
+
   // Atlas entry opens a running map, and its back-link returns to the atlas.
   await page.goto(BASE + "/atlas/", { waitUntil: "networkidle" });
   const count = await page.locator(".atlas > li").count();

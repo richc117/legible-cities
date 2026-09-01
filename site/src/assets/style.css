@@ -260,18 +260,26 @@ p {
   margin-bottom: 1.4rem;
 }
 
-/* --- additions for this site ------------------------------------------- */
-
-/* Prose keeps the portfolio's 600px measure. Figures break out of it, because
-   a map squeezed into a reading column is not a map you can read. */
-.figure {
-  width: min(var(--fig-wide), calc(100vw - 2rem));
-  margin: 2.2rem auto 2.6rem;
+/* The credit sits under the tagline rather than replacing it: the tagline says
+   what the essay argues, and the byline says whose it is. Same treatment as
+   the footer's, so the name reads as a credit and not as navigation. */
+.essay-header .byline {
+  margin-top: 0.5rem;
 }
 
-.figure--full {
-  width: calc(100vw - 2rem);
-  max-width: 1500px;
+.essay-header .byline a {
+  color: var(--text);
+}
+
+/* --- additions for this site ------------------------------------------- */
+
+/* Figures sit on the prose measure, so the page has one left edge and one
+   right edge all the way down. They used to break out to the full viewport,
+   which read as several documents stacked on top of each other. `--fig-wide`
+   is still what the atlas thumbnails use; only the essay came in. */
+.figure {
+  width: min(var(--measure), calc(100vw - 2rem));
+  margin: 2.2rem auto 2.6rem;
 }
 
 .figure svg {
@@ -297,10 +305,94 @@ p {
 
 /* Both maps get the same height box and letterbox inside it. Left to their own
    aspect ratios in a two-column grid, the tall geographic network dwarfs the
-   wide schematic one and the comparison stops being a comparison. */
+   wide schematic one and the comparison stops being a comparison.
+   The box is shallower than it was: in a 600px figure each column is about
+   285px, and the old 360px ceiling letterboxed the wide schematic map down to
+   a sliver inside a tall empty frame. */
 .compare svg {
-  height: clamp(200px, 32vh, 360px);
+  height: clamp(150px, 24vh, 230px);
   width: 100%;
+}
+
+/* An embedded map: the generated animation page in presentation mode, in an
+   iframe. Presentation mode fits the network to its window and makes the map
+   background transparent, so the frame has to be given a box and then reads as
+   part of the page rather than as a card sitting on it. */
+.embed {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  background: var(--bg);
+}
+
+.embed-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* Controls on the left, the same four links the atlas carries on the right,
+   wrapping to two lines when they do not fit. */
+.embed-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.7rem;
+}
+
+.embed-bar .meta {
+  margin: 0;
+}
+
+/* The switcher from the animation page's own toolbar, so the control a reader
+   meets in the essay is the control they meet on the running map -- but drawn
+   tighter. The toolbar's version sits alone on a bar of its own and can afford
+   the air; here it sits under a figure, in a column of prose, where the same
+   padding and the same 1.72 line box make it read as a third element competing
+   with the map and the caption. The type size is unchanged; only the space
+   around it is. */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-soft);
+}
+
+.segmented button {
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  border: 0;
+  border-radius: 0;
+  padding: 0.1rem 0.6rem;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* Until the frame reports `load` there is no window.__present to talk to. The
+   map still runs; only the switcher is inert, so it says so quietly. */
+.segmented button[disabled] {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.segmented button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 
 .compare > div > p {
@@ -435,12 +527,11 @@ blockquote p:last-child {
 }
 
 @media (max-width: 900px) {
-  /* Embedded maps fit the width rather than panning. A thumbnail's job is the
+  /* Thumbnails fit the width rather than panning. A thumbnail's job is the
      shape of a network at a glance -- panning made the atlas open on an empty
      corner of New York -- and the running map, one tap away, is where
      exploring belongs. This also keeps the page from becoming 21 nested
      scroll areas. */
-  .figure--full > svg,
   .atlas .thumb svg {
     width: 100%;
     height: auto;
@@ -453,6 +544,20 @@ blockquote p:last-child {
   }
 }
 
+/* A 3:2 box on a phone is a slit. Give the embedded network more height, since
+   presentation mode fits it to whatever box it is handed. */
+@media (max-width: 720px) {
+  .embed {
+    aspect-ratio: 4 / 3;
+  }
+
+  /* Controls above, links below: side by side at this width they crowd, and
+     the links are the taller of the two once their tap targets grow. */
+  .embed-bar {
+    justify-content: flex-start;
+  }
+}
+
 /* Both platforms ask for a 44px target. Scoped to touch so the desktop
    layout keeps its density. */
 @media (pointer: coarse) {
@@ -462,6 +567,59 @@ blockquote p:last-child {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+  }
+
+  /* A view switcher is a control, not a word in a sentence, so it takes the
+     full 44px rather than the padding trick used on the meta links below.
+     Three 44px words is a slab wider than the caption, so on touch the words
+     become icons and each button becomes a square: the target the platforms
+     ask for, at a third of the width.
+
+     The icons are Esri's Calcite UI icons, applied as CSS masks so the .svg
+     files ship exactly as published -- their licence permits redistribution
+     without modification -- and still take the theme through currentColor.
+     Credited on the Framework page. */
+  .segmented button {
+    min-height: 44px;
+    min-width: 44px;
+    padding-inline: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .segmented .label {
+    /* Hidden from sight, not from the accessibility tree -- though the button's
+       own aria-label is what a screen reader actually announces here. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .segmented button::before {
+    content: "";
+    /* The set is drawn on a 16px grid; scaling it up softens the map icon into
+       a scribble. Rendered at its design size it stays a map. */
+    width: 16px;
+    height: 16px;
+    background: currentColor;
+    mask: var(--icon) center / contain no-repeat;
+    -webkit-mask: var(--icon) center / contain no-repeat;
+  }
+
+  .segmented button[data-view="map"] {
+    --icon: url("icons/map-16.svg");
+  }
+
+  .segmented button[data-view="linear"] {
+    --icon: url("icons/connection-to-connection-16.svg");
+  }
+
+  .segmented button[data-view="time"] {
+    --icon: url("icons/clock-16.svg");
   }
 
   /* Navigation that happens to sit inside a caption or a meta line: grow the

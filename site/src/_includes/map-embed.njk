@@ -1,0 +1,57 @@
+{# One definition of a network's affordances, imported by both the essay and
+   the atlas. The two pages showed the same four links written out twice, and a
+   presentation URL is fiddly enough -- four query parameters, and the
+   parenthesised `('/maps/' + x) | url` that Nunjucks needs because it binds a
+   filter tighter than `+` -- that a second copy would eventually drift. #}
+
+{% macro links(n) %}
+<p class="meta">
+  <a href="{{ ('/maps/' + n.animation) | url }}">Running map</a> &middot;
+  <a href="{{ ('/maps/' + n.animation + '?present=1&clock=1&title=1&city=' + (n.city | urlencode) + '&network=' + (n.network | urlencode)) | url }}"
+     title="The visualization on its own, with no interface around it">Presentation</a> &middot;
+  <a href="{{ ('/maps/' + n.svg) | url }}">SVG</a> &middot;
+  <a href="{{ n.feed_url }}" target="_blank" rel="noopener noreferrer">Source feed</a>
+</p>
+{% endmacro %}
+
+{# A live map in the essay: the generated animation page in presentation mode,
+   inside an iframe. Presentation mode already hides that page's own header and
+   toolbar and fits the network to whatever window it finds -- which, in an
+   iframe, is the iframe -- so this is the same renderer the atlas and the
+   exporter drive, not a second one.
+
+   `labels` defaults off: the SVG is drawn 1600px wide, and at the essay's
+   600px measure a station name lands around 4px. The running map, one link
+   away, is where names are read.
+
+   The caption is passed as a block: `{% call embed(n) %}...{% endcall %}`. #}
+{% macro embed(n, eager=false, labels=false, view="map", controls=true, sequence="", lines="") %}
+<figure class="figure figure--embed">
+  <div class="embed">
+    <iframe class="embed-frame"
+            title="{{ n.name }}, running its timetable"
+            loading="{{ 'eager' if eager else 'lazy' }}"
+            src="{{ ('/maps/' + n.animation + '?present=1&view=' + view + '&labels=' + ('1' if labels else '0') + ('&sequence=' + sequence if sequence else '') + ('&lines=' + lines if lines else '')) | url }}"></iframe>
+  </div>
+  <div class="embed-bar">
+    {# A figure making an argument of its own gets no switcher: the sequence it
+       runs is the point, and three buttons invite the reader to interrupt it. #}
+    {% if controls %}
+      {# Mirrors the switcher in the animation page's own toolbar, so the two
+         read as the same control. Disabled until the frame reports `load` and
+         window.__present exists; embed.js enables them. #}
+      <span class="segmented" role="group" aria-label="View">
+        {# The label is a span so a touch layout can drop it for an icon without
+           taking the accessible name with it -- aria-label carries the same word
+           either way. #}
+        {% for v, label in [["map", "Map"], ["linear", "Linear"], ["time", "Time"]] %}
+          <button type="button" data-view="{{ v }}" aria-label="{{ label }}"
+                  aria-pressed="{{ 'true' if v == view else 'false' }}" disabled><span class="label">{{ label }}</span></button>
+        {% endfor %}
+      </span>
+    {% endif %}
+    {{ links(n) }}
+  </div>
+  <figcaption>{{ caller() }}</figcaption>
+</figure>
+{% endmacro %}

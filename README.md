@@ -268,6 +268,14 @@ the topology ever diverges, the offset or ordering logic is wrong.
 **Times past midnight stay past midnight.** `25:44:00` is 1:44am. Wrapping it
 teleports the last trains of the night back to dawn.
 
+**There is one renderer, and the essay is another of its callers.** The maps on
+the site's landing page are not stills: each is the generated animation page
+loaded in presentation mode inside an iframe, driven through the same
+`window.__present` seam the exporter uses. Nothing about a city is drawn twice,
+and the view switcher under a figure in the essay is the switcher on the running
+map. The page reads the shared theme key before paint, so an embed that loads
+halfway down the page arrives in the right colours.
+
 ## Adding a city
 
 One entry in `FEEDS` in `src/schematic/feeds.py`:

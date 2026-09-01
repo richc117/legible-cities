@@ -3,12 +3,33 @@ layout: layouts/base.njk
 title: Making complex cities legible
 description: What transit maps teach us about GIS, information architecture, and user experience — and a pipeline that generates schematic maps for 21 US rail networks from open data.
 ---
+{% from "map-embed.njk" import embed %}
+{% set la = networks.networks | network(networks.featured) %}
+{% set cdmx = networks.networks | network("cdmx-metro") %}
+
 <section class="wrap">
   <header class="essay-header">
     <h1>Making complex cities legible</h1>
     <p class="meta">What transit maps teach us about GIS, information architecture, and user experience</p>
+    <p class="meta byline">A project by
+      <a href="{{ site.links.portfolio }}" target="_blank" rel="noopener noreferrer">{{ site.author }}</a>
+    </p>
   </header>
+</section>
 
+{# The essay used to open on four screens of prose, and a visitor who had been
+   told about the animations had no way of knowing the site moved. This is that
+   answer: the first thing on the page is a real timetable running. #}
+{% call embed(la, eager=true) %}
+  Los Angeles Metro rail &mdash; no map here was drawn by hand. Every one was
+  generated from the agency&rsquo;s own published schedule. Switch it to a
+  linear diagram or a time chart above, or open the running map to scrub
+  through the day. See the
+  <a href="{{ '/atlas/' | url }}">atlas</a> for all
+  {{ networks.totals.networks }} networks, built by the same code from GTFS.
+{% endcall %}
+
+<section class="wrap">
   <p>
     I have lived in Los Angeles for most of my life, and I still regularly
     discover parts of the city that feel completely new to me. Sometimes that
@@ -64,17 +85,12 @@ description: What transit maps teach us about GIS, information architecture, and
   </p>
 </section>
 
-<figure class="figure figure--full">
-  {{ "la-metro-rail.svg" | inlineMap | safe }}
-  <figcaption>
-    Metro rail in Los Angeles: six lines, 110 stations. This is the object under
-    discussion for the rest of this page. It was generated from
-    <a href="https://developer.metro.net/gtfs-schedule-data/" target="_blank" rel="noopener noreferrer">LA Metro’s published GTFS feed</a>,
-    and nothing about it is specific to Los Angeles — the same pipeline drew
-    <a href="{{ '/atlas/' | url }}">twenty-one more networks</a>, one of them
-    outside the United States.
-  </figcaption>
-</figure>
+{% call embed(la, controls=false, sequence="transform") %}
+  Six lines and 110 stations, told three ways: as they lie on the ground,
+  straightened onto a 45&deg; grid, then pulled apart into a row per line. Each
+  step discards more geography and answers the rider&rsquo;s question more
+  directly.
+{% endcall %}
 
 <hr class="rule">
 
@@ -197,18 +213,11 @@ description: What transit maps teach us about GIS, information architecture, and
   </p>
 </section>
 
-<figure class="figure figure--full">
-  <a href="{{ ('/maps/' + networks.featured + '.html') | url }}">
-    {{ "la-metro-rail.svg" | inlineMap | safe }}
-  </a>
-  <figcaption>
-    <a href="{{ ('/maps/' + networks.featured + '.html') | url }}">Open the running map →</a>
-    Every train LA Metro scheduled on an ordinary Friday, moving on its real
-    timings — about seventy in motion at once during the peak. You can scrub
-    through the day, change speed, isolate a line, or turn the station names off
-    to watch the shape of the service.
-  </figcaption>
-</figure>
+{% call embed(la, labels=true, controls=false, sequence="transform", lines="E") %}
+  The E Line alone, East Los Angeles to Santa Monica &mdash; the commute this
+  page opens with. Take in the whole shape and you are reading it as a survey;
+  follow one train and you have switched to a route.
+{% endcall %}
 
 <hr class="rule">
 
@@ -249,17 +258,14 @@ description: What transit maps teach us about GIS, information architecture, and
   </p>
 </section>
 
-<figure class="figure figure--full">
-  {{ "cdmx-metro.svg" | inlineMap | safe }}
-  <figcaption>
-    The Mexico City Metro: twelve lines, 165 stations, in the operator&rsquo;s
-    own colours. Everything here came out of a schedule file &mdash; the lines,
-    the order of the stations, where they meet. What a schedule file cannot
-    give you is the grasshopper at Chapultepec, and that is the half of the
-    system that lets someone use it without reading it.
-    <a href="{{ '/maps/cdmx-metro.html' | url }}">Watch a day of it run &rarr;</a>
-  </figcaption>
-</figure>
+{% call embed(cdmx) %}
+  The Mexico City Metro: twelve lines, 165 stations, in the operator&rsquo;s
+  own colours. Everything here came out of a schedule file &mdash; the lines,
+  the order of the stations, where they meet, and the trains now running
+  between them. What a schedule file cannot give you is the grasshopper at
+  Chapultepec, and that is the half of the system that lets someone use it
+  without reading it.
+{% endcall %}
 
 <section class="wrap">
   <p>

@@ -54,6 +54,13 @@
 
   // ------------------------------------------------------------------- state
   var view = q.get("view") || "map";
+  // "geographic" is the map view with the geographic axis raised, not a fourth
+  // renderer -- so it is a view to a caller and two calls in here. A page built
+  // without geographic geometry ignores it and shows the schematic map; the
+  // exporter refuses the export before it gets this far, which is where that
+  // belongs.
+  P.setGeo(view === "geographic", 0);
+  if (view === "geographic") view = "map";
   if (view === "time") view = "string";        // the page's internal name
   P.setView(view);
   P.setLabels(on("labels", true));
@@ -67,6 +74,39 @@
   }
   if (!on("play", true)) P.setPlaying(false);
   P.settle();
+
+  // ---------------------------------------------------------------- sequence
+  // `sequence=transform` runs the argument the essay is making, on a loop: the
+  // network as it sits on the ground, straightening into the schematic map,
+  // then unfolding into a row per line. Each step throws away more of the
+  // geography and is easier to read for it, which is the point being made.
+  //
+  // A figure running this gets no controls of its own -- the sequence *is* the
+  // content, and a switcher beside it invites the reader to interrupt the
+  // sentence halfway through.
+  if (q.get("sequence") === "transform" && P.hasGeo && P.hasGeo()) {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // Show the finished map and leave it alone. The trains still run: that is
+      // the timetable, not decoration, and it is not what "reduce motion" means.
+      P.setGeo(false, 0);
+    } else {
+      var MORPH = 1.8, HOLD = 2.6;
+      // There and back, so the loop reads as a rewind rather than a jump cut.
+      var steps = [
+        function () { P.setGeo(false, MORPH); },   // ground -> schematic
+        function () { P.setView("linear", MORPH); },  // schematic -> rows
+        function () { P.setView("map", MORPH); },     // rows -> schematic
+        function () { P.setGeo(true, MORPH); },    // schematic -> ground
+      ];
+      var at = 0;
+      P.setGeo(true, 0);
+      setTimeout(function step() {
+        steps[at]();
+        at = (at + 1) % steps.length;
+        setTimeout(step, (MORPH + HOLD) * 1000);
+      }, HOLD * 1000);
+    }
+  }
 
   // ----------------------------------------------------------------- overlay
   var box = document.getElementById("present-overlay");

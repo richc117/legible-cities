@@ -10,6 +10,21 @@
     } else {
       root.removeAttribute("data-theme");
     }
+
+    // The essay's embedded maps are same-origin iframes. They read this same
+    // key before paint, so one that loads later is already correct -- it is
+    // only a toggle while a frame is open that has to be pushed across, and
+    // leaving it out gives four dark maps on a sepia page.
+    document.querySelectorAll("iframe.embed-frame").forEach(function (frame) {
+      try {
+        var inner = frame.contentDocument.documentElement;
+        if (value === "sepia") {
+          inner.setAttribute("data-theme", "sepia");
+        } else {
+          inner.removeAttribute("data-theme");
+        }
+      } catch (e) {}
+    });
   }
 
   applyTheme(stored);

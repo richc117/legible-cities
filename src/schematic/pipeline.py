@@ -133,7 +133,14 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
     # furniture without resorting to an invert filter over the line colours.
     r = render(graph, width=width, style=style or Style(themed=True),
                title=name, line_order=line_order)
-    anim = animate.build(r, graph, trips, date, line_order=line_order)
+    # The loom stage, not gtfs2graph: same stations and the same solved line
+    # ordering, so only the shape differs. See animate.geographic_tracks.
+    geo = None
+    if feeds.FEEDS[key].geographic:
+        geo_graph = LineGraph.from_geojson(paths["loom"]).reproject(to_mercator)
+        geo = animate.geographic_tracks(geo_graph, graph, r)
+
+    anim = animate.build(r, graph, trips, date, geo, line_order=line_order)
 
     out = out_dir or OUT_DIR
     out.mkdir(parents=True, exist_ok=True)

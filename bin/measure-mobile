@@ -49,8 +49,11 @@ const MIN_TAP = 44;
               smallest = el.textContent.trim().slice(0, 20);
             }
           });
+        // Iframes as well as SVGs: the essay's maps are embedded animation
+        // pages now, and counting only <svg> would let them slip past the one
+        // check that exists to catch a map wider than the phone.
         let overflowing = 0;
-        document.querySelectorAll("svg").forEach(el => {
+        document.querySelectorAll("svg, iframe").forEach(el => {
           if (el.getBoundingClientRect().width > window.innerWidth + 1) overflowing++;
         });
         return { scrollW: de.scrollWidth, innerW: window.innerWidth, minTap, smallest, overflowing };

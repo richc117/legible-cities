@@ -19,7 +19,8 @@ from dataclasses import dataclass, field
 from .labels import Placement, Quad, Station, place, polyline_quads
 from .names import display_name
 from .linegraph import Coord, LineGraph
-from .offsets import cumulative_lengths, dedupe, offset_polyline, track_offset
+from .offsets import (cumulative_lengths, dedupe, offset_polyline, point_at,
+                      track_offset)
 
 @dataclass
 class Style:
@@ -327,3 +328,29 @@ def octilinearity(graph: LineGraph, tol_deg: float = 1.0,
             if min(ang, 45.0 - ang) <= tol_deg:
                 ok += length
     return ok, total
+
+
+# --------------------------------------------------------------- geographic
+
+def resample(points: list[Coord], count: int) -> list[Coord]:
+    """Redistribute a polyline onto ``count`` points, evenly by arc length.
+
+    A morph lerps vertex i to vertex i, so the two polylines must agree on how
+    many vertices there are. They never do on their own: a geographic edge
+    follows the real curve in dozens of points, and its octilinear counterpart
+    is two or three straight segments.
+    """
+    pts = dedupe(points)
+    if count < 2 or len(pts) < 2:
+        return [pts[0]] * max(count, 1) if pts else []
+    cum = cumulative_lengths(pts)
+    total = cum[-1]
+    if total <= 0:
+        return [pts[0]] * count
+    return [point_at(pts, total * i / (count - 1)) for i in range(count)]
+
+
+def bbox(groups) -> tuple[float, float, float, float]:
+    xs = [p[0] for g in groups for p in g]
+    ys = [p[1] for g in groups for p in g]
+    return min(xs), min(ys), max(xs), max(ys)

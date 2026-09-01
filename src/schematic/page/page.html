@@ -188,8 +188,31 @@ __ICONS__
     button, .chip, .back {
       min-height: 44px; display: inline-flex; align-items: center;
     }
-    .segmented button { padding: 0 0.95rem; }
     input[type=range] { height: 44px; }
+
+    /* Three 44px words is a slab: the switcher alone was 196px of a 390px
+       screen, in a header that has to stay under 15% of the viewport. On touch
+       the words become icons and each button becomes a square -- the same
+       target, at a third of the width. Esri's Calcite UI icons, base64'd from
+       the files in vendor/calcite-icons by animate.py rather than redrawn as
+       path data, because their licence allows redistribution only without
+       modification. This page has to stay one file, so they arrive as data
+       URIs rather than as a request. */
+    .segmented button {
+      min-width: 44px; padding: 0 0.5rem; justify-content: center;
+    }
+    .segmented .label {
+      position: absolute; width: 1px; height: 1px;
+      overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
+    .segmented button::before {
+      content: ""; width: 16px; height: 16px; background: currentColor;
+      mask: var(--icon) center / contain no-repeat;
+      -webkit-mask: var(--icon) center / contain no-repeat;
+    }
+    #view-map { --icon: url("__ICON_MAP__"); }
+    #view-linear { --icon: url("__ICON_LINEAR__"); }
+    #view-string { --icon: url("__ICON_TIME__"); }
   }
 
   /* Presentation mode: the visualization and nothing else, for export or for
@@ -239,9 +262,9 @@ __ICONS__
     <span class="sub">__SUBTITLE__</span>
     <span class="spacer"></span>
     <span class="segmented" role="group" aria-label="View">
-      <button id="view-map" aria-pressed="true">Map</button>
-      <button id="view-linear" aria-pressed="false">Linear</button>
-      <button id="view-string" aria-pressed="false">Time</button>
+      <button id="view-map" aria-label="Map" aria-pressed="true"><span class="label">Map</span></button>
+      <button id="view-linear" aria-label="Linear" aria-pressed="false"><span class="label">Linear</span></button>
+      <button id="view-string" aria-label="Time" aria-pressed="false"><span class="label">Time</span></button>
     </span>
   </div>
   <div class="bar">
@@ -281,6 +304,9 @@ __ICONS__
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("data").textContent);
+  // Declared here rather than beside the view state below: the track and dot
+  // builders read it, and they run first.
+  const geoData = data.geo || null;
   const svg = document.querySelector("#stage svg");
   const NS = "http://www.w3.org/2000/svg";
   const params = new URLSearchParams(location.search);
@@ -449,15 +475,29 @@ __ICONS__
   let frameTop = 0.5;     // share of added height taken above the network
   let frameMargin = 0;    // breathing room once the aspect is reached
   let lastBox = vb.slice();
+  // Set when only some lines are showing. The drawn box is sized for the whole
+  // network, so one line inside it is a thin band across a mostly empty frame
+  // -- and every label shrinks with it. Two boxes, not one: the network states
+  // and the row state occupy different parts of the canvas, so a single box
+  // spanning both leaves each of them floating in the other's space. Lerped by
+  // m, exactly as the height already was. See fitVisible().
+  let subsetBox = null, subsetLinBox = null;
 
   function setBox(m) {
     // Tightening onto the network only makes sense for the map: elsewhere the
     // height belongs to the morph and the label overhang is not what sets it.
     const tight = !labelsOn && tightBox && mode === "map";
-    const base = (tight ? tightBox : fullBox).split(/\s+/).map(Number);
+    // The chart is laid out across the full canvas width, so it keeps the drawn
+    // box whatever else is hidden.
+    const subset = subsetBox && mode !== "string";
+    const base = subset
+      ? [0, 1, 2, 3].map(i => lerp(subsetBox[i], subsetLinBox[i], m))
+      : (tight ? tightBox : fullBox).split(/\s+/).map(Number);
     let x = base[0], y = base[1], w = base[2], h = base[3];
     // The row-based views are taller than the map; the morph lerps the height.
-    if (linH !== vbH) h = lerp(h, linH, m);
+    // A subset box has already been measured in each state, so it must not be
+    // stretched again on top of that.
+    if (!subset && linH !== vbH) h = lerp(h, linH, m);
 
     if (frameAspect > 0) {
       // Grow -- never crop -- to reach the frame's aspect. Cropping a transit
@@ -541,7 +581,9 @@ __ICONS__
       dot.setAttribute("stroke", "var(--map-station-stroke, #111)");
       dot.setAttribute("stroke-width", "2.2");
       dotLayer.appendChild(dot);
-      dots.push({ el: dot, label: line.label, node: st.node, mapPt: pt, r: pt.r });
+      const gn = geoData && geoData.nodes[st.node];
+      dots.push({ el: dot, label: line.label, node: st.node, mapPt: pt, r: pt.r,
+                  geoPt: gn ? { x: gn[0], y: gn[1] } : null });
 
       const name = (layout.names || {})[st.node];
       if (name) {
@@ -596,22 +638,36 @@ __ICONS__
         const xy = p.trim().split(/\s+/).map(Number);
         return { x: xy[0], y: xy[1] };
       });
+    // Resampled server-side to this track's own vertex count, so vertex i has
+    // a partner. A track with no twin holds its drawn shape and simply stays
+    // put while the rest of the network moves.
+    const g = geoData && geoData.tracks[el.getAttribute("id")];
     tracks.push({
       el: el, label: label, pts: pts, d0: el.getAttribute("d"),
+      gpts: g && g.length === pts.length ? g.map(c => ({ x: c[0], y: c[1] })) : null,
       src: el.getAttribute("data-src"), dst: el.getAttribute("data-dst"),
     });
   });
 
-  const trackD = (t, m) => {
+  const trackD = (t, m, g) => {
     const a = linXY(t.label, t.src), b = linXY(t.label, t.dst);
-    if (!a || !b) return t.d0;
     const n = t.pts.length - 1;
+    if ((!a || !b) && !(g > 0 && t.gpts)) return t.d0;
     let out = "";
     for (let i = 0; i <= n; i++) {
-      const f = n === 0 ? 0 : i / n;
-      const lx = lerp(a.x, b.x, f), ly = lerp(a.y, b.y, f);
-      const x = lerp(t.pts[i].x, lx, m), y = lerp(t.pts[i].y, ly, m);
-      out += (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+      // Geographic first: it is a variant of the map, and the row layout is
+      // then reached from wherever the network currently is.
+      let px = t.pts[i].x, py = t.pts[i].y;
+      if (g > 0 && t.gpts) {
+        px = lerp(px, t.gpts[i].x, g);
+        py = lerp(py, t.gpts[i].y, g);
+      }
+      if (m > 0 && a && b) {
+        const f = n === 0 ? 0 : i / n;
+        px = lerp(px, lerp(a.x, b.x, f), m);
+        py = lerp(py, lerp(a.y, b.y, f), m);
+      }
+      out += (i ? "L" : "M") + px.toFixed(1) + " " + py.toFixed(1);
     }
     return out;
   };
@@ -621,6 +677,15 @@ __ICONS__
   const pathEls = data.paths.map(p => {
     const el = document.createElementNS(NS, "path");
     el.setAttribute("d", p.d);
+    defs.appendChild(el);
+    return el;
+  });
+  // The geographic twin of each route, for getPointAtLength during the morph.
+  // Null where the city was built without geographic geometry, which is most.
+  const geoPathEls = data.paths.map(p => {
+    if (!p.gd) return null;
+    const el = document.createElementNS(NS, "path");
+    el.setAttribute("d", p.gd);
     defs.appendChild(el);
     return el;
   });
@@ -643,6 +708,10 @@ __ICONS__
   // simply runs both at once.
   let view = 0, viewTarget = 0;     // m: 0 = map, 1 = linear rows
   let str = 0, strTarget = 0;       // s: 0 = network, 1 = stringline
+  // g: 0 = the schematic map as drawn, 1 = the same network before octi
+  // straightened it. A third axis on the same interpolation, not a third
+  // renderer -- and it is only ever non-zero on a page built with geo data.
+  let geo = 0, geoTarget = 0;
   let mode = "map";                 // map | linear | string
   let dirty = true;
 
@@ -775,7 +844,7 @@ __ICONS__
     return lo;
   };
 
-  function geometry(m, sf) {
+  function geometry(m, sf, g) {
     // Network layers dim as the chart takes over; both are positioned every
     // frame so a re-sort moves them together.
     const networkOpacity = (1 - sf).toFixed(3);
@@ -790,22 +859,36 @@ __ICONS__
     // Sizes the box and grows the painted background with it -- without that
     // the extra rows would sit on whatever is behind the SVG.
     setBox(m);
-    for (const t of tracks) t.el.setAttribute("d", trackD(t, m));
+    for (const t of tracks) t.el.setAttribute("d", trackD(t, m, g));
 
     for (const d of dots) {
       const lp = linXY(d.label, d.node);
-      if (!lp) continue;
-      d.el.setAttribute("cx", lerp(d.mapPt.x, lp.x, m).toFixed(1));
-      d.el.setAttribute("cy", lerp(d.mapPt.y, lp.y, m).toFixed(1));
+      if (!lp && !(g > 0 && d.geoPt)) continue;
+      let x = d.mapPt.x, y = d.mapPt.y;
+      if (g > 0 && d.geoPt) { x = lerp(x, d.geoPt.x, g); y = lerp(y, d.geoPt.y, g); }
+      if (m > 0 && lp) { x = lerp(x, lp.x, m); y = lerp(y, lp.y, m); }
+      d.el.setAttribute("cx", x.toFixed(1));
+      d.el.setAttribute("cy", y.toFixed(1));
       // Interchanges are drawn larger on the map; on a row every stop is a stop.
       d.el.setAttribute("r", lerp(d.r, 3.6, m).toFixed(2));
     }
 
     for (const t of texts) {
       const lp = linXY(t.label, t.node);
-      if (!lp) continue;
-      const x = lerp(t.spec.x, lp.x + 7, m);
-      const y = lerp(t.spec.y, lp.y - 9, m);
+      if (!lp && !(g > 0)) continue;
+      // Label boxes are solved against the drawn map, so on the geographic one
+      // they are in the wrong place -- but only by however far their station
+      // moved. Carrying each label by that offset keeps it attached to its stop
+      // instead of fading the names out exactly when a reader wants to read a
+      // route along them. Collisions are possible; a figure that shows the
+      // geographic view is showing one line, where there are none.
+      let sx = t.spec.x, sy = t.spec.y;
+      if (g > 0 && geoData) {
+        const gp = geoData.nodes[t.node], mp = mapXY.get(t.node);
+        if (gp && mp) { sx += (gp[0] - mp.x) * g; sy += (gp[1] - mp.y) * g; }
+      }
+      const x = lp ? lerp(sx, lp.x + 7, m) : sx;
+      const y = lp ? lerp(sy, lp.y - 9, m) : sy;
       const r0 = t.spec.rotate ? +t.spec.rotate[1] : 0;
       const rot = lerp(r0, -55, m);
       t.el.setAttribute("x", x.toFixed(1));
@@ -829,8 +912,8 @@ __ICONS__
   }
 
   function draw() {
-    const m = ease(view), sf = ease(str);
-    if (dirty) { geometry(m, sf); dirty = false; }
+    const m = ease(view), sf = ease(str), gf = ease(geo);
+    if (dirty) { geometry(m, sf, gf); dirty = false; }
     if (sf > 0) {
       const hx = timeX(now);
       playhead.setAttribute("x1", hx.toFixed(1));
@@ -859,6 +942,15 @@ __ICONS__
         const len = lerp(path.stops[lo], path.stops[hi], frac);
         const pt = el.getPointAtLength(Math.min(len, el.getTotalLength()));
         x = pt.x; y = pt.y;
+        // The same fraction of the same hop, measured along the geographic
+        // route instead. Reading the stop index once and placing it twice is
+        // what stops a train drifting off its own line mid-morph.
+        if (gf > 0 && geoPathEls[trip.p]) {
+          const gel = geoPathEls[trip.p];
+          const glen = lerp(path.gstops[lo], path.gstops[hi], frac);
+          const gp = gel.getPointAtLength(Math.min(glen, gel.getTotalLength()));
+          x = lerp(x, gp.x, gf); y = lerp(y, gp.y, gf);
+        }
       }
       if (m > 0) {
         const a = linXY(trip.r, path.nodes[lo]), b = linXY(trip.r, path.nodes[hi]);
@@ -918,7 +1010,7 @@ __ICONS__
   // the second: a beat shorter than the decay's ~130 frames would otherwise be
   // cut off mid-transition. draw() eases the result either way, so the ramp
   // arrives as a cubic in-out rather than as constant motion.
-  let viewTween = null, strTween = null;   // {from, to, t, dur}
+  let viewTween = null, strTween = null, geoTween = null;   // {from, to, t, dur}
 
   function tween(cur, target, state, dt, rate) {
     if (cur === target) return cur;
@@ -949,6 +1041,11 @@ __ICONS__
     if (str !== strTarget) {
       str = tween(str, strTarget, strTween, dt, 3.2);
       if (str === strTarget) strTween = null;
+      dirty = true;
+    }
+    if (geo !== geoTarget) {
+      geo = tween(geo, geoTarget, geoTween, dt, 3.2);
+      if (geo === geoTarget) geoTween = null;
       dirty = true;
     }
     for (const entry of rowTarget) {
@@ -1117,12 +1214,64 @@ __ICONS__
   setMode("map");
   setMore(window.innerWidth > 900);
   addEventListener("resize", () => { dirty = true; });
-  geometry(0, 0);
+  geometry(0, 0, 0);
 
   // The mechanism an exporter drives. Everything above is closed over inside
   // this IIFE, so a second <script> cannot reach it; this object is the only
   // seam. It is deliberately mechanism, not policy -- the storyboard, the URL
   // parameters and the overlay all live outside and talk only through here.
+  // The box that holds only what is still showing, across every state the
+  // figure will pass through. Measured off the drawing rather than computed
+  // from the data, because a label's box is its rendered text and only the
+  // browser knows how wide that is.
+  //
+  // Static, not per-frame: it is sampled at the three extremes and unioned, so
+  // the frame stays put while the network moves inside it. Recomputing every
+  // frame would work, but the box would then drift the whole way through a
+  // morph, which reads as an unasked-for camera move.
+  function fitVisible() {
+    const els = [];
+    svg.querySelectorAll("#lines g.line").forEach(g => els.push(g));
+    for (const d of dots) els.push(d.el);
+    for (const t of texts) els.push(t.el);
+
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const measure = () => {
+      for (const el of els) {
+        if (el.style.display === "none") continue;
+        let b;
+        try { b = el.getBBox(); } catch (e) { continue; }
+        if (!b || (!b.width && !b.height)) continue;
+        x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
+        x1 = Math.max(x1, b.x + b.width); y1 = Math.max(y1, b.y + b.height);
+      }
+    };
+
+    const reset = () => { x0 = y0 = Infinity; x1 = y1 = -Infinity; };
+    const taken = () => {
+      if (!(x1 > x0 && y1 > y0)) return null;
+      const pad = Math.max(x1 - x0, y1 - y0) * 0.03;
+      return [x0 - pad, y0 - pad, (x1 - x0) + 2 * pad, (y1 - y0) + 2 * pad];
+    };
+
+    const wasView = view, wasStr = str, wasGeo = geo;
+    subsetBox = subsetLinBox = null;        // measure against the drawn box
+    reset();
+    geometry(0, 0, 0); measure();                    // the schematic map
+    if (geoData) { geometry(0, 0, 1); measure(); }   // ...and on the ground
+    const netBox = taken();
+    reset();
+    geometry(1, 0, 0); measure();                    // unfolded into rows
+    const linBox = taken();
+    geometry(ease(wasView), ease(wasStr), ease(wasGeo));
+
+    if (!netBox || !linBox) return;
+    subsetBox = netBox;
+    subsetLinBox = linBox;
+    dirty = true;
+    draw();
+  }
+
   window.__present = {
     advance(dt) { advance(dt); draw(); },
     seek(sec) { now = Math.max(t0, Math.min(t1, sec)); dirty = true; draw(); },
@@ -1138,9 +1287,25 @@ __ICONS__
     setPlaying(on) { playing = on; },
     setSpeed(x) { speed = x; },
     setView(v, dur) { setMode(v, dur); },
+    // The geographic axis is deliberately not a fourth button: it is a thing
+    // the page can be *told* to show, for a figure making an argument about the
+    // transformation. Silently a no-op where there is no geometry for it.
+    setGeo(on, dur) {
+      if (!geoData) return false;
+      const to = on ? 1 : 0;
+      geoTween = dur > 0 && to !== geo ? { from: geo, to: to, t: 0, dur: dur } : null;
+      geoTarget = to;
+      if (!(dur > 0)) { geo = to; }
+      dirty = true; draw();
+      return true;
+    },
+    hasGeo() { return !!geoData; },
     setLabels(on) { setLabels(on); },
     setRoutes(keep) {
       for (const r of routes) setRoute(r, !keep || keep.indexOf(r) >= 0);
+      // Showing everything again means the drawn box is right again.
+      if (hidden.size) fitVisible();
+      else { subsetBox = subsetLinBox = null; dirty = true; }
       draw();
     },
     setFrame(aspect, top, margin) {
@@ -1152,7 +1317,8 @@ __ICONS__
     // Snap every tween to its target: a still should never catch a transition
     // halfway through.
     settle() {
-      view = viewTarget; str = strTarget; viewTween = strTween = null;
+      view = viewTarget; str = strTarget; geo = geoTarget;
+      viewTween = strTween = geoTween = null;
       for (const entry of rowTarget) rowPos.set(entry[0], entry[1]);
       dirty = true; draw();
     },
@@ -1160,7 +1326,8 @@ __ICONS__
     onDraw(fn) { onDraw = fn; },
     state() {
       return { now: now, clock: fmt(now), shown: shown, mode: mode,
-               view: view, str: str, box: lastBox.slice(), labels: labelsOn };
+               view: view, str: str, geo: geo, box: lastBox.slice(),
+               labels: labelsOn };
     },
   };
   __PRESENT__
