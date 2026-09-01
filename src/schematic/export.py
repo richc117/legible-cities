@@ -151,6 +151,21 @@ PRESETS: dict[str, Preset] = {p.name: p for p in [
     Preset("linkedin-video", "LinkedIn", 1200, 1200, "video", "mp4",
            storyboard="tour"),
 
+    # --- video, as GIF -------------------------------------------------------
+    # The same three shapes again, because a GIF is what plays in a place that
+    # will not take a video: an email, a README, a slide. They are deliberately
+    # smaller and slower than their mp4 siblings -- a GIF carries a full palette
+    # per frame, so resolution and frame rate are what its weight is made of.
+    Preset("instagram-reel-gif", "Instagram", 630, 1120, "video", "gif",
+           storyboard="morph", fps=12,
+           note="9:16 as GIF; half the mp4's size and rate, or it is unusable"),
+    Preset("linkedin-gif", "LinkedIn", 640, 640, "video", "gif",
+           storyboard="morph", fps=12, note="square GIF"),
+    Preset("bluesky-gif", "Bluesky", 640, 800, "video", "gif",
+           storyboard="morph", fps=12,
+           note="4:5 GIF. Bluesky caps an image at ~1 MB, which nothing this "
+                "long will meet -- post the mp4 there and keep this for a page"),
+
     # --- portfolio and web ---------------------------------------------------
     # The theme pair the essays use: an <img> cannot follow the page's theme, so
     # the page ships both and shows one.
@@ -197,6 +212,12 @@ GEO_VIEW = "geographic"
 VIEWS = (GEO_VIEW, "map", "linear", "time")
 
 
+# The landing page figure's own timing, from present.js's MORPH and HOLD. Named
+# here because `essay-loop` below is that figure and has to stay it.
+PAGE_MORPH = 1.8
+PAGE_HOLD = 2.6
+
+
 STORYBOARDS: dict[str, tuple[Beat, ...]] = {
     # The whole argument, in one clip: the network as it sits on the ground,
     # straightened onto the grid, unfolded into a row per line, then re-read as
@@ -218,6 +239,21 @@ STORYBOARDS: dict[str, tuple[Beat, ...]] = {
         Beat(3, view="map"),
         Beat(3, view="linear"),
         Beat(3, view=GEO_VIEW),
+    ),
+    # Figure two of the essay, beat for beat: the same cycle `?sequence=transform`
+    # runs in the landing page's iframe, so an export of that figure is the
+    # figure and not an approximation of it. The page holds 2.6s and morphs over
+    # 1.8s, and it returns through the schematic map rather than cutting from
+    # the rows back to the ground -- "there and back, so the loop reads as a
+    # rewind rather than a jump cut". A beat is hold + tween, hence 4.4.
+    # test_export.py reads the two constants out of present.js so the two copies
+    # cannot drift.
+    "essay-loop": (
+        Beat(PAGE_HOLD, view=GEO_VIEW, at="08:00", speed=60, tween=0),
+        Beat(PAGE_HOLD + PAGE_MORPH, view="map", tween=PAGE_MORPH),
+        Beat(PAGE_HOLD + PAGE_MORPH, view="linear", tween=PAGE_MORPH),
+        Beat(PAGE_HOLD + PAGE_MORPH, view="map", tween=PAGE_MORPH),
+        Beat(PAGE_HOLD + PAGE_MORPH, view=GEO_VIEW, tween=PAGE_MORPH),
     ),
     # The three views, in the order that explains them.
     "tour": (
@@ -549,11 +585,17 @@ def _vector(key: str, dest: Path, preset: Preset) -> list[Path]:
 
 
 def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = None,
-        labels: bool | None = None, title: bool = True, at: str | None = None,
-        lines: tuple[str, ...] = (), storyboard: str | None = None,
-        quality: str = "standard", fade: float = 0.0, safe: bool = False,
-        out: Path | None = None) -> list[Path]:
-    """Export one network for one destination. Returns what it wrote."""
+        labels: bool | None = None, title: bool = True, clock: bool | None = None,
+        at: str | None = None, lines: tuple[str, ...] = (),
+        storyboard: str | None = None, quality: str = "standard", fade: float = 0.0,
+        safe: bool = False, tag: str = "", out: Path | None = None) -> list[Path]:
+    """Export one network for one destination. Returns what it wrote.
+
+    ``clock`` and ``title`` are the two pieces of furniture the page draws over
+    the map; both off is the essay's own figure, which carries neither. ``tag``
+    goes into the filename, so two dressings of the same preset -- with the name
+    and without it -- can sit in one folder instead of overwriting each other.
+    """
     if key not in feeds.FEEDS:
         raise KeyError(f"unknown feed {key!r}")
     preset = PRESETS[preset_name]
@@ -574,9 +616,10 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
             "standard": (2, False, 20),
             "high": (2, True, 16),
         }[quality]
-        stem = f"{key}-{preset.name}" + (f"-{theme}" if theme != "dark" else "")
+        stem = (f"{key}-{preset.name}" + (f"-{theme}" if theme != "dark" else "")
+                + (f"-{tag}" if tag else ""))
         url = url_for(key, preset, view=view, labels=labels, title=title,
-                      theme=theme, at=at, lines=lines, safe=safe)
+                      clock=clock, theme=theme, at=at, lines=lines, safe=safe)
         job = {"url": url, "width": preset.width, "height": preset.height,
                "scale": scale, "fps": preset.fps, "format": preset.fmt}
 

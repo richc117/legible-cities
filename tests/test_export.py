@@ -236,10 +236,31 @@ def test_the_transform_storyboards_open_already_in_their_view():
     Without tween=0 the clip opens on the schematic map and bends backwards into
     geography -- the argument told in reverse, and only visible on playback.
     """
-    for name in ("transform", "transform-loop"):
+    for name in ("transform", "transform-loop", "essay-loop"):
         first = export.STORYBOARDS[name][0]
         assert first.view == export.GEO_VIEW, name
         assert first.tween == 0, f"{name} would animate into its opening view"
+
+
+def test_the_essay_loop_keeps_the_landing_page_figure_timing():
+    """`essay-loop` exports figure two of the essay, so it has to stay figure two.
+
+    The page runs that cycle itself, from MORPH and HOLD in present.js. Two
+    copies of a number drift; this reads the page's.
+    """
+    js = (Path(export.__file__).parent / "page" / "present.js").read_text()
+    morph = float(re.search(r"var MORPH = ([\d.]+)", js).group(1))
+    hold = float(re.search(r"HOLD = ([\d.]+)", js).group(1))
+    assert (export.PAGE_MORPH, export.PAGE_HOLD) == (morph, hold)
+
+    beats = export.STORYBOARDS["essay-loop"]
+    for b in beats[1:]:
+        assert b.tween == morph
+        assert b.secs == morph + hold
+    # There and back: the page returns through the schematic map rather than
+    # cutting from the rows to the ground, and ends where it began so it loops.
+    assert [b.view for b in beats] == ["geographic", "map", "linear", "map",
+                                       "geographic"]
 
 
 def test_a_geographic_export_is_refused_where_there_is_no_geometry():

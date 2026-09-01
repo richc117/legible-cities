@@ -5,6 +5,7 @@
     bin/export cdmx-metro --preset instagram-post --view time --no-labels
     bin/export la-metro-rail -p portfolio-mp4 --storyboard transform
     bin/export nyc-subway --preset portfolio-svg
+    bin/export la-metro-rail -p instagram-reel-gif --storyboard essay-loop
     bin/export la-metro-rail --preset instagram-reel --dry-run
 
 Everything lands on the Desktop, under ~/Desktop/legible-cities/<feed>/, never
@@ -52,6 +53,10 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--no-labels", dest="labels", action="store_false")
     ap.add_argument("--no-title", dest="title", action="store_false", default=True,
                     help="drop the city/network overlay")
+    ap.add_argument("--clock", dest="clock", action="store_true", default=None)
+    ap.add_argument("--no-clock", dest="clock", action="store_false",
+                    help="drop the clock; with --no-title this is the essay's "
+                         "own figure, which carries neither")
     ap.add_argument("--theme", choices=["dark", "light"], default="dark")
     ap.add_argument("--at", help="clock to start at, e.g. 07:30")
     ap.add_argument("--lines", help="comma-separated line labels to keep")
@@ -65,6 +70,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--fade", type=float, default=0.0, help="seconds, for looping video")
     ap.add_argument("--safe-area", action="store_true",
                     help="also write a preview showing where the platform's UI sits")
+    ap.add_argument("--tag", default="", help="suffix for the filenames, so two "
+                                              "dressings of one preset can share a folder")
     ap.add_argument("--out", type=Path, help="destination root (default: Desktop)")
     ap.add_argument("--sheet", action="store_true", help="contact sheet of the run")
     ap.add_argument("--open", action="store_true", help="reveal the folder when done")
@@ -115,9 +122,9 @@ def main(argv: list[str]) -> int:
             print(f"  {exc}")
             return 1
     kwargs = dict(theme=args.theme, view=args.view, labels=args.labels,
-                  title=args.title, at=args.at, lines=lines,
+                  title=args.title, clock=args.clock, at=args.at, lines=lines,
                   storyboard=args.storyboard, quality=args.quality,
-                  fade=args.fade, out=args.out)
+                  fade=args.fade, tag=args.tag, out=args.out)
 
     if args.dry_run:
         for name in names:
@@ -128,7 +135,8 @@ def main(argv: list[str]) -> int:
                 continue
             print("    " + export.url_for(args.feed, preset, view=args.view,
                                           labels=args.labels, title=args.title,
-                                          theme=args.theme, at=args.at, lines=lines))
+                                          clock=args.clock, theme=args.theme,
+                                          at=args.at, lines=lines))
         return 0
 
     written: list[Path] = []

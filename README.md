@@ -150,7 +150,23 @@ bin/export la-metro-rail --preset instagram-reel
 bin/export cdmx-metro -p instagram-post --view time --no-labels
 bin/export nyc-subway -p portfolio-svg               # the theme pair essays use
 bin/export la-metro-rail -p instagram-reel --dry-run # print the URL, write nothing
+bin/export la-metro-rail -p linkedin-gif --storyboard essay-loop \
+           --no-title --no-clock --no-labels --tag minimal   # the essay's figure two
 ```
+
+The `essay-loop` storyboard is the landing page's second figure, beat for beat:
+geographic → schematic → rows → schematic → geographic, holding 2.6s and
+morphing over 1.8s, returning through the map so the loop reads as a rewind
+rather than a jump cut. Those two numbers come from `present.js`, and a test
+reads them back out of it, because the export is meant to *be* that figure
+rather than resemble it. `--no-title --no-clock` is the rest of the figure:
+it carries no furniture at all. `--tag` names the variant in the filename, so
+a dressed and an undressed cut of one preset can sit in the same folder.
+
+Each social shape has a GIF twin — `instagram-reel-gif`, `linkedin-gif`,
+`bluesky-gif` — for the places that will not take a video. They are smaller and
+slower than their mp4 siblings on purpose: a GIF stores a palette per frame, so
+resolution and frame rate are what its weight is made of.
 
 Everything lands in `~/Desktop/legible-cities/<feed>/` — never in the repo — with
 a `.json` beside each file recording what it is, the network's own caveats, and
