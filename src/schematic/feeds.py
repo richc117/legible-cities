@@ -73,10 +73,14 @@ class Feed:
     # Facts about the feed that the pipeline cannot work out for itself, shown
     # beside the computed caveats on the atlas.
     # Carry the pre-octilinear geometry into the animation page, so it can show
-    # the geographic map straightening into the schematic one. Off by default:
-    # it is a second copy of every track, and only the cities that actually
-    # illustrate the transformation have any use for one.
-    geographic: bool = False
+    # the geographic map straightening into the schematic one. On by default:
+    # Geographic is the switcher's first button, and a network without this
+    # would show a dead control. It is a second copy of every track, so a page
+    # grows about 8% for it. Set False to opt one network out -- the exporter
+    # still refuses a geographic export of such a feed rather than quietly
+    # rendering the schematic map, which is what `export.check_geographic` is
+    # for.
+    geographic: bool = True
     notes: tuple[str, ...] = ()
 
     @property
@@ -98,7 +102,6 @@ FEEDS: dict[str, Feed] = {
         mode="all",
         # LA leaves route_short_name blank and names routes "Metro A Line".
         label_pattern=r"^Metro\s+(\S+)\s+Line$",
-        geographic=True,   # the essay shows this one straightening
     ),
     "bart": Feed(
         key="bart",

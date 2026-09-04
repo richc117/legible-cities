@@ -20,12 +20,13 @@ description: What transit maps teach us about GIS, information architecture, and
 {# The essay used to open on four screens of prose, and a visitor who had been
    told about the animations had no way of knowing the site moved. This is that
    answer: the first thing on the page is a real timetable running. #}
-{% call embed(la, eager=true) %}
+{% call embed(la, eager=true, view="geographic", cycle=true) %}
   Los Angeles Metro rail &mdash; no map here was drawn by hand. Every one was
-  generated from the agency&rsquo;s own published schedule. Switch it to a
-  linear diagram or a time chart above, or open the running map to scrub
-  through the day. See the
-  <a href="{{ '/atlas/' | url }}">atlas</a> for all
+  generated from the agency&rsquo;s own published schedule. It is cycling
+  through the four views on its own &mdash; geographic, schematic, linear, and
+  the service day as a time chart &mdash; so take the switcher above whenever
+  you want to stop somewhere, or open the running map to scrub through the day.
+  See the <a href="{{ '/atlas/' | url }}">atlas</a> for all
   {{ networks.totals.networks }} networks, built by the same code from GTFS.
 {% endcall %}
 
@@ -223,6 +224,31 @@ description: What transit maps teach us about GIS, information architecture, and
 
 <section class="wrap">
   <h2>Culture can become part of the navigation system</h2>
+</section>
+
+{# The one photograph on this site, and it opens the section rather than
+   illustrating it after the fact: the argument that follows is about something
+   no schedule file contains, and it lands better once you have already seen the
+   thing. Self-hosted rather than hotlinked from Wikimedia -- their thumbnail
+   URLs are not a stable API, and spending someone else's bandwidth to make my
+   own point is rude. CC BY-SA 4.0, so the credit in the caption is a licence
+   term and not a courtesy: the author, the source, the licence and the fact
+   that it is resized all have to stay. #}
+<figure class="figure">
+  <img src="{{ '/assets/cdmx-station-icons.jpg' | url }}" width="1200" height="675"
+       loading="lazy" decoding="async"
+       alt="A wayfinding panel inside a Mexico City Metro station, showing Line 5 drawn as a row of stations. Each station is a coloured tile carrying its own pictogram — a pyramid for La Raza, an aeroplane for Terminal A&eacute;rea, a cannon for Balderas — above its name.">
+  <figcaption>
+    Line 5 on a station wall: every stop carries a picture as well as a name.
+    Photograph by
+    <a href="https://commons.wikimedia.org/wiki/User:Tbhotch" target="_blank" rel="noopener noreferrer">Tbhotch</a>,
+    <a href="https://commons.wikimedia.org/wiki/File:Cierre_L%C3%ADnea_1_(Metro_Misterios).jpg" target="_blank" rel="noopener noreferrer">via Wikimedia Commons</a>,
+    <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>,
+    resized.
+  </figcaption>
+</figure>
+
+<section class="wrap">
   <p>
     Clarity is not achieved only by removing information. Sometimes meaning
     makes information easier to recognize.
@@ -244,11 +270,13 @@ description: What transit maps teach us about GIS, information architecture, and
   <p>
     It is worth being precise about why that system exists. When the Metro
     opened in 1969, roughly a third of the population could not read.
-    <a href="https://www.creativereview.co.uk/lance-wyman-and-the-mexico-city-metro/" target="_blank" rel="noopener noreferrer">Lance Wyman</a>
-    and his collaborators designed the icons so the network could be used
-    without reading it at all. The cultural richness is real, but the icons were
-    an accessibility decision first — which is exactly the point. Meaning and
-    access were not in tension. The same choice served both.
+    <a href="https://lancewyman.com/brand-project/mexico-city-metro-system-graphics/" target="_blank" rel="noopener noreferrer">Lance Wyman</a>
+    and his collaborators designed
+    <a href="https://www.creativereview.co.uk/lance-wyman-and-the-mexico-city-metro/" target="_blank" rel="noopener noreferrer">the icons</a>
+    so the network could be used without reading it at all. The cultural
+    richness is real, but the icons were an accessibility decision first —
+    which is exactly the point. Meaning and access were not in tension. The same
+    choice served both.
   </p>
   <p>
     Here is that network, drawn by the same code as everything else on this

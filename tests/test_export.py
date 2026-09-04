@@ -6,7 +6,9 @@ the agreement between the three places the palette is written down.
 """
 
 import re
+from dataclasses import replace
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -198,7 +200,7 @@ def test_no_title_repeats_its_city():
 # ------------------------------------------------------------------ alt text
 
 
-@pytest.mark.parametrize("view", ["map", "linear", "time"])
+@pytest.mark.parametrize("view", ["geographic", "map", "linear", "time"])
 def test_alt_text_is_written_for_every_view(view):
     text = export.alt_text("cdmx-metro", view, stations=168, lines=12)
     assert "Mexico City" in text
@@ -215,6 +217,28 @@ def test_url_carries_the_frame_and_the_name():
     assert "frame=1080%3A1920" in url
     assert "city=Mexico+City" in url
     assert url.startswith("file://")
+
+
+def test_no_export_url_ever_asks_for_the_controls():
+    """A control visible in presentation mode is captured into the deliverable.
+
+    bin/_record.js element-screenshots #stage, which picks up anything painted
+    over that box -- that is how the title and clock get into an export. So a
+    switcher would be baked into every reel, still and GIF, and worse, it would
+    not sit still: the frame loop calls setView/setGeo per beat and syncButtons
+    moves aria-pressed on each, so it would flicker through its pressed states
+    on the beat, inside the footage. Nobody would catch that until review.
+
+    `controls` defaults off in present.js and url_for must never set it. The day
+    this fails is the day a toolbar starts appearing in the social assets.
+    """
+    for name, preset in export.PRESETS.items():
+        for view in export.VIEWS:
+            url = export.url_for("la-metro-rail", preset, view=view)
+            assert "controls" not in url, f"{name}/{view}"
+    # Including the safe-area preview, which is a still like any other.
+    assert "controls" not in export.url_for(
+        "la-metro-rail", export.PRESETS["instagram-reel"], safe=True)
 
 
 def test_exports_refuse_to_write_into_the_repo(tmp_path):
@@ -247,13 +271,26 @@ def test_the_transform_storyboards_open_already_in_their_view():
 def test_the_essay_loop_keeps_the_landing_page_figure_timing():
     """`essay-loop` exports figure two of the essay, so it has to stay figure two.
 
-    The page runs that cycle itself, from MORPH and HOLD in present.js. Two
-    copies of a number drift; this reads the page's.
+    The page runs that cycle itself, from MORPH and HOLD in present.js, and the
+    essay's opening figure cycles on the same beat from embed.js. Copies of a
+    number drift; this reads both of the pages'.
     """
     js = (Path(export.__file__).parent / "page" / "present.js").read_text()
     morph = float(re.search(r"var MORPH = ([\d.]+)", js).group(1))
     hold = float(re.search(r"HOLD = ([\d.]+)", js).group(1))
     assert (export.PAGE_MORPH, export.PAGE_HOLD) == (morph, hold)
+
+    # The site's switcher cycles figure one on the same beat.
+    embed = (feeds.REPO_ROOT / "site" / "src" / "assets" / "embed.js").read_text()
+    assert re.search(r"var MORPH = ([\d.]+), HOLD = ([\d.]+);", embed).groups() \
+        == (str(morph), str(hold))
+
+    # A click on the running map's toolbar runs the same S-curve but shorter:
+    # a figure morphing on a loop is content, a click is a reader waiting. It
+    # must never be the slower of the two.
+    page = PAGE.read_text()
+    click = float(re.search(r"const CLICK_MORPH = ([\d.]+);", page).group(1))
+    assert 0.6 <= click <= morph, click
 
     beats = export.STORYBOARDS["essay-loop"]
     for b in beats[1:]:
@@ -269,16 +306,23 @@ def test_a_geographic_export_is_refused_where_there_is_no_geometry():
     """The page has nothing to raise -- it just shows the schematic map -- so an
     export would come out looking dull rather than broken."""
     geo_feeds = [k for k, f in feeds.FEEDS.items() if f.geographic]
-    plain = [k for k, f in feeds.FEEDS.items() if not f.geographic]
     assert geo_feeds, "no feed carries geographic geometry any more"
-
     export.check_geographic(geo_feeds[0], storyboard="transform")   # allowed
-    with pytest.raises(ValueError, match="geographic"):
-        export.check_geographic(plain[0], storyboard="transform")
-    with pytest.raises(ValueError, match="geographic"):
-        export.check_geographic(plain[0], view=export.GEO_VIEW)
-    # A storyboard that never asks for it is fine on any feed.
-    export.check_geographic(plain[0], storyboard="tour")
+
+    # Every registered feed carries the geometry now, so the refusal has to be
+    # exercised against a feed opted out by hand -- which is the only way it can
+    # arise, and exactly what the flag is still for.
+    plain = "opted-out"
+    real = feeds.FEEDS[geo_feeds[0]]
+    monkeyed = dict(feeds.FEEDS)
+    monkeyed[plain] = replace(real, key=plain, geographic=False)
+    with mock.patch.dict(feeds.FEEDS, monkeyed, clear=True):
+        with pytest.raises(ValueError, match="geographic"):
+            export.check_geographic(plain, storyboard="transform")
+        with pytest.raises(ValueError, match="geographic"):
+            export.check_geographic(plain, view=export.GEO_VIEW)
+        # A storyboard that never asks for it is fine on any feed.
+        export.check_geographic(plain, storyboard="tour")
 
 
 def test_a_storyboard_is_described_by_the_views_it_visits():

@@ -154,9 +154,11 @@ print(result.summary())
 
 Writes `out/la-metro-rail.svg`, `out/la-metro-rail.html` and
 `out/la-metro-rail.positions.json`. Open the HTML in a browser: a clock, a
-time-of-day scrubber, playback speeds, per-line toggles, a **Linear** view that
-unfolds the map into one row per line (sortable by name or station count), a
-**Time** view that plots the whole service day as a Marey chart, and a
+time-of-day scrubber, playback speeds, per-line toggles, a four-way view
+switcher &mdash; **Geographic** (where the track actually runs), **Schematic**
+(straightened onto the 45&deg; grid), **Linear**, which unfolds the map into one
+row per line (sortable by name or station count), and **Time**, which plots the
+whole service day as a Marey chart &mdash; and a
 **Labels** button that hides the station names — dense networks read far better without
 them when you are watching the trains, and hiding them also tightens the view
 onto the network.
@@ -217,17 +219,27 @@ portrait surfaces have such an overlay; other platforms show the image in a
 card with nothing on top of it.
 
 The same thing is reachable by hand: every atlas entry has a **Presentation**
-link beside its Running map, which opens that network with no interface around
-it, filling the window. The parameters are just a URL, so you can set them
+link beside its Running map, which opens that network filling the window, with
+nothing around it but the view switcher &mdash; so all four views are reachable
+without leaving the page. The parameters are just a URL, so you can set them
 yourself too:
 
 ```
 site/dist/maps/cdmx-metro.html?present=1&view=time&clock=1&title=1&frame=9:16
+site/dist/maps/cdmx-metro.html?present=1&controls=1        # with the switcher
 ```
 
-Exports are reproducible: the page's clock is stepped by hand, one frame at a
-time, so running the same command twice produces byte-identical output.
-`notebooks/06_export_assets.ipynb` walks through it.
+`controls=1` is what the Presentation link sets. It defaults off, and an export
+never sets it: in presentation mode anything on screen is captured into the
+frame, so a visible control would be baked into the video.
+
+Video exports are reproducible: the page's clock is stepped by hand, one frame
+at a time, so running the same command twice renders the same frames.
+`tests/test_determinism.py` captures a short clip twice and compares it frame by
+frame. Stills are not — the page is left running in real time for a moment
+before a still is captured, so its clock, and the trains with it, land somewhere
+slightly different each run. `notebooks/06_export_assets.ipynb` walks through
+it.
 
 ## What real transit data is like
 

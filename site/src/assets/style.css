@@ -116,10 +116,14 @@ a:focus-visible {
   font-weight: 700;
 }
 
-.site-nav a[aria-current="page"] {
+/* Where you are, said the same way in both halves of the header: the brand is
+   the home link, and sits outside .site-nav. */
+.site-nav a[aria-current="page"],
+.brand[aria-current="page"] {
   color: var(--text);
   text-decoration: underline;
   text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 
 .theme-switch {
@@ -282,10 +286,17 @@ p {
   margin: 2.2rem auto 2.6rem;
 }
 
-.figure svg {
+.figure svg,
+.figure img {
   width: 100%;
   height: auto;
   display: block;
+}
+
+/* A photograph, unlike a generated map, has its own ground -- so it gets a
+   hairline to sit against rather than bleeding into the page in either theme. */
+.figure img {
+  border: 1px solid var(--border);
 }
 
 .figure figcaption {
@@ -361,17 +372,62 @@ p {
   background: var(--bg-soft);
 }
 
+/* Icons, on every device. Four words is a slab at any width, and one rendering
+   is one thing to reason about rather than two. The accessible name is the
+   button's aria-label; the title is the sighted pointer user's tooltip.
+
+   The icons are Esri's Calcite UI icons, applied as CSS masks so the .svg files
+   ship exactly as published -- their licence permits redistribution without
+   modification -- and still take the theme through currentColor. Credited on
+   the Framework page. */
 .segmented button {
   font: inherit;
-  font-size: 0.82rem;
-  line-height: 1.4;
+  line-height: 1;
   border: 0;
   border-radius: 0;
-  padding: 0.1rem 0.6rem;
+  width: 2rem;
+  height: 1.7rem;
+  padding: 0;
   background: none;
   color: var(--muted);
   cursor: pointer;
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.segmented button::before {
+  content: "";
+  /* The set is drawn on a 16px grid; scaling it up softens the map icon into a
+     scribble. Rendered at its design size it stays a map. */
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  mask: var(--icon) center / contain no-repeat;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+}
+
+.segmented button[data-view="geographic"] {
+  --icon: url("icons/map-16.svg");
+}
+
+.segmented button[data-view="map"] {
+  --icon: url("icons/code-branch-16.svg");
+}
+
+/* code-branch stood on end reads as the octilinear grid the schematic map is
+   solved onto. The rotation is applied to the rendered mask, never to the file:
+   Esri's licence permits redistribution without modification. */
+.segmented button[data-view="map"]::before {
+  transform: rotate(90deg);
+}
+
+.segmented button[data-view="linear"] {
+  --icon: url("icons/connection-to-connection-16.svg");
+}
+
+.segmented button[data-view="time"] {
+  --icon: url("icons/clock-16.svg");
 }
 
 .segmented button + button {
@@ -570,56 +626,14 @@ blockquote p:last-child {
   }
 
   /* A view switcher is a control, not a word in a sentence, so it takes the
-     full 44px rather than the padding trick used on the meta links below.
-     Three 44px words is a slab wider than the caption, so on touch the words
-     become icons and each button becomes a square: the target the platforms
-     ask for, at a third of the width.
-
-     The icons are Esri's Calcite UI icons, applied as CSS masks so the .svg
-     files ship exactly as published -- their licence permits redistribution
-     without modification -- and still take the theme through currentColor.
-     Credited on the Framework page. */
+     full 44px rather than the padding trick used on the meta links below. It is
+     already icons at every width; on touch each one grows to the square both
+     platforms ask for. */
   .segmented button {
     min-height: 44px;
     min-width: 44px;
-    padding-inline: 0.5rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .segmented .label {
-    /* Hidden from sight, not from the accessibility tree -- though the button's
-       own aria-label is what a screen reader actually announces here. */
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .segmented button::before {
-    content: "";
-    /* The set is drawn on a 16px grid; scaling it up softens the map icon into
-       a scribble. Rendered at its design size it stays a map. */
-    width: 16px;
-    height: 16px;
-    background: currentColor;
-    mask: var(--icon) center / contain no-repeat;
-    -webkit-mask: var(--icon) center / contain no-repeat;
-  }
-
-  .segmented button[data-view="map"] {
-    --icon: url("icons/map-16.svg");
-  }
-
-  .segmented button[data-view="linear"] {
-    --icon: url("icons/connection-to-connection-16.svg");
-  }
-
-  .segmented button[data-view="time"] {
-    --icon: url("icons/clock-16.svg");
+    width: 44px;
+    height: 44px;
   }
 
   /* Navigation that happens to sit inside a caption or a meta line: grow the

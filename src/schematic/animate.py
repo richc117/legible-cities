@@ -468,7 +468,10 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
     html_path = out_dir / f"{stem}.html"
     html_path.write_text(
         _HTML.replace("__PRESENT__", _PRESENT_JS)
-             .replace("__ICON_MAP__", _VIEW_ICONS["map-16"])
+             # Named for the button, not the file: map-16 draws Geographic,
+             # and the schematic view is code-branch turned 45 degrees by CSS.
+             .replace("__ICON_GEO__", _VIEW_ICONS["map-16"])
+             .replace("__ICON_SCHEMATIC__", _VIEW_ICONS["code-branch-16"])
              .replace("__ICON_LINEAR__", _VIEW_ICONS["connection-to-connection-16"])
              .replace("__ICON_TIME__", _VIEW_ICONS["clock-16"])
              .replace("__ICONS__", _ICON_LINKS.format(base=icons) if icons else "")
@@ -495,13 +498,15 @@ _PAGE_DIR = Path(__file__).parent / "page"
 _HTML = (_PAGE_DIR / "page.html").read_text()
 _PRESENT_JS = (_PAGE_DIR / "present.js").read_text()
 
-# The touch toolbar's view icons, as data URIs for the same single-file reason.
+# The toolbar's view icons, as data URIs for the same single-file reason.
 # Base64 of the file exactly as Esri published it: their licence permits
 # redistribution without modification, so the bytes are never touched -- no
-# hand-lifted path data, no re-minified SVG. See page/icons/README.md.
+# hand-lifted path data, no re-minified SVG, and the 45-degree turn on the
+# schematic one is a CSS transform over the mask. See page/icons/README.md.
 _ICON_DIR = _PAGE_DIR / "icons"
 _VIEW_ICONS = {
     name: "data:image/svg+xml;base64," + b64encode(
         (_ICON_DIR / f"{name}.svg").read_bytes()).decode("ascii")
-    for name in ("map-16", "connection-to-connection-16", "clock-16")
+    for name in ("map-16", "code-branch-16", "connection-to-connection-16",
+                 "clock-16")
 }

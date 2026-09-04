@@ -102,6 +102,33 @@ const MIN_TAP = 44;
         console.log(line);
       }
     }
+
+    // The Presentation link is a touch surface too, and a new one: its switcher
+    // is the only control on the page, floating over the map rather than in the
+    // header's flow, so nothing above measures it.
+    await page.goto(`${BASE}/maps/la-metro-rail.html`
+                    + `?present=1&controls=1&clock=1&title=1`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(900);
+    const pm = await page.evaluate(() => {
+      const de = document.documentElement;
+      let minTap = 999, n = 0;
+      document.querySelectorAll(".segmented button").forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) { n++; minTap = Math.min(minTap, Math.round(r.height)); }
+      });
+      const sw = document.querySelector(".segmented").getBoundingClientRect();
+      const name = document.querySelector("#present-overlay .name").getBoundingClientRect();
+      return { minTap, n, scrollW: de.scrollWidth, innerW: window.innerWidth,
+               // The title sits top left on the same inset; they must not meet.
+               clearsTitle: sw.left > name.right,
+               onScreen: sw.right <= window.innerWidth + 1 && sw.top >= 0 };
+    });
+    console.log(`${bad(pm.n > 0 && pm.minTap >= MIN_TAP)}  ${"presentation switcher".padEnd(24)} ` +
+                `tap ${pm.minTap}px (${pm.n} buttons)   ` +
+                `${bad(pm.scrollW <= pm.innerW + 1)}  no page h-scroll   ` +
+                `${bad(pm.onScreen)}  on screen   ` +
+                `${bad(pm.clearsTitle)}  clears the title`);
+
     await ctx.close();
   }
   await browser.close();

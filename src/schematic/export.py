@@ -518,6 +518,30 @@ def _run_recorder(job: dict) -> None:
         raise RuntimeError("capture failed")
 
 
+def beat_payload(beats: tuple[Beat, ...],
+                 bounds: tuple[float, float] = (0.0, 86_400.0)) -> list[dict]:
+    """Beats as ``bin/_record.js`` wants them.
+
+    Its own function so a caller other than ``run`` -- the determinism test --
+    drives the recorder through exactly the shape a real export does, rather
+    than through a hand-built copy that can drift from it. ``bounds`` is the
+    clock's range, so a sweep with no explicit span covers whatever service day
+    the network actually has.
+    """
+    out = []
+    for b in beats:
+        lo, hi = _span_seconds(b, bounds)
+        out.append({
+            "secs": b.secs, "view": b.view, "labels": b.labels,
+            "at": _hms(b.at) if b.at else None, "speed": b.speed,
+            "sweep": b.sweep, "hours": b.hours,
+            "lo": None if b.hours else lo,
+            "hi": None if b.hours else hi,
+            "tween": b.tween if b.tween is not None else min(b.secs, 1.2),
+        })
+    return out
+
+
 def _resample(src: Path, dest: Path, preset: Preset) -> None:
     """Down to the preset's exact size. Lanczos, because these maps are mostly
     one-pixel strokes and a box filter turns them to mush."""
@@ -649,20 +673,8 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
                 frames = Path(tmp)
                 # The clock bounds are the feed's, so a sweep with no explicit
                 # span covers whatever service day this network actually has.
-                probe = {"t0": 0.0, "t1": 86400.0}
-                payload = []
-                for b in beats:
-                    lo, hi = _span_seconds(b, (probe["t0"], probe["t1"]))
-                    payload.append({
-                        "secs": b.secs, "view": b.view, "labels": b.labels,
-                        "at": _hms(b.at) if b.at else None, "speed": b.speed,
-                        "sweep": b.sweep, "hours": b.hours,
-                        "lo": None if b.hours else lo,
-                        "hi": None if b.hours else hi,
-                        "tween": b.tween if b.tween is not None else min(b.secs, 1.2),
-                    })
                 _run_recorder({**job, "mode": "video", "frames": str(frames),
-                               "beats": payload})
+                               "beats": beat_payload(beats)})
                 path = dest / f"{stem}.{preset.fmt}"
                 _encode(frames, path, preset, fade=fade, crf=crf, keep=keep)
             written = [path]

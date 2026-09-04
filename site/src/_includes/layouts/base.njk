@@ -40,7 +40,10 @@
   <body>
     <header class="site-header">
       <div class="wrap">
-        <a class="brand" href="{{ '/' | url }}">{{ site.title }}</a>
+        {# The brand is the home link, so it takes the same current-page mark
+           the other two carry -- without it the landing page is the one page
+           whose nav says nothing about where you are. #}
+        <a class="brand" href="{{ '/' | url }}" {% if page.url == "/" %}aria-current="page"{% endif %}>{{ site.title }}</a>
         <nav class="site-nav" aria-label="Primary">
           <a href="{{ '/atlas/' | url }}" {% if page.url == "/atlas/" %}aria-current="page"{% endif %}>Atlas</a>
           <a href="{{ '/framework/' | url }}" {% if page.url == "/framework/" %}aria-current="page"{% endif %}>Framework</a>

@@ -210,6 +210,12 @@ def social_tags(key: str) -> str:
 # them on one map but not the other would make the two incomparable.
 PLAIN = (FEATURED, "cdmx-metro")
 
+# The two the essay argues from, in the order it argues them: Los Angeles is the
+# city the whole piece is about, and Mexico City is the counter-example it ends
+# on. They lead the atlas regardless of how cleanly they came out, because the
+# atlas is the essay's appendix before it is a league table.
+LEADS = (FEATURED, "cdmx-metro")
+
 
 @dataclass
 class NetworkEntry:
@@ -232,6 +238,9 @@ class NetworkEntry:
     caveats: list[str]
     # Facts about the feed itself, which no amount of computing would reveal.
     notes: list[str]
+    # Weighted share of the network the pipeline had to fudge; 0 is clean. What
+    # the atlas is ordered by, after the two leads.
+    issues: float
 
 
 def _caveats(result: pipeline.Result) -> list[str]:
@@ -269,6 +278,39 @@ def _caveats(result: pipeline.Result) -> list[str]:
                    f"without overlapping another and {'are' if n > 1 else 'is'} "
                    f"not drawn")
     return out
+
+
+# What each class of imperfection costs a reader, relative to the others. An
+# unplaced stop and an untraceable trip are structural -- the map is missing
+# something the timetable has. A skipped call is a hole in one trip. Borrowed
+# track is the mildest: the train follows the right corridor, one parallel
+# track over, which at this scale is a few pixels. A dropped label costs a name,
+# not a train.
+ISSUE_WEIGHTS = {"unplaced": 3.0, "unrouted": 3.0, "skipped": 2.0,
+                 "borrowed": 1.0, "unlabelled": 1.0}
+
+
+def _issue_score(result: pipeline.Result) -> float:
+    """How much of this network the pipeline had to fudge, as one number.
+
+    Proportions, never counts: New York has more of everything, including
+    stations, and ranking by raw totals would just re-sort the atlas by size.
+    Zero means every stop placed, every trip traced on its own track, and every
+    name drawn. Sorts the atlas, and is worth reading beside ``_caveats``, which
+    says the same things in words.
+    """
+    m, a = result.match, result.animation
+    trips = max(len(result.trips), 1)
+    stops = max(len(m.stop_to_node) + len(m.unmatched), 1)
+    stations = max(len(result.graph.stations), 1)
+    fractions = {
+        "unplaced": len(m.unmatched) / stops,
+        "unrouted": len(a.unrouted) / trips,
+        "skipped": a.trips_with_skipped_calls / trips,
+        "borrowed": a.trips_with_borrowed_track / trips,
+        "unlabelled": len(result.render.dropped_labels) / stations,
+    }
+    return sum(ISSUE_WEIGHTS[k] * v for k, v in fractions.items())
 
 
 def export_unlabelled(key: str, stage: str, name: str,
@@ -322,6 +364,7 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
             feed_url=feeds.FEEDS[key].url,
             caveats=_caveats(result),
             notes=list(feeds.FEEDS[key].notes),
+            issues=round(_issue_score(result), 4),
         ))
 
     export_comparison(FEATURED)
@@ -333,8 +376,13 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
     if FEATURED in keys:
         og_card()
 
-    # Largest first: the atlas should open on New York.
-    entries.sort(key=lambda e: -e.stations)
+    # The two the essay argues from first, then cleanest to messiest. Ordering
+    # by size opened the atlas on New York, which is both the biggest network
+    # and the one with the most caveats under it -- so the page led with its
+    # worst-looking case and buried the maps that came out perfectly. Size is
+    # still on every entry; it is just not what the page is sorted by.
+    lead = {key: i for i, key in enumerate(LEADS)}
+    entries.sort(key=lambda e: (lead.get(e.key, len(lead)), e.issues, -e.stations))
     payload = {
         "generated": dt.date.today().isoformat(),
         "totals": {

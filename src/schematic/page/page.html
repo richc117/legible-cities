@@ -95,13 +95,38 @@ __SOCIAL__
     display: inline-flex; border: 1px solid var(--border); border-radius: 999px;
     overflow: hidden; background: var(--bg-soft);
   }
+  /* Icons, on every device. Four words is a slab at any width -- it was 196px
+     of a 390px screen with three -- and one rendering is one thing to reason
+     about rather than two. The accessible name is the button's aria-label; the
+     title is the sighted pointer user's tooltip. */
   .segmented button {
-    border: 0; border-radius: 0; padding: 0.28rem 0.85rem; color: var(--muted);
+    border: 0; border-radius: 0; color: var(--muted);
+    width: 2rem; height: 1.7rem; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
   }
   .segmented button + button { border-left: 1px solid var(--border); }
   .segmented button[aria-pressed="true"] {
     background: var(--text); color: var(--bg); border-bottom-color: transparent;
   }
+  /* Esri's Calcite UI icons, base64'd from page/icons/ by animate.py rather
+     than redrawn as path data, because their licence allows redistribution
+     only without modification. This page has to stay one file, so they arrive
+     as data URIs rather than as a request. Masked over currentColor so they
+     take the theme and invert with the pressed state. */
+  .segmented button::before {
+    content: ""; width: 16px; height: 16px; background: currentColor;
+    mask: var(--icon) center / contain no-repeat;
+    -webkit-mask: var(--icon) center / contain no-repeat;
+  }
+  #view-geo { --icon: url("__ICON_GEO__"); }
+  #view-map { --icon: url("__ICON_SCHEMATIC__"); }
+  #view-linear { --icon: url("__ICON_LINEAR__"); }
+  #view-string { --icon: url("__ICON_TIME__"); }
+  /* code-branch stood on end reads as the octilinear grid the schematic map is
+     solved onto. The rotation is applied to the rendered mask here, never to
+     the file: Esri's licence permits redistribution without modification, so
+     the bytes shipped are the bytes they published. */
+  #view-map::before { transform: rotate(90deg); }
 
   input[type=range] {
     flex: 1 1 12rem; min-width: 8rem; max-width: 26rem; accent-color: var(--text);
@@ -178,7 +203,6 @@ __SOCIAL__
     .spacer { display: none; }
     .back { font-size: 0; }              /* keeps the arrow, drops the word */
     .back::before { content: "\2190"; font-size: 1rem; }
-    .segmented button { padding: 0 0.6rem; font-size: 0.8rem; }
     button { font-size: 0.8rem; }
     #stage { padding: 0.7rem 0; }
   }
@@ -191,29 +215,11 @@ __SOCIAL__
     }
     input[type=range] { height: 44px; }
 
-    /* Three 44px words is a slab: the switcher alone was 196px of a 390px
-       screen, in a header that has to stay under 15% of the viewport. On touch
-       the words become icons and each button becomes a square -- the same
-       target, at a third of the width. Esri's Calcite UI icons, base64'd from
-       the files in vendor/calcite-icons by animate.py rather than redrawn as
-       path data, because their licence allows redistribution only without
-       modification. This page has to stay one file, so they arrive as data
-       URIs rather than as a request. */
-    .segmented button {
-      min-width: 44px; padding: 0 0.5rem; justify-content: center;
-    }
-    .segmented .label {
-      position: absolute; width: 1px; height: 1px;
-      overflow: hidden; clip-path: inset(50%); white-space: nowrap;
-    }
-    .segmented button::before {
-      content: ""; width: 16px; height: 16px; background: currentColor;
-      mask: var(--icon) center / contain no-repeat;
-      -webkit-mask: var(--icon) center / contain no-repeat;
-    }
-    #view-map { --icon: url("__ICON_MAP__"); }
-    #view-linear { --icon: url("__ICON_LINEAR__"); }
-    #view-string { --icon: url("__ICON_TIME__"); }
+    /* The switcher is already icons everywhere; on touch each one grows to the
+       44px square both platforms ask for. Four of those is 176px of a 390px
+       screen, in a header that has to stay under 15% of the viewport --
+       bin/measure-mobile is the check on that. */
+    .segmented button { min-width: 44px; width: 44px; height: 44px; }
   }
 
   /* Presentation mode: the visualization and nothing else, for export or for
@@ -223,6 +229,22 @@ __SOCIAL__
      in warm-dark --map-bg (#1f1915) is lighter than --bg (#15120f), which is
      the faint card edge visible around the map on the normal page. */
   :root[data-present] header { display: none; }
+  /* ...except with `controls=1`, which brings back the view switcher and
+     nothing else. It returns as a floating overlay rather than as flow content:
+     #stage is height:100vh under an overflow:hidden root, so there is no band
+     above it left to occupy. Every other child of the header stays
+     display:none, which keeps #clock, #count and #scrub in the DOM for draw()
+     to write to -- the same reason the header is hidden and not removed.
+
+     Top right is the one free corner: the overlay puts the name top left and
+     the clock bottom right, on this same inset, so the three line up. */
+  :root[data-present][data-controls] header {
+    display: block; position: fixed; top: 4.2vmin; right: 5vmin; left: auto;
+    z-index: 12; background: none; border: 0; padding: 0;
+  }
+  :root[data-present][data-controls] header .bar > *:not(.segmented),
+  :root[data-present][data-controls] header .bar + .bar,
+  :root[data-present][data-controls] #more-panel { display: none; }
   :root[data-present], :root[data-present] body { height: 100%; overflow: hidden; }
   :root[data-present] { --map-bg: transparent; }
   :root[data-present] #stage {
@@ -262,10 +284,14 @@ __SOCIAL__
     <h1>__NAME__</h1>
     <span class="sub">__SUBTITLE__</span>
     <span class="spacer"></span>
+    <!-- Icon-only, so the accessible name lives on aria-label and the tooltip
+         on title. #view-geo is dropped at boot on a page built without the
+         geographic geometry, rather than sitting there dead. -->
     <span class="segmented" role="group" aria-label="View">
-      <button id="view-map" aria-label="Map" aria-pressed="true"><span class="label">Map</span></button>
-      <button id="view-linear" aria-label="Linear" aria-pressed="false"><span class="label">Linear</span></button>
-      <button id="view-string" aria-label="Time" aria-pressed="false"><span class="label">Time</span></button>
+      <button id="view-geo" aria-label="Geographic" title="Geographic — where the track actually runs" aria-pressed="false"></button>
+      <button id="view-map" aria-label="Schematic" title="Schematic — straightened onto a 45° grid" aria-pressed="true"></button>
+      <button id="view-linear" aria-label="Linear" title="Linear — one row per line" aria-pressed="false"></button>
+      <button id="view-string" aria-label="Time" title="Time — the service day as a Marey chart" aria-pressed="false"></button>
     </span>
   </div>
   <div class="bar">
@@ -1123,6 +1149,24 @@ __SOCIAL__
     linear: document.getElementById("view-linear"),
     string: document.getElementById("view-string"),
   };
+  const geoBtn = document.getElementById("view-geo");
+  // A page built without the geographic geometry has nothing to show for that
+  // button, and setGeo is a documented no-op there. Drop it rather than leave a
+  // control that does nothing.
+  if (!geoData) geoBtn.remove();
+
+  // The switcher shows four choices over two axes -- the geographic one is the
+  // map view with `geo` raised -- so pressed state is derived from both, and
+  // from the *targets*, so a button lights the moment a morph starts rather
+  // than when it lands. Called by setMode and by setGeo, which is what keeps
+  // the buttons honest no matter which seam moved the page: a click, the
+  // present.js sequence, or bin/_record.js driving an export.
+  const syncButtons = () => {
+    const pressed = (geoData && geoTarget === 1) ? "geo" : mode;
+    if (geoData) geoBtn.setAttribute("aria-pressed", String(pressed === "geo"));
+    Object.keys(viewBtns).forEach(k =>
+      viewBtns[k].setAttribute("aria-pressed", String(pressed === k)));
+  };
   // `dur` is only ever passed by a capture, which needs a transition that lands
   // exactly on a frame boundary. A click leaves it undefined and keeps the
   // page's own feel.
@@ -1134,15 +1178,73 @@ __SOCIAL__
     strTween = dur > 0 && nextStr !== str ? { from: str, to: nextStr, t: 0, dur } : null;
     viewTarget = nextView;
     strTarget = nextStr;
-    Object.keys(viewBtns).forEach(k =>
-      viewBtns[k].setAttribute("aria-pressed", String(k === next)));
+    syncButtons();
     // Station names belong to the network views; the chart has its own axis.
     sortGroup.hidden = next === "map";
     labelsBtn.hidden = next === "string";
     syncBox();
     dirty = true;
   };
-  Object.keys(viewBtns).forEach(k => { viewBtns[k].onclick = () => setMode(k); });
+  // The geographic axis: the same network before octi straightened it. A
+  // no-op, reported as false, on a page built without that geometry.
+  //
+  // Three ways to be asked, and they are not the same: an explicit duration
+  // runs a timed tween (a capture, or a figure morphing on a beat), an explicit
+  // *zero* snaps -- which is how present.js sets the opening state and how a
+  // capture lands frame 0 -- and an omitted duration eases at the page's own
+  // rate, the way setMode does for a click. Collapsing the last two, as this
+  // did while nothing but present.js called it, made the toolbar's Geographic
+  // button a hard cut across the whole network.
+  function setGeo(on, dur) {
+    if (!geoData) return false;
+    const to = on ? 1 : 0;
+    geoTween = dur > 0 && to !== geo ? { from: geo, to: to, t: 0, dur: dur } : null;
+    geoTarget = to;
+    if (dur === 0) { geo = to; }
+    syncButtons();
+    dirty = true; draw();
+    return true;
+  }
+
+  // How long a click takes to land. A timed tween rather than the rate-based
+  // ease the axes fall back to: that one is front-loaded, spending half its
+  // travel in the first fifth of a second, which is fine for rows sliding a
+  // little and reads as a jump cut when the whole network is moving between two
+  // different geographies.
+  //
+  // Shorter than MORPH in present.js, deliberately. That 1.8s belongs to a
+  // figure that morphs on its own, on a loop, while a reader takes it in --
+  // there, a slow transformation *is* the content. A click is a reader asking
+  // for something, and waiting on an answer you already asked for feels slower
+  // than watching the same motion unprompted. Same S-curve, less of it.
+  const CLICK_MORPH = 1.2;
+
+  // Every button sets both axes: naming a view says where the network is as
+  // well as how it is laid out. Both tweens run over the same window, so
+  // Geographic -> Linear morphs the two together, which the interpolation in
+  // trackD(t, m, g) already handles.
+  Object.keys(viewBtns).forEach(k => {
+    viewBtns[k].onclick = () => { setGeo(false, CLICK_MORPH); setMode(k, CLICK_MORPH); };
+  });
+  if (geoData) {
+    geoBtn.onclick = () => { setGeo(true, CLICK_MORPH); setMode("map", CLICK_MORPH); };
+  }
+
+  // The four public view names, as the URL, the site's switcher and the
+  // exporter spell them, mapped onto the two axes. `map` and `schematic` are
+  // the same view: the label changed, the key did not, because it is written
+  // into every atlas link and every storyboard.
+  const showView = (name, dur) => {
+    const geoOn = name === "geographic";
+    setGeo(geoOn, dur);
+    setMode(geoOn ? "map"
+          : name === "time" ? "string"
+          : name === "schematic" ? "map" : name, dur);
+  };
+  // What showView would have been passed to reach the state now showing.
+  const viewName = () =>
+    (geoData && geoTarget === 1) ? "geographic"
+      : mode === "string" ? "time" : mode;
 
   const sortBtns = {
     line: document.getElementById("sort-line"),
@@ -1287,19 +1389,14 @@ __SOCIAL__
     },
     setPlaying(on) { playing = on; },
     setSpeed(x) { speed = x; },
+    // setView and setGeo are the two axes, unchanged and independent:
+    // bin/_record.js raises geo and *then* names a view, so a setView that
+    // lowered geo by itself would break every geographic export.
     setView(v, dur) { setMode(v, dur); },
-    // The geographic axis is deliberately not a fourth button: it is a thing
-    // the page can be *told* to show, for a figure making an argument about the
-    // transformation. Silently a no-op where there is no geometry for it.
-    setGeo(on, dur) {
-      if (!geoData) return false;
-      const to = on ? 1 : 0;
-      geoTween = dur > 0 && to !== geo ? { from: geo, to: to, t: 0, dur: dur } : null;
-      geoTarget = to;
-      if (!(dur > 0)) { geo = to; }
-      dirty = true; draw();
-      return true;
-    },
+    setGeo(on, dur) { return setGeo(on, dur); },
+    // Both axes at once, by the public name of the view. This is what the
+    // site's switcher drives, and what the page's own buttons go through.
+    showView(name, dur) { showView(name, dur); },
     hasGeo() { return !!geoData; },
     setLabels(on) { setLabels(on); },
     setRoutes(keep) {
@@ -1328,7 +1425,7 @@ __SOCIAL__
     state() {
       return { now: now, clock: fmt(now), shown: shown, mode: mode,
                view: view, str: str, geo: geo, box: lastBox.slice(),
-               labels: labelsOn };
+               viewName: viewName(), labels: labelsOn };
     },
   };
   __PRESENT__

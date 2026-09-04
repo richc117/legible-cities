@@ -181,6 +181,36 @@ const strip = u => u.replace(BASE, "") || "/";
   console.log(`${backTrains > 0 ? "ok  " : "FAIL"}  trains still running after the round trip (${mapTrains} -> ${backTrains})`);
   if (!backTrains) failures.push("no trains after round trip");
 
+  // The Presentation link is the one present-mode URL that carries a switcher.
+  // Following the real link matters here: the flag lives in the href, so a
+  // hand-built URL would pass while the atlas's own link stayed inert.
+  await page.goto(BASE + "/atlas/", { waitUntil: "networkidle" });
+  await page.locator('.atlas > li a:text-is("Presentation")').first().click();
+  await page.waitForLoadState("networkidle");
+  await page.waitForFunction(() => window.__present && window.__present.state,
+                             null, { timeout: 20000 });
+  const presentSwitcher = await page.locator(".segmented").isVisible();
+  console.log(`${presentSwitcher ? "ok  " : "FAIL"}  presentation link shows the switcher`);
+  if (!presentSwitcher) failures.push("presentation mode has no switcher");
+  // The rest of the toolbar stays gone -- it is a presentation, not the app.
+  const quiet = !(await page.locator("#play").isVisible())
+             && !(await page.locator("#scrub").isVisible());
+  console.log(`${quiet ? "ok  " : "FAIL"}  ...and nothing else from the toolbar`);
+  if (!quiet) failures.push("presentation mode leaked the rest of the header");
+
+  await page.locator("#view-linear").click();
+  await page.waitForTimeout(1600);
+  expect(await page.evaluate(() => window.__present.state().viewName),
+         "linear", "presentation switcher drives the view");
+
+  // Without the flag it must stay hidden, or every export gains a toolbar.
+  await page.goto(page.url().replace("controls=1&", ""), { waitUntil: "networkidle" });
+  await page.waitForFunction(() => window.__present && window.__present.state,
+                             null, { timeout: 20000 });
+  const bare = await page.locator(".segmented").isVisible();
+  console.log(`${!bare ? "ok  " : "FAIL"}  present=1 alone stays bare (exports)`);
+  if (bare) failures.push("present=1 shows controls without the flag");
+
   if (httpErrors.length) {
     console.log("FAIL  HTTP errors:", [...new Set(httpErrors)].slice(0, 6).join(", "));
     failures.push("http");

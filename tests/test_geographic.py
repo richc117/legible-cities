@@ -121,17 +121,56 @@ def test_los_angeles_pairs_every_drawn_track():
 
 @pytest.mark.skipif(not (pipeline.GRAPH_DIR / "la-metro-rail" / "03_octi.json").exists(),
                     reason="needs a built graph in data/")
-def test_only_the_opted_in_city_carries_the_second_geometry():
-    """It is a whole second copy of the network; most pages have no use for one."""
-    from schematic import feeds
-    assert feeds.FEEDS["la-metro-rail"].geographic
-    assert not feeds.FEEDS["nyc-subway"].geographic
+def test_every_built_page_carries_the_second_geometry():
+    """Geographic is the switcher's first button, so every network needs one.
 
-    la = pipeline.SITE_MAPS if hasattr(pipeline, "SITE_MAPS") else None
-    del la  # the built pages are checked below, not through the pipeline
+    It used to be opt-in, and LA was the only city that took it. A page without
+    it would now show a dead control -- the page drops the button rather than do
+    that, but the point is that none of them should have to.
+    """
+    from schematic import feeds
+    assert all(f.geographic for f in feeds.FEEDS.values())
 
     built = pipeline.feeds.REPO_ROOT / "site" / "src" / "maps"
     if not (built / "nyc-subway.html").exists():
         pytest.skip("site not built")
-    assert '"geo"' in (built / "la-metro-rail.html").read_text()
-    assert '"geo"' not in (built / "nyc-subway.html").read_text()
+    for key in ("la-metro-rail", "nyc-subway", "cdmx-metro"):
+        assert '"geo"' in (built / f"{key}.html").read_text(), key
+
+
+# Track pairing, measured against every cached graph. A track with no twin holds
+# its schematic shape while the network moves around it, which reads as the map
+# tearing -- so these are the numbers that say how much tearing each city shows.
+# Measured, not guessed, and pinned here so they can only improve. LA is the one
+# the essay animates and is held to the full 100%.
+PAIRING_FLOOR = 0.88
+
+
+@pytest.mark.skipif(not (pipeline.GRAPH_DIR / "la-metro-rail" / "03_octi.json").exists(),
+                    reason="needs a built graph in data/")
+def test_every_city_pairs_most_of_its_tracks_and_all_of_its_stations():
+    from schematic import feeds
+
+    checked = 0
+    for key in feeds.FEEDS:
+        d = pipeline.GRAPH_DIR / key
+        if not ((d / "03_octi.json").exists() and (d / "02_loom.json").exists()):
+            continue
+        checked += 1
+        drawn = LineGraph.from_geojson(d / "03_octi.json").reproject(to_mercator)
+        geo = LineGraph.from_geojson(d / "02_loom.json").reproject(to_mercator)
+        r = render(drawn, width=1600.0, style=Style(themed=True))
+        layer = animate.geographic_tracks(geo, drawn, r)
+
+        # Every station pairs everywhere. A dot that stayed behind would leave
+        # its own line, which is far more visible than a track that did.
+        assert len(layer.nodes) == len(drawn.stations), key
+        ratio = len(layer.tracks) / len(r.tracks)
+        assert ratio >= PAIRING_FLOOR, f"{key} pairs {ratio:.1%} of its tracks"
+        # Whatever paired has to have the right vertex count, or the lerp reads
+        # against the wrong end of the edge.
+        for track in r.tracks.values():
+            twin = layer.tracks.get(track.element_id)
+            if twin is not None:
+                assert len(twin) == len(track.points), key
+    assert checked, "no cached graphs to check"

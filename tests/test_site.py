@@ -55,6 +55,59 @@ def test_the_animation_page_keeps_its_placeholder():
     assert "__SOCIAL__" in PAGE.read_text()
 
 
+EMBED_NJK = site.SRC_DIR / "_includes" / "map-embed.njk"
+
+# The four views, in the order the argument runs in. Written down here because
+# two switchers have to agree: the animation page's own toolbar and the copy the
+# essay draws outside the iframe. `map` is labelled "Schematic" -- the word
+# changed, the key did not, because it is in every atlas link and storyboard.
+SWITCHER = [("geographic", "Geographic"), ("map", "Schematic"),
+            ("linear", "Linear"), ("time", "Time")]
+
+
+def test_both_switchers_offer_the_same_four_views_in_the_same_order():
+    """A reader meets this control twice; it has to be the same control."""
+    page = PAGE.read_text()
+    ids = re.findall(r'<button id="view-(\w+)"', page)
+    assert ids == ["geo", "map", "linear", "string"]
+
+    njk = EMBED_NJK.read_text()
+    pairs = re.findall(r'\["(\w+)", "(\w+)", "', njk)
+    assert pairs == SWITCHER
+
+
+def test_the_switcher_is_icons_with_an_accessible_name():
+    """Icon-only on every device, so the name cannot ride on visible text."""
+    for text, sel in ((PAGE.read_text(), 'id="view-'),
+                      (EMBED_NJK.read_text(), 'data-view=')):
+        # No visible label survives -- that variant is gone, not hidden.
+        assert 'class="label"' not in text
+        for button in re.findall(r"<button [^>]*>", text):
+            if sel not in button:
+                continue
+            assert "aria-label=" in button, button
+            assert "title=" in button, button
+            assert "aria-pressed=" in button, button
+
+
+def test_the_icons_are_the_four_vendored_calcite_files():
+    """They ship as published; the schematic one is turned by CSS, not by hand."""
+    from schematic import animate
+
+    icons = Path(animate.__file__).parent / "page" / "icons"
+    assert set(animate._VIEW_ICONS) == {
+        "map-16", "code-branch-16", "connection-to-connection-16", "clock-16"}
+    for name in animate._VIEW_ICONS:
+        assert (icons / f"{name}.svg").exists(), name
+
+    page = PAGE.read_text()
+    for placeholder in ("__ICON_GEO__", "__ICON_SCHEMATIC__", "__ICON_LINEAR__",
+                        "__ICON_TIME__"):
+        assert placeholder in page, placeholder
+    # The 45-degree turn is a transform over the mask, never an edit to the file.
+    assert "#view-map::before { transform: rotate(90deg); }" in page
+
+
 def test_generated_tags_are_escaped_and_absolute():
     tags = site.social_tags("la-metro-rail")
     assert 'property="og:image"' in tags
@@ -110,3 +163,79 @@ def test_the_manifest_survives_the_subpath():
 
 def test_the_card_is_drawn_from_a_real_network():
     assert site.FEATURED in feeds.FEEDS
+
+
+# ------------------------------------------------------------------- the atlas
+
+
+def test_the_issue_score_is_a_proportion_not_a_count():
+    """Ranking by raw totals would just re-sort the atlas by size again."""
+    assert set(site.ISSUE_WEIGHTS) == {"unplaced", "unrouted", "skipped",
+                                       "borrowed", "unlabelled"}
+    # Structural failures outrank cosmetic ones: a stop the map cannot place
+    # costs more than a name it cannot draw.
+    assert site.ISSUE_WEIGHTS["unplaced"] > site.ISSUE_WEIGHTS["unlabelled"]
+    assert site.ISSUE_WEIGHTS["unrouted"] > site.ISSUE_WEIGHTS["borrowed"]
+
+
+def test_the_atlas_leads_with_the_essay_then_runs_cleanest_first():
+    """The atlas is the essay's appendix before it is a league table.
+
+    Ordering by size opened it on New York, which is both the biggest network
+    and the one carrying the most caveats -- so the page led with its worst case
+    and buried the maps that came out perfectly.
+    """
+    data = site.DATA_DIR / "networks.json"
+    if not data.exists():
+        pytest.skip("site not built")
+    entries = json.loads(data.read_text())["networks"]
+
+    assert [e["key"] for e in entries[:2]] == list(site.LEADS)
+    rest = [e["issues"] for e in entries[2:]]
+    assert rest == sorted(rest), "the tail is not cleanest-first"
+    # A clean network really is clean, and the score means what it says.
+    assert rest[0] == 0.0
+    for e in entries:
+        assert e["issues"] >= 0
+        if not e["caveats"]:
+            assert e["issues"] == 0.0, e["key"]
+
+
+def test_every_top_level_page_marks_itself_current_in_the_nav():
+    """The brand is the home link, so it needs the mark the other two carry.
+
+    Without it the landing page was the one page whose header said nothing
+    about where you were.
+    """
+    head = BASE_NJK.read_text()
+    assert 'page.url == "/"' in head, "the brand carries no current-page test"
+    # One rule, both halves of the header -- the brand sits outside .site-nav.
+    css = (site.ASSETS_DIR / "style.css").read_text()
+    assert '.brand[aria-current="page"]' in css
+    assert '.site-nav a[aria-current="page"]' in css
+
+
+def test_only_the_presentation_link_asks_for_the_switcher():
+    """Three things open present mode; exactly one of them wants controls.
+
+    The Presentation link is a page a reader steers. The essay's iframes draw
+    their own switcher outside the frame, so one inside would double it. And an
+    export captures whatever is on screen -- guarded on the Python side by
+    test_no_export_url_ever_asks_for_the_controls.
+    """
+    njk = EMBED_NJK.read_text()
+    link, iframe = njk.split("{% macro embed(")
+    assert "controls=1" in link, "the Presentation link does not ask for it"
+    assert "controls=1" not in iframe, "the essay's iframe would double the switcher"
+    # The link's tooltip promised no interface at all; it has one now.
+    assert "with no interface around it" not in njk
+
+
+def test_the_page_only_shows_the_switcher_when_asked():
+    """Present mode still hides the header by default -- controls=1 is opt-in."""
+    page = PAGE.read_text()
+    assert ":root[data-present] header { display: none; }" in page
+    assert ':root[data-present][data-controls] header {' in page
+    js = (Path(site.__file__).parent / "page" / "present.js").read_text()
+    assert 'on("controls", false)' in js, "the flag must default off"
+

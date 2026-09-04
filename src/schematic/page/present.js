@@ -6,6 +6,10 @@
 //
 //   maps/cdmx-metro.html?present=1&view=map&labels=0&title=1&clock=1&frame=9:16
 //
+// `controls=1` adds the view switcher, so a presentation can be steered. It is
+// off by default and the exporter never sets it: anything visible in present
+// mode is captured into the frame.
+//
 // Nothing in here reaches into the page's internals; it talks only through
 // window.__present.
 (function () {
@@ -61,6 +65,10 @@
   // belongs.
   P.setGeo(view === "geographic", 0);
   if (view === "geographic") view = "map";
+  // "schematic" is what the switcher calls it now. The key stayed `map`,
+  // because it is written into every atlas link and every storyboard, so both
+  // spellings have to arrive at the same view.
+  if (view === "schematic") view = "map";
   if (view === "time") view = "string";        // the page's internal name
   P.setView(view);
   P.setLabels(on("labels", true));
@@ -109,6 +117,16 @@
   }
 
   // ----------------------------------------------------------------- overlay
+  // The view switcher, for a presentation opened in a browser rather than one
+  // being captured. Off by default, and that default is what keeps it out of
+  // every export: url_for() never sets it, so a recorded frame is exactly what
+  // it was before this existed. A document-level attribute rather than a style,
+  // the way `present` itself is set -- the stylesheet acts on it, and nothing
+  // in here reaches into the page.
+  if (on("controls", false)) {
+    document.documentElement.setAttribute("data-controls", "");
+  }
+
   var box = document.getElementById("present-overlay");
   var nameEl = box.querySelector(".name");
   var timeEl = box.querySelector(".time");

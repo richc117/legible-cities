@@ -7,8 +7,12 @@
 {% macro links(n) %}
 <p class="meta">
   <a href="{{ ('/maps/' + n.animation) | url }}">Running map</a> &middot;
-  <a href="{{ ('/maps/' + n.animation + '?present=1&clock=1&title=1&city=' + (n.city | urlencode) + '&network=' + (n.network | urlencode)) | url }}"
-     title="The visualization on its own, with no interface around it">Presentation</a> &middot;
+  {# `controls=1` is the switcher and nothing else. Deliberately here and not on
+     the iframe below: the essay's figures draw their own switcher outside the
+     frame, and an export must never set it -- a control visible under present=1
+     is captured into the video, and moves on the beat while it is. #}
+  <a href="{{ ('/maps/' + n.animation + '?present=1&controls=1&clock=1&title=1&city=' + (n.city | urlencode) + '&network=' + (n.network | urlencode)) | url }}"
+     title="The visualization on its own, with only the view switcher around it">Presentation</a> &middot;
   <a href="{{ ('/maps/' + n.svg) | url }}">SVG</a> &middot;
   <a href="{{ n.feed_url }}" target="_blank" rel="noopener noreferrer">Source feed</a>
 </p>
@@ -25,8 +29,8 @@
    away, is where names are read.
 
    The caption is passed as a block: `{% call embed(n) %}...{% endcall %}`. #}
-{% macro embed(n, eager=false, labels=false, view="map", controls=true, sequence="", lines="") %}
-<figure class="figure figure--embed">
+{% macro embed(n, eager=false, labels=false, view="map", controls=true, sequence="", lines="", cycle=false) %}
+<figure class="figure figure--embed"{% if cycle %} data-cycle="1"{% endif %}>
   <div class="embed">
     <iframe class="embed-frame"
             title="{{ n.name }}, running its timetable"
@@ -35,18 +39,24 @@
   </div>
   <div class="embed-bar">
     {# A figure making an argument of its own gets no switcher: the sequence it
-       runs is the point, and three buttons invite the reader to interrupt it. #}
+       runs is the point, and four buttons invite the reader to interrupt it. #}
     {% if controls %}
       {# Mirrors the switcher in the animation page's own toolbar, so the two
          read as the same control. Disabled until the frame reports `load` and
          window.__present exists; embed.js enables them. #}
       <span class="segmented" role="group" aria-label="View">
-        {# The label is a span so a touch layout can drop it for an icon without
-           taking the accessible name with it -- aria-label carries the same word
-           either way. #}
-        {% for v, label in [["map", "Map"], ["linear", "Linear"], ["time", "Time"]] %}
-          <button type="button" data-view="{{ v }}" aria-label="{{ label }}"
-                  aria-pressed="{{ 'true' if v == view else 'false' }}" disabled><span class="label">{{ label }}</span></button>
+        {# Icons on every device, so there is one rendering rather than two.
+           The accessible name is the button's aria-label; the title is the
+           tooltip a sighted pointer user gets. `map` is labelled "Schematic":
+           the word changed, the key did not, because it is written into every
+           atlas link and every storyboard. #}
+        {% for v, label, tip in [
+             ["geographic", "Geographic", "Where the track actually runs"],
+             ["map", "Schematic", "Straightened onto a 45° grid"],
+             ["linear", "Linear", "One row per line"],
+             ["time", "Time", "The service day as a Marey chart"]] %}
+          <button type="button" data-view="{{ v }}" aria-label="{{ label }}" title="{{ tip }}"
+                  aria-pressed="{{ 'true' if v == view else 'false' }}" disabled></button>
         {% endfor %}
       </span>
     {% endif %}
