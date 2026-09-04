@@ -1,0 +1,572 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1814" height="784" viewBox="-134.71 -86.82 1814.33 783.68" data-viewbox-nolabels="-36.01 -31.00 1667.01 622.00" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+<title>Long Island Rail Road</title>
+<rect id="backdrop" x="-134.71" y="-86.82" width="1814.33" height="783.68" fill="var(--map-bg, #ffffff)"/>
+<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<g class="line" data-line="Babylon Branch" stroke="#00985f" stroke-width="7.00">
+<path id="t0_Babylon_Branch" data-src="0xaaaadaaef8b0" data-dst="0xaaaadac2b3f0" d="M 152.08 461.25 L 125.41 434.59"/>
+<path id="t1_Babylon_Branch" data-src="0xaaaadaafa2a0" data-dst="0xaaaadb1a0d10" d="M 213.33 501.07 L 238.44 501.07"/>
+<path id="t2_Babylon_Branch" data-src="0xaaaadaafa3e0" data-dst="0xaaaadaafa2a0" d="M 186.67 480.00 L 213.33 506.67"/>
+<path id="t3_Babylon_Branch" data-src="0xaaaadaafa3e0" data-dst="0xaaaadaf00bd0" d="M 178.75 487.92 L 165.41 474.59"/>
+<path id="t6_Babylon_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 107.72 345.61 L 125.50 363.39"/>
+<path id="t13_Babylon_Branch" data-src="0xaaaadab909e0" data-dst="0xaaaadac2a7d0" d="M 414.17 501.07 L 426.34 501.07 L 426.34 501.07 L 426.14 501.07 L 425.68 501.12 L 424.97 501.28 L 424.19 501.58 L 423.57 501.95 L 423.19 502.25 L 423.01 502.41 L 422.97 502.44 L 423.02 502.39 L 423.02 502.39 L 431.64 493.78"/>
+<path id="t19_Babylon_Branch" data-src="0xaaaadac02e60" data-dst="0xaaaadacbacb0" d="M 467.13 448.38 L 449.37 430.63"/>
+<path id="t21_Babylon_Branch" data-src="0xaaaadac2a690" data-dst="0xaaaadae87cd0" d="M 449.39 476.03 L 467.14 458.27"/>
+<path id="t22_Babylon_Branch" data-src="0xaaaadac2a7d0" data-dst="0xaaaadac2a690" d="M 431.64 493.78 L 449.39 476.03"/>
+<path id="t23_Babylon_Branch" data-src="0xaaaadac2b3f0" data-dst="0xaaaadb24c8c0" d="M 144.53 426.67 L 144.53 453.33"/>
+<path id="t27_Babylon_Branch" data-src="0xaaaadac877c0" data-dst="0xaaaadac2b3f0" d="M 97.78 387.47 L 133.33 387.47"/>
+<path id="t28_Babylon_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 328.53 L 53.33 328.53"/>
+<path id="t33_Babylon_Branch" data-src="0xaaaadacb3c20" data-dst="0xaaaadace3500" d="M 266.67 432.27 L 160.00 432.27"/>
+<path id="t37_Babylon_Branch" data-src="0xaaaadacbacb0" data-dst="0xaaaadacb3c20" d="M 453.33 432.27 L 266.67 432.27"/>
+<path id="t39_Babylon_Branch" data-src="0xaaaadacbacb0" data-dst="0xaaaadb2df6a0" d="M 453.33 432.27 L 529.88 432.27"/>
+<path id="t42_Babylon_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadac2b3f0" d="M 160.00 409.87 L 133.33 409.87"/>
+<path id="t43_Babylon_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadb0be960" d="M 154.40 426.67 L 154.40 440.00"/>
+<path id="t47_Babylon_Branch" data-src="0xaaaadad290b0" data-dst="0xaaaadb02b0f0" d="M 26.67 387.47 L 62.22 387.47"/>
+<path id="t52_Babylon_Branch" data-src="0xaaaadad48c80" data-dst="0xaaaadb200ff0" d="M 288.65 501.07 L 313.75 501.07"/>
+<path id="t56_Babylon_Branch" data-src="0xaaaadae3d090" data-dst="0xaaaadb0e5ea0" d="M 338.86 501.07 L 363.96 501.07"/>
+<path id="t58_Babylon_Branch" data-src="0xaaaadae62760" data-dst="0xaaaadad48c80" d="M 263.54 501.07 L 288.65 501.07"/>
+<path id="t59_Babylon_Branch" data-src="0xaaaadae87cd0" data-dst="0xaaaadac02e60" d="M 467.14 458.27 L 475.71 449.70 L 475.73 449.69 L 475.52 449.91 L 474.99 450.62 L 474.32 452.23 L 474.32 454.44 L 474.99 456.04 L 475.52 456.76 L 475.73 456.98 L 475.71 456.97 L 467.13 448.38"/>
+<path id="t65_Babylon_Branch" data-src="0xaaaadaf00bd0" data-dst="0xaaaadaaef8b0" d="M 157.49 482.51 L 144.16 469.17"/>
+<path id="t67_Babylon_Branch" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 125.50 363.39 L 143.27 381.17"/>
+<path id="t76_Babylon_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadad28fa0" d="M 85.01 341.65 L 58.35 314.99"/>
+<path id="t77_Babylon_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 328.53 L 80.00 328.53"/>
+<path id="t79_Babylon_Branch" data-src="0xaaaadb02b0f0" data-dst="0xaaaadac877c0" d="M 62.22 387.47 L 97.78 387.47"/>
+<path id="t87_Babylon_Branch" data-src="0xaaaadb0be960" data-dst="0xaaaadaaef8b0" d="M 154.40 440.00 L 154.40 453.33"/>
+<path id="t89_Babylon_Branch" data-src="0xaaaadb0e5ea0" data-dst="0xaaaadb49caa0" d="M 363.96 501.07 L 389.07 501.07"/>
+<path id="t90_Babylon_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 328.53 L 26.67 328.53"/>
+<path id="t99_Babylon_Branch" data-src="0xaaaadb1a0d10" data-dst="0xaaaadae62760" d="M 238.44 501.07 L 263.54 501.07"/>
+<path id="t101_Babylon_Branch" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 143.27 381.17 L 161.05 398.95"/>
+<path id="t102_Babylon_Branch" data-src="0xaaaadb200ff0" data-dst="0xaaaadae3d090" d="M 313.75 501.07 L 338.86 501.07"/>
+<path id="t108_Babylon_Branch" data-src="0xaaaadb24c8c0" data-dst="0xaaaadaaef8b0" d="M 133.33 442.13 L 160.00 442.13"/>
+<path id="t133_Babylon_Branch" data-src="0xaaaadb49caa0" data-dst="0xaaaadab909e0" d="M 389.07 501.07 L 414.17 501.07"/>
+</g>
+<g class="line" data-line="City Terminal Zone" stroke="#4d5357" stroke-width="7.00">
+<path id="t6_City_Terminal_Zone" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 99.80 353.53 L 117.58 371.31"/>
+<path id="t27_City_Terminal_Zone" data-src="0xaaaadac877c0" data-dst="0xaaaadac2b3f0" d="M 97.78 398.67 L 133.33 398.67"/>
+<path id="t28_City_Terminal_Zone" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 339.73 L 53.33 339.73"/>
+<path id="t47_City_Terminal_Zone" data-src="0xaaaadad290b0" data-dst="0xaaaadb02b0f0" d="M 26.67 398.67 L 62.22 398.67"/>
+<path id="t67_City_Terminal_Zone" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 117.58 371.31 L 135.35 389.09"/>
+<path id="t76_City_Terminal_Zone" data-src="0xaaaadafe1090" data-dst="0xaaaadad28fa0" d="M 77.09 349.57 L 50.43 322.91"/>
+<path id="t77_City_Terminal_Zone" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 339.73 L 80.00 339.73"/>
+<path id="t79_City_Terminal_Zone" data-src="0xaaaadb02b0f0" data-dst="0xaaaadac877c0" d="M 62.22 398.67 L 97.78 398.67"/>
+<path id="t90_City_Terminal_Zone" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 339.73 L 26.67 339.73"/>
+<path id="t101_City_Terminal_Zone" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 135.35 389.09 L 153.13 406.87"/>
+</g>
+<g class="line" data-line="Far Rockaway Branch" stroke="#6e3219" stroke-width="7.00">
+<path id="t0_Far_Rockaway_Branch" data-src="0xaaaadaaef8b0" data-dst="0xaaaadac2b3f0" d="M 160.00 453.33 L 133.33 426.67"/>
+<path id="t3_Far_Rockaway_Branch" data-src="0xaaaadaafa3e0" data-dst="0xaaaadaf00bd0" d="M 186.67 480.00 L 173.33 466.67"/>
+<path id="t6_Far_Rockaway_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 91.88 361.45 L 109.66 379.23"/>
+<path id="t11_Far_Rockaway_Branch" data-src="0xaaaadab69490" data-dst="0xaaaadafde4a0" d="M 186.67 537.14 L 186.67 525.71"/>
+<path id="t23_Far_Rockaway_Branch" data-src="0xaaaadac2b3f0" data-dst="0xaaaadb24c8c0" d="M 133.33 426.67 L 133.33 453.33"/>
+<path id="t24_Far_Rockaway_Branch" data-src="0xaaaadac4c750" data-dst="0xaaaadb2246b0" d="M 186.67 514.29 L 186.67 502.86"/>
+<path id="t27_Far_Rockaway_Branch" data-src="0xaaaadac877c0" data-dst="0xaaaadac2b3f0" d="M 97.78 409.87 L 133.33 409.87"/>
+<path id="t28_Far_Rockaway_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 362.13 L 53.33 362.13"/>
+<path id="t47_Far_Rockaway_Branch" data-src="0xaaaadad290b0" data-dst="0xaaaadb02b0f0" d="M 26.67 409.87 L 62.22 409.87"/>
+<path id="t49_Far_Rockaway_Branch" data-src="0xaaaadad2fcd0" data-dst="0xaaaadab69490" d="M 186.67 548.57 L 186.67 537.14"/>
+<path id="t65_Far_Rockaway_Branch" data-src="0xaaaadaf00bd0" data-dst="0xaaaadaaef8b0" d="M 189.17 450.83 L 175.84 437.49"/>
+<path id="t67_Far_Rockaway_Branch" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 109.66 379.23 L 127.43 397.01"/>
+<path id="t75_Far_Rockaway_Branch" data-src="0xaaaadafde4a0" data-dst="0xaaaadac4c750" d="M 186.67 525.71 L 186.67 514.29"/>
+<path id="t76_Far_Rockaway_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadad28fa0" d="M 61.25 365.41 L 34.59 338.75"/>
+<path id="t77_Far_Rockaway_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 362.13 L 80.00 362.13"/>
+<path id="t79_Far_Rockaway_Branch" data-src="0xaaaadb02b0f0" data-dst="0xaaaadac877c0" d="M 62.22 409.87 L 97.78 409.87"/>
+<path id="t88_Far_Rockaway_Branch" data-src="0xaaaadb0e3f80" data-dst="0xaaaadaafa3e0" d="M 186.67 491.43 L 186.67 480.00"/>
+<path id="t90_Far_Rockaway_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 362.13 L 26.67 362.13"/>
+<path id="t101_Far_Rockaway_Branch" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 127.43 397.01 L 145.21 414.79"/>
+<path id="t104_Far_Rockaway_Branch" data-src="0xaaaadb2246b0" data-dst="0xaaaadb0e3f80" d="M 186.67 502.86 L 186.67 491.43"/>
+<path id="t108_Far_Rockaway_Branch" data-src="0xaaaadb24c8c0" data-dst="0xaaaadaaef8b0" d="M 133.33 453.33 L 160.00 453.33"/>
+<path id="t113_Far_Rockaway_Branch" data-src="0xaaaadb297500" data-dst="0xaaaadad2fcd0" d="M 186.67 560.00 L 186.67 548.57"/>
+</g>
+<g class="line" data-line="Greenport Service" stroke="#a626aa" stroke-width="7.00">
+<path id="t31_Greenport_Service" data-src="0xaaaadac9a6c0" data-dst="0xaaaadb04e700" d="M 1280.00 0.00 L 1201.62 0.00"/>
+<path id="t54_Greenport_Service" data-src="0xaaaadae15b10" data-dst="0xaaaadaf6e240" d="M 888.08 0.00 L 826.98 0.00 L 826.90 0.00 L 826.83 0.00 L 826.77 0.01 L 826.72 0.02 L 826.67 0.04 L 826.62 0.07 L 826.57 0.11 L 826.51 0.16 L 826.44 0.23 L 826.36 0.31 L 826.35 0.32 L 814.65 12.02"/>
+<path id="t66_Greenport_Service" data-src="0xaaaadaf23600" data-dst="0xaaaadb19ee20" d="M 1123.23 0.00 L 1044.85 0.00"/>
+<path id="t81_Greenport_Service" data-src="0xaaaadb04e700" data-dst="0xaaaadaf23600" d="M 1201.62 0.00 L 1123.23 0.00"/>
+<path id="t86_Greenport_Service" data-src="0xaaaadb099340" data-dst="0xaaaadae15b10" d="M 966.46 0.00 L 888.08 0.00"/>
+<path id="t98_Greenport_Service" data-src="0xaaaadb19ee20" data-dst="0xaaaadb099340" d="M 1044.85 0.00 L 966.46 0.00"/>
+</g>
+<g class="line" data-line="Hempstead Branch" stroke="#ce8e00" stroke-width="7.00">
+<path id="t6_Hempstead_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 52.28 401.05 L 70.06 418.83"/>
+<path id="t27_Hempstead_Branch" data-src="0xaaaadac877c0" data-dst="0xaaaadac2b3f0" d="M 97.78 465.87 L 133.33 465.87"/>
+<path id="t28_Hempstead_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 418.13 L 53.33 418.13"/>
+<path id="t34_Hempstead_Branch" data-src="0xaaaadacb3c20" data-dst="0xaaaadb12ebc0" d="M 266.67 426.67 L 253.33 413.33"/>
+<path id="t36_Hempstead_Branch" data-src="0xaaaadacb92a0" data-dst="0xaaaadacb3c20" d="M 293.33 453.33 L 266.67 426.67"/>
+<path id="t42_Hempstead_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadac2b3f0" d="M 160.00 454.67 L 133.33 454.67"/>
+<path id="t44_Hempstead_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadadf04f0" d="M 171.20 426.67 L 171.20 408.47"/>
+<path id="t47_Hempstead_Branch" data-src="0xaaaadad290b0" data-dst="0xaaaadb02b0f0" d="M 26.67 465.87 L 62.22 465.87"/>
+<path id="t51_Hempstead_Branch" data-src="0xaaaadad46de0" data-dst="0xaaaadb249da0" d="M 240.00 400.00 L 226.67 386.67"/>
+<path id="t53_Hempstead_Branch" data-src="0xaaaadadf04f0" data-dst="0xaaaadb374f40" d="M 171.20 408.47 L 171.20 400.34 L 171.20 400.42 L 171.19 400.89 L 171.09 401.88 L 170.76 403.35 L 170.13 404.95 L 169.36 406.24 L 168.73 407.06 L 168.36 407.47 L 168.22 407.62 L 168.24 407.60 L 168.24 407.60 L 174.82 401.02"/>
+<path id="t67_Hempstead_Branch" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 70.06 418.83 L 87.84 436.61"/>
+<path id="t72_Hempstead_Branch" data-src="0xaaaadaf93860" data-dst="0xaaaadac9a5b0" d="M 195.13 384.53 L 213.33 384.53"/>
+<path id="t76_Hempstead_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadad28fa0" d="M 21.65 405.01 L -5.01 378.35"/>
+<path id="t77_Hempstead_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 418.13 L 80.00 418.13"/>
+<path id="t79_Hempstead_Branch" data-src="0xaaaadb02b0f0" data-dst="0xaaaadac877c0" d="M 62.22 465.87 L 97.78 465.87"/>
+<path id="t90_Hempstead_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 418.13 L 26.67 418.13"/>
+<path id="t93_Hempstead_Branch" data-src="0xaaaadb12ebc0" data-dst="0xaaaadad46de0" d="M 253.33 413.33 L 240.00 400.00"/>
+<path id="t101_Hempstead_Branch" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 87.84 436.61 L 105.61 454.39"/>
+<path id="t106_Hempstead_Branch" data-src="0xaaaadb249da0" data-dst="0xaaaadac9a5b0" d="M 226.67 386.67 L 213.33 373.33"/>
+<path id="t120_Hempstead_Branch" data-src="0xaaaadb374dd0" data-dst="0xaaaadaf93860" d="M 187.69 388.15 L 194.26 381.58 L 194.29 381.55 L 194.15 381.68 L 193.76 382.04 L 192.97 382.65 L 191.71 383.41 L 190.11 384.06 L 188.62 384.41 L 187.60 384.52 L 187.11 384.53 L 187.00 384.53 L 186.98 384.53 L 195.13 384.53"/>
+<path id="t121_Hempstead_Branch" data-src="0xaaaadb374f40" data-dst="0xaaaadb374dd0" d="M 174.82 401.02 L 187.69 388.15"/>
+</g>
+<g class="line" data-line="Long Beach Branch" stroke="#ff6319" stroke-width="7.00">
+<path id="t0_Long_Beach_Branch" data-src="0xaaaadaaef8b0" data-dst="0xaaaadac2b3f0" d="M 167.92 445.41 L 141.25 418.75"/>
+<path id="t2_Long_Beach_Branch" data-src="0xaaaadaafa3e0" data-dst="0xaaaadaafa2a0" d="M 194.59 472.08 L 221.25 498.75"/>
+<path id="t3_Long_Beach_Branch" data-src="0xaaaadaafa3e0" data-dst="0xaaaadaf00bd0" d="M 202.51 464.16 L 189.17 450.83"/>
+<path id="t6_Long_Beach_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 83.96 369.37 L 101.74 387.15"/>
+<path id="t15_Long_Beach_Branch" data-src="0xaaaadabd0670" data-dst="0xaaaadb073e30" d="M 256.92 533.33 L 240.32 533.33 L 240.23 533.33 L 240.16 533.33 L 240.10 533.32 L 240.05 533.31 L 240.00 533.29 L 239.95 533.27 L 239.90 533.23 L 239.84 533.17 L 239.77 533.11 L 239.69 533.02 L 239.68 533.02 L 239.08 532.41"/>
+<path id="t23_Long_Beach_Branch" data-src="0xaaaadac2b3f0" data-dst="0xaaaadb24c8c0" d="M 122.13 426.67 L 122.13 453.33"/>
+<path id="t26_Long_Beach_Branch" data-src="0xaaaadac857d0" data-dst="0xaaaadabd0670" d="M 275.13 533.33 L 256.92 533.33"/>
+<path id="t27_Long_Beach_Branch" data-src="0xaaaadac877c0" data-dst="0xaaaadac2b3f0" d="M 97.78 421.07 L 133.33 421.07"/>
+<path id="t28_Long_Beach_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 373.33 L 53.33 373.33"/>
+<path id="t35_Long_Beach_Branch" data-src="0xaaaadacb3d30" data-dst="0xaaaadac857d0" d="M 293.33 533.33 L 275.13 533.33"/>
+<path id="t42_Long_Beach_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadac2b3f0" d="M 160.00 387.47 L 133.33 387.47"/>
+<path id="t43_Long_Beach_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadb0be960" d="M 176.80 426.67 L 176.80 440.00"/>
+<path id="t47_Long_Beach_Branch" data-src="0xaaaadad290b0" data-dst="0xaaaadb02b0f0" d="M 26.67 421.07 L 62.22 421.07"/>
+<path id="t65_Long_Beach_Branch" data-src="0xaaaadaf00bd0" data-dst="0xaaaadaaef8b0" d="M 173.33 466.67 L 160.00 453.33"/>
+<path id="t67_Long_Beach_Branch" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 101.74 387.15 L 119.52 404.93"/>
+<path id="t76_Long_Beach_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadad28fa0" d="M 53.33 373.33 L 26.67 346.67"/>
+<path id="t77_Long_Beach_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 373.33 L 80.00 373.33"/>
+<path id="t79_Long_Beach_Branch" data-src="0xaaaadb02b0f0" data-dst="0xaaaadac877c0" d="M 62.22 421.07 L 97.78 421.07"/>
+<path id="t83_Long_Beach_Branch" data-src="0xaaaadb073d20" data-dst="0xaaaadaafa2a0" d="M 226.21 519.54 L 213.33 506.67"/>
+<path id="t84_Long_Beach_Branch" data-src="0xaaaadb073e30" data-dst="0xaaaadb073d20" d="M 239.08 532.41 L 226.21 519.54"/>
+<path id="t87_Long_Beach_Branch" data-src="0xaaaadb0be960" data-dst="0xaaaadaaef8b0" d="M 176.80 440.00 L 176.80 453.33"/>
+<path id="t90_Long_Beach_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 373.33 L 26.67 373.33"/>
+<path id="t101_Long_Beach_Branch" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 119.52 404.93 L 137.29 422.71"/>
+<path id="t108_Long_Beach_Branch" data-src="0xaaaadb24c8c0" data-dst="0xaaaadaaef8b0" d="M 133.33 464.53 L 160.00 464.53"/>
+</g>
+<g class="line" data-line="Montauk Branch" stroke="#00b2a9" stroke-width="7.00">
+<path id="t1_Montauk_Branch" data-src="0xaaaadaafa2a0" data-dst="0xaaaadb1a0d10" d="M 213.33 512.27 L 238.44 512.27"/>
+<path id="t2_Montauk_Branch" data-src="0xaaaadaafa3e0" data-dst="0xaaaadaafa2a0" d="M 178.75 487.92 L 205.41 514.59"/>
+<path id="t3_Montauk_Branch" data-src="0xaaaadaafa3e0" data-dst="0xaaaadaf00bd0" d="M 170.83 495.84 L 157.49 482.51"/>
+<path id="t5_Montauk_Branch" data-src="0xaaaadaafa660" data-dst="0xaaaadb47a8b0" d="M 377.29 342.71 L 403.96 369.37"/>
+<path id="t6_Montauk_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 115.64 337.70 L 133.42 355.47"/>
+<path id="t12_Montauk_Branch" data-src="0xaaaadab6b410" data-dst="0xaaaadb296890" d="M 1329.37 323.97 L 1383.49 269.84"/>
+<path id="t13_Montauk_Branch" data-src="0xaaaadab909e0" data-dst="0xaaaadac2a7d0" d="M 414.17 512.27 L 426.36 512.27 L 426.53 512.27 L 426.87 512.26 L 427.45 512.20 L 428.27 512.02 L 429.14 511.67 L 429.86 511.25 L 430.34 510.87 L 430.64 510.61 L 430.81 510.44 L 430.93 510.32 L 430.94 510.31 L 439.56 501.70"/>
+<path id="t14_Montauk_Branch" data-src="0xaaaadabacf40" data-dst="0xaaaadb3e6f20" d="M 1142.25 426.67 L 1218.80 426.67"/>
+<path id="t16_Montauk_Branch" data-src="0xaaaadabd25f0" data-dst="0xaaaadb39c370" d="M 1491.75 161.59 L 1545.87 107.46"/>
+<path id="t19_Montauk_Branch" data-src="0xaaaadac02e60" data-dst="0xaaaadacbacb0" d="M 475.04 440.46 L 457.29 422.71"/>
+<path id="t21_Montauk_Branch" data-src="0xaaaadac2a690" data-dst="0xaaaadae87cd0" d="M 457.31 483.94 L 475.06 466.19"/>
+<path id="t22_Montauk_Branch" data-src="0xaaaadac2a7d0" data-dst="0xaaaadac2a690" d="M 439.56 501.70 L 457.31 483.94"/>
+<path id="t28_Montauk_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 317.33 L 53.33 317.33"/>
+<path id="t29_Montauk_Branch" data-src="0xaaaadac981f0" data-dst="0xaaaadb201c80" d="M 293.33 362.13 L 323.68 362.13"/>
+<path id="t30_Montauk_Branch" data-src="0xaaaadac9a5b0" data-dst="0xaaaadb2df550" d="M 213.33 356.53 L 240.00 356.53"/>
+<path id="t32_Montauk_Branch" data-src="0xaaaadaca4130" data-dst="0xaaaadaf95750" d="M 606.43 426.67 L 682.97 426.67"/>
+<path id="t33_Montauk_Branch" data-src="0xaaaadacb3c20" data-dst="0xaaaadace3500" d="M 266.67 421.07 L 160.00 421.07"/>
+<path id="t37_Montauk_Branch" data-src="0xaaaadacbacb0" data-dst="0xaaaadacb3c20" d="M 453.33 421.07 L 266.67 421.07"/>
+<path id="t38_Montauk_Branch" data-src="0xaaaadacbacb0" data-dst="0xaaaadacd90e0" d="M 453.33 426.67 L 400.32 479.68 L 400.23 479.77 L 400.16 479.84 L 400.10 479.89 L 400.05 479.93 L 400.00 479.96 L 399.95 479.98 L 399.90 479.99 L 399.84 480.00 L 399.77 480.00 L 399.69 480.00 L 399.68 480.00 L 293.33 480.00"/>
+<path id="t39_Montauk_Branch" data-src="0xaaaadacbacb0" data-dst="0xaaaadb2df6a0" d="M 453.33 421.07 L 529.88 421.07"/>
+<path id="t41_Montauk_Branch" data-src="0xaaaadacd90e0" data-dst="0xaaaadace3500" d="M 293.33 480.00 L 266.98 453.65 L 266.90 453.56 L 266.83 453.50 L 266.77 453.44 L 266.72 453.40 L 266.67 453.37 L 266.62 453.35 L 266.57 453.34 L 266.51 453.34 L 266.44 453.33 L 266.36 453.33 L 266.35 453.33 L 186.98 453.33 L 186.90 453.33 L 186.83 453.33 L 186.77 453.32 L 186.72 453.31 L 186.67 453.29 L 186.62 453.27 L 186.57 453.23 L 186.51 453.17 L 186.44 453.11 L 186.36 453.02 L 186.35 453.02 L 160.00 426.67"/>
+<path id="t42_Montauk_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadac2b3f0" d="M 160.00 421.07 L 133.33 421.07"/>
+<path id="t43_Montauk_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadb0be960" d="M 143.20 426.67 L 143.20 440.00"/>
+<path id="t44_Montauk_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadadf04f0" d="M 137.60 426.67 L 137.60 408.47"/>
+<path id="t45_Montauk_Branch" data-src="0xaaaadace3610" data-dst="0xaaaadacbacb0" d="M 426.67 400.00 L 453.33 426.67"/>
+<path id="t50_Montauk_Branch" data-src="0xaaaadad31bc0" data-dst="0xaaaadb1560d0" d="M 836.06 426.67 L 912.61 426.67"/>
+<path id="t52_Montauk_Branch" data-src="0xaaaadad48c80" data-dst="0xaaaadb200ff0" d="M 288.65 512.27 L 313.75 512.27"/>
+<path id="t53_Montauk_Branch" data-src="0xaaaadadf04f0" data-dst="0xaaaadb374f40" d="M 137.60 408.47 L 137.60 400.28 L 137.60 399.85 L 137.64 398.70 L 137.85 396.55 L 138.54 393.45 L 139.86 390.11 L 141.48 387.38 L 142.85 385.59 L 143.75 384.59 L 144.23 384.09 L 144.45 383.87 L 144.48 383.84 L 151.06 377.26"/>
+<path id="t56_Montauk_Branch" data-src="0xaaaadae3d090" data-dst="0xaaaadb0e5ea0" d="M 338.86 512.27 L 363.96 512.27"/>
+<path id="t58_Montauk_Branch" data-src="0xaaaadae62760" data-dst="0xaaaadad48c80" d="M 263.54 512.27 L 288.65 512.27"/>
+<path id="t59_Montauk_Branch" data-src="0xaaaadae87cd0" data-dst="0xaaaadac02e60" d="M 475.06 466.19 L 483.65 457.60 L 483.83 457.42 L 484.17 457.05 L 484.79 456.21 L 485.52 454.49 L 485.52 452.17 L 484.79 450.46 L 484.17 449.62 L 483.83 449.24 L 483.65 449.07 L 475.04 440.46"/>
+<path id="t61_Montauk_Branch" data-src="0xaaaadaeb5410" data-dst="0xaaaadac981f0" d="M 266.67 356.53 L 293.33 356.53"/>
+<path id="t65_Montauk_Branch" data-src="0xaaaadaf00bd0" data-dst="0xaaaadaaef8b0" d="M 165.41 474.59 L 152.08 461.25"/>
+<path id="t67_Montauk_Branch" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 133.42 355.47 L 151.19 373.25"/>
+<path id="t72_Montauk_Branch" data-src="0xaaaadaf93860" data-dst="0xaaaadac9a5b0" d="M 195.13 350.93 L 213.33 350.93"/>
+<path id="t73_Montauk_Branch" data-src="0xaaaadaf95750" data-dst="0xaaaadb2265a0" d="M 682.97 426.67 L 759.52 426.67"/>
+<path id="t77_Montauk_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 317.33 L 80.00 317.33"/>
+<path id="t85_Montauk_Branch" data-src="0xaaaadb075ca0" data-dst="0xaaaadabd25f0" d="M 1437.62 215.71 L 1491.75 161.59"/>
+<path id="t87_Montauk_Branch" data-src="0xaaaadb0be960" data-dst="0xaaaadaaef8b0" d="M 143.20 440.00 L 143.20 453.33"/>
+<path id="t89_Montauk_Branch" data-src="0xaaaadb0e5ea0" data-dst="0xaaaadb49caa0" d="M 363.96 512.27 L 389.07 512.27"/>
+<path id="t90_Montauk_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 317.33 L 26.67 317.33"/>
+<path id="t94_Montauk_Branch" data-src="0xaaaadb130ab0" data-dst="0xaaaadb457180" d="M 989.16 426.67 L 1065.70 426.67"/>
+<path id="t95_Montauk_Branch" data-src="0xaaaadb1560d0" data-dst="0xaaaadb130ab0" d="M 912.61 426.67 L 989.16 426.67"/>
+<path id="t96_Montauk_Branch" data-src="0xaaaadb17b6f0" data-dst="0xaaaadab6b410" d="M 1275.24 378.09 L 1329.37 323.97"/>
+<path id="t97_Montauk_Branch" data-src="0xaaaadb17c3f0" data-dst="0xaaaadaafa660" d="M 343.96 360.20 L 365.41 338.75"/>
+<path id="t99_Montauk_Branch" data-src="0xaaaadb1a0d10" data-dst="0xaaaadae62760" d="M 238.44 512.27 L 263.54 512.27"/>
+<path id="t101_Montauk_Branch" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 151.19 373.25 L 168.97 391.03"/>
+<path id="t102_Montauk_Branch" data-src="0xaaaadb200ff0" data-dst="0xaaaadae3d090" d="M 313.75 512.27 L 338.86 512.27"/>
+<path id="t103_Montauk_Branch" data-src="0xaaaadb201c80" data-dst="0xaaaadb17c3f0" d="M 323.68 362.13 L 346.33 362.13 L 346.24 362.13 L 345.78 362.15 L 344.79 362.25 L 343.32 362.57 L 341.72 363.21 L 340.43 363.97 L 339.61 364.60 L 339.20 364.97 L 339.05 365.11 L 339.07 365.09 L 339.06 365.10 L 343.96 360.20"/>
+<path id="t105_Montauk_Branch" data-src="0xaaaadb2265a0" data-dst="0xaaaadad31bc0" d="M 759.52 426.67 L 836.06 426.67"/>
+<path id="t112_Montauk_Branch" data-src="0xaaaadb296890" data-dst="0xaaaadb075ca0" d="M 1383.49 269.84 L 1437.62 215.71"/>
+<path id="t114_Montauk_Branch" data-src="0xaaaadb2df550" data-dst="0xaaaadaeb5410" d="M 240.00 356.53 L 266.67 356.53"/>
+<path id="t115_Montauk_Branch" data-src="0xaaaadb2df6a0" data-dst="0xaaaadaca4130" d="M 529.88 426.67 L 606.43 426.67"/>
+<path id="t120_Montauk_Branch" data-src="0xaaaadb374dd0" data-dst="0xaaaadaf93860" d="M 163.93 364.39 L 170.53 357.80 L 170.73 357.59 L 171.21 357.13 L 172.18 356.26 L 173.91 354.91 L 176.58 353.29 L 179.91 351.94 L 183.05 351.21 L 185.27 350.98 L 186.47 350.94 L 186.93 350.93 L 186.98 350.93 L 195.13 350.93"/>
+<path id="t121_Montauk_Branch" data-src="0xaaaadb374f40" data-dst="0xaaaadb374dd0" d="M 151.06 377.26 L 163.93 364.39"/>
+<path id="t122_Montauk_Branch" data-src="0xaaaadb39c370" data-dst="0xaaaadacea930" d="M 1545.87 107.46 L 1600.00 53.33"/>
+<path id="t125_Montauk_Branch" data-src="0xaaaadb3e6f20" data-dst="0xaaaadb17b6f0" d="M 1218.80 426.67 L 1226.35 426.67 L 1226.44 426.67 L 1226.51 426.66 L 1226.57 426.66 L 1226.62 426.65 L 1226.67 426.63 L 1226.71 426.60 L 1226.76 426.56 L 1226.82 426.51 L 1226.89 426.44 L 1226.98 426.36 L 1226.98 426.35 L 1275.24 378.09"/>
+<path id="t131_Montauk_Branch" data-src="0xaaaadb457180" data-dst="0xaaaadabacf40" d="M 1065.70 426.67 L 1142.25 426.67"/>
+<path id="t132_Montauk_Branch" data-src="0xaaaadb47a8b0" data-dst="0xaaaadace3610" d="M 403.96 369.37 L 430.63 396.04"/>
+<path id="t133_Montauk_Branch" data-src="0xaaaadb49caa0" data-dst="0xaaaadab909e0" d="M 389.07 512.27 L 414.17 512.27"/>
+</g>
+<g class="line" data-line="Oyster Bay Branch" stroke="#00af3f" stroke-width="7.00">
+<path id="t6_Oyster_Bay_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 44.36 408.97 L 62.14 426.75"/>
+<path id="t28_Oyster_Bay_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 429.33 L 53.33 429.33"/>
+<path id="t30_Oyster_Bay_Branch" data-src="0xaaaadac9a5b0" data-dst="0xaaaadb2df550" d="M 213.33 390.13 L 240.00 390.13"/>
+<path id="t42_Oyster_Bay_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadac2b3f0" d="M 160.00 465.87 L 133.33 465.87"/>
+<path id="t44_Oyster_Bay_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadadf04f0" d="M 182.40 426.67 L 182.40 408.47"/>
+<path id="t46_Oyster_Bay_Branch" data-src="0xaaaadaceaa40" data-dst="0xaaaadb24bbc0" d="M 346.67 213.33 L 346.67 231.54"/>
+<path id="t53_Oyster_Bay_Branch" data-src="0xaaaadadf04f0" data-dst="0xaaaadb374f40" d="M 182.40 408.47 L 182.40 400.36 L 182.40 400.62 L 182.37 401.62 L 182.17 403.65 L 181.50 406.64 L 180.21 409.89 L 178.65 412.53 L 177.36 414.21 L 176.57 415.10 L 176.22 415.46 L 176.17 415.51 L 176.16 415.52 L 182.74 408.94"/>
+<path id="t61_Oyster_Bay_Branch" data-src="0xaaaadaeb5410" data-dst="0xaaaadac981f0" d="M 266.67 390.13 L 293.33 390.13"/>
+<path id="t67_Oyster_Bay_Branch" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 62.14 426.75 L 79.92 444.53"/>
+<path id="t69_Oyster_Bay_Branch" data-src="0xaaaadaf4ab10" data-dst="0xaaaadb2e1480" d="M 331.96 334.71 L 319.08 347.58"/>
+<path id="t70_Oyster_Bay_Branch" data-src="0xaaaadaf4ac20" data-dst="0xaaaadaf4ab10" d="M 344.83 321.84 L 331.96 334.71"/>
+<path id="t72_Oyster_Bay_Branch" data-src="0xaaaadaf93860" data-dst="0xaaaadac9a5b0" d="M 195.13 395.73 L 213.33 395.73"/>
+<path id="t77_Oyster_Bay_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 429.33 L 80.00 429.33"/>
+<path id="t82_Oyster_Bay_Branch" data-src="0xaaaadb0505f0" data-dst="0xaaaadb32c080" d="M 346.67 286.16 L 346.67 304.37"/>
+<path id="t90_Oyster_Bay_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 429.33 L 26.67 429.33"/>
+<path id="t92_Oyster_Bay_Branch" data-src="0xaaaadb10b490" data-dst="0xaaaadb0505f0" d="M 346.67 267.95 L 346.67 286.16"/>
+<path id="t101_Oyster_Bay_Branch" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 79.92 444.53 L 97.70 462.30"/>
+<path id="t107_Oyster_Bay_Branch" data-src="0xaaaadb24bbc0" data-dst="0xaaaadb40c540" d="M 346.67 231.54 L 346.67 249.75"/>
+<path id="t114_Oyster_Bay_Branch" data-src="0xaaaadb2df550" data-dst="0xaaaadaeb5410" d="M 240.00 390.13 L 266.67 390.13"/>
+<path id="t116_Oyster_Bay_Branch" data-src="0xaaaadb2e1480" data-dst="0xaaaadb431ba0" d="M 319.08 347.58 L 306.21 360.46"/>
+<path id="t118_Oyster_Bay_Branch" data-src="0xaaaadb32c080" data-dst="0xaaaadaf4ac20" d="M 346.67 304.37 L 346.67 319.68 L 346.67 319.77 L 346.66 319.84 L 346.66 319.90 L 346.65 319.95 L 346.63 320.00 L 346.60 320.05 L 346.56 320.10 L 346.51 320.16 L 346.44 320.23 L 346.36 320.31 L 346.35 320.32 L 344.83 321.84"/>
+<path id="t120_Oyster_Bay_Branch" data-src="0xaaaadb374dd0" data-dst="0xaaaadaf93860" d="M 195.61 396.07 L 202.17 389.50 L 202.14 389.54 L 201.80 389.87 L 200.95 390.63 L 199.33 391.89 L 196.75 393.45 L 193.52 394.77 L 190.48 395.47 L 188.38 395.70 L 187.32 395.73 L 187.03 395.73 L 186.98 395.73 L 195.13 395.73"/>
+<path id="t121_Oyster_Bay_Branch" data-src="0xaaaadb374f40" data-dst="0xaaaadb374dd0" d="M 182.74 408.94 L 195.61 396.07"/>
+<path id="t127_Oyster_Bay_Branch" data-src="0xaaaadb40c540" data-dst="0xaaaadb10b490" d="M 346.67 249.75 L 346.67 267.95"/>
+<path id="t129_Oyster_Bay_Branch" data-src="0xaaaadb431ba0" data-dst="0xaaaadac981f0" d="M 306.21 360.46 L 293.33 373.33"/>
+</g>
+<g class="line" data-line="Port Jefferson Branch" stroke="#006ec7" stroke-width="7.00">
+<path id="t6_Port_Jefferson_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 60.20 393.13 L 77.98 410.91"/>
+<path id="t8_Port_Jefferson_Branch" data-src="0xaaaadab43e70" data-dst="0xaaaadb1095a0" d="M 490.12 229.88 L 460.93 259.07"/>
+<path id="t9_Port_Jefferson_Branch" data-src="0xaaaadab43fc0" data-dst="0xaaaadab43e70" d="M 519.32 200.68 L 490.12 229.88"/>
+<path id="t18_Port_Jefferson_Branch" data-src="0xaaaadac00e10" data-dst="0xaaaadb455290" d="M 596.12 186.67 L 554.83 186.67"/>
+<path id="t27_Port_Jefferson_Branch" data-src="0xaaaadac877c0" data-dst="0xaaaadac2b3f0" d="M 97.78 454.67 L 133.33 454.67"/>
+<path id="t28_Port_Jefferson_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 406.93 L 53.33 406.93"/>
+<path id="t29_Port_Jefferson_Branch" data-src="0xaaaadac981f0" data-dst="0xaaaadb201c80" d="M 293.33 384.53 L 323.68 384.53"/>
+<path id="t30_Port_Jefferson_Branch" data-src="0xaaaadac9a5b0" data-dst="0xaaaadb2df550" d="M 213.33 378.93 L 240.00 378.93"/>
+<path id="t42_Port_Jefferson_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadac2b3f0" d="M 160.00 443.47 L 133.33 443.47"/>
+<path id="t44_Port_Jefferson_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadadf04f0" d="M 160.00 426.67 L 160.00 408.47"/>
+<path id="t47_Port_Jefferson_Branch" data-src="0xaaaadad290b0" data-dst="0xaaaadb02b0f0" d="M 26.67 454.67 L 62.22 454.67"/>
+<path id="t48_Port_Jefferson_Branch" data-src="0xaaaadad2b4e0" data-dst="0xaaaadb34f7b0" d="M 720.00 186.67 L 678.71 186.67"/>
+<path id="t53_Port_Jefferson_Branch" data-src="0xaaaadadf04f0" data-dst="0xaaaadb374f40" d="M 160.00 408.47 L 160.00 400.32 L 160.00 400.23 L 160.00 400.16 L 160.01 400.10 L 160.02 400.05 L 160.04 400.00 L 160.07 399.95 L 160.11 399.90 L 160.16 399.84 L 160.23 399.77 L 160.31 399.69 L 160.32 399.68 L 166.90 393.10"/>
+<path id="t61_Port_Jefferson_Branch" data-src="0xaaaadaeb5410" data-dst="0xaaaadac981f0" d="M 266.67 378.93 L 293.33 378.93"/>
+<path id="t67_Port_Jefferson_Branch" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 77.98 410.91 L 95.76 428.69"/>
+<path id="t72_Port_Jefferson_Branch" data-src="0xaaaadaf93860" data-dst="0xaaaadac9a5b0" d="M 195.13 373.33 L 213.33 373.33"/>
+<path id="t74_Port_Jefferson_Branch" data-src="0xaaaadafb8e80" data-dst="0xaaaadaafa660" d="M 402.53 317.47 L 373.33 346.67"/>
+<path id="t76_Port_Jefferson_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadad28fa0" d="M 29.57 397.09 L 2.91 370.43"/>
+<path id="t77_Port_Jefferson_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 406.93 L 80.00 406.93"/>
+<path id="t78_Port_Jefferson_Branch" data-src="0xaaaadb003ac0" data-dst="0xaaaadafb8e80" d="M 431.73 288.27 L 402.53 317.47"/>
+<path id="t79_Port_Jefferson_Branch" data-src="0xaaaadb02b0f0" data-dst="0xaaaadac877c0" d="M 62.22 454.67 L 97.78 454.67"/>
+<path id="t90_Port_Jefferson_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 406.93 L 26.67 406.93"/>
+<path id="t91_Port_Jefferson_Branch" data-src="0xaaaadb1095a0" data-dst="0xaaaadb003ac0" d="M 460.93 259.07 L 431.73 288.27"/>
+<path id="t97_Port_Jefferson_Branch" data-src="0xaaaadb17c3f0" data-dst="0xaaaadaafa660" d="M 359.80 376.04 L 381.25 354.59"/>
+<path id="t101_Port_Jefferson_Branch" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 95.76 428.69 L 113.53 446.47"/>
+<path id="t103_Port_Jefferson_Branch" data-src="0xaaaadb201c80" data-dst="0xaaaadb17c3f0" d="M 323.68 384.53 L 346.37 384.53 L 346.63 384.53 L 347.23 384.51 L 348.34 384.40 L 349.91 384.05 L 351.61 383.38 L 353.00 382.56 L 353.92 381.85 L 354.45 381.38 L 354.74 381.10 L 354.89 380.95 L 354.90 380.94 L 359.80 376.04"/>
+<path id="t114_Port_Jefferson_Branch" data-src="0xaaaadb2df550" data-dst="0xaaaadaeb5410" d="M 240.00 378.93 L 266.67 378.93"/>
+<path id="t117_Port_Jefferson_Branch" data-src="0xaaaadb32a190" data-dst="0xaaaadac00e10" d="M 637.42 186.67 L 596.12 186.67"/>
+<path id="t119_Port_Jefferson_Branch" data-src="0xaaaadb34f7b0" data-dst="0xaaaadb32a190" d="M 678.71 186.67 L 637.42 186.67"/>
+<path id="t120_Port_Jefferson_Branch" data-src="0xaaaadb374dd0" data-dst="0xaaaadaf93860" d="M 179.77 380.23 L 186.35 373.65 L 186.44 373.56 L 186.51 373.50 L 186.57 373.44 L 186.62 373.40 L 186.67 373.37 L 186.71 373.35 L 186.76 373.34 L 186.82 373.34 L 186.89 373.33 L 186.98 373.33 L 186.98 373.33 L 195.13 373.33"/>
+<path id="t121_Port_Jefferson_Branch" data-src="0xaaaadb374f40" data-dst="0xaaaadb374dd0" d="M 166.90 393.10 L 179.77 380.23"/>
+<path id="t130_Port_Jefferson_Branch" data-src="0xaaaadb455290" data-dst="0xaaaadab43fc0" d="M 554.83 186.67 L 533.65 186.67 L 533.56 186.67 L 533.49 186.67 L 533.43 186.68 L 533.38 186.69 L 533.33 186.71 L 533.29 186.73 L 533.24 186.77 L 533.18 186.83 L 533.11 186.89 L 533.02 186.98 L 533.02 186.98 L 519.32 200.68"/>
+</g>
+<g class="line" data-line="Port Washington Branch" stroke="#c60c30" stroke-width="7.00">
+<path id="t7_Port_Washington_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadab46a60" d="M 80.00 373.33 L 96.09 373.33"/>
+<path id="t10_Port_Washington_Branch" data-src="0xaaaadab46a60" data-dst="0xaaaadaf48c20" d="M 96.09 373.33 L 112.19 373.33"/>
+<path id="t28_Port_Washington_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 350.93 L 53.33 350.93"/>
+<path id="t55_Port_Washington_Branch" data-src="0xaaaadae3b130" data-dst="0xaaaadb3e5030" d="M 194.48 338.85 L 205.86 327.47"/>
+<path id="t60_Port_Washington_Branch" data-src="0xaaaadaeb33d0" data-dst="0xaaaadb42fc70" d="M 217.24 316.09 L 228.62 304.71"/>
+<path id="t62_Port_Washington_Branch" data-src="0xaaaadaed89c0" data-dst="0xaaaadb3bfa10" d="M 171.72 361.61 L 183.10 350.23"/>
+<path id="t63_Port_Washington_Branch" data-src="0xaaaadaed8ad0" data-dst="0xaaaadaed89c0" d="M 160.34 372.99 L 171.72 361.61"/>
+<path id="t68_Port_Washington_Branch" data-src="0xaaaadaf48c20" data-dst="0xaaaadb294910" d="M 112.19 373.33 L 128.28 373.33"/>
+<path id="t76_Port_Washington_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadad28fa0" d="M 69.17 357.49 L 42.51 330.83"/>
+<path id="t77_Port_Washington_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 350.93 L 80.00 350.93"/>
+<path id="t90_Port_Washington_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 350.93 L 26.67 350.93"/>
+<path id="t110_Port_Washington_Branch" data-src="0xaaaadb294910" data-dst="0xaaaadb294a80" d="M 128.28 373.33 L 144.37 373.33"/>
+<path id="t111_Port_Washington_Branch" data-src="0xaaaadb294a80" data-dst="0xaaaadaed8ad0" d="M 144.37 373.33 L 159.68 373.33 L 159.77 373.33 L 159.84 373.33 L 159.90 373.32 L 159.95 373.31 L 160.00 373.29 L 160.05 373.27 L 160.10 373.23 L 160.16 373.17 L 160.23 373.11 L 160.31 373.02 L 160.32 373.02 L 160.34 372.99"/>
+<path id="t123_Port_Washington_Branch" data-src="0xaaaadb3bfa10" data-dst="0xaaaadae3b130" d="M 183.10 350.23 L 194.48 338.85"/>
+<path id="t124_Port_Washington_Branch" data-src="0xaaaadb3e5030" data-dst="0xaaaadaeb33d0" d="M 205.86 327.47 L 217.24 316.09"/>
+<path id="t128_Port_Washington_Branch" data-src="0xaaaadb42fc70" data-dst="0xaaaadaf96450" d="M 228.62 304.71 L 240.00 293.33"/>
+</g>
+<g class="line" data-line="Ronkonkoma Branch" stroke="#a626aa" stroke-width="7.00">
+<path id="t5_Ronkonkoma_Branch" data-src="0xaaaadaafa660" data-dst="0xaaaadb47a8b0" d="M 369.37 350.63 L 396.04 377.29"/>
+<path id="t6_Ronkonkoma_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 76.04 377.29 L 93.82 395.07"/>
+<path id="t17_Ronkonkoma_Branch" data-src="0xaaaadabfc840" data-dst="0xaaaadb26f330" d="M 592.95 233.72 L 537.52 289.15"/>
+<path id="t20_Ronkonkoma_Branch" data-src="0xaaaadac287a0" data-dst="0xaaaadb40a650" d="M 759.22 67.44 L 703.80 122.87"/>
+<path id="t27_Ronkonkoma_Branch" data-src="0xaaaadac877c0" data-dst="0xaaaadac2b3f0" d="M 97.78 432.27 L 133.33 432.27"/>
+<path id="t28_Ronkonkoma_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 384.53 L 53.33 384.53"/>
+<path id="t29_Ronkonkoma_Branch" data-src="0xaaaadac981f0" data-dst="0xaaaadb201c80" d="M 293.33 373.33 L 323.68 373.33"/>
+<path id="t30_Ronkonkoma_Branch" data-src="0xaaaadac9a5b0" data-dst="0xaaaadb2df550" d="M 213.33 367.73 L 240.00 367.73"/>
+<path id="t42_Ronkonkoma_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadac2b3f0" d="M 160.00 432.27 L 133.33 432.27"/>
+<path id="t44_Ronkonkoma_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadadf04f0" d="M 148.80 426.67 L 148.80 408.47"/>
+<path id="t47_Ronkonkoma_Branch" data-src="0xaaaadad290b0" data-dst="0xaaaadb02b0f0" d="M 26.67 432.27 L 62.22 432.27"/>
+<path id="t53_Ronkonkoma_Branch" data-src="0xaaaadadf04f0" data-dst="0xaaaadb374f40" d="M 148.80 408.47 L 148.80 400.30 L 148.80 400.04 L 148.82 399.43 L 148.93 398.32 L 149.28 396.75 L 149.95 395.06 L 150.77 393.67 L 151.48 392.75 L 151.96 392.22 L 152.23 391.93 L 152.38 391.78 L 152.40 391.76 L 158.98 385.18"/>
+<path id="t57_Ronkonkoma_Branch" data-src="0xaaaadae607e0" data-dst="0xaaaadace3610" d="M 482.09 344.57 L 426.67 400.00"/>
+<path id="t61_Ronkonkoma_Branch" data-src="0xaaaadaeb5410" data-dst="0xaaaadac981f0" d="M 266.67 367.73 L 293.33 367.73"/>
+<path id="t64_Ronkonkoma_Branch" data-src="0xaaaadaefdfe0" data-dst="0xaaaadabfc840" d="M 648.37 178.30 L 592.95 233.72"/>
+<path id="t67_Ronkonkoma_Branch" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 93.82 395.07 L 111.60 412.85"/>
+<path id="t71_Ronkonkoma_Branch" data-src="0xaaaadaf6e240" data-dst="0xaaaadac287a0" d="M 814.65 12.02 L 759.22 67.44"/>
+<path id="t72_Ronkonkoma_Branch" data-src="0xaaaadaf93860" data-dst="0xaaaadac9a5b0" d="M 195.13 362.13 L 213.33 362.13"/>
+<path id="t76_Ronkonkoma_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadad28fa0" d="M 45.41 381.25 L 18.75 354.59"/>
+<path id="t77_Ronkonkoma_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 384.53 L 80.00 384.53"/>
+<path id="t79_Ronkonkoma_Branch" data-src="0xaaaadb02b0f0" data-dst="0xaaaadac877c0" d="M 62.22 432.27 L 97.78 432.27"/>
+<path id="t90_Ronkonkoma_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 384.53 L 26.67 384.53"/>
+<path id="t97_Ronkonkoma_Branch" data-src="0xaaaadb17c3f0" data-dst="0xaaaadaafa660" d="M 351.88 368.12 L 373.33 346.67"/>
+<path id="t101_Ronkonkoma_Branch" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 111.60 412.85 L 129.37 430.63"/>
+<path id="t103_Ronkonkoma_Branch" data-src="0xaaaadb201c80" data-dst="0xaaaadb17c3f0" d="M 323.68 373.33 L 346.35 373.33 L 346.44 373.33 L 346.51 373.33 L 346.57 373.32 L 346.62 373.31 L 346.67 373.29 L 346.71 373.27 L 346.76 373.23 L 346.82 373.17 L 346.89 373.11 L 346.98 373.02 L 346.98 373.02 L 351.88 368.12"/>
+<path id="t109_Ronkonkoma_Branch" data-src="0xaaaadb26f330" data-dst="0xaaaadae607e0" d="M 537.52 289.15 L 482.09 344.57"/>
+<path id="t114_Ronkonkoma_Branch" data-src="0xaaaadb2df550" data-dst="0xaaaadaeb5410" d="M 240.00 367.73 L 266.67 367.73"/>
+<path id="t120_Ronkonkoma_Branch" data-src="0xaaaadb374dd0" data-dst="0xaaaadaf93860" d="M 171.85 372.31 L 178.44 365.72 L 178.59 365.58 L 178.86 365.31 L 179.37 364.85 L 180.26 364.16 L 181.62 363.33 L 183.31 362.65 L 184.91 362.28 L 186.05 362.16 L 186.68 362.13 L 186.95 362.13 L 186.98 362.13 L 195.13 362.13"/>
+<path id="t121_Ronkonkoma_Branch" data-src="0xaaaadb374f40" data-dst="0xaaaadb374dd0" d="M 158.98 385.18 L 171.85 372.31"/>
+<path id="t126_Ronkonkoma_Branch" data-src="0xaaaadb40a650" data-dst="0xaaaadaefdfe0" d="M 703.80 122.87 L 648.37 178.30"/>
+<path id="t132_Ronkonkoma_Branch" data-src="0xaaaadb47a8b0" data-dst="0xaaaadace3610" d="M 396.04 377.29 L 422.71 403.96"/>
+</g>
+<g class="line" data-line="West Hempstead Branch" stroke="#00a1de" stroke-width="7.00">
+<path id="t3_West_Hempstead_Branch" data-src="0xaaaadaafa3e0" data-dst="0xaaaadaf00bd0" d="M 194.59 472.08 L 181.25 458.75"/>
+<path id="t4_West_Hempstead_Branch" data-src="0xaaaadaafa3e0" data-dst="0xaaaadb02bcd0" d="M 186.67 480.00 L 213.33 480.00"/>
+<path id="t6_West_Hempstead_Branch" data-src="0xaaaadab0a630" data-dst="0xaaaadaf261f0" d="M 68.12 385.21 L 85.90 402.99"/>
+<path id="t25_West_Hempstead_Branch" data-src="0xaaaadac4f340" data-dst="0xaaaadacd90e0" d="M 266.67 480.00 L 293.33 480.00"/>
+<path id="t27_West_Hempstead_Branch" data-src="0xaaaadac877c0" data-dst="0xaaaadac2b3f0" d="M 97.78 443.47 L 133.33 443.47"/>
+<path id="t28_West_Hempstead_Branch" data-src="0xaaaadac8c850" data-dst="0xaaaadafe1090" d="M 26.67 395.73 L 53.33 395.73"/>
+<path id="t40_West_Hempstead_Branch" data-src="0xaaaadacd90e0" data-dst="0xaaaadad2b5f0" d="M 293.33 480.00 L 320.00 453.33"/>
+<path id="t42_West_Hempstead_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadac2b3f0" d="M 160.00 398.67 L 133.33 398.67"/>
+<path id="t43_West_Hempstead_Branch" data-src="0xaaaadace3500" data-dst="0xaaaadb0be960" d="M 165.60 426.67 L 165.60 440.00"/>
+<path id="t47_West_Hempstead_Branch" data-src="0xaaaadad290b0" data-dst="0xaaaadb02b0f0" d="M 26.67 443.47 L 62.22 443.47"/>
+<path id="t65_West_Hempstead_Branch" data-src="0xaaaadaf00bd0" data-dst="0xaaaadaaef8b0" d="M 181.25 458.75 L 167.92 445.41"/>
+<path id="t67_West_Hempstead_Branch" data-src="0xaaaadaf261f0" data-dst="0xaaaadb1dc660" d="M 85.90 402.99 L 103.68 420.77"/>
+<path id="t76_West_Hempstead_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadad28fa0" d="M 37.49 389.17 L 10.83 362.51"/>
+<path id="t77_West_Hempstead_Branch" data-src="0xaaaadafe1090" data-dst="0xaaaadab0a630" d="M 53.33 395.73 L 80.00 395.73"/>
+<path id="t79_West_Hempstead_Branch" data-src="0xaaaadb02b0f0" data-dst="0xaaaadac877c0" d="M 62.22 443.47 L 97.78 443.47"/>
+<path id="t80_West_Hempstead_Branch" data-src="0xaaaadb02bcd0" data-dst="0xaaaadb1b7090" d="M 213.33 480.00 L 240.00 480.00"/>
+<path id="t87_West_Hempstead_Branch" data-src="0xaaaadb0be960" data-dst="0xaaaadaaef8b0" d="M 165.60 440.00 L 165.60 453.33"/>
+<path id="t90_West_Hempstead_Branch" data-src="0xaaaadb0e6b70" data-dst="0xaaaadac8c850" d="M 0.00 395.73 L 26.67 395.73"/>
+<path id="t100_West_Hempstead_Branch" data-src="0xaaaadb1b7090" data-dst="0xaaaadac4f340" d="M 240.00 480.00 L 266.67 480.00"/>
+<path id="t101_West_Hempstead_Branch" data-src="0xaaaadb1dc660" data-dst="0xaaaadac2b3f0" d="M 103.68 420.77 L 121.45 438.55"/>
+</g>
+</g>
+<g id="stations">
+<circle cx="160.00" cy="453.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaaef8b0" data-station-id="122"/>
+<circle cx="213.33" cy="506.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaafa2a0" data-station-id="125"/>
+<circle cx="186.67" cy="480.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaafa3e0" data-station-id="211"/>
+<circle cx="373.33" cy="346.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaafa660" data-station-id="92"/>
+<circle cx="80.00" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadab0a630" data-station-id="214"/>
+<circle cx="490.12" cy="229.88" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadab43e70" data-station-id="78"/>
+<circle cx="519.32" cy="200.68" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadab43fc0" data-station-id="153"/>
+<circle cx="96.09" cy="373.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadab46a60" data-station-id="199"/>
+<circle cx="186.67" cy="537.14" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadab69490" data-station-id="114"/>
+<circle cx="1329.37" cy="323.97" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadab6b410" data-station-id="83"/>
+<circle cx="414.17" cy="506.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadab909e0" data-station-id="136"/>
+<circle cx="1142.25" cy="426.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadabacf40" data-station-id="140"/>
+<circle cx="256.92" cy="533.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadabd0670" data-station-id="155"/>
+<circle cx="1491.75" cy="161.59" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadabd25f0" data-station-id="48"/>
+<circle cx="592.95" cy="233.72" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadabfc840" data-station-id="220"/>
+<circle cx="596.12" cy="186.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac00e10" data-station-id="202"/>
+<circle cx="471.08" cy="444.42" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac02e60" data-station-id="117"/>
+<circle cx="759.22" cy="67.44" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac287a0" data-station-id="33"/>
+<circle cx="453.35" cy="479.99" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac2a690" data-station-id="8"/>
+<circle cx="435.60" cy="497.74" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac2a7d0" data-station-id="135"/>
+<circle cx="133.33" cy="426.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac2b3f0" data-station-id="102"/>
+<circle cx="186.67" cy="514.29" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac4c750" data-station-id="217"/>
+<circle cx="266.67" cy="480.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac4f340" data-station-id="124"/>
+<circle cx="275.13" cy="533.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac857d0" data-station-id="99"/>
+<circle cx="97.78" cy="426.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac877c0" data-station-id="50"/>
+<circle cx="26.67" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac8c850" data-station-id="118"/>
+<circle cx="293.33" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac981f0" data-station-id="132"/>
+<circle cx="213.33" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac9a5b0" data-station-id="63"/>
+<circle cx="1280.00" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadac9a6c0" data-station-id="73"/>
+<circle cx="606.43" cy="426.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaca4130" data-station-id="26"/>
+<circle cx="266.67" cy="426.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadacb3c20" data-station-id="36"/>
+<circle cx="293.33" cy="533.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadacb3d30" data-station-id="113"/>
+<circle cx="293.33" cy="453.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadacb92a0" data-station-id="84"/>
+<circle cx="293.33" cy="480.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadacd90e0" data-station-id="85"/>
+<circle cx="160.00" cy="426.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadace3500" data-station-id="86"/>
+<circle cx="1600.00" cy="53.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadacea930" data-station-id="141"/>
+<circle cx="346.67" cy="213.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaceaa40" data-station-id="154"/>
+<circle cx="26.67" cy="346.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadad28fa0" data-station-id="349"/>
+<circle cx="26.67" cy="426.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadad290b0" data-station-id="241"/>
+<circle cx="720.00" cy="186.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadad2b4e0" data-station-id="164"/>
+<circle cx="320.00" cy="453.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadad2b5f0" data-station-id="216"/>
+<circle cx="186.67" cy="548.57" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadad2fcd0" data-station-id="101"/>
+<circle cx="836.06" cy="426.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadad31bc0" data-station-id="157"/>
+<circle cx="240.00" cy="400.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadad46de0" data-station-id="149"/>
+<circle cx="288.65" cy="506.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadad48c80" data-station-id="64"/>
+<circle cx="160.00" cy="408.47" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadadf04f0" data-station-id="89"/>
+<circle cx="888.08" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadae15b10" data-station-id="129"/>
+<circle cx="194.48" cy="338.85" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadae3b130" data-station-id="120"/>
+<circle cx="338.86" cy="506.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadae3d090" data-station-id="16"/>
+<circle cx="482.09" cy="344.57" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadae607e0" data-station-id="59"/>
+<circle cx="263.54" cy="506.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadae62760" data-station-id="225"/>
+<circle cx="471.10" cy="462.23" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadae87cd0" data-station-id="38"/>
+<circle cx="217.24" cy="316.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaeb33d0" data-station-id="131"/>
+<circle cx="266.67" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaeb5410" data-station-id="127"/>
+<circle cx="171.72" cy="361.61" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaed89c0" data-station-id="25"/>
+<circle cx="160.34" cy="372.99" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaed8ad0" data-station-id="2"/>
+<circle cx="648.37" cy="178.30" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaefdfe0" data-station-id="44"/>
+<circle cx="173.33" cy="466.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf00bd0" data-station-id="180"/>
+<circle cx="1123.23" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf23600" data-station-id="126"/>
+<circle cx="97.78" cy="391.11" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf261f0" data-station-id="55"/>
+<circle cx="112.19" cy="373.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf48c20" data-station-id="56"/>
+<circle cx="331.96" cy="334.71" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf4ab10" data-station-id="182"/>
+<circle cx="344.83" cy="321.84" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf4ac20" data-station-id="77"/>
+<circle cx="814.65" cy="12.02" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf6e240" data-station-id="179"/>
+<circle cx="195.13" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf93860" data-station-id="23"/>
+<circle cx="682.97" cy="426.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf95750" data-station-id="100"/>
+<circle cx="240.00" cy="293.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadaf96450" data-station-id="171"/>
+<circle cx="402.53" cy="317.47" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadafb8e80" data-station-id="205"/>
+<circle cx="186.67" cy="525.71" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadafde4a0" data-station-id="32"/>
+<circle cx="53.33" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadafe1090" data-station-id="90"/>
+<circle cx="431.73" cy="288.27" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb003ac0" data-station-id="40"/>
+<circle cx="62.22" cy="426.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb02b0f0" data-station-id="148"/>
+<circle cx="213.33" cy="480.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb02bcd0" data-station-id="219"/>
+<circle cx="1201.62" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb04e700" data-station-id="190"/>
+<circle cx="346.67" cy="286.16" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb0505f0" data-station-id="185"/>
+<circle cx="226.21" cy="519.54" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb073d20" data-station-id="31"/>
+<circle cx="239.08" cy="532.41" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb073e30" data-station-id="51"/>
+<circle cx="1437.62" cy="215.71" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb075ca0" data-station-id="13"/>
+<circle cx="966.46" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb099340" data-station-id="223"/>
+<circle cx="160.00" cy="440.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb0be960" data-station-id="184"/>
+<circle cx="186.67" cy="491.43" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb0e3f80" data-station-id="66"/>
+<circle cx="363.96" cy="506.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb0e5ea0" data-station-id="215"/>
+<circle cx="0.00" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb0e6b70" data-station-id="237"/>
+<circle cx="460.93" cy="259.07" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb1095a0" data-station-id="91"/>
+<circle cx="346.67" cy="267.95" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb10b490" data-station-id="76"/>
+<circle cx="253.33" cy="413.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb12ebc0" data-station-id="68"/>
+<circle cx="989.16" cy="426.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb130ab0" data-station-id="163"/>
+<circle cx="912.61" cy="426.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb1560d0" data-station-id="204"/>
+<circle cx="1275.24" cy="378.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb17b6f0" data-station-id="233"/>
+<circle cx="351.88" cy="368.12" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb17c3f0" data-station-id="213"/>
+<circle cx="1044.85" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb19ee20" data-station-id="176"/>
+<circle cx="238.44" cy="506.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb1a0d10" data-station-id="183"/>
+<circle cx="240.00" cy="480.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb1b7090" data-station-id="142"/>
+<circle cx="115.56" cy="408.89" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb1dc660" data-station-id="107"/>
+<circle cx="313.75" cy="506.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb200ff0" data-station-id="226"/>
+<circle cx="323.68" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb201c80" data-station-id="39"/>
+<circle cx="186.67" cy="502.86" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb2246b0" data-station-id="94"/>
+<circle cx="759.52" cy="426.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb2265a0" data-station-id="74"/>
+<circle cx="226.67" cy="386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb249da0" data-station-id="195"/>
+<circle cx="346.67" cy="231.54" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb24bbc0" data-station-id="123"/>
+<circle cx="133.33" cy="453.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb24c8c0" data-station-id="119"/>
+<circle cx="537.52" cy="289.15" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb26f330" data-station-id="165"/>
+<circle cx="128.28" cy="373.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb294910" data-station-id="130"/>
+<circle cx="144.37" cy="373.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb294a80" data-station-id="11"/>
+<circle cx="1383.49" cy="269.84" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb296890" data-station-id="191"/>
+<circle cx="186.67" cy="560.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb297500" data-station-id="65"/>
+<circle cx="240.00" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb2df550" data-station-id="152"/>
+<circle cx="529.88" cy="426.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb2df6a0" data-station-id="27"/>
+<circle cx="319.08" cy="347.58" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb2e1480" data-station-id="1"/>
+<circle cx="637.42" cy="186.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb32a190" data-station-id="193"/>
+<circle cx="346.67" cy="304.37" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb32c080" data-station-id="71"/>
+<circle cx="678.71" cy="186.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb34f7b0" data-station-id="14"/>
+<circle cx="179.77" cy="380.23" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb374dd0" data-station-id="359"/>
+<circle cx="166.90" cy="393.10" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb374f40" data-station-id="175"/>
+<circle cx="1545.87" cy="107.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb39c370" data-station-id="4"/>
+<circle cx="183.10" cy="350.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb3bfa10" data-station-id="42"/>
+<circle cx="205.86" cy="327.47" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb3e5030" data-station-id="72"/>
+<circle cx="1218.80" cy="426.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb3e6f20" data-station-id="198"/>
+<circle cx="703.80" cy="122.87" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb40a650" data-station-id="29"/>
+<circle cx="346.67" cy="249.75" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb40c540" data-station-id="67"/>
+<circle cx="228.62" cy="304.71" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb42fc70" data-station-id="162"/>
+<circle cx="306.21" cy="360.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb431ba0" data-station-id="52"/>
+<circle cx="554.83" cy="186.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb455290" data-station-id="111"/>
+<circle cx="1065.70" cy="426.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb457180" data-station-id="21"/>
+<circle cx="400.00" cy="373.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb47a8b0" data-station-id="20"/>
+<circle cx="389.07" cy="506.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaadb49caa0" data-station-id="187"/>
+</g>
+<g id="labels" font-size="11.0" fill="var(--map-label, #111111)">
+<text x="128.44" y="324.90" text-anchor="start" data-node="0xaaaadab0a630" transform="rotate(-45 128.44 324.90)">Woodside</text>
+<text x="-21.77" y="421.77" text-anchor="end" data-node="0xaaaadac8c850" transform="rotate(-45 -21.77 421.77)">Long Island City</text>
+<text x="101.77" y="324.90" text-anchor="start" data-node="0xaaaadafe1090" transform="rotate(-45 101.77 324.90)">Hunterspoint Avenue</text>
+<text x="-48.44" y="421.77" text-anchor="end" data-node="0xaaaadb0e6b70" transform="rotate(-45 -48.44 421.77)">Penn Station</text>
+<text x="101.88" y="481.14" text-anchor="end" data-node="0xaaaadac2b3f0" transform="rotate(-60 101.88 481.14)">Jamaica</text>
+<text x="142.25" y="346.63" text-anchor="start" data-node="0xaaaadaf261f0" transform="rotate(-45 142.25 346.63)">Forest Hills</text>
+<text x="71.53" y="485.15" text-anchor="end" data-node="0xaaaadb1dc660" transform="rotate(-60 71.53 485.15)">Kew Gardens</text>
+<text x="-30.63" y="346.67" text-anchor="end" data-node="0xaaaadad28fa0">Grand Central</text>
+<text x="46.60" y="477.85" text-anchor="end" data-node="0xaaaadac877c0" transform="rotate(-45 46.60 477.85)">East New York</text>
+<text x="123.81" y="489.35" text-anchor="end" data-node="0xaaaadace3500" transform="rotate(-60 123.81 489.35)">Hillside Facility</text>
+<text x="-9.89" y="463.22" text-anchor="end" data-node="0xaaaadad290b0" transform="rotate(-45 -9.89 463.22)">Atlantic Terminal</text>
+<text x="11.04" y="477.85" text-anchor="end" data-node="0xaaaadb02b0f0" transform="rotate(-45 11.04 477.85)">Nostrand Avenue</text>
+<text x="142.55" y="483.56" text-anchor="end" data-node="0xaaaadaaef8b0" transform="rotate(-60 142.55 483.56)">Laurelton</text>
+<text x="161.99" y="504.68" text-anchor="end" data-node="0xaaaadaafa3e0" transform="rotate(-45 161.99 504.68)">Valley Stream</text>
+<text x="238.01" y="348.66" text-anchor="start" data-node="0xaaaadac9a5b0" transform="rotate(-45 238.01 348.66)">Floral Park</text>
+<text x="224.16" y="344.30" text-anchor="start" data-node="0xaaaadadf04f0" transform="rotate(-45 224.16 344.30)">Hollis</text>
+<text x="206.49" y="524.09" text-anchor="start" data-node="0xaaaadaf00bd0" transform="rotate(60 206.49 524.09)">Rosedale</text>
+<text x="259.30" y="309.17" text-anchor="start" data-node="0xaaaadaf93860" transform="rotate(-45 259.30 309.17)">Bellerose</text>
+<text x="95.86" y="296.33" text-anchor="end" data-node="0xaaaadb374dd0" transform="rotate(45 95.86 296.33)">Elmont-UBS Arena</text>
+<text x="82.99" y="309.20" text-anchor="end" data-node="0xaaaadb374f40" transform="rotate(45 82.99 309.20)">Queens Village</text>
+<text x="313.84" y="337.81" text-anchor="start" data-node="0xaaaadac981f0" transform="rotate(-60 313.84 337.81)">Mineola</text>
+<text x="281.32" y="347.96" text-anchor="start" data-node="0xaaaadaeb5410" transform="rotate(-60 281.32 347.96)">Merillon Avenue</text>
+<text x="160.00" y="589.43" text-anchor="middle" data-node="0xaaaadb0be960">St. Albans</text>
+<text x="304.46" y="261.69" text-anchor="start" data-node="0xaaaadb2df550" transform="rotate(-60 304.46 261.69)">New Hyde Park</text>
+<text x="174.34" y="529.18" text-anchor="end" data-node="0xaaaadaafa2a0" transform="rotate(-30 174.34 529.18)">Lynbrook</text>
+<text x="397.03" y="346.67" text-anchor="start" data-node="0xaaaadaafa660">Hicksville</text>
+<text x="351.88" y="403.67" text-anchor="middle" data-node="0xaaaadb17c3f0">Westbury</text>
+<text x="367.25" y="329.76" text-anchor="start" data-node="0xaaaadb201c80" transform="rotate(-45 367.25 329.76)">Carle Place</text>
+<text x="133.33" y="574.20" text-anchor="middle" data-node="0xaaaadb24c8c0">Locust Manor</text>
+<text x="405.12" y="522.34" text-anchor="end" data-node="0xaaaadab909e0" transform="rotate(-60 405.12 522.34)">Massapequa</text>
+<text x="489.00" y="462.34" text-anchor="start" data-node="0xaaaadac02e60" transform="rotate(45 489.00 462.34)">Lindenhurst</text>
+<text x="466.15" y="492.78" text-anchor="start" data-node="0xaaaadac2a690" transform="rotate(45 466.15 492.78)">Amityville</text>
+<text x="448.40" y="510.54" text-anchor="start" data-node="0xaaaadac2a7d0" transform="rotate(45 448.40 510.54)">Massapequa Park</text>
+<text x="320.83" y="527.63" text-anchor="start" data-node="0xaaaadacd90e0" transform="rotate(60 320.83 527.63)">Hempstead Gardens</text>
+<text x="305.84" y="536.45" text-anchor="start" data-node="0xaaaadad48c80" transform="rotate(60 305.84 536.45)">Freeport</text>
+<text x="295.34" y="550.18" text-anchor="end" data-node="0xaaaadae3d090" transform="rotate(-45 295.34 550.18)">Bellmore</text>
+<text x="294.31" y="559.96" text-anchor="start" data-node="0xaaaadae62760" transform="rotate(60 294.31 559.96)">Baldwin</text>
+<text x="483.90" y="475.03" text-anchor="start" data-node="0xaaaadae87cd0" transform="rotate(45 483.90 475.03)">Copiague</text>
+<text x="823.49" y="20.86" text-anchor="start" data-node="0xaaaadaf6e240" transform="rotate(45 823.49 20.86)">Ronkonkoma</text>
+<text x="363.96" y="472.28" text-anchor="middle" data-node="0xaaaadb0e5ea0">Wantagh</text>
+<text x="278.26" y="575.64" text-anchor="start" data-node="0xaaaadb1a0d10" transform="rotate(60 278.26 575.64)">Rockville Centre</text>
+<text x="270.24" y="550.18" text-anchor="end" data-node="0xaaaadb200ff0" transform="rotate(-45 270.24 550.18)">Merrick</text>
+<text x="542.68" y="413.87" text-anchor="start" data-node="0xaaaadb2df6a0" transform="rotate(-45 542.68 413.87)">Babylon</text>
+<text x="443.52" y="329.82" text-anchor="start" data-node="0xaaaadb47a8b0" transform="rotate(-45 443.52 329.82)">Bethpage</text>
+<text x="380.02" y="522.34" text-anchor="end" data-node="0xaaaadb49caa0" transform="rotate(-60 380.02 522.34)">Seaford</text>
+<text x="477.62" y="229.88" text-anchor="end" data-node="0xaaaadab43e70">Greenlawn</text>
+<text x="528.16" y="209.52" text-anchor="start" data-node="0xaaaadab43fc0" transform="rotate(45 528.16 209.52)">Northport</text>
+<text x="198.54" y="557.71" text-anchor="start" data-node="0xaaaadab69490" transform="rotate(60 198.54 557.71)">Lawrence</text>
+<text x="1316.87" y="323.97" text-anchor="end" data-node="0xaaaadab6b410">Hampton Bays</text>
+<text x="1151.09" y="417.83" text-anchor="start" data-node="0xaaaadabacf40" transform="rotate(-45 1151.09 417.83)">Mastic-Shirley</text>
+<text x="256.92" y="615.83" text-anchor="middle" data-node="0xaaaadabd0670">Oceanside</text>
+<text x="1479.25" y="161.59" text-anchor="end" data-node="0xaaaadabd25f0">East Hampton</text>
+<text x="601.78" y="242.56" text-anchor="start" data-node="0xaaaadabfc840" transform="rotate(45 601.78 242.56)">Wyandanch</text>
+<text x="604.96" y="177.83" text-anchor="start" data-node="0xaaaadac00e10" transform="rotate(-45 604.96 177.83)">Smithtown</text>
+<text x="746.72" y="67.44" text-anchor="end" data-node="0xaaaadac287a0">Central Islip</text>
+<text x="1288.84" y="-8.84" text-anchor="start" data-node="0xaaaadac9a6c0" transform="rotate(-45 1288.84 -8.84)">Greenport</text>
+<text x="615.26" y="417.83" text-anchor="start" data-node="0xaaaadaca4130" transform="rotate(-45 615.26 417.83)">Bay Shore</text>
+<text x="335.83" y="453.33" text-anchor="start" data-node="0xaaaadacb92a0">Hempstead</text>
+<text x="1612.50" y="53.33" text-anchor="start" data-node="0xaaaadacea930">Montauk</text>
+<text x="359.17" y="213.33" text-anchor="start" data-node="0xaaaadaceaa40">Oyster Bay</text>
+<text x="728.84" y="177.83" text-anchor="start" data-node="0xaaaadad2b4e0" transform="rotate(-45 728.84 177.83)">Port Jefferson</text>
+<text x="186.67" y="612.32" text-anchor="middle" data-node="0xaaaadad2fcd0">Inwood</text>
+<text x="844.90" y="417.83" text-anchor="start" data-node="0xaaaadad31bc0" transform="rotate(-45 844.90 417.83)">Oakdale</text>
+<text x="896.92" y="-8.84" text-anchor="start" data-node="0xaaaadae15b10" transform="rotate(-45 896.92 -8.84)">Medford</text>
+<text x="215.73" y="302.05" text-anchor="start" data-node="0xaaaadae3b130" transform="rotate(-60 215.73 302.05)">Little Neck</text>
+<text x="490.93" y="353.41" text-anchor="start" data-node="0xaaaadae607e0" transform="rotate(45 490.93 353.41)">Farmingdale</text>
+<text x="247.29" y="286.04" text-anchor="start" data-node="0xaaaadaeb33d0" transform="rotate(-45 247.29 286.04)">Manhasset</text>
+<text x="660.25" y="198.86" text-anchor="start" data-node="0xaaaadaefdfe0" transform="rotate(60 660.25 198.86)">Deer Park</text>
+<text x="1132.07" y="-8.84" text-anchor="start" data-node="0xaaaadaf23600" transform="rotate(-45 1132.07 -8.84)">Mattituck</text>
+<text x="362.01" y="304.66" text-anchor="start" data-node="0xaaaadaf4ab10" transform="rotate(-45 362.01 304.66)">Roslyn</text>
+<text x="372.33" y="274.20" text-anchor="start" data-node="0xaaaadaf4ac20" transform="rotate(-60 372.33 274.20)">Greenvale</text>
+<text x="691.81" y="417.83" text-anchor="start" data-node="0xaaaadaf95750" transform="rotate(-45 691.81 417.83)">Islip</text>
+<text x="218.75" y="256.53" text-anchor="end" data-node="0xaaaadaf96450" transform="rotate(60 218.75 256.53)">Port Washington</text>
+<text x="450.16" y="289.97" text-anchor="start" data-node="0xaaaadafb8e80" transform="rotate(-30 450.16 289.97)">Syosset</text>
+<text x="1210.45" y="-8.84" text-anchor="start" data-node="0xaaaadb04e700" transform="rotate(-45 1210.45 -8.84)">Southold</text>
+<text x="1425.12" y="215.71" text-anchor="end" data-node="0xaaaadb075ca0">Bridgehampton</text>
+<text x="975.30" y="-8.84" text-anchor="start" data-node="0xaaaadb099340" transform="rotate(-45 975.30 -8.84)">Yaphank-BNL</text>
+<text x="493.43" y="259.07" text-anchor="start" data-node="0xaaaadb1095a0">Huntington</text>
+<text x="307.78" y="229.06" text-anchor="end" data-node="0xaaaadb10b490" transform="rotate(45 307.78 229.06)">Glen Street</text>
+<text x="998.00" y="417.83" text-anchor="start" data-node="0xaaaadb130ab0" transform="rotate(-45 998.00 417.83)">Patchogue</text>
+<text x="921.45" y="417.83" text-anchor="start" data-node="0xaaaadb1560d0" transform="rotate(-45 921.45 417.83)">Sayville</text>
+<text x="1284.08" y="386.93" text-anchor="start" data-node="0xaaaadb17b6f0" transform="rotate(45 1284.08 386.93)">Westhampton</text>
+<text x="1053.69" y="-8.84" text-anchor="start" data-node="0xaaaadb19ee20" transform="rotate(-45 1053.69 -8.84)">Riverhead</text>
+<text x="240.00" y="467.50" text-anchor="middle" data-node="0xaaaadb1b7090">Malverne</text>
+<text x="768.36" y="417.83" text-anchor="start" data-node="0xaaaadb2265a0" transform="rotate(-45 768.36 417.83)">Great River</text>
+<text x="376.72" y="201.49" text-anchor="start" data-node="0xaaaadb24bbc0" transform="rotate(-45 376.72 201.49)">Locust Valley</text>
+<text x="546.36" y="297.99" text-anchor="start" data-node="0xaaaadb26f330" transform="rotate(45 546.36 297.99)">Pinelawn</text>
+<text x="1370.99" y="269.84" text-anchor="end" data-node="0xaaaadb296890">Southampton</text>
+<text x="159.17" y="607.63" text-anchor="end" data-node="0xaaaadb297500" transform="rotate(-60 159.17 607.63)">Far Rockaway</text>
+<text x="643.67" y="197.49" text-anchor="start" data-node="0xaaaadb32a190" transform="rotate(60 643.67 197.49)">St. James</text>
+<text x="394.30" y="276.87" text-anchor="start" data-node="0xaaaadb32c080" transform="rotate(-30 394.30 276.87)">Glen Head</text>
+<text x="687.55" y="177.83" text-anchor="start" data-node="0xaaaadb34f7b0" transform="rotate(-45 687.55 177.83)">Stony Brook</text>
+<text x="1533.37" y="107.46" text-anchor="end" data-node="0xaaaadb39c370">Amagansett</text>
+<text x="1227.63" y="435.51" text-anchor="start" data-node="0xaaaadb3e6f20" transform="rotate(45 1227.63 435.51)">Speonk</text>
+<text x="691.30" y="122.87" text-anchor="end" data-node="0xaaaadb40a650">Brentwood</text>
+<text x="307.78" y="210.86" text-anchor="end" data-node="0xaaaadb40c540" transform="rotate(45 307.78 210.86)">Glen Cove</text>
+<text x="212.37" y="276.57" text-anchor="end" data-node="0xaaaadb42fc70" transform="rotate(60 212.37 276.57)">Plandome</text>
+<text x="563.67" y="177.83" text-anchor="start" data-node="0xaaaadb455290" transform="rotate(-45 563.67 177.83)">Kings Park</text>
+<text x="1074.54" y="417.83" text-anchor="start" data-node="0xaaaadb457180" transform="rotate(-45 1074.54 417.83)">Bellport</text>
+<text x="284.77" y="426.67" text-anchor="start" data-node="0xaaaadacb3c20" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Country Life Press</text>
+<text x="96.09" y="360.83" text-anchor="middle" data-node="0xaaaadab46a60" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Mets-Willets Point</text>
+<text x="236.61" y="449.95" text-anchor="end" data-node="0xaaaadac4f340" transform="rotate(45 236.61 449.95)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Lakeview</text>
+<text x="320.00" y="440.83" text-anchor="middle" data-node="0xaaaadad2b5f0" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">West Hempstead</text>
+<text x="195.47" y="361.61" text-anchor="start" data-node="0xaaaadaed89c0" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Bayside</text>
+<text x="176.59" y="401.14" text-anchor="start" data-node="0xaaaadaed8ad0" transform="rotate(60 176.59 401.14)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Auburndale</text>
+<text x="82.13" y="343.28" text-anchor="end" data-node="0xaaaadaf48c20" transform="rotate(45 82.13 343.28)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Flushing Main Street</text>
+<text x="479.36" y="315.77" text-anchor="start" data-node="0xaaaadb003ac0" transform="rotate(30 479.36 315.77)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Cold Spring Harbor</text>
+<text x="204.49" y="471.16" text-anchor="end" data-node="0xaaaadb02bcd0" transform="rotate(45 204.49 471.16)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Westwood</text>
+<text x="171.51" y="494.11" text-anchor="end" data-node="0xaaaadb2246b0" transform="rotate(30 171.51 494.11)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Hewlett</text>
+</g>
+<g id="trains"></g>
+</svg>

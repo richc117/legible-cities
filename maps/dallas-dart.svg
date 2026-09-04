@@ -1,0 +1,264 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1766" height="1591" viewBox="-31.00 -32.58 1766.06 1590.85" data-viewbox-nolabels="-31.00 -31.00 1662.00 1589.27" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+<title>DART Light Rail</title>
+<rect id="backdrop" x="-31.00" y="-32.58" width="1766.06" height="1590.85" fill="var(--map-bg, #ffffff)"/>
+<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<g class="line" data-line="BLUE" stroke="#198bc3" stroke-width="7.00">
+<path id="t0_BLUE" data-src="0xaaaaea585f60" data-dst="0xaaaaea6d6bb0" d="M 1600.00 509.09 L 1528.63 580.46 L 1528.34 580.75 L 1528.08 581.01 L 1527.86 581.23 L 1527.67 581.42 L 1527.49 581.60 L 1527.33 581.76 L 1527.17 581.92 L 1527.00 582.09 L 1526.83 582.27 L 1508.67 600.42"/>
+<path id="t2_BLUE" data-src="0xaaaaea587940" data-dst="0xaaaaea62e350" d="M 800.00 1163.64 L 800.00 1215.58"/>
+<path id="t7_BLUE" data-src="0xaaaaea5dedb0" data-dst="0xaaaaea99be70" d="M 945.45 788.80 L 872.73 788.80"/>
+<path id="t18_BLUE" data-src="0xaaaaea62e350" data-dst="0xaaaaea8618d0" d="M 800.00 1215.58 L 800.00 1267.53"/>
+<path id="t21_BLUE" data-src="0xaaaaea63ae40" data-dst="0xaaaaea906100" d="M 783.20 896.97 L 783.20 945.45"/>
+<path id="t22_BLUE" data-src="0xaaaaea63b380" data-dst="0xaaaaea92d250" d="M 863.75 840.00 L 811.88 788.12"/>
+<path id="t25_BLUE" data-src="0xaaaaea688910" data-dst="0xaaaaea5dedb0" d="M 1074.61 800.00 L 945.45 800.00"/>
+<path id="t26_BLUE" data-src="0xaaaaea688bf0" data-dst="0xaaaaea688910" d="M 1203.77 800.00 L 1074.61 800.00"/>
+<path id="t27_BLUE" data-src="0xaaaaea6afa60" data-dst="0xaaaaea688bf0" d="M 1326.01 783.08 L 1310.45 798.64 L 1310.08 799.01 L 1309.78 799.30 L 1309.53 799.53 L 1309.30 799.70 L 1309.10 799.83 L 1308.89 799.91 L 1308.67 799.96 L 1308.42 799.99 L 1308.12 800.00 L 1307.75 800.00 L 1307.73 800.00 L 1203.77 800.00"/>
+<path id="t28_BLUE" data-src="0xaaaaea6afd40" data-dst="0xaaaaea6afa60" d="M 1417.34 691.75 L 1383.18 725.91 L 1382.88 726.21 L 1382.63 726.46 L 1382.41 726.68 L 1382.21 726.88 L 1382.04 727.05 L 1381.88 727.21 L 1381.72 727.38 L 1381.55 727.54 L 1381.37 727.72 L 1326.01 783.08"/>
+<path id="t29_BLUE" data-src="0xaaaaea6d6bb0" data-dst="0xaaaaea6afd40" d="M 1508.67 600.42 L 1455.91 653.18 L 1455.61 653.48 L 1455.36 653.74 L 1455.14 653.96 L 1454.94 654.15 L 1454.77 654.32 L 1454.60 654.49 L 1454.44 654.65 L 1454.28 654.81 L 1454.10 654.99 L 1417.34 691.75"/>
+<path id="t34_BLUE" data-src="0xaaaaea79e520" data-dst="0xaaaaea588fc0" d="M 800.00 1475.32 L 800.00 1527.27"/>
+<path id="t35_BLUE" data-src="0xaaaaea7c5670" data-dst="0xaaaaea79e520" d="M 800.00 1423.38 L 800.00 1475.32"/>
+<path id="t36_BLUE" data-src="0xaaaaea813630" data-dst="0xaaaaea7c5670" d="M 800.00 1371.43 L 800.00 1423.38"/>
+<path id="t37_BLUE" data-src="0xaaaaea83a780" data-dst="0xaaaaea813630" d="M 800.00 1319.48 L 800.00 1371.43"/>
+<path id="t38_BLUE" data-src="0xaaaaea8618d0" data-dst="0xaaaaea83a780" d="M 800.00 1267.53 L 800.00 1319.48"/>
+<path id="t41_BLUE" data-src="0xaaaaea906100" data-dst="0xaaaaea989360" d="M 794.40 945.45 L 794.40 1000.00"/>
+<path id="t42_BLUE" data-src="0xaaaaea92d250" data-dst="0xaaaaea97d510" d="M 783.20 800.00 L 783.20 848.48"/>
+<path id="t44_BLUE" data-src="0xaaaaea97d510" data-dst="0xaaaaea63ae40" d="M 783.20 848.48 L 783.20 896.97"/>
+<path id="t46_BLUE" data-src="0xaaaaea9809f0" data-dst="0xaaaaea63b380" d="M 915.63 891.87 L 885.97 862.21 L 885.67 861.91 L 885.42 861.66 L 885.20 861.44 L 885.00 861.24 L 884.83 861.07 L 884.67 860.91 L 884.50 860.75 L 884.34 860.58 L 884.16 860.40 L 863.75 840.00"/>
+<path id="t47_BLUE" data-src="0xaaaaea9826a0" data-dst="0xaaaaea587940" d="M 794.40 1109.09 L 794.40 1163.64"/>
+<path id="t48_BLUE" data-src="0xaaaaea984050" data-dst="0xaaaaea9809f0" d="M 967.50 943.75 L 958.70 934.94 L 958.40 934.64 L 958.14 934.39 L 957.92 934.17 L 957.73 933.97 L 957.56 933.80 L 957.39 933.63 L 957.23 933.47 L 957.07 933.31 L 956.89 933.13 L 915.63 891.87"/>
+<path id="t49_BLUE" data-src="0xaaaaea9841d0" data-dst="0xaaaaea9826a0" d="M 794.40 1054.55 L 794.40 1109.09"/>
+<path id="t52_BLUE" data-src="0xaaaaea989360" data-dst="0xaaaaea9841d0" d="M 794.40 1000.00 L 794.40 1054.55"/>
+<path id="t62_BLUE" data-src="0xaaaaea99be70" data-dst="0xaaaaea92d250" d="M 872.73 788.80 L 800.00 788.80"/>
+</g>
+<g class="line" data-line="GREEN" stroke="#006f38" stroke-width="7.00">
+<path id="t4_GREEN" data-src="0xaaaaea58b600" data-dst="0xaaaaea99f350" d="M 436.36 654.55 L 436.36 581.82"/>
+<path id="t21_GREEN" data-src="0xaaaaea63ae40" data-dst="0xaaaaea906100" d="M 816.80 896.97 L 816.80 945.45"/>
+<path id="t22_GREEN" data-src="0xaaaaea63b380" data-dst="0xaaaaea92d250" d="M 840.00 863.75 L 788.12 811.88"/>
+<path id="t40_GREEN" data-src="0xaaaaea906100" data-dst="0xaaaaea99f4d0" d="M 800.00 951.05 L 728.62 951.05 L 728.17 951.05 L 727.60 951.04 L 726.82 950.96 L 725.84 950.74 L 724.81 950.33 L 723.93 949.81 L 723.28 949.31 L 722.79 948.87 L 722.38 948.48 L 721.98 948.08 L 721.95 948.05 L 717.63 943.73"/>
+<path id="t42_GREEN" data-src="0xaaaaea92d250" data-dst="0xaaaaea97d510" d="M 816.80 800.00 L 816.80 848.48"/>
+<path id="t43_GREEN" data-src="0xaaaaea9540c0" data-dst="0xaaaaea98e370" d="M 1163.64 1236.36 L 1163.64 1165.00 L 1163.64 1164.63 L 1163.63 1164.33 L 1163.60 1164.07 L 1163.55 1163.85 L 1163.47 1163.64 L 1163.35 1163.44 L 1163.18 1163.22 L 1163.11 1163.14"/>
+<path id="t44_GREEN" data-src="0xaaaaea97d510" data-dst="0xaaaaea63ae40" d="M 816.80 848.48 L 816.80 896.97"/>
+<path id="t46_GREEN" data-src="0xaaaaea9809f0" data-dst="0xaaaaea63b380" d="M 891.87 915.63 L 862.21 885.97 L 861.91 885.67 L 861.66 885.42 L 861.44 885.20 L 861.24 885.00 L 861.07 884.83 L 860.91 884.67 L 860.75 884.50 L 860.58 884.34 L 860.40 884.16 L 840.00 863.75"/>
+<path id="t48_GREEN" data-src="0xaaaaea984050" data-dst="0xaaaaea9809f0" d="M 943.75 967.50 L 934.94 958.70 L 934.64 958.40 L 934.39 958.14 L 934.17 957.92 L 933.97 957.73 L 933.80 957.56 L 933.63 957.39 L 933.47 957.23 L 933.31 957.07 L 933.13 956.89 L 891.87 915.63"/>
+<path id="t50_GREEN" data-src="0xaaaaea985b80" data-dst="0xaaaaea984050" d="M 1007.50 1007.50 L 955.63 955.63"/>
+<path id="t51_GREEN" data-src="0xaaaaea9891e0" data-dst="0xaaaaea985b80" d="M 1059.38 1059.38 L 1019.54 1019.54 L 1019.25 1019.25 L 1018.99 1018.99 L 1018.77 1018.77 L 1018.58 1018.58 L 1018.40 1018.40 L 1018.24 1018.24 L 1018.08 1018.08 L 1017.91 1017.91 L 1017.73 1017.73 L 1007.50 1007.50"/>
+<path id="t53_GREEN" data-src="0xaaaaea98c840" data-dst="0xaaaaea9891e0" d="M 1111.25 1111.25 L 1092.27 1092.27 L 1091.97 1091.97 L 1091.72 1091.72 L 1091.50 1091.50 L 1091.31 1091.31 L 1091.13 1091.13 L 1090.97 1090.97 L 1090.81 1090.81 L 1090.64 1090.64 L 1090.46 1090.46 L 1090.26 1090.26 L 1059.38 1059.38"/>
+<path id="t54_GREEN" data-src="0xaaaaea98e370" data-dst="0xaaaaea98c840" d="M 1163.11 1163.14 L 1162.95 1162.96 L 1162.66 1162.66 L 1162.30 1162.30 L 1162.28 1162.28 L 1111.25 1111.25"/>
+<path id="t55_GREEN" data-src="0xaaaaea98e4f0" data-dst="0xaaaaea58b600" d="M 489.45 715.55 L 432.40 658.51"/>
+<path id="t56_GREEN" data-src="0xaaaaea991b50" data-dst="0xaaaaea98e4f0" d="M 546.49 772.60 L 506.49 732.59 L 506.20 732.30 L 505.94 732.04 L 505.72 731.82 L 505.53 731.63 L 505.35 731.45 L 505.19 731.29 L 505.03 731.13 L 504.86 730.96 L 504.68 730.79 L 504.48 730.59 L 504.26 730.36 L 489.45 715.55"/>
+<path id="t57_GREEN" data-src="0xaaaaea993500" data-dst="0xaaaaea9543a0" d="M 436.36 290.91 L 436.36 218.18"/>
+<path id="t58_GREEN" data-src="0xaaaaea9951b0" data-dst="0xaaaaea991b50" d="M 603.54 829.64 L 579.22 805.32 L 578.92 805.02 L 578.67 804.77 L 578.45 804.55 L 578.26 804.36 L 578.08 804.18 L 577.92 804.02 L 577.76 803.86 L 577.59 803.69 L 577.41 803.51 L 546.49 772.60"/>
+<path id="t59_GREEN" data-src="0xaaaaea996b60" data-dst="0xaaaaea993500" d="M 436.36 363.64 L 436.36 290.91"/>
+<path id="t60_GREEN" data-src="0xaaaaea998810" data-dst="0xaaaaea9951b0" d="M 660.59 886.69 L 651.95 878.05 L 651.65 877.75 L 651.40 877.50 L 651.18 877.28 L 650.98 877.08 L 650.81 876.91 L 650.64 876.75 L 650.48 876.58 L 650.32 876.42 L 650.14 876.24 L 603.54 829.64"/>
+<path id="t61_GREEN" data-src="0xaaaaea99a1c0" data-dst="0xaaaaea996b60" d="M 436.36 436.36 L 436.36 363.64"/>
+<path id="t63_GREEN" data-src="0xaaaaea99d820" data-dst="0xaaaaea99a1c0" d="M 436.36 509.09 L 436.36 436.36"/>
+<path id="t64_GREEN" data-src="0xaaaaea99f350" data-dst="0xaaaaea99d820" d="M 436.36 581.82 L 436.36 509.09"/>
+<path id="t65_GREEN" data-src="0xaaaaea99f4d0" data-dst="0xaaaaea998810" d="M 717.63 943.73 L 660.59 886.69"/>
+</g>
+<g class="line" data-line="ORANGE" stroke="#f68b1f" stroke-width="7.00">
+<path id="t3_ORANGE" data-src="0xaaaaea58b600" data-dst="0xaaaaea750280" d="M 436.36 654.55 L 386.21 604.39"/>
+<path id="t6_ORANGE" data-src="0xaaaaea5db0e0" data-dst="0xaaaaea616f60" d="M 1169.24 342.42 L 1169.24 410.90"/>
+<path id="t7_ORANGE" data-src="0xaaaaea5dedb0" data-dst="0xaaaaea99be70" d="M 945.45 811.20 L 872.73 811.20"/>
+<path id="t9_ORANGE" data-src="0xaaaaea601d90" data-dst="0xaaaaea61f9e0" d="M 1169.24 479.39 L 1169.24 547.87"/>
+<path id="t10_ORANGE" data-src="0xaaaaea602480" data-dst="0xaaaaea6216d0" d="M 1169.24 136.97 L 1169.24 205.45"/>
+<path id="t11_ORANGE" data-src="0xaaaaea6063a0" data-dst="0xaaaaea6315d0" d="M 1143.12 610.26 L 1096.23 657.14 L 1095.93 657.44 L 1095.68 657.70 L 1095.46 657.92 L 1095.27 658.11 L 1095.09 658.28 L 1094.93 658.45 L 1094.77 658.61 L 1094.69 658.68"/>
+<path id="t12_ORANGE" data-src="0xaaaaea608190" data-dst="0xaaaaea74dd90" d="M 70.93 509.09 L 0.00 509.09"/>
+<path id="t13_ORANGE" data-src="0xaaaaea612c30" data-dst="0xaaaaea5dedb0" d="M 997.84 755.53 L 949.41 803.96"/>
+<path id="t14_ORANGE" data-src="0xaaaaea616f60" data-dst="0xaaaaea601d90" d="M 1169.24 410.90 L 1169.24 479.39"/>
+<path id="t15_ORANGE" data-src="0xaaaaea61bf50" data-dst="0xaaaaea612c30" d="M 1046.26 707.11 L 1023.50 729.87 L 1023.21 730.17 L 1022.95 730.42 L 1022.73 730.64 L 1022.54 730.84 L 1022.36 731.01 L 1022.20 731.17 L 1022.04 731.33 L 1021.87 731.50 L 1021.69 731.68 L 997.84 755.53"/>
+<path id="t16_ORANGE" data-src="0xaaaaea61f9e0" data-dst="0xaaaaea6063a0" d="M 1169.24 547.87 L 1169.24 580.47 L 1169.23 580.92 L 1169.22 581.49 L 1169.14 582.27 L 1168.92 583.25 L 1168.51 584.28 L 1167.99 585.16 L 1167.49 585.82 L 1167.05 586.30 L 1166.66 586.71 L 1166.26 587.11 L 1166.23 587.14 L 1143.12 610.26"/>
+<path id="t17_ORANGE" data-src="0xaaaaea6216d0" data-dst="0xaaaaea63b9d0" d="M 1169.24 205.45 L 1169.24 273.93"/>
+<path id="t19_ORANGE" data-src="0xaaaaea6315d0" data-dst="0xaaaaea61bf50" d="M 1094.69 658.68 L 1094.60 658.77 L 1094.42 658.95 L 1094.22 659.15 L 1046.26 707.11"/>
+<path id="t20_ORANGE" data-src="0xaaaaea63a460" data-dst="0xaaaaea608190" d="M 141.86 509.09 L 70.93 509.09"/>
+<path id="t21_ORANGE" data-src="0xaaaaea63ae40" data-dst="0xaaaaea906100" d="M 805.60 896.97 L 805.60 945.45"/>
+<path id="t22_ORANGE" data-src="0xaaaaea63b380" data-dst="0xaaaaea92d250" d="M 847.92 855.83 L 796.04 803.96"/>
+<path id="t23_ORANGE" data-src="0xaaaaea63b9d0" data-dst="0xaaaaea5db0e0" d="M 1169.24 273.93 L 1169.24 342.42"/>
+<path id="t30_ORANGE" data-src="0xaaaaea6fdfe0" data-dst="0xaaaaea724e50" d="M 283.73 509.09 L 212.80 509.09"/>
+<path id="t31_ORANGE" data-src="0xaaaaea724e50" data-dst="0xaaaaea63a460" d="M 212.80 509.09 L 141.86 509.09"/>
+<path id="t32_ORANGE" data-src="0xaaaaea750280" data-dst="0xaaaaea7770f0" d="M 386.21 604.39 L 365.00 583.18 L 364.70 582.88 L 364.45 582.63 L 364.23 582.41 L 364.03 582.21 L 363.86 582.04 L 363.69 581.88 L 363.53 581.72 L 363.37 581.55 L 363.19 581.37 L 336.05 554.23"/>
+<path id="t33_ORANGE" data-src="0xaaaaea7770f0" data-dst="0xaaaaea6fdfe0" d="M 336.05 554.23 L 292.27 510.45 L 291.90 510.09 L 291.60 509.79 L 291.34 509.56 L 291.12 509.39 L 290.92 509.26 L 290.71 509.18 L 290.49 509.13 L 290.24 509.10 L 289.94 509.09 L 289.57 509.09 L 289.55 509.09 L 283.73 509.09"/>
+<path id="t39_ORANGE" data-src="0xaaaaea905e20" data-dst="0xaaaaea97f040" d="M 1169.24 0.00 L 1169.24 68.48"/>
+<path id="t40_ORANGE" data-src="0xaaaaea906100" data-dst="0xaaaaea99f4d0" d="M 800.00 939.85 L 728.64 939.85 L 728.36 939.85 L 728.33 939.85 L 728.60 939.88 L 729.13 940.00 L 729.75 940.24 L 730.22 940.52 L 730.43 940.68 L 730.41 940.67 L 730.22 940.48 L 729.89 940.15 L 729.87 940.13 L 725.55 935.81"/>
+<path id="t42_ORANGE" data-src="0xaaaaea92d250" data-dst="0xaaaaea97d510" d="M 805.60 800.00 L 805.60 848.48"/>
+<path id="t44_ORANGE" data-src="0xaaaaea97d510" data-dst="0xaaaaea63ae40" d="M 805.60 848.48 L 805.60 896.97"/>
+<path id="t45_ORANGE" data-src="0xaaaaea97f040" data-dst="0xaaaaea602480" d="M 1169.24 68.48 L 1169.24 136.97"/>
+<path id="t46_ORANGE" data-src="0xaaaaea9809f0" data-dst="0xaaaaea63b380" d="M 899.79 907.71 L 870.13 878.05 L 869.83 877.75 L 869.58 877.50 L 869.36 877.28 L 869.16 877.08 L 868.99 876.91 L 868.83 876.75 L 868.67 876.58 L 868.50 876.42 L 868.32 876.24 L 847.92 855.83"/>
+<path id="t48_ORANGE" data-src="0xaaaaea984050" data-dst="0xaaaaea9809f0" d="M 951.67 959.59 L 942.86 950.78 L 942.56 950.48 L 942.30 950.22 L 942.08 950.00 L 941.89 949.81 L 941.72 949.64 L 941.55 949.47 L 941.39 949.31 L 941.23 949.15 L 941.05 948.97 L 899.79 907.71"/>
+<path id="t55_ORANGE" data-src="0xaaaaea98e4f0" data-dst="0xaaaaea58b600" d="M 497.37 707.63 L 440.32 650.59"/>
+<path id="t56_ORANGE" data-src="0xaaaaea991b50" data-dst="0xaaaaea98e4f0" d="M 554.41 764.68 L 514.41 724.67 L 514.12 724.38 L 513.86 724.12 L 513.64 723.90 L 513.45 723.71 L 513.27 723.54 L 513.11 723.37 L 512.95 723.21 L 512.78 723.04 L 512.60 722.87 L 512.40 722.67 L 512.18 722.44 L 497.37 707.63"/>
+<path id="t58_ORANGE" data-src="0xaaaaea9951b0" data-dst="0xaaaaea991b50" d="M 611.46 821.72 L 587.14 797.40 L 586.84 797.10 L 586.59 796.85 L 586.37 796.63 L 586.17 796.44 L 586.00 796.26 L 585.84 796.10 L 585.68 795.94 L 585.51 795.77 L 585.33 795.59 L 554.41 764.68"/>
+<path id="t60_ORANGE" data-src="0xaaaaea998810" data-dst="0xaaaaea9951b0" d="M 668.51 878.77 L 659.87 870.13 L 659.57 869.83 L 659.32 869.58 L 659.10 869.36 L 658.90 869.16 L 658.73 868.99 L 658.56 868.83 L 658.40 868.67 L 658.24 868.50 L 658.06 868.32 L 611.46 821.72"/>
+<path id="t62_ORANGE" data-src="0xaaaaea99be70" data-dst="0xaaaaea92d250" d="M 872.73 811.20 L 800.00 811.20"/>
+<path id="t65_ORANGE" data-src="0xaaaaea99f4d0" data-dst="0xaaaaea998810" d="M 725.55 935.81 L 668.51 878.77"/>
+</g>
+<g class="line" data-line="RED" stroke="#fd3e3e" stroke-width="7.00">
+<path id="t1_RED" data-src="0xaaaaea587940" data-dst="0xaaaaea63cdf0" d="M 800.00 1163.64 L 756.12 1207.52"/>
+<path id="t5_RED" data-src="0xaaaaea5cc810" data-dst="0xaaaaea5806e0" d="M 643.87 1236.36 L 581.82 1236.36"/>
+<path id="t6_RED" data-src="0xaaaaea5db0e0" data-dst="0xaaaaea616f60" d="M 1158.04 342.42 L 1158.04 410.90"/>
+<path id="t7_RED" data-src="0xaaaaea5dedb0" data-dst="0xaaaaea99be70" d="M 945.45 800.00 L 872.73 800.00"/>
+<path id="t8_RED" data-src="0xaaaaea5fdd30" data-dst="0xaaaaea5cc810" d="M 705.93 1236.36 L 643.87 1236.36"/>
+<path id="t9_RED" data-src="0xaaaaea601d90" data-dst="0xaaaaea61f9e0" d="M 1158.04 479.39 L 1158.04 547.87"/>
+<path id="t10_RED" data-src="0xaaaaea602480" data-dst="0xaaaaea6216d0" d="M 1158.04 136.97 L 1158.04 205.45"/>
+<path id="t11_RED" data-src="0xaaaaea6063a0" data-dst="0xaaaaea6315d0" d="M 1135.20 602.34 L 1088.31 649.22 L 1088.01 649.52 L 1087.76 649.78 L 1087.54 650.00 L 1087.35 650.19 L 1087.17 650.36 L 1087.01 650.53 L 1086.85 650.69 L 1086.77 650.76"/>
+<path id="t13_RED" data-src="0xaaaaea612c30" data-dst="0xaaaaea5dedb0" d="M 989.92 747.61 L 941.49 796.04"/>
+<path id="t14_RED" data-src="0xaaaaea616f60" data-dst="0xaaaaea601d90" d="M 1158.04 410.90 L 1158.04 479.39"/>
+<path id="t15_RED" data-src="0xaaaaea61bf50" data-dst="0xaaaaea612c30" d="M 1038.35 699.19 L 1015.58 721.95 L 1015.29 722.25 L 1015.03 722.50 L 1014.81 722.72 L 1014.62 722.92 L 1014.44 723.09 L 1014.28 723.25 L 1014.12 723.42 L 1013.95 723.58 L 1013.77 723.76 L 989.92 747.61"/>
+<path id="t16_RED" data-src="0xaaaaea61f9e0" data-dst="0xaaaaea6063a0" d="M 1158.04 547.87 L 1158.04 580.45 L 1158.04 580.73 L 1158.03 580.76 L 1158.06 580.50 L 1158.18 579.96 L 1158.43 579.34 L 1158.70 578.87 L 1158.86 578.66 L 1158.85 578.68 L 1158.66 578.87 L 1158.34 579.20 L 1158.32 579.22 L 1135.20 602.34"/>
+<path id="t17_RED" data-src="0xaaaaea6216d0" data-dst="0xaaaaea63b9d0" d="M 1158.04 205.45 L 1158.04 273.93"/>
+<path id="t19_RED" data-src="0xaaaaea6315d0" data-dst="0xaaaaea61bf50" d="M 1086.77 650.76 L 1086.68 650.85 L 1086.50 651.03 L 1086.30 651.23 L 1038.35 699.19"/>
+<path id="t21_RED" data-src="0xaaaaea63ae40" data-dst="0xaaaaea906100" d="M 794.40 896.97 L 794.40 945.45"/>
+<path id="t22_RED" data-src="0xaaaaea63b380" data-dst="0xaaaaea92d250" d="M 855.83 847.92 L 803.96 796.04"/>
+<path id="t23_RED" data-src="0xaaaaea63b9d0" data-dst="0xaaaaea5db0e0" d="M 1158.04 273.93 L 1158.04 342.42"/>
+<path id="t24_RED" data-src="0xaaaaea63cdf0" data-dst="0xaaaaea5fdd30" d="M 756.12 1207.52 L 728.63 1235.00 L 728.27 1235.37 L 727.96 1235.66 L 727.71 1235.89 L 727.48 1236.07 L 727.28 1236.19 L 727.07 1236.27 L 726.85 1236.33 L 726.60 1236.35 L 726.30 1236.36 L 725.94 1236.36 L 725.91 1236.36 L 705.93 1236.36"/>
+<path id="t39_RED" data-src="0xaaaaea905e20" data-dst="0xaaaaea97f040" d="M 1158.04 0.00 L 1158.04 68.48"/>
+<path id="t41_RED" data-src="0xaaaaea906100" data-dst="0xaaaaea989360" d="M 805.60 945.45 L 805.60 1000.00"/>
+<path id="t42_RED" data-src="0xaaaaea92d250" data-dst="0xaaaaea97d510" d="M 794.40 800.00 L 794.40 848.48"/>
+<path id="t44_RED" data-src="0xaaaaea97d510" data-dst="0xaaaaea63ae40" d="M 794.40 848.48 L 794.40 896.97"/>
+<path id="t45_RED" data-src="0xaaaaea97f040" data-dst="0xaaaaea602480" d="M 1158.04 68.48 L 1158.04 136.97"/>
+<path id="t46_RED" data-src="0xaaaaea9809f0" data-dst="0xaaaaea63b380" d="M 907.71 899.79 L 878.05 870.13 L 877.75 869.83 L 877.50 869.58 L 877.28 869.36 L 877.08 869.16 L 876.91 868.99 L 876.75 868.83 L 876.58 868.67 L 876.42 868.50 L 876.24 868.32 L 855.83 847.92"/>
+<path id="t47_RED" data-src="0xaaaaea9826a0" data-dst="0xaaaaea587940" d="M 805.60 1109.09 L 805.60 1163.64"/>
+<path id="t48_RED" data-src="0xaaaaea984050" data-dst="0xaaaaea9809f0" d="M 959.59 951.67 L 950.78 942.86 L 950.48 942.56 L 950.22 942.30 L 950.00 942.08 L 949.81 941.89 L 949.64 941.72 L 949.47 941.55 L 949.31 941.39 L 949.15 941.23 L 948.97 941.05 L 907.71 899.79"/>
+<path id="t49_RED" data-src="0xaaaaea9841d0" data-dst="0xaaaaea9826a0" d="M 805.60 1054.55 L 805.60 1109.09"/>
+<path id="t52_RED" data-src="0xaaaaea989360" data-dst="0xaaaaea9841d0" d="M 805.60 1000.00 L 805.60 1054.55"/>
+<path id="t62_RED" data-src="0xaaaaea99be70" data-dst="0xaaaaea92d250" d="M 872.73 800.00 L 800.00 800.00"/>
+</g>
+</g>
+<g id="stations">
+<circle cx="581.82" cy="1236.36" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea5806e0" data-station-id="15913"/>
+<circle cx="1600.00" cy="509.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea585f60" data-station-id="32562"/>
+<circle cx="800.00" cy="1163.64" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea587940" data-station-id="15262"/>
+<circle cx="800.00" cy="1527.27" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea588fc0" data-station-id="33087"/>
+<circle cx="436.36" cy="654.55" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea58b600" data-station-id="29821"/>
+<circle cx="643.87" cy="1236.36" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea5cc810" data-station-id="21210"/>
+<circle cx="1163.64" cy="342.42" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea5db0e0" data-station-id="26673"/>
+<circle cx="945.45" cy="800.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea5dedb0" data-station-id="22938"/>
+<circle cx="705.93" cy="1236.36" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea5fdd30" data-station-id="22730"/>
+<circle cx="1163.64" cy="479.39" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea601d90" data-station-id="32376"/>
+<circle cx="1163.64" cy="136.97" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea602480" data-station-id="33599"/>
+<circle cx="1139.16" cy="606.30" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea6063a0" data-station-id="26671"/>
+<circle cx="70.93" cy="509.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea608190" data-station-id="31089"/>
+<circle cx="993.88" cy="751.57" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea612c30" data-station-id="22984"/>
+<circle cx="1163.64" cy="410.90" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea616f60" data-station-id="26672"/>
+<circle cx="1042.30" cy="703.15" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea61bf50" data-station-id="28755"/>
+<circle cx="1163.64" cy="547.87" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea61f9e0" data-station-id="26670"/>
+<circle cx="1163.64" cy="205.45" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea6216d0" data-station-id="26895"/>
+<circle cx="800.00" cy="1215.58" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea62e350" data-station-id="16083"/>
+<circle cx="1090.73" cy="654.72" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea6315d0" data-station-id="26669"/>
+<circle cx="141.86" cy="509.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea63a460" data-station-id="31088"/>
+<circle cx="800.00" cy="896.97" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea63ae40" data-station-id="22750"/>
+<circle cx="851.88" cy="851.88" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea63b380" data-station-id="32043"/>
+<circle cx="1163.64" cy="273.93" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea63b9d0" data-station-id="26674"/>
+<circle cx="756.12" cy="1207.52" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea63cdf0" data-station-id="13659"/>
+<circle cx="1074.61" cy="800.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea688910" data-station-id="26652"/>
+<circle cx="1203.77" cy="800.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea688bf0" data-station-id="32049"/>
+<circle cx="1326.01" cy="783.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea6afa60" data-station-id="26668"/>
+<circle cx="1417.34" cy="691.75" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea6afd40" data-station-id="26690"/>
+<circle cx="1508.67" cy="600.42" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea6d6bb0" data-station-id="26691"/>
+<circle cx="283.73" cy="509.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea6fdfe0" data-station-id="32338"/>
+<circle cx="212.80" cy="509.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea724e50" data-station-id="33566"/>
+<circle cx="0.00" cy="509.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea74dd90" data-station-id="32553"/>
+<circle cx="386.21" cy="604.39" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea750280" data-station-id="31084"/>
+<circle cx="336.05" cy="554.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea7770f0" data-station-id="32337"/>
+<circle cx="800.00" cy="1475.32" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea79e520" data-station-id="33086"/>
+<circle cx="800.00" cy="1423.38" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea7c5670" data-station-id="23320"/>
+<circle cx="800.00" cy="1371.43" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea813630" data-station-id="23391"/>
+<circle cx="800.00" cy="1319.48" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea83a780" data-station-id="23390"/>
+<circle cx="800.00" cy="1267.53" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea8618d0" data-station-id="21030"/>
+<circle cx="1163.64" cy="0.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea905e20" data-station-id="26897"/>
+<circle cx="800.00" cy="945.45" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea906100" data-station-id="22749"/>
+<circle cx="800.00" cy="800.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea92d250" data-station-id="22752"/>
+<circle cx="1163.64" cy="1236.36" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea9540c0" data-station-id="29834"/>
+<circle cx="436.36" cy="218.18" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea9543a0" data-station-id="29815"/>
+<circle cx="800.00" cy="848.48" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea97d510" data-station-id="22751"/>
+<circle cx="1163.64" cy="68.48" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea97f040" data-station-id="26896"/>
+<circle cx="903.75" cy="903.75" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea9809f0" data-station-id="32042"/>
+<circle cx="800.00" cy="1109.09" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea9826a0" data-station-id="22729"/>
+<circle cx="955.63" cy="955.63" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea984050" data-station-id="32041"/>
+<circle cx="800.00" cy="1054.55" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea9841d0" data-station-id="22747"/>
+<circle cx="1007.50" cy="1007.50" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea985b80" data-station-id="32040"/>
+<circle cx="1059.38" cy="1059.38" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea9891e0" data-station-id="29831"/>
+<circle cx="800.00" cy="1000.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea989360" data-station-id="22748"/>
+<circle cx="1111.25" cy="1111.25" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea98c840" data-station-id="29832"/>
+<circle cx="1163.11" cy="1163.14" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea98e370" data-station-id="29833"/>
+<circle cx="493.41" cy="711.59" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea98e4f0" data-station-id="29822"/>
+<circle cx="550.45" cy="768.64" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea991b50" data-station-id="29824"/>
+<circle cx="436.36" cy="290.91" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea993500" data-station-id="29816"/>
+<circle cx="607.50" cy="825.68" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea9951b0" data-station-id="29826"/>
+<circle cx="436.36" cy="363.64" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea996b60" data-station-id="29817"/>
+<circle cx="664.55" cy="882.73" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea998810" data-station-id="29825"/>
+<circle cx="436.36" cy="436.36" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea99a1c0" data-station-id="29818"/>
+<circle cx="872.73" cy="800.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea99be70" data-station-id="26420"/>
+<circle cx="436.36" cy="509.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea99d820" data-station-id="29819"/>
+<circle cx="436.36" cy="581.82" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea99f350" data-station-id="29820"/>
+<circle cx="721.59" cy="939.77" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaea99f4d0" data-station-id="28264"/>
+</g>
+<g id="labels" font-size="11.0" fill="var(--map-label, #111111)">
+<text x="825.37" y="911.62" text-anchor="start" data-node="0xaaaaea63ae40" transform="rotate(30 825.37 911.62)">AKARD STATION</text>
+<text x="892.90" y="851.88" text-anchor="start" data-node="0xaaaaea63b380">DEEP ELLUM</text>
+<text x="779.28" y="966.17" text-anchor="end" data-node="0xaaaaea906100" transform="rotate(-45 779.28 966.17)">WEST END</text>
+<text x="820.72" y="779.28" text-anchor="start" data-node="0xaaaaea92d250" transform="rotate(-45 820.72 779.28)">PEARL/ARTS DISTRICT</text>
+<text x="770.70" y="848.48" text-anchor="end" data-node="0xaaaaea97d510">ST PAUL</text>
+<text x="929.12" y="889.10" text-anchor="start" data-node="0xaaaaea9809f0" transform="rotate(-30 929.12 889.10)">BAYLOR STATION</text>
+<text x="984.93" y="955.63" text-anchor="start" data-node="0xaaaaea984050">FAIR PARK</text>
+<text x="974.19" y="816.59" text-anchor="start" data-node="0xaaaaea5dedb0" transform="rotate(30 974.19 816.59)">SMU/MOCKINGBIRD STATION</text>
+<text x="884.58" y="779.48" text-anchor="start" data-node="0xaaaaea99be70" transform="rotate(-60 884.58 779.48)">CITYPLACE/UPTOWN STATION</text>
+<text x="818.10" y="1163.64" text-anchor="start" data-node="0xaaaaea587940">8TH &amp; CORINTH</text>
+<text x="454.46" y="654.55" text-anchor="start" data-node="0xaaaaea58b600">BACHMAN STATION</text>
+<text x="1181.74" y="342.42" text-anchor="start" data-node="0xaaaaea5db0e0">ARAPAHO CENTER</text>
+<text x="1181.74" y="479.39" text-anchor="start" data-node="0xaaaaea601d90">SHERMAN POCKET TRACK</text>
+<text x="1181.74" y="136.97" text-anchor="start" data-node="0xaaaaea602480">12TH STREET</text>
+<text x="1121.06" y="606.30" text-anchor="end" data-node="0xaaaaea6063a0">FOREST LN</text>
+<text x="984.83" y="735.90" text-anchor="end" data-node="0xaaaaea612c30" transform="rotate(60 984.83 735.90)">LOVERS LANE</text>
+<text x="1181.74" y="410.90" text-anchor="start" data-node="0xaaaaea616f60">SPRING VALLEY</text>
+<text x="1055.10" y="715.95" text-anchor="start" data-node="0xaaaaea61bf50" transform="rotate(45 1055.10 715.95)">PARK LANE</text>
+<text x="1181.74" y="547.87" text-anchor="start" data-node="0xaaaaea61f9e0">LBJ / CENTRAL</text>
+<text x="1181.74" y="205.45" text-anchor="start" data-node="0xaaaaea6216d0">CITYLINE/BUSH STATION</text>
+<text x="1072.63" y="654.72" text-anchor="end" data-node="0xaaaaea6315d0">WALNUT HILL</text>
+<text x="1181.74" y="273.93" text-anchor="start" data-node="0xaaaaea63b9d0">GALATYN PARK</text>
+<text x="1181.74" y="0.00" text-anchor="start" data-node="0xaaaaea905e20">PARKER ROAD</text>
+<text x="1181.74" y="68.48" text-anchor="start" data-node="0xaaaaea97f040">DOWNTOWN PLANO</text>
+<text x="818.10" y="1109.09" text-anchor="start" data-node="0xaaaaea9826a0">CEDARS STATION</text>
+<text x="818.10" y="1054.55" text-anchor="start" data-node="0xaaaaea9841d0">CONVENTION CENTER</text>
+<text x="818.10" y="1000.00" text-anchor="start" data-node="0xaaaaea989360">EBJ UNION</text>
+<text x="511.51" y="711.59" text-anchor="start" data-node="0xaaaaea98e4f0">BURBANK STATION</text>
+<text x="568.55" y="768.64" text-anchor="start" data-node="0xaaaaea991b50">INWOOD/LOVE FIELD</text>
+<text x="594.70" y="838.48" text-anchor="end" data-node="0xaaaaea9951b0" transform="rotate(-45 594.70 838.48)">SOUTHWEST MEDICAL DISTRICT/PARKLAND</text>
+<text x="682.65" y="882.73" text-anchor="start" data-node="0xaaaaea998810">MARKET CENTER</text>
+<text x="708.79" y="952.57" text-anchor="end" data-node="0xaaaaea99f4d0" transform="rotate(-45 708.79 952.57)">VICTORY STATION</text>
+<text x="590.66" y="1227.52" text-anchor="start" data-node="0xaaaaea5806e0" transform="rotate(-45 590.66 1227.52)">WESTMORELAND STATION</text>
+<text x="1612.50" y="509.09" text-anchor="start" data-node="0xaaaaea585f60">DOWNTOWN ROWLETT</text>
+<text x="812.50" y="1527.27" text-anchor="start" data-node="0xaaaaea588fc0">UNT DALLAS</text>
+<text x="652.71" y="1227.52" text-anchor="start" data-node="0xaaaaea5cc810" transform="rotate(-45 652.71 1227.52)">HAMPTON STATION</text>
+<text x="714.77" y="1227.52" text-anchor="start" data-node="0xaaaaea5fdd30" transform="rotate(-45 714.77 1227.52)">TYLER VERNON</text>
+<text x="79.77" y="500.25" text-anchor="start" data-node="0xaaaaea608190" transform="rotate(-45 79.77 500.25)">BELT LINE</text>
+<text x="812.50" y="1215.58" text-anchor="start" data-node="0xaaaaea62e350">MORRELL STATION</text>
+<text x="150.70" y="500.25" text-anchor="start" data-node="0xaaaaea63a460" transform="rotate(-45 150.70 500.25)">DALLAS COLLEGE NORTHLAKE CAMPUS</text>
+<text x="739.87" y="1179.37" text-anchor="end" data-node="0xaaaaea63cdf0" transform="rotate(60 739.87 1179.37)">ZOO STATION</text>
+<text x="1083.45" y="791.16" text-anchor="start" data-node="0xaaaaea688910" transform="rotate(-45 1083.45 791.16)">WHITE ROCK</text>
+<text x="1212.61" y="791.16" text-anchor="start" data-node="0xaaaaea688bf0" transform="rotate(-45 1212.61 791.16)">LAKE HIGHLANDS</text>
+<text x="1334.85" y="791.92" text-anchor="start" data-node="0xaaaaea6afa60" transform="rotate(45 1334.85 791.92)">LBJ / SKILLMAN</text>
+<text x="1404.84" y="691.75" text-anchor="end" data-node="0xaaaaea6afd40">FOREST / JUPITER</text>
+<text x="1496.17" y="600.42" text-anchor="end" data-node="0xaaaaea6d6bb0">DOWNTOWN GARLAND</text>
+<text x="292.57" y="500.25" text-anchor="start" data-node="0xaaaaea6fdfe0" transform="rotate(-45 292.57 500.25)">IRVING CONVENTION CENTER</text>
+<text x="221.64" y="500.25" text-anchor="start" data-node="0xaaaaea724e50" transform="rotate(-45 221.64 500.25)">HIDDEN RIDGE</text>
+<text x="8.84" y="500.25" text-anchor="start" data-node="0xaaaaea74dd90" transform="rotate(-45 8.84 500.25)">DFW AIRPORT</text>
+<text x="377.37" y="613.23" text-anchor="end" data-node="0xaaaaea750280" transform="rotate(-45 377.37 613.23)">UNIVERSITY OF DALLAS</text>
+<text x="327.21" y="563.07" text-anchor="end" data-node="0xaaaaea7770f0" transform="rotate(-45 327.21 563.07)">LAS COLINAS URBAN CENTER</text>
+<text x="812.50" y="1475.32" text-anchor="start" data-node="0xaaaaea79e520">CAMP WISDOM</text>
+<text x="812.50" y="1423.38" text-anchor="start" data-node="0xaaaaea7c5670">LEDBETTER STATION</text>
+<text x="812.50" y="1371.43" text-anchor="start" data-node="0xaaaaea813630">VA MEDICAL CENTER</text>
+<text x="812.50" y="1319.48" text-anchor="start" data-node="0xaaaaea83a780">KIEST STATION</text>
+<text x="812.50" y="1267.53" text-anchor="start" data-node="0xaaaaea8618d0">ILLINOIS TC/STATION</text>
+<text x="1176.14" y="1236.36" text-anchor="start" data-node="0xaaaaea9540c0">BUCKNER STATION</text>
+<text x="448.86" y="218.18" text-anchor="start" data-node="0xaaaaea9543a0">NORTH CARROLLTON/FRANKFORD</text>
+<text x="1020.00" y="1007.50" text-anchor="start" data-node="0xaaaaea985b80">MLK STATION</text>
+<text x="1071.88" y="1059.38" text-anchor="start" data-node="0xaaaaea9891e0">HATCHER STATION</text>
+<text x="1123.75" y="1111.25" text-anchor="start" data-node="0xaaaaea98c840">LAWNVIEW STATION</text>
+<text x="1175.61" y="1163.14" text-anchor="start" data-node="0xaaaaea98e370">LAKE JUNE</text>
+<text x="448.86" y="290.91" text-anchor="start" data-node="0xaaaaea993500">TRINITY MILLS RAIL</text>
+<text x="448.86" y="363.64" text-anchor="start" data-node="0xaaaaea996b60">DOWNTOWN CARROLLTON</text>
+<text x="448.86" y="436.36" text-anchor="start" data-node="0xaaaaea99a1c0">FARMERS BRANCH</text>
+<text x="448.86" y="509.09" text-anchor="start" data-node="0xaaaaea99d820">ROYAL LANE</text>
+<text x="448.86" y="581.82" text-anchor="start" data-node="0xaaaaea99f350">WALNUT HILL/DENTON</text>
+</g>
+<g id="trains"></g>
+</svg>
