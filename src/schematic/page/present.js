@@ -146,6 +146,13 @@
     }
     nameEl.querySelector("b").textContent = city;
     nameEl.querySelector("span").textContent = network;
+    // Which service day this is. An exported clock reading 07:14 says nothing
+    // about *when*, and these feeds are snapshots -- the atlas names the date
+    // beside every network, so an image that travels on its own should too.
+    var when = q.get("date") || "";
+    var whenEl = nameEl.querySelector(".when");
+    whenEl.textContent = when;
+    whenEl.hidden = !when;
   }
 
   if (showClock) {

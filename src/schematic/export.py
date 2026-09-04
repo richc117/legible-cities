@@ -22,6 +22,7 @@ Nothing here writes inside the repository. Exports land on the Desktop.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 import shutil
@@ -346,6 +347,12 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
     if title:
         q["city"] = feed.city
         q["network"] = feed.network
+        # The service day, from the same networks.json the atlas prints. A
+        # clock reading 07:14 does not say *when*, and these feeds are
+        # snapshots -- an image outlives the page that explains it.
+        when = _provenance(key).get("service_date")
+        if when:
+            q["date"] = dt.date.fromisoformat(when).strftime("%A %-d %B %Y")
     if at:
         q["at"] = at
     if speed is not None:

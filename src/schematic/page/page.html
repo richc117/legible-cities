@@ -267,6 +267,10 @@ __SOCIAL__
   }
   #present-overlay .name b { display: block; font-weight: 700; }
   #present-overlay .name span { display: block; color: var(--muted); font-weight: 400; }
+  /* The service day the trains below are actually running. Smaller than the
+     network: it is a caption on the other two lines, not a third fact of equal
+     weight. */
+  #present-overlay .name .when { font-size: 0.72em; margin-top: 0.35em; }
   #present-overlay .time {
     position: absolute; right: 5vmin; bottom: 4.2vmin;
     font-size: 4.6vmin; font-variant-numeric: tabular-nums; color: var(--text);
@@ -324,7 +328,7 @@ __SOCIAL__
 </header>
 <main id="stage">__SVG__</main>
 <div id="present-overlay" aria-hidden="true">
-  <div class="name" hidden><b></b><span></span></div>
+  <div class="name" hidden><b></b><span></span><span class="when" hidden></span></div>
   <div class="time" hidden></div>
 </div>
 <script id="data" type="application/json">__DATA__</script>
