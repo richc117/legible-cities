@@ -6,11 +6,13 @@ readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
-# What src/schematic imports: pandas (feeds, schedule) and requests (feeds).
-# geopandas, shapely and networkx were declared and never imported; the
-# notebooks and their plotting are an optional group, as are the tests.
+# What src/schematic imports: pandas (feeds, schedule), requests (feeds) and
+# python-lsp-jsonrpc (serve). geopandas, shapely and networkx were declared
+# and never imported; the notebooks and their plotting are an optional group,
+# as are the tests (jsonschema checks the protocol there, never at runtime).
 dependencies = [
     "pandas>=2.2",
+    "python-lsp-jsonrpc>=1.1",
     "requests>=2.32",
 ]
 
@@ -22,6 +24,7 @@ notebooks = [
 dev = [
     "pytest>=8",
     "pillow>=10",
+    "jsonschema>=4.23",
 ]
 
 [build-system]

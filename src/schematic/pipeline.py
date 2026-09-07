@@ -15,6 +15,7 @@ import datetime as dt
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from . import animate, config, feeds, loom
 from .crs import to_mercator
@@ -29,6 +30,11 @@ STAGES: list[tuple[str, tuple[str, ...]]] = [
     ("loom", ()),
     ("octi", ()),
 ]
+
+# Called as each step finishes: (stage, fraction of the whole done, a line
+# about what it produced). The JSON-RPC server turns these into notifications;
+# a notebook can print them; nothing here waits on the callback.
+Progress = Callable[[str, float, str], None]
 
 
 def graph_dir(key: str) -> Path:
@@ -50,11 +56,14 @@ def line_graph(key: str, *, force: bool = False) -> Path:
 
 
 def schematize(key: str, *, force: bool = False,
-               stages: list[tuple[str, tuple[str, ...]]] | None = None) -> dict[str, Path]:
+               stages: list[tuple[str, tuple[str, ...]]] | None = None,
+               progress: Progress | None = None) -> dict[str, Path]:
     """Run topo | loom | octi, caching each stage. Returns stage name -> path."""
     stages = stages or STAGES
     d = graph_dir(key)
+    total = 1 + len(stages)
     paths = {"gtfs2graph": line_graph(key, force=force)}
+    _report(progress, "gtfs2graph", 1 / total, paths["gtfs2graph"])
     payload = paths["gtfs2graph"].read_bytes()
     for i, (tool, args) in enumerate(stages, start=1):
         out = d / f"{i:02d}_{tool}.json"
@@ -64,7 +73,23 @@ def schematize(key: str, *, force: bool = False,
             payload = json.dumps(loom.run(tool, payload, *args)).encode()
             out.write_bytes(payload)
         paths[tool] = out
+        _report(progress, tool, (i + 1) / total, out)
     return paths
+
+
+def _report(progress: Progress | None, stage: str, fraction: float, path: Path) -> None:
+    if progress is not None:
+        progress(stage, fraction, LineGraph.from_geojson(path).summary())
+
+
+def require_edges(key: str, graph: LineGraph) -> None:
+    """Refuse an empty graph with the sentence about modes. Raised here rather
+    than returned so the error is the pipeline's, wherever it is checked."""
+    if not graph.edges:
+        raise ValueError(
+            f"{key}: the line graph is empty -- gtfs2graph -m {feeds.FEEDS[key].mode!r} "
+            f"matched no routes. Check the feed's route_type values; agencies "
+            f"disagree about which of tram/subway/rail their network is.")
 
 
 @dataclass
@@ -78,12 +103,16 @@ class Result:
     animation: animate.Animation
     paths: dict[str, Path]
 
-    def summary(self) -> str:
-        ok, total = octilinearity(self.graph)
-        peak = max(len(self.animation.trips) and
+    def peak_concurrent(self) -> int:
+        """The most trains under way at once, sampled on the hour."""
+        return max(len(self.animation.trips) and
                    sum(1 for t in self.animation.trips
                        if t["k"][0][0] <= h * 3600 <= t["k"][-1][0])
                    for h in range(24))
+
+    def summary(self) -> str:
+        ok, total = octilinearity(self.graph)
+        peak = self.peak_concurrent()
         return "\n".join([
             f"{feeds.FEEDS[self.key].name} -- {self.date:%A %d %B %Y}",
             f"  {self.graph.summary()}",
@@ -102,23 +131,26 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
         style: Style | None = None, line_order: list[str] | None = None,
         force: bool = False, out_dir: Path | None = None,
         back: str = "index.html", icons: str | None = None,
-        social: str = "") -> Result:
+        social: str = "", progress: Progress | None = None) -> Result:
     """Everything: fetch, schematize, draw, schedule, animate, write.
 
     ``back`` is the href the animation page's back-link points at. The default
     is the sibling gallery in ``out/``; the site passes its own atlas URL,
     because a relative "index.html" resolves to /maps/index.html there.
     """
-    paths = schematize(key, force=force)
+    steps = ("gtfs2graph", "topo", "loom", "octi", "schedule", "render", "animate", "write")
+
+    def tick(stage: str, message: str = "") -> None:
+        if progress is not None:
+            progress(stage, (steps.index(stage) + 1) / len(steps), message)
+
+    paths = schematize(key, force=force,
+                       progress=(lambda stage, _f, m: tick(stage, m)) if progress else None)
 
     # Match stops against the unprojected graph -- station_id is what matters
     # there, and reprojecting is only needed for geometry.
     graph_ll = LineGraph.from_geojson(paths["octi"])
-    if not graph_ll.edges:
-        raise ValueError(
-            f"{key}: the line graph is empty -- gtfs2graph -m {feeds.FEEDS[key].mode!r} "
-            f"matched no routes. Check the feed's route_type values; agencies "
-            f"disagree about which of tram/subway/rail their network is.")
+    require_edges(key, graph_ll)
     graph = graph_ll.reproject(to_mercator)
 
     tables = feeds.tables(key)
@@ -126,6 +158,7 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
     match = match_stops(graph_ll, tables)
     date = date or busiest_weekday(tables, lines)
     trips = trips_on(tables, date, match, lines)
+    tick("schedule", f"{len(trips)} trips on {date:%A %-d %B %Y}; {match.report()}")
 
     name = feeds.FEEDS[key].name
     # Themed by default: the CSS variables carry literal fallbacks, so a
@@ -133,6 +166,7 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
     # furniture without resorting to an invert filter over the line colours.
     r = render(graph, width=width, style=style or Style(themed=True),
                title=name, line_order=line_order)
+    tick("render", f"{len(r.dropped_labels)} labels dropped")
     # The loom stage, not gtfs2graph: same stations and the same solved line
     # ordering, so only the shape differs. See animate.geographic_tracks.
     geo = None
@@ -141,6 +175,8 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
         geo = animate.geographic_tracks(geo_graph, graph, r)
 
     anim = animate.build(r, graph, trips, date, geo, line_order=line_order)
+    tick("animate", f"{len(anim.paths)} distinct paths"
+         + (f", {len(anim.unrouted)} unrouted" if anim.unrouted else ""))
 
     out = out_dir or config.out_dir()
     out.mkdir(parents=True, exist_ok=True)
@@ -149,6 +185,7 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
                   social=social,
                   title=f"{name} — {date:%A %-d %B %Y}", name=name,
                   subtitle=f"{len(trips):,} trips · {date:%A %-d %B %Y}")
+    tick("write", str(out))
 
     return Result(key=key, date=date, graph=graph, render=r, trips=trips,
                   match=match, animation=anim, paths=paths)

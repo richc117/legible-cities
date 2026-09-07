@@ -174,6 +174,13 @@ Feeds, cached graphs and output live under the repository (`data/feeds`,
 case the engine writes there and nowhere else. The site and `bin/` are code
 and stay put either way.
 
+`python -m schematic.serve` runs the engine as a JSON-RPC 2.0 server on stdin
+and stdout, framed like a language server, which is how the desktop app
+drives it: `engine.info`, `graph.build` and `map.build`, with progress and
+LOOM's log as notifications and `$/cancelRequest` to stop a run. The service
+day is a required parameter there, never picked by the engine. `--schema`
+prints the protocol's JSON Schema, from which the app generates its types.
+
 The notebooks in `notebooks/` walk the same pipeline one stage at a time, and
 are the place to start if you want to see what each tool does.
 

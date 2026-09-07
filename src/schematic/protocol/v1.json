@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Legible Cities engine protocol, version 1",
+  "description": "JSON-RPC 2.0 over stdin/stdout with Content-Length framing. `methods` maps each request to the schema of its params and result; `notifications` maps each notification to the schema of its params. Long requests (graph.build, map.build) stay open until done and send job/progress and job/log carrying the request's id meanwhile; $/cancelRequest ends the LOOM process they are waiting on and they answer with the cancelled error (-32800). Errors a person can act on are code -32000 with `data` of the ErrorData shape; bad parameters are -32602 with the same shape and kind `params`.",
+  "protocol": 1,
+  "methods": {
+    "engine.info": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/EngineInfo" } },
+    "engine.shutdown": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/Ok" } },
+    "graph.build": { "params": { "$ref": "#/$defs/GraphBuildParams" }, "result": { "$ref": "#/$defs/GraphBuildResult" } },
+    "map.build": { "params": { "$ref": "#/$defs/MapBuildParams" }, "result": { "$ref": "#/$defs/MapBuildResult" } }
+  },
+  "notifications": {
+    "job/progress": { "$ref": "#/$defs/JobProgress" },
+    "job/log": { "$ref": "#/$defs/JobLog" },
+    "$/cancelRequest": { "$ref": "#/$defs/CancelParams" }
+  },
+  "$defs": {
+    "RequestId": {
+      "description": "A JSON-RPC request id, as the client chose it.",
+      "type": ["integer", "string"]
+    },
+    "NoParams": {
+      "description": "The method takes no parameters: omit `params`, or send an empty object.",
+      "oneOf": [
+        { "type": "null" },
+        { "type": "object", "additionalProperties": false }
+      ]
+    },
+    "Ok": {
+      "type": "object",
+      "properties": { "ok": { "const": true } },
+      "required": ["ok"],
+      "additionalProperties": false
+    },
+    "FeedKey": {
+      "description": "The key of a registered feed: lower-case letters, digits and hyphens, as in the engine's registry and its file names.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+    },
+    "Token": {
+      "description": "A folder name under the engine's home, never a path: the desktop app passes its project id.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "ServiceDate": {
+      "description": "A calendar day, YYYY-MM-DD. The engine never picks one: its choice would depend on the day the request was made.",
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "EngineInfo": {
+      "description": "The handshake. A client refuses to continue unless `protocol` is the version it was built for and `engine` is the tag it pinned.",
+      "type": "object",
+      "properties": {
+        "engine": { "type": "string", "description": "The engine's version, as in its package metadata." },
+        "protocol": { "const": 1 },
+        "python": { "type": "string" },
+        "loom": {
+          "type": "object",
+          "properties": {
+            "commit": { "type": ["string", "null"], "description": "The LOOM commit the binaries were built from; null when the backend cannot say." },
+            "backend": { "enum": ["docker", "native"] }
+          },
+          "required": ["commit", "backend"],
+          "additionalProperties": false
+        },
+        "ffmpeg": { "type": ["string", "null"], "description": "The ffmpeg the engine would run (SCHEMATIC_FFMPEG, else the first on PATH), or null." },
+        "home": { "type": "string", "description": "SCHEMATIC_HOME as resolved: where feeds, graphs and output live." }
+      },
+      "required": ["engine", "protocol", "python", "loom", "ffmpeg", "home"],
+      "additionalProperties": false
+    },
+    "GraphBuildParams": {
+      "description": "Run gtfs2graph, topo, loom and octi for a registered feed, each stage cached under the home. Mode and agency come from the registry entry; passing them arrives with the native backend and user feeds.",
+      "type": "object",
+      "properties": {
+        "key": { "$ref": "#/$defs/FeedKey" },
+        "force": { "type": "boolean", "default": false, "description": "Re-run every stage even if its output is cached. A new layout may place stations differently." }
+      },
+      "required": ["key"],
+      "additionalProperties": false
+    },
+    "StageSummary": {
+      "type": "object",
+      "properties": {
+        "nodes": { "type": "integer", "minimum": 0 },
+        "stations": { "type": "integer", "minimum": 0 },
+        "junctions": { "type": "integer", "minimum": 0 },
+        "edges": { "type": "integer", "minimum": 0 },
+        "lines": { "type": "array", "items": { "type": "string" } },
+        "octilinear": { "type": "number", "minimum": 0, "maximum": 1, "description": "The share of drawn length on a 45-degree multiple; only the octi stage carries it." }
+      },
+      "required": ["nodes", "stations", "junctions", "edges", "lines"],
+      "additionalProperties": false
+    },
+    "GraphBuildResult": {
+      "type": "object",
+      "properties": {
+        "stages": {
+          "type": "object",
+          "properties": {
+            "gtfs2graph": { "$ref": "#/$defs/StageSummary" },
+            "topo": { "$ref": "#/$defs/StageSummary" },
+            "loom": { "$ref": "#/$defs/StageSummary" },
+            "octi": { "$ref": "#/$defs/StageSummary" }
+          },
+          "required": ["gtfs2graph", "topo", "loom", "octi"],
+          "additionalProperties": false
+        },
+        "paths": {
+          "type": "object",
+          "description": "Where each stage's GeoJSON is cached, as absolute paths under the home.",
+          "properties": {
+            "gtfs2graph": { "type": "string" },
+            "topo": { "type": "string" },
+            "loom": { "type": "string" },
+            "octi": { "type": "string" }
+          },
+          "required": ["gtfs2graph", "topo", "loom", "octi"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["stages", "paths"],
+      "additionalProperties": false
+    },
+    "MapBuildParams": {
+      "description": "Draw the map and the animation page for a registered feed on one service day, from the cached stages (built first if missing).",
+      "type": "object",
+      "properties": {
+        "key": { "$ref": "#/$defs/FeedKey" },
+        "date": { "$ref": "#/$defs/ServiceDate" },
+        "out": { "$ref": "#/$defs/Token", "description": "The folder under the home's out/ to write into. Omitted, the files go into out/ itself." },
+        "width": { "type": "number", "exclusiveMinimum": 0, "default": 1800, "description": "The SVG's width in CSS pixels." },
+        "line_order": { "type": "array", "items": { "type": "string" }, "description": "Line labels in the order they stack on shared track; the rest follow." },
+        "force": { "type": "boolean", "default": false, "description": "Re-run the layout stages first. A new layout may place stations differently." }
+      },
+      "required": ["key", "date"],
+      "additionalProperties": false
+    },
+    "Diagnostics": {
+      "description": "Result.summary() as data.",
+      "type": "object",
+      "properties": {
+        "stations": { "type": "integer", "minimum": 0 },
+        "junctions": { "type": "integer", "minimum": 0 },
+        "edges": { "type": "integer", "minimum": 0 },
+        "lines": { "type": "array", "items": { "type": "string" } },
+        "octilinear": { "type": "number", "minimum": 0, "maximum": 1 },
+        "stops": {
+          "type": "object",
+          "properties": {
+            "matched": { "type": "integer", "minimum": 0 },
+            "total": { "type": "integer", "minimum": 0 },
+            "by": {
+              "type": "object",
+              "properties": {
+                "station_id": { "type": "integer", "minimum": 0 },
+                "parent_station": { "type": "integer", "minimum": 0 },
+                "name": { "type": "integer", "minimum": 0 }
+              },
+              "required": ["station_id", "parent_station", "name"],
+              "additionalProperties": false
+            },
+            "unmatched": { "type": "array", "items": { "type": "string" }, "description": "The first few stop ids that matched no node." }
+          },
+          "required": ["matched", "total", "by", "unmatched"],
+          "additionalProperties": false
+        },
+        "trips": {
+          "type": "object",
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "paths": { "type": "integer", "minimum": 0 },
+            "unrouted": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["total", "paths", "unrouted"],
+          "additionalProperties": false
+        },
+        "degraded": {
+          "type": "object",
+          "properties": {
+            "skipped_calls": { "type": "integer", "minimum": 0 },
+            "borrowed_track": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["skipped_calls", "borrowed_track"],
+          "additionalProperties": false
+        },
+        "labels_dropped": { "type": "integer", "minimum": 0 },
+        "peak_concurrent": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["stations", "junctions", "edges", "lines", "octilinear", "stops", "trips", "degraded", "labels_dropped", "peak_concurrent"],
+      "additionalProperties": false
+    },
+    "MapBuildResult": {
+      "type": "object",
+      "properties": {
+        "date": { "$ref": "#/$defs/ServiceDate" },
+        "files": {
+          "type": "object",
+          "properties": {
+            "svg": { "type": "string" },
+            "html": { "type": "string", "description": "The self-contained animation page." },
+            "positions": { "type": "string" }
+          },
+          "required": ["svg", "html", "positions"],
+          "additionalProperties": false
+        },
+        "summary": { "type": "string", "description": "Result.summary(), the lines the CLI prints." },
+        "diagnostics": { "$ref": "#/$defs/Diagnostics" }
+      },
+      "required": ["date", "files", "summary", "diagnostics"],
+      "additionalProperties": false
+    },
+    "JobProgress": {
+      "description": "Sent while a long request runs, once per step as it finishes.",
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/RequestId" },
+        "stage": { "type": "string" },
+        "fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "message": { "type": "string" }
+      },
+      "required": ["id", "stage", "fraction", "message"],
+      "additionalProperties": false
+    },
+    "JobLog": {
+      "description": "A line a tool wrote to stderr while a long request ran, as it arrived.",
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/RequestId" },
+        "level": { "enum": ["debug", "info", "warning", "error"] },
+        "line": { "type": "string" }
+      },
+      "required": ["id", "level", "line"],
+      "additionalProperties": false
+    },
+    "CancelParams": {
+      "type": "object",
+      "properties": { "id": { "$ref": "#/$defs/RequestId" } },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "ErrorData": {
+      "description": "The `data` of an error response. `hint` is a sentence for a person and is what a UI shows; `detail` says where, for a log.",
+      "type": "object",
+      "properties": {
+        "kind": { "enum": ["params", "feed", "loom", "schedule", "export", "io", "engine"] },
+        "detail": { "type": "string" },
+        "hint": { "type": "string" }
+      },
+      "required": ["kind", "detail", "hint"],
+      "additionalProperties": false
+    }
+  }
+}
