@@ -135,9 +135,13 @@ the prefix, at the root, and locally.
 ## Setup
 
 ```bash
-uv venv && uv pip install -e .
+uv venv && uv pip install -e ".[dev,notebooks]"   # the pipeline, the tests and the notebooks
 docker build -t openschematicmaps/loom docker/
 ```
+
+The package itself needs only pandas and requests; `dev` adds pytest and
+Pillow (the pixel tests), `notebooks` adds JupyterLab and matplotlib.
+`uv.lock` pins the whole set; `uv sync --all-extras` reproduces it exactly.
 
 The Dockerfile builds LOOM natively for your architecture with the open ILP
 solvers. (Upstream's pins Ubuntu 20.04 and downloads Gurobi's linux64 tarball,

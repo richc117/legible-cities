@@ -6,14 +6,22 @@ readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
+# What src/schematic imports: pandas (feeds, schedule) and requests (feeds).
+# geopandas, shapely and networkx were declared and never imported; the
+# notebooks and their plotting are an optional group, as are the tests.
 dependencies = [
     "pandas>=2.2",
-    "geopandas>=1.0",
-    "shapely>=2.0",
-    "networkx>=3.3",
     "requests>=2.32",
+]
+
+[project.optional-dependencies]
+notebooks = [
     "jupyterlab>=4.2",
     "matplotlib>=3.9",
+]
+dev = [
+    "pytest>=8",
+    "pillow>=10",
 ]
 
 [build-system]
