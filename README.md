@@ -356,3 +356,31 @@ combined bus-and-rail feed, this is what keeps the map to rail. `label_pattern`
 and `label_strip` clean up route labels; most feeds need neither.
 
 `bin/run-all <key>` runs one; with no argument it runs the lot.
+
+## Licence
+
+The code is licensed under the GNU General Public License, version 3 or
+later (`GPL-3.0-or-later`); the text is in `LICENSE`, and `pyproject.toml`
+and `site/package.json` carry the SPDX identifier. That covers `src/`,
+`bin/`, `tests/`, `docker/`, the notebooks, and the site's templates,
+stylesheets and scripts. Three things in this repository are not code and
+keep their own terms:
+
+- **The essay and the atlas prose** under `site/src/` are © the author, all
+  rights reserved; quote with attribution.
+- **The station-icon photograph** `site/src/assets/cdmx-station-icons.jpg`
+  is by Tbhotch via Wikimedia Commons, [CC BY-SA 4.0][ccbysa], resized.
+- **The four Esri Calcite icons** in `src/schematic/page/icons/` are
+  redistributed without modification under Esri's Master License Agreement;
+  the `README.md` beside them says what that permits.
+
+Each agency's GTFS feed stays under that agency's terms; `data/` is not
+tracked and nothing from a feed is redistributed here.
+
+[LOOM](https://github.com/ad-freiburg/loom) (University of Freiburg,
+[GPL-3.0](https://github.com/ad-freiburg/loom/blob/master/LICENSE)) runs as
+a separate program that this pipeline drives. When its binaries ship inside
+the desktop app, that app links their source and the scripts that built
+them, as the GPL asks.
+
+[ccbysa]: https://creativecommons.org/licenses/by-sa/4.0/

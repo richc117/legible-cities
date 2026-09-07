@@ -2,6 +2,7 @@
   "name": "openschematicmaps-site",
   "version": "0.1.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "description": "Standalone site for the schematic transit map project",
   "scripts": {
     "dev": "eleventy --serve --input=src --output=dist",
