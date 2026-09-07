@@ -2,28 +2,27 @@
 
 import pytest
 
-from schematic import feeds, linear
+from schematic import config, feeds, linear
 from schematic.linegraph import LineGraph
-from schematic.pipeline import GRAPH_DIR
 
 KEY = "la-metro-rail"
 
 pytestmark = pytest.mark.skipif(
-    not (GRAPH_DIR / KEY / "03_octi.json").exists(),
+    not (config.graphs_dir() / KEY / "03_octi.json").exists(),
     reason="run the pipeline once to populate data/graphs",
 )
 
 
 def built_graphs():
     for key in feeds.FEEDS:
-        path = GRAPH_DIR / key / "03_octi.json"
+        path = config.graphs_dir() / key / "03_octi.json"
         if path.exists():
             yield key, LineGraph.from_geojson(path)
 
 
 @pytest.fixture(scope="module")
 def la():
-    return LineGraph.from_geojson(GRAPH_DIR / KEY / "03_octi.json")
+    return LineGraph.from_geojson(config.graphs_dir() / KEY / "03_octi.json")
 
 
 def test_every_station_is_placed_exactly_once():
@@ -80,7 +79,7 @@ def test_a_branch_starts_past_its_junction(la):
 
 def test_disconnected_lines_get_a_row_each():
     """NYC labels three unconnected shuttles 'S'."""
-    path = GRAPH_DIR / "nyc-subway" / "03_octi.json"
+    path = config.graphs_dir() / "nyc-subway" / "03_octi.json"
     if not path.exists():
         pytest.skip("nyc-subway not built")
     graph = LineGraph.from_geojson(path)

@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from schematic import export, feeds
+from schematic import config, export
 from schematic.export import Beat
 
 # Skia does not rasterise a frame identically every time: a handful of pixels
@@ -33,8 +33,8 @@ from schematic.export import Beat
 DRIFT = 8
 
 PAGE = Path(export.__file__).parent / "page" / "page.html"
-BUILT = feeds.REPO_ROOT / "site" / "src" / "maps" / "la-metro-rail.html"
-PLAYWRIGHT = feeds.REPO_ROOT / "site" / "node_modules" / "playwright"
+BUILT = config.REPO_ROOT / "site" / "src" / "maps" / "la-metro-rail.html"
+PLAYWRIGHT = config.REPO_ROOT / "site" / "node_modules" / "playwright"
 
 needs_browser = pytest.mark.skipif(
     not (BUILT.exists() and PLAYWRIGHT.exists() and shutil.which("node")),

@@ -169,6 +169,11 @@ onto the network.
 
 `bin/run-all` runs every registered feed and prints a table of what worked.
 
+Feeds, cached graphs and output live under the repository (`data/feeds`,
+`data/graphs`, `out/`) unless `SCHEMATIC_HOME` names another folder, in which
+case the engine writes there and nowhere else. The site and `bin/` are code
+and stay put either way.
+
 The notebooks in `notebooks/` walk the same pipeline one stage at a time, and
 are the place to start if you want to see what each tool does.
 

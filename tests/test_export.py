@@ -12,10 +12,10 @@ from unittest import mock
 
 import pytest
 
-from schematic import export, feeds
+from schematic import config, export, feeds
 
 PAGE = Path(export.__file__).parent / "page" / "page.html"
-SITE_CSS = feeds.REPO_ROOT / "site" / "src" / "assets" / "style.css"
+SITE_CSS = config.REPO_ROOT / "site" / "src" / "assets" / "style.css"
 
 
 # ------------------------------------------------------------------- presets
@@ -243,7 +243,7 @@ def test_no_export_url_ever_asks_for_the_controls():
 
 def test_exports_refuse_to_write_into_the_repo(tmp_path):
     with pytest.raises(ValueError, match="repository"):
-        export._guard_outside_repo(feeds.REPO_ROOT / "out" / "somewhere")
+        export._guard_outside_repo(config.REPO_ROOT / "out" / "somewhere")
     export._guard_outside_repo(tmp_path)      # must not raise
 
 
@@ -281,7 +281,7 @@ def test_the_essay_loop_keeps_the_landing_page_figure_timing():
     assert (export.PAGE_MORPH, export.PAGE_HOLD) == (morph, hold)
 
     # The site's switcher cycles figure one on the same beat.
-    embed = (feeds.REPO_ROOT / "site" / "src" / "assets" / "embed.js").read_text()
+    embed = (config.REPO_ROOT / "site" / "src" / "assets" / "embed.js").read_text()
     assert re.search(r"var MORPH = ([\d.]+), HOLD = ([\d.]+);", embed).groups() \
         == (str(morph), str(hold))
 

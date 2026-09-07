@@ -32,8 +32,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import feeds
+from .config import REPO_ROOT
 
-REPO_ROOT = feeds.REPO_ROOT
+# Anchored to the repository, not to the engine's home: the recorder is code,
+# and the site's map folder is the site's, whatever SCHEMATIC_HOME says.
 MAPS_DIR = REPO_ROOT / "site" / "src" / "maps"
 RECORDER = REPO_ROOT / "bin" / "_record.js"
 

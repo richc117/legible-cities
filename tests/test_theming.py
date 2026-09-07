@@ -9,22 +9,22 @@ import re
 
 import pytest
 
+from schematic import config
 from schematic.crs import to_mercator
 from schematic.linegraph import LineGraph
-from schematic.pipeline import GRAPH_DIR
 from schematic.render import Style, render
 
 KEY = "la-metro-rail"
 
 pytestmark = pytest.mark.skipif(
-    not (GRAPH_DIR / KEY / "03_octi.json").exists(),
+    not (config.graphs_dir() / KEY / "03_octi.json").exists(),
     reason="run the pipeline once to populate data/graphs",
 )
 
 
 @pytest.fixture(scope="module")
 def graph():
-    return LineGraph.from_geojson(GRAPH_DIR / KEY / "03_octi.json").reproject(to_mercator)
+    return LineGraph.from_geojson(config.graphs_dir() / KEY / "03_octi.json").reproject(to_mercator)
 
 
 def line_strokes(svg: str) -> set[str]:

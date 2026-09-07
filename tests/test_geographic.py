@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from schematic import animate, pipeline
+from schematic import animate, config
 from schematic.crs import to_mercator
 from schematic.linegraph import LineGraph
 from schematic.render import Style, render, resample
@@ -99,7 +99,7 @@ def test_pairing_is_oriented_the_same_way_as_the_drawn_track():
     assert near(pts[-1], dst_xy) < near(pts[-1], src_xy)
 
 
-@pytest.mark.skipif(not (pipeline.GRAPH_DIR / "la-metro-rail" / "03_octi.json").exists(),
+@pytest.mark.skipif(not (config.graphs_dir() / "la-metro-rail" / "03_octi.json").exists(),
                     reason="needs a built graph in data/")
 def test_los_angeles_pairs_every_drawn_track():
     """LA is the one the essay animates, so a gap there is a visible hole.
@@ -107,7 +107,7 @@ def test_los_angeles_pairs_every_drawn_track():
     A track with no twin holds still while the network around it moves, which
     reads as the map tearing rather than as a missing feature.
     """
-    d = pipeline.GRAPH_DIR / "la-metro-rail"
+    d = config.graphs_dir() / "la-metro-rail"
     drawn = LineGraph.from_geojson(d / "03_octi.json").reproject(to_mercator)
     geo = LineGraph.from_geojson(d / "02_loom.json").reproject(to_mercator)
     r = render(drawn, width=1600.0, style=Style(themed=True))
@@ -119,7 +119,7 @@ def test_los_angeles_pairs_every_drawn_track():
         assert len(layer.tracks[track.element_id]) == len(track.points)
 
 
-@pytest.mark.skipif(not (pipeline.GRAPH_DIR / "la-metro-rail" / "03_octi.json").exists(),
+@pytest.mark.skipif(not (config.graphs_dir() / "la-metro-rail" / "03_octi.json").exists(),
                     reason="needs a built graph in data/")
 def test_every_built_page_carries_the_second_geometry():
     """Geographic is the switcher's first button, so every network needs one.
@@ -131,7 +131,7 @@ def test_every_built_page_carries_the_second_geometry():
     from schematic import feeds
     assert all(f.geographic for f in feeds.FEEDS.values())
 
-    built = pipeline.feeds.REPO_ROOT / "site" / "src" / "maps"
+    built = config.REPO_ROOT / "site" / "src" / "maps"
     if not (built / "nyc-subway.html").exists():
         pytest.skip("site not built")
     for key in ("la-metro-rail", "nyc-subway", "cdmx-metro"):
@@ -146,14 +146,14 @@ def test_every_built_page_carries_the_second_geometry():
 PAIRING_FLOOR = 0.88
 
 
-@pytest.mark.skipif(not (pipeline.GRAPH_DIR / "la-metro-rail" / "03_octi.json").exists(),
+@pytest.mark.skipif(not (config.graphs_dir() / "la-metro-rail" / "03_octi.json").exists(),
                     reason="needs a built graph in data/")
 def test_every_city_pairs_most_of_its_tracks_and_all_of_its_stations():
     from schematic import feeds
 
     checked = 0
     for key in feeds.FEEDS:
-        d = pipeline.GRAPH_DIR / key
+        d = config.graphs_dir() / key
         if not ((d / "03_octi.json").exists() and (d / "02_loom.json").exists()):
             continue
         checked += 1

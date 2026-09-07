@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 """Build out/index.html -- a contact sheet of every map generated so far.
 
-Scans out/ rather than the registry, so it only lists what actually built.
+Scans out/ (under the engine's home, see ``schematic.config``) rather than the
+registry, so it only lists what actually built.
 """
 from __future__ import annotations
 
 import html
 import json
 import re
-from pathlib import Path
 
-from schematic import feeds
+from schematic import config, feeds
 
-OUT = Path(__file__).resolve().parents[1] / "out"
+OUT = config.out_dir()
 
 
 def main() -> int:

@@ -1,7 +1,8 @@
 """GTFS feed registry and local cache.
 
-Feeds are downloaded once into ``data/feeds`` and reused. Add a city by adding a
-``Feed`` to ``FEEDS`` -- nothing downstream in the pipeline is city-specific.
+Feeds are downloaded once into ``data/feeds`` under the engine's home (see
+``config``) and reused. Add a city by adding a ``Feed`` to ``FEEDS`` -- nothing
+downstream in the pipeline is city-specific.
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+
+from . import config
 
 # A GTFS zip is only *mostly* GTFS. Agencies drop license agreements, readmes
 # and spreadsheets in alongside the tables, and reading every .txt as CSV then
@@ -35,11 +38,6 @@ GTFS_TABLES = frozenset({
 # levels.txt deliberately stays: stops.txt references it by level_id, and
 # dropping it turns one parse error into a dangling-reference error.
 LOOM_SKIP = frozenset({"pathways", "translations", "attributions"})
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = REPO_ROOT / "data"
-FEED_DIR = DATA_DIR / "feeds"
-
 
 @dataclass(frozen=True)
 class Feed:
@@ -85,11 +83,11 @@ class Feed:
 
     @property
     def zip_path(self) -> Path:
-        return FEED_DIR / f"{self.key}.zip"
+        return config.feeds_dir() / f"{self.key}.zip"
 
     @property
     def normalized_zip_path(self) -> Path:
-        return FEED_DIR / f"{self.key}.normalized.zip"
+        return config.feeds_dir() / f"{self.key}.normalized.zip"
 
 
 FEEDS: dict[str, Feed] = {

@@ -15,7 +15,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from . import feeds, pipeline
+from . import config, feeds, pipeline
 # By name, not as a module: this file already has an export() of its own, and
 # `from . import export` would be shadowed by it.
 from .export import PALETTES, padded_box, resolve
@@ -23,7 +23,8 @@ from .crs import to_mercator
 from .linegraph import LineGraph
 from .render import Style, render
 
-SITE_DIR = feeds.REPO_ROOT / "site"
+# The site is part of the repository, not of the engine's home.
+SITE_DIR = config.REPO_ROOT / "site"
 SRC_DIR = SITE_DIR / "src"
 MAPS_DIR = SRC_DIR / "maps"
 DATA_DIR = SRC_DIR / "_data"
@@ -321,7 +322,7 @@ def export_unlabelled(key: str, stage: str, name: str,
     that draws the finished map, pointed at an earlier stage or told to leave
     the labels off.
     """
-    graph = LineGraph.from_geojson(pipeline.GRAPH_DIR / key / stage)
+    graph = LineGraph.from_geojson(config.graphs_dir() / key / stage)
     svg = render(graph.reproject(to_mercator), width=width,
                  style=Style(themed=True), labels=False).svg
     path = MAPS_DIR / name
@@ -369,7 +370,7 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
 
     export_comparison(FEATURED)
     for key in PLAIN:
-        if key != FEATURED and (pipeline.GRAPH_DIR / key / "03_octi.json").exists():
+        if key != FEATURED and (config.graphs_dir() / key / "03_octi.json").exists():
             export_unlabelled(key, "03_octi.json", f"{key}-plain.svg")
 
     # After export_comparison, which is what draws the unlabelled map it reads.

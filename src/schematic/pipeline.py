@@ -1,8 +1,9 @@
 """End-to-end pipeline: GTFS feed in, schematic map and animation out.
 
-Each stage caches its LOOM output under ``data/graphs/<feed>/`` so a notebook can
-re-run a later stage without paying for the earlier ones -- ``gtfs2graph`` takes
-about ten seconds, everything after it is instant.
+Each stage caches its LOOM output under ``data/graphs/<feed>/`` in the engine's
+home (see ``config``) so a notebook can re-run a later stage without paying for
+the earlier ones -- ``gtfs2graph`` takes about ten seconds, everything after it
+is instant.
 
     from schematic import pipeline
     result = pipeline.run("la-metro-rail")
@@ -15,14 +16,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import animate, feeds, loom
+from . import animate, config, feeds, loom
 from .crs import to_mercator
 from .linegraph import LineGraph
 from .render import RenderResult, Style, octilinearity, render
 from .schedule import (StopMatch, Trip, busiest_weekday, match_stops, trips_on)
-
-GRAPH_DIR = feeds.DATA_DIR / "graphs"
-OUT_DIR = feeds.REPO_ROOT / "out"
 
 # The LOOM stages, in order, with the arguments we run them with. Kept as data
 # so a notebook can print the pipeline or re-run one stage with a tweak.
@@ -34,7 +32,8 @@ STAGES: list[tuple[str, tuple[str, ...]]] = [
 
 
 def graph_dir(key: str) -> Path:
-    d = GRAPH_DIR / key
+    """The stage cache for one feed, created if it is missing."""
+    d = config.graphs_dir() / key
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -143,7 +142,7 @@ def run(key: str, *, date: dt.date | None = None, width: float = 1800.0,
 
     anim = animate.build(r, graph, trips, date, geo, line_order=line_order)
 
-    out = out_dir or OUT_DIR
+    out = out_dir or config.out_dir()
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{key}.svg").write_text(r.svg)
     animate.write(anim, r.svg, out, stem=key, back=back, icons=icons,
