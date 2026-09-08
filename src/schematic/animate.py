@@ -483,7 +483,7 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
              .replace("__SUBTITLE__", html_escape(subtitle))
              .replace("__BACK__", html_escape(back))
              .replace("__SVG__", svg)
-             .replace("__DATA__", json.dumps(data, separators=(",", ":"))))
+             .replace("__DATA__", _json_for_script(data)))
     return json_path, html_path
 
 
@@ -495,6 +495,27 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
 # has to stay a single self-contained file: it is opened from file:// during an
 # export, and served from a subpath on the site.
 _PAGE_DIR = Path(__file__).parent / "page"
+def _json_for_script(data: object) -> str:
+    """JSON that is safe to place inside a ``<script>`` element.
+
+    A browser does not read a script element as JSON. It scans for the first
+    ``</script`` and ends the element there, whatever the surrounding text
+    means, so a station or line name containing one would end the data early
+    and leave the rest as live markup. The names come from an agency's GTFS
+    feed, which is not ours to trust.
+
+    Escaping ``<`` is what closes that; ``>`` and ``&`` follow the same
+    convention other frameworks use for this exact substitution. All three
+    are valid inside a JSON string and parse back to the original character,
+    so nothing downstream sees any difference. Non-ASCII is already escaped,
+    because ``json.dumps`` defaults to ``ensure_ascii``.
+    """
+    return (json.dumps(data, separators=(",", ":"))
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026"))
+
+
 _HTML = (_PAGE_DIR / "page.html").read_text()
 _PRESENT_JS = (_PAGE_DIR / "present.js").read_text()
 

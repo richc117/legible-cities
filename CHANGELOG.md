@@ -5,6 +5,20 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## Unreleased
+
+### Fixed
+
+- **A feed's text can no longer end the page's data element.** The animation
+  page carries its data inside a `<script>` element, and a browser ends that
+  element at the first `</script` it sees, whatever the surrounding text
+  means. Station and line names come from an agency's GTFS feed, so a name
+  containing one would have ended the data early and left the rest of it as
+  live markup, in the desktop app and on every published page. The characters
+  that can end an element are now escaped; they are valid inside a JSON
+  string and parse back unchanged, so no name is altered and nothing
+  downstream sees a difference. Published pages should be regenerated.
+
 ## [0.2.0] - 2026-09-07
 
 The engine learns to be run by something other than a person at a prompt.
