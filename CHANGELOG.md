@@ -5,7 +5,9 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
-## Unreleased
+## [0.2.1] - 2026-09-08
+
+One fix, and it matters wherever a page is published.
 
 ### Fixed
 

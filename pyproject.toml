@@ -1,6 +1,6 @@
 [project]
 name = "openschematicmaps"
-version = "0.2.0"
+version = "0.2.1"
 description = "Schematic transit maps from open data (GTFS + OpenStreetMap)"
 readme = "README.md"
 license = "GPL-3.0-or-later"
