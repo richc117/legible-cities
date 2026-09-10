@@ -1,0 +1,46 @@
+# The half of the never list that no secret scanner recognises: absolute
+# paths from someone's machine, personal addresses, private hostnames, links
+# to tool sessions. `gitleaks.yml` covers keys and tokens.
+#
+# The same script runs locally through .pre-commit-config.yaml. Here it reads
+# every commit message in the history it was given, not just the new ones, so
+# a leak that arrived through a merge is still a red check. The commits that
+# predate the rule are named in .preflight-allowlist, with the reason.
+#
+# On a pull request it also reads the commits the branch adds, for the one
+# thing the file passes do not cover: a keyword that closes an issue.
+name: preflight
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Personal paths, addresses, keys and session links
+        run: bin/preflight
+
+      # A closing keyword in a *commit* message is a different mistake from
+      # a leak: a commit message is for why, and the number belongs on the
+      # pull request or the issue. The commit-msg hook refuses it while it
+      # can still be edited; this is the same check for a machine without
+      # the hooks installed. Only the commits this pull request adds.
+      - name: Closing keywords in the commits this pull request adds
+        if: github.event_name == 'pull_request'
+        run: >-
+          bin/preflight --commit-range
+          "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"

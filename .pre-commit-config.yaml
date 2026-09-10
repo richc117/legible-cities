@@ -1,0 +1,52 @@
+# Local git hooks. Install them once per checkout:
+#
+#   pip install pre-commit   (or: brew install pre-commit)
+#   pre-commit install
+#
+# After that `git commit` runs gitleaks over the staged changes and
+# bin/preflight over the staged tree and the message being written. The two
+# scanners run again in CI (.github/workflows/gitleaks.yml and
+# preflight.yml), so a bypassed hook is caught rather than trusted. The same
+# arrangement as the desktop app's; keep the two pins in step with each other
+# and with the versions the workflows name.
+
+default_install_hook_types: [pre-commit, commit-msg]
+minimum_pre_commit_version: "3.2.0"
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      # Keys, tokens and certificates in the staged changes. The allowlist
+      # for this repository's false positives is in .gitleaks.toml. Pinned to
+      # the commit stage: with `commit-msg` also installed it would otherwise
+      # scan the same staged changes twice.
+      - id: gitleaks
+        stages: [pre-commit]
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      # bin/preflight is what the repository's hygiene rests on, so it is
+      # checked like anything else that decides. The other shell scripts
+      # under bin/ predate this and are not in scope here.
+      - id: shellcheck
+        files: '^bin/preflight$'
+
+  - repo: local
+    hooks:
+      # The rest of the never list, which no secret scanner knows about:
+      # machine paths, personal addresses, private hosts, session links.
+      - id: preflight
+        name: preflight (paths, addresses, keys, session links)
+        entry: bin/preflight
+        language: script
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      - id: preflight-commit-message
+        name: preflight (the commit message)
+        entry: bin/preflight --message-file
+        language: script
+        stages: [commit-msg]

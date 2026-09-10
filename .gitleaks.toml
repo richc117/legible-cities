@@ -1,0 +1,30 @@
+# gitleaks configuration for the Legible Cities engine.
+#
+# The default rule set does the detecting; this file only extends it with the
+# few findings that are false here. Keep every entry narrow and say why it
+# exists: an allowlist that grows by guesswork is how a real key gets through.
+#
+# gitleaks looks for keys and tokens. It does not know about this project's
+# other never-list items - machine paths, personal addresses, private hosts,
+# links to tool sessions. `bin/preflight` covers those. Both run before every
+# commit and both run in CI. The same arrangement as the desktop app's.
+#
+# Check a change to this file with:
+#   gitleaks dir . --no-banner --verbose
+
+title = "legible-cities"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """
+Installed dependencies, gitignored and not ours. `gitleaks dir .` reads the
+working tree and finds JupyterLab's bundled scripts under .venv/ (a
+`FourKeyMap` that reads as a generic key) and whatever npm put under
+site/node_modules/. Neither is committed; `gitleaks git` never sees them.
+"""
+paths = [
+  '''^\.venv/''',
+  '''^site/node_modules/''',
+]

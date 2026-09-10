@@ -20,6 +20,25 @@ first, and `tests/test_serve.py` holds the server to it. Anything the desktop
 app needs from the pipeline is a change here, versioned and tagged, never a
 copy over there.
 
+## Before you push
+
+This is a public repository, so two scanners run on every commit and again
+in CI: `gitleaks` for keys and tokens, and `bin/preflight` for what a
+secret scanner does not know - machine paths, personal addresses, private
+hosts, links to tool sessions, and a keyword in a commit message that would
+close an issue (name the issue without the `#`; the number belongs in a
+pull request or on the issue). Install the hooks once per checkout:
+
+    pip install pre-commit        # or your package manager's equivalent
+    pre-commit install
+
+`pre-commit run --all-files` runs them without committing. The `gitleaks`
+hook reads only what is staged; `gitleaks dir .` reads the whole working
+tree. `.gitleaks.toml` holds the scanner's false positives, each with a
+reason, and `.preflight-allowlist` holds the commits already in the history
+that the rule arrived too late for. Nothing new goes on either list without
+a reason beside it.
+
 ## Releasing
 
 The desktop app pins the engine by git tag and refuses to run against any

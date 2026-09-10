@@ -1,0 +1,40 @@
+# Keys, tokens and certificates, on every push and every pull request.
+#
+# The same scanner runs locally through .pre-commit-config.yaml, over the
+# staged changes. This job is what catches a bypassed or uninstalled hook,
+# and it reads the whole history rather than one commit, so it must not be
+# skippable: no path filters, no `paths-ignore`.
+name: gitleaks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# Read-only by default; a job that needs more says so itself.
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Whole history: a key removed in a later commit is still leaked.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Keep this in step with `rev` in .pre-commit-config.yaml, so a
+          # commit that passes locally passes here for the same reasons.
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_CONFIG: ${{ github.workspace }}/.gitleaks.toml
+          # Commenting on a pull request needs a writable token; a failed job
+          # and the run summary say enough.
+          GITLEAKS_ENABLE_COMMENTS: false

@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# Refuse to let personal paths, addresses, keys or tool-session links into a
+# public repository. Three passes: the index (everything that would be
+# committed), every commit message in the history, and private files that
+# have strayed into the working tree. Exit 1 on any hit. Run before every
+# push. Ported from the desktop app's bin/preflight; the one addition is
+# .preflight-allowlist, the commits already in this history that the rule
+# arrived too late for.
+#
+#   bin/preflight                     the three passes above
+#   bin/preflight --message-file FILE scan a commit message being written
+#   bin/preflight --commit-range A..B scan the messages of a range of commits
+#
+# The second form is what the `commit-msg` hook in .pre-commit-config.yaml
+# runs, so a bad trailer is refused while it can still be edited rather than
+# after it is history. The third is what the pull request check runs over the
+# commits a branch adds, so a machine without the hooks is caught too.
+# gitleaks is the other half of the pair: it knows keys and tokens, this
+# knows the rest of the never list.
+#
+# The message forms refuse one thing the file passes do not: a keyword that
+# closes an issue. See `closing` below for why that is a message-only rule.
+set -u
+usage() {
+  echo "usage: preflight [--message-file FILE | --commit-range A..B]" >&2
+  exit 2
+}
+msgfile=''
+range=''
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --message-file) [ $# -ge 2 ] || usage; msgfile=$2; shift 2 ;;
+    --commit-range) [ $# -ge 2 ] || usage; range=$2; shift 2 ;;
+    -h|--help) usage ;;
+    *) echo "preflight: unknown argument: $1" >&2; usage ;;
+  esac
+done
+if [ -n "$msgfile" ] && [ -n "$range" ]; then usage; fi
+cd "$(git rev-parse --show-toplevel)" || exit 1
+pattern='/Users/[A-Za-z]|/home/[A-Za-z0-9._-]+|[A-Za-z]:[\\/]{1,2}[Uu]sers[\\/]|@gmail\.com|@icloud\.com|@outlook\.com|100\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.[0-9]+\.[0-9]+|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+|10\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+|\.ts\.net\b|fd7a:115c:a1e0:|ghp_[A-Za-z0-9]{20,}|github_pat_|-----BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|claude\.ai/code/|Claude-Session:'
+status=0
+
+# A keyword that closes an issue. Not a leak - a different mistake with the
+# same shape, caught in the same place.
+#
+# GitHub reads `Closes #12` out of a *commit* message and closes issue 12.
+#
+# The desktop app learned this when one `main` reached two boards that
+# numbered the same issues differently and a keyword closed the wrong issue
+# three times. This repository pushes to two remotes as well, so the same
+# shape is possible here. A commit message is for why a change was made;
+# which issue it settles belongs in the pull request or on the issue, where
+# the number is unambiguous.
+#
+# Deliberately **not** part of pass 2: it belongs to a message being written
+# and to a named range, never to the whole history.
+#
+# The spellings GitHub acts on: close/closes/closed, fix/fixes/fixed,
+# resolve/resolves/resolved, any case, then `#N`, `owner/repo#N` or a full
+# issue URL. Naming an issue without the `#` closes nothing.
+closing='(^|[^A-Za-z0-9_/])(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]*:?[[:space:]]*(#[0-9]+|[A-Za-z0-9._-]+/[A-Za-z0-9._-]+#[0-9]+|https?://[^[:space:]]+/issues/[0-9]+)'
+
+why_closing() {
+  echo "preflight: a commit message says why a change was made; which issue" >&2
+  echo "preflight: it settles belongs in the pull request or on the issue," >&2
+  echo "preflight: where the number is unambiguous. The desktop app paid for" >&2
+  echo "preflight: this rule: a keyword reached two boards and closed the" >&2
+  echo "preflight: wrong issue three times." >&2
+  echo "preflight: To name an issue here without closing it, drop the '#':" >&2
+  echo "preflight: \"closes issue 22\" is read by nobody." >&2
+}
+
+if [ -n "$msgfile" ]; then
+  # 0. A commit message being written, read from the file git is about to
+  #    use. One file, so grep prints line numbers without a path prefix.
+  found=$(grep -nE "$pattern" -- "$msgfile" || true)
+  if [ -n "$found" ]; then
+    echo "preflight: this commit message contains something that must not be public:" >&2
+    echo "$found" >&2
+    echo "preflight: edit the message; nothing has been committed." >&2
+    exit 1
+  fi
+  shut=$(grep -niE "$closing" -- "$msgfile" || true)
+  if [ -n "$shut" ]; then
+    echo "preflight: this commit message closes an issue by number:" >&2
+    echo "$shut" >&2
+    why_closing
+    echo "preflight: edit the message; nothing has been committed." >&2
+    exit 1
+  fi
+  echo "preflight: commit message clean"
+  exit 0
+fi
+
+if [ -n "$range" ]; then
+  # The messages of the commits a branch adds, which is what a squash commit
+  # is built from. The hook above catches this while the message can still
+  # be edited; this catches it when the hook was never installed or was
+  # bypassed, which is the invariant the rest of the tooling keeps: whatever
+  # a hook enforces, CI enforces again.
+  msgs=$(git log --format='%h %B' "$range" 2>/dev/null || true)
+  found=$(printf '%s\n' "$msgs" | grep -nE "$pattern" || true)
+  if [ -n "$found" ]; then
+    echo "preflight: a commit message in this range must not be public:" >&2
+    echo "$found" >&2; status=1
+  fi
+  shut=$(printf '%s\n' "$msgs" | grep -niE "$closing" || true)
+  if [ -n "$shut" ]; then
+    echo "preflight: a commit message in this range closes an issue by number:" >&2
+    echo "$shut" >&2
+    why_closing
+    status=1
+  fi
+  [ $status -eq 0 ] && echo "preflight: commit messages clean"
+  exit $status
+fi
+
+# 1. The index: tracked files plus staged changes, real path:line output.
+#    This script and the allowlist hold the patterns themselves.
+hits=$(git grep --cached -nE "$pattern" -- . ':(exclude)bin/preflight' ':(exclude).preflight-allowlist' 2>/dev/null || true)
+if [ -n "$hits" ]; then
+  echo "preflight: files about to be committed contain something that must not be public:" >&2
+  echo "$hits" >&2; status=1
+fi
+
+# 2. Commit message bodies, all of them; author metadata is not scanned.
+#    Not the range against the tracked upstream: that describes the branch
+#    and not what a push actually sends, and this repository has two
+#    remotes. CI scans everything for the same reason; this way the answer
+#    is the same in both places.
+#
+#    .preflight-allowlist names the commits this pass skips: full hashes,
+#    one per line, with the reason beside each. Every entry is a mistake
+#    that is already public and is not being unmade. Nothing new goes there;
+#    the point of this pass is that the list stops growing.
+if git rev-parse -q --verify HEAD >/dev/null 2>&1; then
+  allowed=$(grep -oE '^[0-9a-f]{40}' .preflight-allowlist 2>/dev/null || true)
+  if [ -n "$allowed" ]; then
+    commits=$(git log --format='%H' HEAD 2>/dev/null | grep -vxF -f <(printf '%s\n' "$allowed") || true)
+  else
+    commits=$(git log --format='%H' HEAD 2>/dev/null || true)
+  fi
+  msgs=$(for h in $commits; do git log -1 --format='%h %B' "$h"; done | grep -nE "$pattern" || true)
+  if [ -n "$msgs" ]; then
+    echo "preflight: an unpushed commit message contains something that must not be public:" >&2
+    echo "$msgs" >&2; status=1
+  fi
+fi
+
+# 3. Private files present and not ignored. CLAUDE.md here is a private
+#    working log and is gitignored on purpose; if it ever shows up in the
+#    status, the ignore rule has gone.
+stray=$(git status --porcelain 2>/dev/null | grep -E 'CLAUDE\.md|CLAUDE\.local\.md|settings\.local\.json|\.env|\.p12|\.pem|\.key$' | grep -vE '(^|[ /])\.env\.example$' || true)
+if [ -n "$stray" ]; then
+  echo "preflight: a private file is in the working tree and not ignored:" >&2
+  echo "$stray" >&2; status=1
+fi
+
+[ $status -eq 0 ] && echo "preflight: clean"
+exit $status

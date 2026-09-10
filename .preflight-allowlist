@@ -1,0 +1,41 @@
+# Commits whose messages bin/preflight does not scan: the full hash, then
+# why. Every entry is a mistake that is already public and is not being
+# unmade. Nothing new goes on this list; the hook and the CI check exist so
+# that it stops here.
+#
+# The twenty-nine below, 29 Aug to 3 Sep 2026, each carry a trailer linking
+# the tool session that wrote them, which this project's rules forbid and
+# which nothing in this repository refused at the time. They had been
+# public for a fortnight before the rule arrived here. Rewriting them would
+# move three tags the desktop app pins by name and the deployed gh-pages
+# branch, which costs more than it removes.
+
+20eec158ae1c30a95b9fb99e6b08ed1e321e05db  2026-08-29  session trailer, before the rule
+27133ac8c7a1891a0c8ca7ff58e3bba96f1b398d  2026-08-29  session trailer, before the rule
+4a171e2ad6c4fab9d4e3cfb89a9c10fd956a77d8  2026-08-29  session trailer, before the rule
+533056b2d6c660f2c55414c301bfceb6d4feb001  2026-08-29  session trailer, before the rule
+8ca346fa496dbd77e80e68bfd8567195e99371c1  2026-08-29  session trailer, before the rule
+a896a4462fc0f9bd89892e73c0d32f64eda0dbf3  2026-08-29  session trailer, before the rule
+c67aa496a74908ddf2e79ffdeabe4efb818c521d  2026-08-29  session trailer, before the rule
+ce0e2d0a9b7cea9812cb86ff8597468fc3c4bc8b  2026-08-29  session trailer, before the rule
+d32f8d9550812836bfd60d7da9c9da1c64da88b1  2026-08-29  session trailer, before the rule
+fa92fc6c772bef471314d6cf9f02211a0ddc0a53  2026-08-29  session trailer, before the rule
+fe96e228b98b07159b892b9232da1e4055c21821  2026-08-29  session trailer, before the rule
+0067f02fa309b8f1b50182ef0ffb405786e06c98  2026-08-30  session trailer, before the rule
+01fdc5569f515a5a6ca195967240f39103493325  2026-08-30  session trailer, before the rule
+0c2da46c20541c16a751904552d5357101a15971  2026-08-30  session trailer, before the rule
+39a3769aa0ffda38bcb42b5347e502c9485a66fb  2026-08-30  session trailer, before the rule
+4a456e6dd7cd6ce6593e391f3d6c7970dd6efa29  2026-08-30  session trailer, before the rule
+5642e031ef31ef6f7231ca1b0defa3e07a0c9e73  2026-08-30  session trailer, before the rule
+aabb2fa6e3eb66c1a9ed730c64a7914e7db19d44  2026-08-30  session trailer, before the rule
+d53042a93fcd81933d4d22911ca14869808c280d  2026-08-30  session trailer, before the rule
+dcc1fc2fedc132249f6dfa0d9c196d0ab8975006  2026-08-30  session trailer, before the rule
+e00d7005ffdb16fc5544d3cdd817b1de6718f7db  2026-08-30  session trailer, before the rule
+f94d30ca45d762eeaee2ba3f68ff381d9da4e918  2026-08-30  session trailer, before the rule
+b2b655f1af1f82e4987f674c2c2e40bb409e74b3  2026-08-31  session trailer, before the rule
+d11c96d0b5353ea922a8af6dd85606315a75af82  2026-08-31  session trailer, before the rule
+01088301e3ad5a6197d3ad949f3a32fdefdf44f2  2026-09-01  session trailer, before the rule
+370cede8769dc92e237ba519dea79f39d2ee325c  2026-09-01  session trailer, before the rule
+3cd0ec2f18eb7d1ebae9806bd74f459d532c2241  2026-09-01  session trailer, before the rule
+0ec21a9c490c8a9e8d843150c4b41574b19ea30b  2026-09-03  session trailer, before the rule
+96c5dbc32ba21cc1d21d7cf28fa16ceb5547d776  2026-09-03  session trailer, before the rule
