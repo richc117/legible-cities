@@ -4,6 +4,14 @@ The README's Setup section gets you a working checkout: `uv venv && uv pip
 install -e ".[dev,notebooks]"`, Docker for LOOM, `pytest` for the tests. The
 tests that run LOOM need Docker and the image and skip without them.
 
+## Issues
+
+The work is planned on this repository's issues, one unit of work each,
+with a label for the phase, the type, the area and the size, and a
+milestone per phase. The `E04a` at the front of a title is a reading aid,
+not something a tool checks. Pick one, say you are taking it, and keep
+the change to what it asks.
+
 ## Changes
 
 Commit to `main`; the history is the record, so the message says why. A
