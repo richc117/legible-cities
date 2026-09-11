@@ -458,7 +458,7 @@ class EngineEndpoint(Endpoint):
             "engine": __version__,
             "protocol": PROTOCOL,
             "python": platform.python_version(),
-            "loom": {"commit": None, "backend": "docker"},
+            "loom": {"commit": loom.commit(), "backend": loom.backend().name},
             "ffmpeg": shutil.which(export.ffmpeg_path()),
             "home": str(config.home()),
         }

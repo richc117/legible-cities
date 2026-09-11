@@ -5,6 +5,31 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Added
+
+- **A native LOOM backend.** `SCHEMATIC_LOOM_BIN` names a directory of the
+  four tools as binaries and the engine runs those instead of the Docker
+  image, which is how the desktop app runs LOOM on a machine without Docker.
+  A native `gtfs2graph` is handed the feed unpacked beside its zip, because
+  the app's build has no libzip. `SCHEMATIC_LOOM_COMMIT` tells the engine
+  which LOOM commit the binaries came from, since they cannot say, and
+  `engine.info` reports it with the backend. The protocol is unchanged:
+  `engine.info.loom` already had both fields.
+- **Every LOOM tool has a timeout** (thirty minutes unless the call says
+  otherwise), which ends the process and raises with the tail of its
+  stderr. On Windows the tools run without a console window.
+
+### Changed
+
+- **`docker/Dockerfile` pins `LOOM_REF`** to the commit the desktop app
+  builds its binaries from, so the two backends run the same LOOM;
+  `--build-arg LOOM_REF=<ref>` overrides it.
+- **`loom.execute`** is the one runner both backends share; `run`,
+  `pipeline`, `gtfs2graph` and `transitmap` keep their signatures and gain
+  a `timeout` keyword.
+
 ## [0.3.0] - 2026-09-10
 
 The export module is three halves, so another process can do the middle,

@@ -144,8 +144,20 @@ Pillow (the pixel tests), `notebooks` adds JupyterLab and matplotlib.
 `uv.lock` pins the whole set; `uv sync --all-extras` reproduces it exactly.
 
 The Dockerfile builds LOOM natively for your architecture with the open ILP
-solvers. (Upstream's pins Ubuntu 20.04 and downloads Gurobi's linux64 tarball,
-which forces amd64 emulation on Apple Silicon.)
+solvers, at the commit the desktop app pins (`LOOM_REF`; pass
+`--build-arg LOOM_REF=<ref>` for another). (Upstream's pins Ubuntu 20.04 and
+downloads Gurobi's linux64 tarball, which forces amd64 emulation on Apple
+Silicon.)
+
+Docker is one of two ways to run LOOM. Set `SCHEMATIC_LOOM_BIN` to a directory
+holding `gtfs2graph`, `topo`, `loom` and `octi` as native binaries (with their
+DLLs beside them on Windows) and the engine runs those instead, which is how
+the desktop app runs it on a machine without Docker; its `gtfs2graph` is
+handed the feed unpacked, because a build without libzip cannot read the zip.
+The binaries carry no version of their own, so `SCHEMATIC_LOOM_COMMIT` says
+which LOOM commit they came from and `engine.info` reports it. Either way,
+every tool has a timeout, its stderr streams to the caller's log, and a cancel
+ends it.
 
 ## Use
 

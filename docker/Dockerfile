@@ -14,7 +14,10 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
       libzip-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ARG LOOM_REF=master
+# The commit the desktop app pins in its vendor/pins.json and builds its
+# native binaries from, so the two backends run the same LOOM. Another ref:
+#   docker build --build-arg LOOM_REF=<commit> -t openschematicmaps/loom docker/
+ARG LOOM_REF=1e4757838104d1e4d22186c9b77d5fc4b98681a0
 RUN git clone --recurse-submodules https://github.com/ad-freiburg/loom /loom \
     && cd /loom && git checkout ${LOOM_REF} && git submodule update --init --recursive \
     && mkdir build && cd build && cmake .. && make -j"$(nproc)" install

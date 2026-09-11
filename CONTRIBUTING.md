@@ -2,7 +2,11 @@
 
 The README's Setup section gets you a working checkout: `uv venv && uv pip
 install -e ".[dev,notebooks]"`, Docker for LOOM, `pytest` for the tests. The
-tests that run LOOM need Docker and the image and skip without them.
+tests that run LOOM need Docker and the image and skip without them; the one
+that holds the native binaries against the image needs `SCHEMATIC_LOOM_BIN`
+naming them as well, and prints its comparison under `-s`. The runner's own
+tests drive stand-in tools that are shebang scripts, so on Windows they skip
+and the spawn path there is exercised only by the desktop app's tests.
 
 ## Issues
 

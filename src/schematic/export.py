@@ -601,7 +601,7 @@ def beat_payload(beats: tuple[Beat, ...],
 
 def _ffmpeg(args: list[str], *, progress: Progress | None = None,
             frames: int | None = None, stage: str = "encode") -> None:
-    """Run one ffmpeg command, the way ``loom._run`` runs a tool: attached to
+    """Run one ffmpeg command, the way ``loom.execute`` runs a tool: attached to
     the caller's job, so a cancel ends it and the partial file can go; stderr
     streamed to the job's log; and, given ``frames``, ffmpeg's own frame count
     reported as progress."""

@@ -50,6 +50,10 @@ needs_loom = pytest.mark.skipif(
     not (_docker_ready() and all(z.exists() for z in SOURCE_ZIPS)),
     reason="needs docker, the loom image and the cached LA feed")
 
+needs_native = pytest.mark.skipif(
+    not (os.environ.get(loom.BIN_ENV) and all(z.exists() for z in SOURCE_ZIPS)),
+    reason=f"needs {loom.BIN_ENV} naming the native binaries and the cached LA feed")
+
 needs_ffmpeg = pytest.mark.skipif(
     not (shutil.which("ffmpeg") and shutil.which("ffprobe")), reason="needs ffmpeg on PATH")
 
@@ -272,7 +276,24 @@ def test_engine_info_is_the_handshake(client):
     assert info["engine"] == __version__
     assert info["protocol"] == 1
     assert info["home"] == str(config.home())
-    assert info["loom"]["backend"] == "docker"
+    # Whatever the environment asked for: docker unless SCHEMATIC_LOOM_BIN is set.
+    assert info["loom"]["backend"] == loom.backend().name
+    assert info["loom"]["commit"] == loom.commit()
+
+
+def test_engine_info_reports_the_backend_and_the_commit_the_host_passed(client, monkeypatch,
+                                                                       tmp_path):
+    monkeypatch.setenv(loom.BIN_ENV, str(tmp_path))
+    monkeypatch.setenv(loom.COMMIT_ENV, "1e4757838104d1e4d22186c9b77d5fc4b98681a0")
+    info = client.call("engine.info")["result"]
+    check(info, "EngineInfo")
+    assert info["loom"] == {"backend": "native",
+                            "commit": "1e4757838104d1e4d22186c9b77d5fc4b98681a0"}
+    monkeypatch.delenv(loom.BIN_ENV)
+    monkeypatch.setenv(loom.COMMIT_ENV, "  ")
+    info = client.call("engine.info")["result"]
+    check(info, "EngineInfo")
+    assert info["loom"] == {"backend": "docker", "commit": None}
 
 
 def test_no_parameter_methods_refuse_parameters(client):
@@ -655,6 +676,34 @@ def test_graph_build_reports_four_stages(client, home):
     for stage, path in result["paths"].items():
         assert Path(path).is_file()
         assert Path(path).parent == home / "data" / "graphs" / KEY
+    assert client.endpoint.jobs == {}
+
+
+@needs_native
+def test_graph_build_over_the_native_backend(client, home):
+    """The same four stages from the binaries the app ships, into the same
+    cache, with the feed unpacked beside its zip; a cancel ends the binary."""
+    assert client.call("engine.info")["result"]["loom"]["backend"] == "native"
+    msg_id = client.send("graph.build", {"key": KEY, "force": True})
+    response = client.wait(msg_id, timeout=180)
+    assert "result" in response, response
+    check(response["result"], "GraphBuildResult")
+    progress = client.notifications("job/progress", msg_id)
+    assert [p["stage"] for p in progress] == ["gtfs2graph", "topo", "loom", "octi"]
+    assert response["result"]["stages"]["octi"]["stations"] > 50
+    assert (home / "data" / "feeds" / f"{KEY}.normalized").is_dir()
+    for path in response["result"]["paths"].values():
+        assert Path(path).is_file()
+
+    second = client.send("graph.build", {"key": KEY, "force": True})
+    wait_for(lambda: second in client.endpoint.jobs
+             and client.endpoint.jobs[second].running is not None, 30, "gtfs2graph to start")
+    proc = client.endpoint.jobs[second].running
+    time.sleep(0.5)
+    client.notify("$/cancelRequest", {"id": second})
+    response = client.wait(second, timeout=30)
+    assert response["error"]["code"] == -32800, response
+    assert proc.poll() is not None, "the binary is still running"
     assert client.endpoint.jobs == {}
 
 
