@@ -5,10 +5,11 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
-## [Unreleased]
+## [0.3.0] - 2026-09-10
 
 The export module is three halves, so another process can do the middle,
-and two of them are on the protocol.
+and two of them are on the protocol. The protocol stays at version 1: every
+change is an addition, and a client of 0.2.1 sees nothing different.
 
 ### Added
 
