@@ -354,3 +354,59 @@ def bbox(groups) -> tuple[float, float, float, float]:
     xs = [p[0] for g in groups for p in g]
     ys = [p[1] for g in groups for p in g]
     return min(xs), min(ys), max(xs), max(ys)
+
+
+# --------------------------------------------------------------------------
+# A stage's graph, drawn, for someone else to rely on (E15)
+# --------------------------------------------------------------------------
+
+def summary(graph: LineGraph) -> dict:
+    """The counts a stage is described by: nodes, stations, junctions, edges
+    and the line labels. The protocol's StageSummary."""
+    stations = len(graph.stations)
+    return {"nodes": len(graph.nodes), "stations": stations,
+            "junctions": len(graph.nodes) - stations, "edges": len(graph.edges),
+            "lines": list(graph.labels)}
+
+
+def stage(key: str, stage: str, *, layout: str | None = None, width: float = 1200.0,
+          labels: bool = False, **overrides) -> tuple[str, dict]:
+    """One stored stage graph of a feed, as SVG, with its counts.
+
+    ``stage`` is one of the pipeline's four (``gtfs2graph``, ``topo``, ``loom``,
+    ``octi``). ``layout`` names the stored set by its id; without it, the set
+    stored for the registry entry with ``overrides`` applied, as the site and
+    the notebooks find it. The graph is reprojected before it is drawn, as
+    every drawing here must be: LOOM emits lon/lat and computes in metres.
+    A stage that is not stored raises ``pipeline.LayoutMissing`` with a hint
+    naming it and what builds it.
+    """
+    from . import pipeline  # here, not at the top: pipeline imports this module
+    from .crs import to_mercator
+
+    if stage not in pipeline.STAGE_FILES:
+        raise ValueError(f"{stage!r} is not a stage; the stages are "
+                         + ", ".join(pipeline.STAGE_FILES))
+    if layout is not None:
+        found = pipeline.read_layout(key, layout)
+    else:
+        found = pipeline.stored(key, **overrides)
+    if found is None:
+        raise pipeline.LayoutMissing(
+            f"{key!r} has no stored {stage} graph"
+            + (f" under layout {layout[:8]}" if layout else "")
+            + "; lay the feed out first (graph.build)")
+    path = found.paths[stage]
+    if not path.is_file():
+        raise pipeline.LayoutMissing(
+            f"{key!r} has no stored {stage} graph; lay the feed out first (graph.build)")
+    graph = LineGraph.from_geojson(path).reproject(to_mercator)
+    counts = summary(graph)
+    if stage == "octi":
+        ok, total = octilinearity(graph)
+        counts["octilinear"] = ok / total if total else 0.0
+    r = render(graph, width=width, labels=labels, style=Style(themed=True))
+    counts["width"] = r.width
+    counts["height"] = r.height
+    return r.svg, counts
+
