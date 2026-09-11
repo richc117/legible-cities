@@ -35,7 +35,7 @@ from . import __version__, animate, config, feeds, loom
 from . import diagnostics as diagnostics_module
 from .crs import to_mercator
 from .linegraph import LineGraph
-from .render import RenderResult, Style, render
+from .render import RenderResult, Style, check_color, render
 from .schedule import (StopMatch, Trip, busiest_weekday, match_stops, trips_on)
 
 # The LOOM stages, in order, with the arguments we run them with. Kept as data
@@ -434,6 +434,7 @@ class Result:
 def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         anchor: dt.date | None = None,
         width: float = 1800.0, style: Style | None = None,
+        colors: dict[str, str] | None = None, default_color: str | None = None,
         line_order: list[str] | None = None, force: bool = False,
         out_dir: Path | None = None, back: str = "index.html",
         icons: str | None = None, social: str = "",
@@ -445,10 +446,14 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     laid out if it is not stored yet (``force`` again), which is what the
     command line and the site want. ``date`` is the service day; without
     one the busiest weekday is chosen scanning from ``anchor``, which is
-    today unless the caller says otherwise. ``back`` is the href the animation
-    page's back-link points at. The default is the sibling gallery in
-    ``out/``; the site passes its own atlas URL, because a relative
-    "index.html" resolves to /maps/index.html there.
+    today unless the caller says otherwise. ``colors`` overrides a line's
+    colour by label and ``default_color`` is the colour of a line the feed
+    leaves uncoloured, both written ``#rrggbb`` and both reaching the map
+    and the page alike (``render.line_colors``); ``line_order`` is the
+    stacking on shared track. ``back`` is the href the animation page's
+    back-link points at. The default is the sibling gallery in ``out/``;
+    the site passes its own atlas URL, because a relative "index.html"
+    resolves to /maps/index.html there.
     """
     steps = ("gtfs2graph", "topo", "loom", "octi", "schedule", "render", "animate", "write")
 
@@ -488,8 +493,11 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     # Themed by default: the CSS variables carry literal fallbacks, so a
     # standalone SVG is unchanged, while an embedding page can theme the
     # furniture without resorting to an invert filter over the line colours.
-    r = render(graph, width=width, style=style or Style(themed=True),
-               title=name, line_order=line_order)
+    style = style or Style(themed=True)
+    if default_color is not None:
+        style = replace(style, default_line_color=check_color(default_color, "default_color"))
+    r = render(graph, width=width, style=style, title=name, line_order=line_order,
+               colors=colors)
     tick("render", f"{len(r.dropped_labels)} labels dropped")
     # The loom stage, not gtfs2graph: same stations and the same solved line
     # ordering, so only the shape differs. See animate.geographic_tracks.

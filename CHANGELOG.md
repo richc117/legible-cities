@@ -9,6 +9,16 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 ### Added
 
+- **Line colours as inputs** (E06). `pipeline.run(..., colors=, default_color=)`
+  overrides a line's colour by label over the feed's `route_color` and sets
+  the colour of a line the feed leaves uncoloured, resolved once in
+  `render.line_colors` for the map and the page together; `map.build` takes
+  both as `colors` and `default_color`, written `#rrggbb` (`HexColor` in the
+  schema) and refused otherwise. Every drawn line now has an entry in the
+  page's `data.lines`, so an uncoloured line (Pittsburgh's inclines) is the
+  same colour on the map, in the chips, under the train dots and in the
+  time chart, where each element used to fall back on its own. The SVG is
+  unchanged for the same inputs. Additive at protocol 1.
 - **Diagnostics as data** (`schematic.diagnostics`, E05). `Result.diagnostics()`
   builds one `Diagnostics` from a build; `to_dict()` is the block `map.build`
   has always sent, unchanged; `summary()` renders the lines the command line

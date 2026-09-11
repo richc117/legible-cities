@@ -271,6 +271,7 @@ def test_patterns_agree_with_the_schema():
     assert serve.CLOCK_PATTERN.pattern == defs["Clock"]["pattern"]
     assert serve.URL_PATTERN.pattern == defs["PageUrl"]["pattern"]
     assert serve.STEM_PATTERN.pattern == defs["CaptureJob"]["properties"]["stem"]["pattern"]
+    assert serve.COLOR_PATTERN.pattern == defs["HexColor"]["pattern"]
     # The app's generated types know every preset and storyboard by name.
     assert defs["PresetName"]["enum"] == list(export.PRESETS)
     assert defs["StoryboardName"]["enum"] == list(export.STORYBOARDS)
@@ -414,6 +415,18 @@ BAD_PARAMS = [
     ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "width": 0}, "MapBuildParams"),
     ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "width": "wide"},
      "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "colors": ["#123456"]},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "colors": {"A": "red"}},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "colors": {"A": "123456"}},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "colors": {"A": None}},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "default_color": "888888"},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "default_color": "#8888"},
+     "MapBuildParams"),
     ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "line_order": "A,B"},
      "MapBuildParams"),
     ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "style": {}}, "MapBuildParams"),
@@ -534,6 +547,9 @@ GOOD_PARAMS = [
     ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE}),
     ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "out": "p1",
                         "width": 900, "line_order": ["A", "B"]}),
+    ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                        "colors": {"A": "#123456", "Z": "#ABCDEF"}, "default_color": "#00ff00"}),
+    ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "colors": {}}),
     ("ExportPlanParams", {"key": KEY, "preset": "instagram-reel"}),
     ("ExportPlanParams", {"key": KEY, "preset": "instagram-post",
                           "page": "app://local/projects/p1/la-metro-rail.html", "date": DATE,
@@ -975,6 +991,23 @@ def test_map_build_writes_under_out_and_reports_diagnostics(client, home):
                       "schedule", "render", "animate", "write"]
     fractions = [p["fraction"] for p in client.notifications("job/progress", msg_id)]
     assert fractions == sorted(fractions) and fractions[-1] == 1.0
+
+
+@needs_loom
+def test_map_build_takes_a_colour_per_line_and_a_default(client, home):
+    """The two colour inputs reach the map's strokes and the page's data
+    through the server as they do through the library (test_colors.py)."""
+    layout = stored_layout(client)
+    result = client.call("map.build", {"key": KEY, "layout": layout, "date": DATE, "out": "p3",
+                                       "colors": {"A": "#123456", "ZZ": "#000000"},
+                                       "default_color": "#abcdef"},
+                         timeout=180)["result"]
+    svg = Path(result["files"]["svg"]).read_text()
+    assert '<g class="line" data-line="A" stroke="#123456"' in svg
+    assert '<g class="line" data-line="B" stroke="#eb131b"' in svg
+    lines = json.loads(Path(result["files"]["positions"]).read_text())["lines"]
+    assert lines["A"] == "#123456" and lines["B"] == "#eb131b" and "ZZ" not in lines
+    assert set(lines) == set(result["diagnostics"]["lines"])
 
 
 @needs_loom

@@ -355,11 +355,10 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
         for n in graph.stations if n.station_label
     }
 
-    colors: dict[str, str] = {}
-    for e in graph.edges:
-        for ln in e.lines:
-            if ln.color:
-                colors.setdefault(ln.label, ln.color if ln.color.startswith("#") else f"#{ln.color}")
+    # The colours the map was drawn in, every line included: the page's
+    # chips, dots and chart read this and never fall back on their own, so
+    # an uncoloured line looks the same in all four places.
+    colors = dict(render.colors)
 
     path_index: dict[tuple, int] = {}
     paths: list[dict] = []

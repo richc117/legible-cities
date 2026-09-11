@@ -179,6 +179,16 @@ whole service day as a Marey chart &mdash; and a
 them when you are watching the trains, and hiding them also tightens the view
 onto the network.
 
+A line's colour is an input, resolved once for the map and the page
+together: `pipeline.run(..., colors={"A": "#123456"})` overrides one line's
+colour over the feed's own `route_color`, `default_color="#888888"` is the
+colour of a line the feed leaves uncoloured, and `line_order=["A", "B"]` is
+the stacking on shared track. Every line the map draws has an entry in the
+page's `data.lines` in the colour it was drawn, so the chips, the train dots
+and the time chart never fall back on their own; a colour is written
+`#rrggbb` or refused; an override for a line the layout does not carry is
+ignored.
+
 `bin/run-all` runs every registered feed and prints a table of what worked.
 
 Feeds, layouts and output live under the repository (`data/feeds`,

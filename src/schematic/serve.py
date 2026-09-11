@@ -43,7 +43,8 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 from . import __version__, config, diagnostics, export, feeds, loom, pipeline, schedule
 from .crs import to_mercator
 from .linegraph import LineGraph
-from .render import octilinearity, stage as render_stage, summary as render_summary
+from .render import (HEX_COLOR_PATTERN, octilinearity, stage as render_stage,
+                     summary as render_summary)
 
 log = logging.getLogger(__name__)
 
@@ -234,6 +235,32 @@ def _strings(left: dict[str, Any], name: str) -> list[str] | None:
         return None
     if not isinstance(value, list) or not all(isinstance(s, str) for s in value):
         raise invalid_params(f"{name} must be a list of strings")
+    return value
+
+
+COLOR_PATTERN = re.compile(HEX_COLOR_PATTERN)
+
+
+def _color(left: dict[str, Any], name: str) -> str | None:
+    """A colour the client chose, written ``#rrggbb``, or none."""
+    value = left.pop(name, None)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not COLOR_PATTERN.match(value):
+        raise invalid_params(f"{name} must be a colour written #rrggbb")
+    return value
+
+
+def _colors(left: dict[str, Any], name: str) -> dict[str, str] | None:
+    """Line label to colour, every colour written ``#rrggbb``, or none."""
+    value = left.pop(name, None)
+    if value is None:
+        return None
+    if not isinstance(value, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) and COLOR_PATTERN.match(v)
+            for k, v in value.items()):
+        raise invalid_params(f"{name} must be an object of line label to a colour "
+                             f"written #rrggbb")
     return value
 
 
@@ -568,6 +595,8 @@ class EngineEndpoint(Endpoint):
         date = _date(left.pop("date", None))
         out = _token(left.pop("out")) if "out" in left else None
         width = _positive(left, "width", 1800.0)
+        colors = _colors(left, "colors")
+        default_color = _color(left, "default_color")
         line_order = _strings(left, "line_order")
         _no_extra("map.build", left)
         folder = config.out_dir() / out if out else None
@@ -576,6 +605,7 @@ class EngineEndpoint(Endpoint):
             # From the stored layout, and never a layout of its own: a map
             # that re-laid a network unasked would be a different map.
             result = pipeline.run(key, layout=layout, date=date, width=width,
+                                  colors=colors, default_color=default_color,
                                   line_order=line_order, out_dir=folder, progress=progress)
             where = folder or config.out_dir()
             diag = result.diagnostics()

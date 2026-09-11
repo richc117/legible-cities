@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import html
 import math
+import re
 from dataclasses import dataclass, field
 
 from .labels import Placement, Quad, Station, place, polyline_quads
@@ -90,6 +91,41 @@ def _color(hexish: str | None, fallback: str) -> str:
     return hexish if hexish.startswith("#") else f"#{hexish}"
 
 
+# A colour a caller chooses is written the one way, ``#rrggbb``: what the
+# schema says, what the server checks, and what this module refuses
+# otherwise. GTFS's own six digits without the hash are the feed's, not a
+# caller's, and ``_color`` keeps taking them.
+HEX_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
+_HEX_COLOR = re.compile(HEX_COLOR_PATTERN)
+
+
+def check_color(value: object, what: str) -> str:
+    """``value`` as a colour written ``#rrggbb``, or a ValueError naming
+    ``what`` was wrong."""
+    if not isinstance(value, str) or not _HEX_COLOR.match(value):
+        raise ValueError(f"{what} must be a colour written #rrggbb, not {value!r}")
+    return value
+
+
+def line_colors(graph: LineGraph, *, default: str,
+                overrides: dict[str, str] | None = None) -> dict[str, str]:
+    """Every line's colour, resolved once for the map, the page and the
+    export: a caller's override, else the feed's ``route_color``, else the
+    default. Keyed by label in the order the lines first appear on an edge,
+    so the map's stacking and the page's chips agree. An override for a
+    label the graph does not carry is ignored -- a client keeps colours for
+    lines a narrower mode has since dropped -- and one that is not
+    ``#rrggbb`` is refused."""
+    colors: dict[str, str] = {}
+    for e in graph.edges:
+        for ln in e.lines:
+            colors.setdefault(ln.label, _color(ln.color, default))
+    for label, value in (overrides or {}).items():
+        if label in colors:
+            colors[label] = check_color(value, f"the colour of line {label!r}")
+    return colors
+
+
 def _safe(token: str) -> str:
     return "".join(ch if ch.isalnum() else "_" for ch in token)
 
@@ -118,6 +154,10 @@ class RenderResult:
     tracks: dict[tuple[str, str, str], TrackPath] = field(default_factory=dict)
     node_xy: dict[str, Coord] = field(default_factory=dict)
     dropped_labels: list[str] = field(default_factory=list)
+    # The colour each line was drawn in, by label: what the animation page's
+    # chips, dots and chart show, so nothing downstream resolves a colour
+    # again or falls back on its own.
+    colors: dict[str, str] = field(default_factory=dict)
 
     def track(self, label: str, src: str, dst: str) -> TrackPath | None:
         """Look up a track path in either direction."""
@@ -159,18 +199,21 @@ def _horizontal_run(graph: LineGraph, node_id: str, proj: Projection) -> bool:
 
 def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = None,
            labels: bool = True, title: str | None = None,
-           line_order: list[str] | None = None) -> RenderResult:
-    """Draw the graph. ``width`` sizes the network; the canvas grows for labels."""
+           line_order: list[str] | None = None,
+           colors: dict[str, str] | None = None) -> RenderResult:
+    """Draw the graph. ``width`` sizes the network; the canvas grows for labels.
+
+    ``colors`` overrides a line's colour by label, over the feed's own and
+    before the style's default (``line_colors``); ``line_order`` is the
+    stacking on shared track."""
     style = style or Style()
     proj = Projection.fit(graph, width)
     tracks = build_tracks(graph, proj, style)
     node_xy = {nid: proj(n.coord) for nid, n in graph.nodes.items()}
 
-    colors: dict[str, str] = {}
+    colors = line_colors(graph, default=style.default_line_color, overrides=colors)
     routes_at: dict[str, set[str]] = {}
     for e in graph.edges:
-        for ln in e.lines:
-            colors.setdefault(ln.label, _color(ln.color, style.default_line_color))
         for end in (e.src, e.dst):
             routes_at.setdefault(end, set()).update(ln.label for ln in e.lines)
 
@@ -302,7 +345,8 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     out.append("</svg>")
 
     return RenderResult(svg="\n".join(out), width=w, height=h, projection=proj,
-                        tracks=tracks, node_xy=node_xy, dropped_labels=dropped)
+                        tracks=tracks, node_xy=node_xy, dropped_labels=dropped,
+                        colors=colors)
 
 
 def octilinearity(graph: LineGraph, tol_deg: float = 1.0,
