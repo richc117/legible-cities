@@ -194,8 +194,8 @@ def _overrides(left: dict[str, Any]) -> dict[str, Any]:
                      "or route_type numbers, comma-joined")
     if mode is not None:
         out["mode"] = mode
-    agency = _optional(left, "agency", lambda v: isinstance(v, str) and 0 < len(v) <= 64,
-                       "must be an agency_id from the feed")
+    agency = _optional(left, "agency", lambda v: isinstance(v, str) and len(v) <= 64,
+                       "must be an agency_id from the feed, or empty for every operator")
     if agency is not None:
         out["agency"] = agency
     for name in ("label_pattern", "label_strip"):
@@ -638,6 +638,10 @@ class EngineEndpoint(Endpoint):
         for extra in ("label_pattern", "label_strip"):
             if extra in overrides:
                 raise invalid_params(f"feeds.add does not take {extra}")
+        # An empty agency is graph.build's word for every operator; a feed
+        # added with none simply has none.
+        if overrides.get("agency") == feeds.NO_AGENCY:
+            raise invalid_params("agency must be an agency_id from the feed, or left out")
         _no_extra("feeds.add", left)
 
         def work(job: loom.Job, progress: Progress) -> dict[str, Any]:

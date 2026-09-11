@@ -218,9 +218,8 @@
         },
         "agency": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 64,
-          "description": "Keep only this agency_id; the registry entry's when omitted."
+          "description": "Keep only this agency_id; the registry entry's when omitted; empty for every operator, whatever the entry says."
         },
         "label_pattern": {
           "type": "string",
@@ -1414,6 +1413,11 @@
           "type": ["string", "null"],
           "description": "The LOOM mode (gtfs2graph -m) that keeps this type, so a client can show which types a chosen mode draws; null for a type LOOM has no name for. The mode all keeps every type."
         },
+        "modes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Every -m name that keeps this type, the canonical one first (subway and metro; tram and streetcar; rail and train); empty for a type LOOM has no name for. A numeric mode keeps its own code."
+        },
         "routes": {
           "type": "integer",
           "minimum": 0
@@ -1427,6 +1431,7 @@
         "route_type",
         "name",
         "mode",
+        "modes",
         "routes",
         "trips"
       ],

@@ -35,7 +35,7 @@ def test_a_small_feed_inspects_whole(home, tmp_path):
         "route_id": "R1", "agency_id": "M", "short_name": "1", "long_name": "Linea 1",
         "label": "1", "route_type": 1, "color": None, "text_color": None, "trips": 1}]
     assert d["route_types"] == [{"route_type": 1, "name": "subway", "mode": "subway",
-                                 "routes": 1, "trips": 1}]
+                                 "modes": ["subway", "metro"], "routes": 1, "trips": 1}]
     assert d["stops"] == {"stops": 2, "stations": 0, "entrances": 0, "generic_nodes": 0,
                           "boarding_areas": 0, "total": 2}
     assert d["trips"] == 1 and d["frequency_trips"] == 0
@@ -94,6 +94,13 @@ def test_route_type_names_and_modes():
     assert inspection.route_type_name(99) == "type 99"
     assert inspection.mode_for(700) == "bus"
     assert inspection.mode_for(99) is None
+    assert inspection.modes_for(0) == ["tram", "streetcar"]
+    assert inspection.modes_for(1100) == []
+    # Every alias is a name gtfs2graph takes, and every basic type has one.
+    from schematic import feeds
+    for names in inspection.ALIASES.values():
+        assert all(n in feeds.MOTS for n in names)
+    assert set(inspection.ALIASES) == set(inspection.ROUTE_TYPES)
     only_bus = [{"route_type": 3, "routes": 5, "trips": 50}]
     assert inspection._suggest_mode(only_bus) == "bus"
     assert inspection._suggest_mode([]) is None

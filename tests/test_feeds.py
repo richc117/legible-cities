@@ -354,3 +354,12 @@ def test_add_reports_the_download_and_the_check_and_stops_when_asked(home, tmp_p
     assert "gone" not in feeds.all()
     assert sorted(p.name for p in config.feeds_dir().iterdir()) == ["seen.zip", "user-feeds.json"]
 
+
+def test_an_empty_agency_means_every_operator_where_the_entry_names_one():
+    cdmx = feeds.get("cdmx-metro")
+    assert cdmx.agency == "METRO"
+    assert feeds.resolved("cdmx-metro").agency == "METRO"
+    assert feeds.resolved("cdmx-metro", agency=None).agency == "METRO"
+    assert feeds.resolved("cdmx-metro", agency=feeds.NO_AGENCY).agency is None
+    assert feeds.resolved("cdmx-metro", agency="SUB").agency == "SUB"
+

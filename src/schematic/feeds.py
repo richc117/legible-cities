@@ -641,14 +641,23 @@ def valid_mode(value: str) -> bool:
 OVERRIDES = ("mode", "agency", "label_pattern", "label_strip")
 
 
+# The one way to ask for no agency at all on a feed whose entry names one:
+# None means the registry's value, so "none" needs a word of its own.
+NO_AGENCY = ""
+
+
 def resolved(key: str, **overrides: Any) -> Feed:
     """The registry entry with any of ``OVERRIDES`` replaced. ``None`` means
-    the registry's value; an override equal to it changes nothing."""
+    the registry's value; an override equal to it changes nothing; an
+    ``agency`` of ``NO_AGENCY`` (the empty string) means every operator,
+    whatever the entry says."""
     unknown = set(overrides) - set(OVERRIDES)
     if unknown:
         raise TypeError(f"not something a build can override: {', '.join(sorted(unknown))}")
     feed = get(key)
     given = {name: value for name, value in overrides.items() if value is not None}
+    if given.get("agency") == NO_AGENCY:
+        given["agency"] = None
     return replace(feed, **given) if given else feed
 
 

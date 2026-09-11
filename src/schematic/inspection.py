@@ -37,6 +37,16 @@ ROUTE_TYPES: dict[int, tuple[str, str]] = {
 }
 EXTENDED: dict[int, int] = {1: 2, 2: 3, 3: 2, 4: 1, 5: 1, 6: 1, 7: 3, 8: 11, 9: 0,
                             10: 4, 12: 4, 13: 6, 14: 7}
+# The other names gtfs2graph's -m takes for each basic type (feeds.MOTS is
+# the whole list); a client that lets a person type a mode reads these to
+# say what it keeps, rather than carrying the table itself.
+ALIASES: dict[int, tuple[str, ...]] = {
+    0: ("tram", "streetcar"), 1: ("subway", "metro"), 2: ("rail", "train"),
+    3: ("bus", "coach"), 4: ("ferry", "boat", "ship"), 5: ("cablecar",),
+    6: ("gondola",), 7: ("funicular",), 11: ("trolleybus", "trolley", "trolley-bus"),
+    12: ("monorail", "mono-rail"),
+}
+
 # Rail-like types: a feed with nothing else is drawn whole ("all"), as the
 # presets are, rather than filtered to its most common type.
 RAILISH = frozenset({0, 1, 2, 5, 6, 7, 12})
@@ -58,11 +68,21 @@ def route_type_name(code: int) -> str:
     return f"type {code}"
 
 
-def mode_for(code: int) -> str | None:
+def _basic(code: int) -> int | None:
     if code in ROUTE_TYPES:
-        return ROUTE_TYPES[code][1]
-    basic = EXTENDED.get(code // 100)
+        return code
+    return EXTENDED.get(code // 100)
+
+
+def mode_for(code: int) -> str | None:
+    basic = _basic(code)
     return ROUTE_TYPES[basic][1] if basic is not None else None
+
+
+def modes_for(code: int) -> list[str]:
+    """Every -m name that keeps the type, the canonical one first."""
+    basic = _basic(code)
+    return list(ALIASES[basic]) if basic is not None else []
 
 
 @dataclass
@@ -138,7 +158,8 @@ def _route_types(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
         entry["trips"] += route["trips"]
     # The LOOM mode that keeps each type, so a client can show which of the
     # types a chosen mode draws without knowing the table itself.
-    return [{"route_type": code, "name": route_type_name(code), "mode": mode_for(code), **counts}
+    return [{"route_type": code, "name": route_type_name(code), "mode": mode_for(code),
+             "modes": modes_for(code), **counts}
             for code, counts in sorted(by_type.items())]
 
 

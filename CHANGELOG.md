@@ -9,10 +9,15 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 ### Added
 
-- **`feeds.inspect` names the LOOM mode per route type** (`route_types[].mode`),
-  so a client can show which of a feed's types a chosen mode keeps without
-  carrying the table itself; null for a type LOOM has no name for.
-  Additive at protocol 1.
+- **`feeds.inspect` names the LOOM mode per route type** (`route_types[].mode`,
+  and `modes`, every `-m` name that keeps the type), so a client can show
+  which of a feed's types a chosen mode keeps without carrying the table
+  itself; null and empty for a type LOOM has no name for. Additive at
+  protocol 1.
+- **An empty `agency` on `graph.build` means every operator.** A missing
+  one means the registry entry's, as before, so a feed whose entry names
+  an operator had no way to be drawn whole; `feeds.NO_AGENCY` is the word
+  for it in the library.
 
 ## [0.7.0] - 2026-09-11
 
