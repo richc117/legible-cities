@@ -26,9 +26,10 @@ from pathlib import Path
 import jsonschema
 import pandas as pd
 import pytest
+from unittest import mock
 from jsonschema import Draft202012Validator
 
-from schematic import __version__, config, feeds, loom, schedule, serve
+from schematic import __version__, config, export, feeds, loom, schedule, serve
 
 SCHEMA = serve.schema()
 KEY = "la-metro-rail"
@@ -48,6 +49,9 @@ def _docker_ready() -> bool:
 needs_loom = pytest.mark.skipif(
     not (_docker_ready() and all(z.exists() for z in SOURCE_ZIPS)),
     reason="needs docker, the loom image and the cached LA feed")
+
+needs_ffmpeg = pytest.mark.skipif(
+    not (shutil.which("ffmpeg") and shutil.which("ffprobe")), reason="needs ffmpeg on PATH")
 
 
 def check(instance, name: str) -> None:
@@ -245,6 +249,13 @@ def test_patterns_agree_with_the_schema():
     assert serve.DATE_PATTERN.pattern == defs["ServiceDate"]["pattern"]
     assert set(serve.KIND_BY_MODULE.values()) | {"engine", "io", "params"} \
         == set(defs["ErrorData"]["properties"]["kind"]["enum"])
+    assert serve.CLOCK_PATTERN.pattern == defs["Clock"]["pattern"]
+    assert serve.URL_PATTERN.pattern == defs["PageUrl"]["pattern"]
+    assert serve.STEM_PATTERN.pattern == defs["CaptureJob"]["properties"]["stem"]["pattern"]
+    # The app's generated types know every preset and storyboard by name.
+    assert defs["PresetName"]["enum"] == list(export.PRESETS)
+    assert defs["StoryboardName"]["enum"] == list(export.STORYBOARDS)
+    assert defs["View"]["enum"] == list(export.VIEWS)
 
 
 def test_every_registered_key_is_a_valid_feed_key():
@@ -312,7 +323,72 @@ BAD_PARAMS = [
     ("map.build", {"key": KEY, "date": DATE, "width": "wide"}, "MapBuildParams"),
     ("map.build", {"key": KEY, "date": DATE, "line_order": "A,B"}, "MapBuildParams"),
     ("map.build", {"key": KEY, "date": DATE, "style": {}}, "MapBuildParams"),
+    ("export.plan", None, "ExportPlanParams"),
+    ("export.plan", {}, "ExportPlanParams"),
+    ("export.plan", {"key": KEY}, "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": 3}, "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "page": "not an address"},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "date": "tomorrow"},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"view": "plan"}},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"quality": "ultra"}},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"at": "7am"}},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"labels": "no"}},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"tag": "a/b"}},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"lines": "A,B"}},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "mode": "video"},
+     "ExportPlanParams"),
+    ("export.encode", {}, "ExportEncodeParams"),
+    ("export.encode", {"plan": {}, "source": "/a", "dest": "/b/x.mp4"}, "ExportEncodeParams"),
+    ("export.encode", {"plan": "plan", "source": "/a", "dest": "/b/x.mp4"}, "ExportEncodeParams"),
 ]
+
+
+def _plan_dict(**over):
+    job = export.plan(KEY, "instagram-reel", **over)
+    return {**job.to_dict(), "filename": job.filename}
+
+
+# A plan handed back with one field wrong, per field the server checks.
+BAD_PLANS = [
+    {"mode": "gif"}, {"url": "no scheme"}, {"width": 0}, {"scale": 2.5}, {"fps": True},
+    {"format": "webm"}, {"beats": "none"}, {"beats": [{"secs": 0}]},
+    {"beats": [{"secs": 1, "view": "plan", "labels": None, "at": None, "speed": None,
+                "sweep": False, "hours": None, "lo": None, "hi": None, "tween": None}]},
+    {"beats": [{"secs": 1, "view": None, "labels": None, "at": "07:00", "speed": None,
+                "sweep": False, "hours": None, "lo": None, "hi": None, "tween": None}]},
+    {"keep": "yes"}, {"fade": -1}, {"stem": "../x"}, {"theme": "sepia"}, {"view": "plan"},
+    {"storyboard": "unknown"}, {"at": "07:00"}, {"notes": "note"}, {"extra": 1},
+]
+
+
+@pytest.mark.parametrize("wrong", BAD_PLANS)
+def test_a_plan_handed_back_is_checked_field_by_field(client, wrong):
+    plan = {**_plan_dict(), **wrong}
+    params = {"plan": plan, "source": "/somewhere/frames", "dest": "/elsewhere/out.mp4"}
+    error = client.call("export.encode", params)["error"]
+    assert error["code"] == -32602, error
+    assert error["data"]["kind"] == "params"
+    assert invalid(params, "ExportEncodeParams")
+
+
+@pytest.mark.parametrize("params", [
+    {"source": "frames", "dest": "/elsewhere/out.mp4"},
+    {"source": "/somewhere/frames", "dest": "out.mp4"},
+    {"source": "/somewhere/frames", "dest": str(config.REPO_ROOT / "out" / "x.mp4")},
+    {"source": "/somewhere/frames", "dest": "/elsewhere/out.mp4", "provenance": {"trips": -1}},
+    {"source": "/somewhere/frames", "dest": "/elsewhere/out.mp4", "provenance": {"x": 1}},
+])
+def test_encode_refuses_a_path_it_must_not_write_to(client, params):
+    error = client.call("export.encode", {"plan": _plan_dict(), **params})["error"]
+    assert error["code"] == -32602, error
 
 
 @pytest.mark.parametrize("method,params,definition", BAD_PARAMS)
@@ -340,12 +416,180 @@ GOOD_PARAMS = [
     ("MapBuildParams", {"key": KEY, "date": DATE}),
     ("MapBuildParams", {"key": KEY, "date": DATE, "out": "p1", "width": 900,
                         "line_order": ["A", "B"], "force": False}),
+    ("ExportPlanParams", {"key": KEY, "preset": "instagram-reel"}),
+    ("ExportPlanParams", {"key": KEY, "preset": "instagram-post",
+                          "page": "app://local/projects/p1/la-metro-rail.html", "date": DATE,
+                          "options": {"view": "map", "labels": True, "title": False,
+                                      "clock": True, "theme": "light", "at": "07:30",
+                                      "lines": ["A"], "storyboard": "tour",
+                                      "quality": "draft", "fade": 0.5, "tag": "t",
+                                      "safe": False}}),
+    ("ExportEncodeParams", {"plan": _plan_dict(), "source": "/somewhere/frames",
+                            "dest": "/elsewhere/out.mp4"}),
+    ("ExportEncodeParams", {"plan": _plan_dict(), "source": "/somewhere/frames",
+                            "dest": "/elsewhere/out.mp4",
+                            "provenance": {"service_date": DATE, "trips": 100,
+                                           "stations": 10, "lines": 2, "caveats": ["a"]}}),
 ]
 
 
 @pytest.mark.parametrize("definition,params", GOOD_PARAMS)
 def test_the_schema_accepts_what_the_server_accepts(definition, params):
     check(params, definition)
+
+
+# -------------------------------------------------------------------- export
+
+def test_export_presets_and_storyboards_are_the_tables(client):
+    presets = client.call("export.presets")["result"]
+    check(presets, "ExportPresets")
+    reel = next(p for p in presets["presets"] if p["name"] == "instagram-reel")
+    assert (reel["width"], reel["height"], reel["kind"], reel["format"]) == (1080, 1920, "video", "mp4")
+    assert reel["storyboard"] == "tour" and reel["safe_zones"] is True
+    assert {p["name"] for p in presets["presets"]} == set(export.PRESETS)
+
+    boards = client.call("export.storyboards")["result"]
+    check(boards, "ExportStoryboards")
+    by_name = {b["name"]: b for b in boards["storyboards"]}
+    assert set(by_name) == set(export.STORYBOARDS)
+    assert by_name["tour"]["geographic"] is False
+    assert by_name["transform"]["geographic"] is True
+    assert by_name["transform"]["beats"][0]["at"] == "08:00"
+    assert by_name["transform"]["views"] == "geographic -> map -> linear -> time"
+    for name in ("export.presets", "export.storyboards"):
+        assert client.call(name, {"x": 1})["error"]["code"] == -32602
+
+
+def test_export_plan_is_the_module_plan_and_is_pure(client):
+    result = client.call("export.plan", {"key": KEY, "preset": "instagram-reel"})["result"]
+    check(result, "CaptureJob")
+    assert result == _plan_dict()
+    assert result["filename"] == "la-metro-rail-instagram-reel.mp4"
+    assert result["mode"] == "video" and len(result["beats"]) == 4
+    assert client.endpoint.jobs == {}, "a plan is not a job"
+
+
+def test_export_plan_takes_the_apps_page_and_service_day(client):
+    """The desktop app serves a project's page on its own origin and knows
+    the project's service day; nothing in the answer is a path under the
+    engine's own repository."""
+    page = "app://local/projects/p1/la-metro-rail.html"
+    result = client.call("export.plan", {
+        "key": KEY, "preset": "instagram-post", "page": page, "date": "2026-09-11",
+        "options": {"quality": "high", "at": "09:15", "theme": "light", "tag": "app"}})["result"]
+    check(result, "CaptureJob")
+    assert result["url"].startswith(page + "?present=1")
+    assert "date=Friday+11+September+2026" in result["url"]
+    assert "at=09%3A15" in result["url"]
+    assert result["at"] == 9 * 3600 + 15 * 60
+    assert result["filename"] == "la-metro-rail-instagram-post-light-app.png"
+    assert str(config.REPO_ROOT) not in json.dumps(result)
+
+
+def test_export_plan_refuses_with_the_export_modules_sentences(client):
+    vector = client.call("export.plan", {"key": KEY, "preset": "portfolio-svg"})["error"]
+    assert vector["code"] == -32000 and vector["data"]["kind"] == "export"
+    assert "vector" in vector["data"]["hint"]
+    # A geographic storyboard on a feed opted out of the geometry: the plan's
+    # own refusal, with the sentence bin/export shows.
+    plain = "opted-out"
+    real = feeds.FEEDS[KEY]
+    with mock.patch.dict(feeds.FEEDS, {**feeds.FEEDS, plain: replace(real, key=plain, geographic=False)},
+                         clear=True):
+        geo = client.call("export.plan", {"key": plain, "preset": "portfolio-mp4",
+                                          "options": {"storyboard": "transform"}})["error"]
+    assert geo["code"] == -32000 and geo["data"]["kind"] == "export"
+    assert "geographic" in geo["data"]["hint"]
+
+
+def _frames(into: Path, n: int, size: int, *, noise: bool = False) -> Path:
+    """A square crossing the frame, or noise: near-identical frames encode
+    in a blink, and a cancel test needs ffmpeg to still be at work."""
+    from PIL import Image, ImageDraw
+    into.mkdir(parents=True, exist_ok=True)
+    for i in range(n):
+        if noise:
+            im = Image.frombytes("RGB", (size, size), os.urandom(size * size * 3))
+        else:
+            im = Image.new("RGB", (size, size), "#15120f")
+            x = int(i / max(n - 1, 1) * (size - 12))
+            ImageDraw.Draw(im).rectangle([x, size // 2 - 6, x + 12, size // 2 + 6],
+                                         fill="#e8b04a")
+        im.save(into / f"{i:06d}.png")
+    return into
+
+
+@needs_ffmpeg
+def test_export_encode_reproduces_the_video_and_reports_progress(client, tmp_path):
+    from PIL import Image, ImageChops
+    frames = _frames(tmp_path / "frames", 12, 64)
+    plan = client.call("export.plan", {"key": KEY, "preset": "linkedin-video",
+                                       "options": {"quality": "high"}})["result"]
+    outs = []
+    for name in ("a", "b"):
+        dest = tmp_path / name / plan["filename"]
+        msg_id = client.send("export.encode", {
+            "plan": plan, "source": str(frames), "dest": str(dest),
+            "provenance": {"service_date": "2026-09-11", "trips": 321, "caveats": ["one"]}})
+        result = client.wait(msg_id)["result"]
+        check(result, "ExportEncodeResult")
+        assert result["files"][0]["path"] == str(dest) and result["files"][0]["bytes"] > 0
+        assert result["sidecar"]["file"] == plan["filename"]
+        assert result["sidecar"]["service_date"] == "2026-09-11"
+        assert result["sidecar"]["trips"] == 321
+        assert result["sidecar"]["caveats"] == ["one"]
+        assert export.sidecar_path(dest).exists()
+        progress = client.notifications("job/progress", msg_id)
+        assert progress and progress[-1]["fraction"] == 1.0
+        assert all(p["stage"] == "encode" for p in progress)
+        assert [p["fraction"] for p in progress] == sorted(p["fraction"] for p in progress)
+        outs.append(dest)
+    assert sorted(p.name for p in frames.iterdir()) == [f"{i:06d}.png" for i in range(12)]
+
+    def decoded(video: Path, into: Path) -> list:
+        into.mkdir()
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(video),
+                        str(into / "%06d.png")], check=True)
+        return [Image.open(p).convert("RGB") for p in sorted(into.glob("*.png"))]
+
+    da, db = decoded(outs[0], tmp_path / "da"), decoded(outs[1], tmp_path / "db")
+    assert len(da) == len(db) == 12
+    for x, y in zip(da, db):
+        assert max(band[1] for band in ImageChops.difference(x, y).getextrema()) <= 8
+    assert client.endpoint.jobs == {}
+
+
+@needs_ffmpeg
+def test_export_encode_refuses_a_source_that_is_not_there(client, tmp_path):
+    plan = _plan_dict()
+    error = client.call("export.encode", {"plan": plan, "source": str(tmp_path / "missing"),
+                                          "dest": str(tmp_path / "out.mp4")})["error"]
+    assert error["code"] == -32000 and error["data"]["kind"] == "io"
+    assert not (tmp_path / "out.mp4").exists()
+
+
+@needs_ffmpeg
+def test_cancel_ends_ffmpeg_and_leaves_no_partial_file(client, tmp_path):
+    """Enough frames at the preset's size that libx264 on its slow preset
+    is still encoding when the cancel lands."""
+    frames = _frames(tmp_path / "frames", 90, 400, noise=True)
+    plan = client.call("export.plan", {"key": KEY, "preset": "linkedin-video"})["result"]
+    dest = tmp_path / "out" / plan["filename"]
+    msg_id = client.send("export.encode", {"plan": plan, "source": str(frames), "dest": str(dest)})
+    wait_for(lambda: msg_id in client.endpoint.jobs
+             and client.endpoint.jobs[msg_id].running is not None, 30, "ffmpeg to start")
+    proc = client.endpoint.jobs[msg_id].running
+    time.sleep(0.5)  # well inside the encode: noise at 1200x1200 on x264's slow preset
+    assert proc.poll() is None, "ffmpeg was already done; the frames are too cheap"
+    client.notify("$/cancelRequest", {"id": msg_id})
+
+    response = client.wait(msg_id, timeout=30)
+    assert response["error"]["code"] == -32800, response
+    assert proc.poll() is not None, "ffmpeg is still running"
+    assert client.endpoint.jobs == {}
+    assert not dest.exists(), "a partial file was left behind"
+    assert not export.sidecar_path(dest).exists()
+    assert sorted(p.name for p in frames.iterdir()) == [f"{i:06d}.png" for i in range(90)]
 
 
 # -------------------------------------------------------------------- errors

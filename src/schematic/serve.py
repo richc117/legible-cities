@@ -52,6 +52,9 @@ ENGINE_ERROR = -32000
 KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 DATE_PATTERN = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+CLOCK_PATTERN = re.compile(r"^[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?$")
+URL_PATTERN = re.compile(r"^[a-z][a-z0-9+.-]*://[^\s]+$")
+STEM_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 # An exception's kind is the module that raised it, since that is where the
 # sentence for a person was written.
@@ -180,6 +183,186 @@ def _strings(left: dict[str, Any], name: str) -> list[str] | None:
     return value
 
 
+# ---- the export methods' parameters: a preset, a page, the options, a plan
+
+def _number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _preset(value: Any) -> str:
+    if not isinstance(value, str) or value not in export.PRESETS:
+        raise invalid_params("preset must be the name of an export preset; export.presets "
+                             "lists them")
+    return value
+
+
+def _optional(left: dict[str, Any], name: str, ok: Callable[[Any], bool], sentence: str) -> Any:
+    value = left.pop(name, None)
+    if value is not None and not ok(value):
+        raise invalid_params(f"{name} {sentence}")
+    return value
+
+
+def _export_options(value: Any) -> dict[str, Any]:
+    """The optional dressing of an export, as ``export.plan`` takes it."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise invalid_params("options must be an object")
+    left = dict(value)
+    out: dict[str, Any] = {}
+    view = _optional(left, "view", lambda v: v in export.VIEWS,
+                     "must be one of " + ", ".join(export.VIEWS))
+    if view is not None:
+        out["view"] = view
+    for flag in ("labels", "title", "clock", "safe"):
+        v = _optional(left, flag, lambda x: isinstance(x, bool), "must be true or false")
+        if v is not None:
+            out[flag] = v
+    theme = _optional(left, "theme", lambda v: v in ("dark", "light"), "must be dark or light")
+    if theme is not None:
+        out["theme"] = theme
+    at = _optional(left, "at", lambda v: isinstance(v, str) and bool(CLOCK_PATTERN.match(v)),
+                   "must be a clock, HH:MM")
+    if at is not None:
+        out["at"] = at
+    lines = _strings(left, "lines")
+    if lines is not None:
+        out["lines"] = tuple(lines)
+    board = _optional(left, "storyboard", lambda v: v in export.STORYBOARDS,
+                      "must be the name of a storyboard; export.storyboards lists them")
+    if board is not None:
+        out["storyboard"] = board
+    quality = _optional(left, "quality", lambda v: v in export.QUALITY,
+                        "must be draft, standard or high")
+    if quality is not None:
+        out["quality"] = quality
+    fade = _optional(left, "fade", lambda v: _number(v) and v >= 0, "must be seconds, 0 or more")
+    if fade is not None:
+        out["fade"] = float(fade)
+    tag = _optional(left, "tag", lambda v: isinstance(v, str) and bool(TOKEN_PATTERN.match(v)),
+                    "must be a short filename suffix: letters, digits, dot, underscore, hyphen")
+    if tag is not None:
+        out["tag"] = tag
+    _no_extra("export.plan options", left)
+    return out
+
+
+def _beat_payload(value: Any, where: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise invalid_params(f"{where} is not an object")
+    left = dict(value)
+    secs = left.pop("secs", None)
+    if not _number(secs) or secs <= 0:
+        raise invalid_params(f"{where} lasts no time")
+    out: dict[str, Any] = {"secs": secs}
+    out["view"] = _optional(left, "view", lambda v: v in export.VIEWS, "names a view the page lacks")
+    out["labels"] = _optional(left, "labels", lambda v: isinstance(v, bool), "must be true or false")
+    for field in ("at", "speed", "hours", "lo", "hi", "tween"):
+        out[field] = _optional(left, field, _number, "must be a number")
+    sweep = left.pop("sweep", False)
+    if not isinstance(sweep, bool):
+        raise invalid_params(f"{where} has a sweep that is not true or false")
+    out["sweep"] = sweep
+    _no_extra(where, left)
+    return out
+
+
+def _capture_job(value: Any) -> export.CaptureJob:
+    """A plan the client hands back, checked field by field before it is trusted."""
+    if not isinstance(value, dict):
+        raise invalid_params("plan must be the object export.plan answered with")
+    left = dict(value)
+    left.pop("filename", None)          # the plan's own convenience; recomputed
+    key = _feed_key(left.pop("key", None))
+    preset = _preset(left.pop("preset", None))
+    mode = left.pop("mode", None)
+    if mode not in ("still", "video"):
+        raise invalid_params("plan.mode must be still or video")
+    url = left.pop("url", None)
+    if not isinstance(url, str) or not URL_PATTERN.match(url):
+        raise invalid_params("plan.url must be the page's address")
+    ints: dict[str, int] = {}
+    for name, low in (("width", 1), ("height", 1), ("scale", 1), ("fps", 1), ("settle", 0),
+                      ("crf", 0)):
+        v = left.pop(name, None)
+        if not isinstance(v, int) or isinstance(v, bool) or v < low:
+            raise invalid_params(f"plan.{name} must be a whole number, {low} or more")
+        ints[name] = v
+    fmt = left.pop("format", None)
+    if fmt not in ("png", "jpg", "mp4", "gif"):
+        raise invalid_params("plan.format must be png, jpg, mp4 or gif")
+    beats_raw = left.pop("beats", None)
+    if not isinstance(beats_raw, list):
+        raise invalid_params("plan.beats must be a list")
+    beats = tuple(_beat_payload(b, f"plan.beats[{i}]") for i, b in enumerate(beats_raw))
+    keep = left.pop("keep", None)
+    if not isinstance(keep, bool):
+        raise invalid_params("plan.keep must be true or false")
+    fade = left.pop("fade", None)
+    if not _number(fade) or fade < 0:
+        raise invalid_params("plan.fade must be seconds, 0 or more")
+    stem = left.pop("stem", None)
+    if not isinstance(stem, str) or not STEM_PATTERN.match(stem):
+        raise invalid_params("plan.stem must be a file name without a path or an extension")
+    theme = left.pop("theme", None)
+    if theme not in ("dark", "light"):
+        raise invalid_params("plan.theme must be dark or light")
+    view = left.pop("view", None)
+    if view not in export.VIEWS:
+        raise invalid_params("plan.view must be one of " + ", ".join(export.VIEWS))
+    board = left.pop("storyboard", "")
+    if not isinstance(board, str) or (board and board not in export.STORYBOARDS):
+        raise invalid_params("plan.storyboard must be a storyboard's name, or empty")
+    at = left.pop("at", None)
+    if at is not None and not _number(at):
+        raise invalid_params("plan.at must be seconds, or null")
+    notes = left.pop("notes", [])
+    if not isinstance(notes, list) or not all(isinstance(n, str) for n in notes):
+        raise invalid_params("plan.notes must be a list of strings")
+    _no_extra("plan", left)
+    return export.CaptureJob(key=key, preset=preset, mode=mode, url=url, width=ints["width"],
+                             height=ints["height"], scale=ints["scale"], fps=ints["fps"],
+                             format=fmt, settle=ints["settle"], beats=beats, keep=keep,
+                             crf=ints["crf"], fade=float(fade), stem=stem, theme=theme,
+                             view=view, storyboard=board, at=at, notes=tuple(notes))
+
+
+def _absolute(left: dict[str, Any], name: str) -> Path:
+    """A path the client owns: absolute, and never inside the engine's own tree."""
+    value = left.pop(name, None)
+    if not isinstance(value, str) or not value or not Path(value).is_absolute():
+        raise invalid_params(f"{name} must be an absolute path")
+    path = Path(value)
+    try:
+        export._guard_outside_repo(path if name == "source" else path.parent)
+    except ValueError:
+        raise invalid_params(f"{name} must not be inside the engine's own repository") from None
+    return path
+
+
+def _provenance(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise invalid_params("provenance must be an object")
+    left = dict(value)
+    out: dict[str, Any] = {}
+    date = left.pop("service_date", None)
+    if date is not None:
+        out["service_date"] = _date(date).isoformat()
+    for name in ("trips", "stations", "lines"):
+        v = _optional(left, name, lambda x: isinstance(x, int) and not isinstance(x, bool) and x >= 0,
+                      "must be a count")
+        if v is not None:
+            out[name] = v
+    caveats = _strings(left, "caveats")
+    if caveats is not None:
+        out["caveats"] = caveats
+    _no_extra("provenance", left)
+    return out
+
+
 # ------------------------------------------------------------------- the server
 
 class EngineEndpoint(Endpoint):
@@ -195,6 +378,10 @@ class EngineEndpoint(Endpoint):
             "engine.shutdown": self.engine_shutdown,
             "graph.build": self.graph_build,
             "map.build": self.map_build,
+            "export.presets": self.export_presets,
+            "export.storyboards": self.export_storyboards,
+            "export.plan": self.export_plan,
+            "export.encode": self.export_encode,
         }, consumer, max_workers=max_workers)
 
     @property
@@ -324,6 +511,59 @@ class EngineEndpoint(Endpoint):
                 "summary": result.summary(),
                 "diagnostics": _diagnostics(result),
             }
+
+        return self._job(work)
+
+
+    # -- export: the two halves the desktop app cannot do itself. It captures
+    # for itself (its ADR-024); there is no export.capture here.
+
+    def export_presets(self, params: Any = None) -> dict[str, Any]:
+        _no_params("export.presets", params)
+        return {"presets": export.preset_table()}
+
+    def export_storyboards(self, params: Any = None) -> dict[str, Any]:
+        _no_params("export.storyboards", params)
+        return {"storyboards": export.storyboard_table()}
+
+    def export_plan(self, params: Any) -> dict[str, Any]:
+        """Pure and instant: the plan's own refusals (a vector preset, a
+        geographic view on a feed without the geometry) are export errors."""
+        left = _object("export.plan", params)
+        key = _feed_key(left.pop("key", None))
+        preset = _preset(left.pop("preset", None))
+        page = _optional(left, "page", lambda v: isinstance(v, str) and bool(URL_PATTERN.match(v)),
+                         "must be the page's address, with its scheme")
+        date = _date(left.pop("date")).isoformat() if "date" in left else None
+        options = _export_options(left.pop("options", None))
+        _no_extra("export.plan", left)
+        try:
+            job = export.plan(key, preset, page=page, date=date, **options)
+        except (KeyError, ValueError) as exc:
+            raise classify(exc) from exc
+        return {**job.to_dict(), "filename": job.filename}
+
+    def export_encode(self, params: Any) -> Callable[[], Any]:
+        """The frames the client captured, or its still, to the file. Long:
+        ffmpeg's own frame count arrives as job/progress, and a cancel ends
+        ffmpeg and removes the partial file."""
+        left = _object("export.encode", params)
+        job = _capture_job(left.pop("plan", None))
+        source = _absolute(left, "source")
+        dest = _absolute(left, "dest")
+        provenance = _provenance(left.pop("provenance", None))
+        _no_extra("export.encode", left)
+        if job.mode == "video" and not source.is_dir():
+            raise EngineError("io", "the frames directory is not there")
+        if job.mode == "still" and not source.is_file():
+            raise EngineError("io", "the captured still is not there")
+
+        def work(_job: loom.Job, progress: Progress) -> dict[str, Any]:
+            written = export.encode(job, source, dest, provenance=provenance,
+                                    progress=progress)
+            sidecar = json.loads(export.sidecar_path(dest).read_text(encoding="utf-8"))
+            return {"files": [{"path": str(f), "bytes": f.stat().st_size} for f in written],
+                    "sidecar": sidecar}
 
         return self._job(work)
 

@@ -7,7 +7,23 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 ## [Unreleased]
 
-The export module is three halves, so another process can do the middle.
+The export module is three halves, so another process can do the middle,
+and two of them are on the protocol.
+
+### Added
+
+- **`export.presets`, `export.storyboards`, `export.plan` and
+  `export.encode` over the protocol.** The two tables as data; a plan for a
+  preset, pure and instant, taking the page's own address and the service
+  day when the caller knows them (the desktop app does) and refusing what
+  `bin/export` refuses; and the encode of a directory of frames the client
+  captured, or its still, into the deliverable with its sidecar, taking the
+  client's provenance for the sidecar. `export.encode` is a long request:
+  ffmpeg's own frame count arrives as `job/progress`, and `$/cancelRequest`
+  ends ffmpeg and leaves no partial file. There is no `export.capture`; the
+  desktop app captures for itself. Additive: the protocol stays at 1, the
+  schema grows sixteen definitions, and the server checks a plan handed back
+  field by field before it trusts it.
 
 ### Changed
 

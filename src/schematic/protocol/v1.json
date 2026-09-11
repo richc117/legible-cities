@@ -1,13 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Legible Cities engine protocol, version 1",
-  "description": "JSON-RPC 2.0 over stdin/stdout with Content-Length framing. `methods` maps each request to the schema of its params and result; `notifications` maps each notification to the schema of its params. Long requests (graph.build, map.build) stay open until done and send job/progress and job/log carrying the request's id meanwhile; $/cancelRequest ends the LOOM process they are waiting on and they answer with the cancelled error (-32800). Errors a person can act on are code -32000 with `data` of the ErrorData shape; bad parameters are -32602 with the same shape and kind `params`.",
+  "description": "JSON-RPC 2.0 over stdin/stdout with Content-Length framing. `methods` maps each request to the schema of its params and result; `notifications` maps each notification to the schema of its params. Long requests (graph.build, map.build, export.encode) stay open until done and send job/progress and job/log carrying the request's id meanwhile; $/cancelRequest ends the process they are waiting on (a LOOM tool, or ffmpeg) and they answer with the cancelled error (-32800). The export methods are the two halves of an export a client cannot do itself: export.plan describes one and is pure, export.encode turns the frames the client captured into the file; there is no export.capture, because the desktop app captures for itself. Errors a person can act on are code -32000 with `data` of the ErrorData shape; bad parameters are -32602 with the same shape and kind `params`.",
   "protocol": 1,
   "methods": {
     "engine.info": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/EngineInfo" } },
     "engine.shutdown": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/Ok" } },
     "graph.build": { "params": { "$ref": "#/$defs/GraphBuildParams" }, "result": { "$ref": "#/$defs/GraphBuildResult" } },
-    "map.build": { "params": { "$ref": "#/$defs/MapBuildParams" }, "result": { "$ref": "#/$defs/MapBuildResult" } }
+    "map.build": { "params": { "$ref": "#/$defs/MapBuildParams" }, "result": { "$ref": "#/$defs/MapBuildResult" } },
+    "export.presets": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/ExportPresets" } },
+    "export.storyboards": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/ExportStoryboards" } },
+    "export.plan": { "params": { "$ref": "#/$defs/ExportPlanParams" }, "result": { "$ref": "#/$defs/CaptureJob" } },
+    "export.encode": { "params": { "$ref": "#/$defs/ExportEncodeParams" }, "result": { "$ref": "#/$defs/ExportEncodeResult" } }
   },
   "notifications": {
     "job/progress": { "$ref": "#/$defs/JobProgress" },
@@ -238,6 +242,688 @@
       "type": "object",
       "properties": { "id": { "$ref": "#/$defs/RequestId" } },
       "required": ["id"],
+      "additionalProperties": false
+    },
+    "PresetName": {
+      "description": "A preset's name; export.presets describes each. Held equal to the engine's table by a test.",
+      "enum": [
+        "instagram-post",
+        "instagram-square",
+        "instagram-story",
+        "linkedin",
+        "linkedin-link",
+        "bluesky",
+        "x",
+        "instagram-reel",
+        "bluesky-video",
+        "linkedin-video",
+        "instagram-reel-gif",
+        "linkedin-gif",
+        "bluesky-gif",
+        "portfolio-svg",
+        "portfolio-mp4",
+        "portfolio-gif"
+      ]
+    },
+    "StoryboardName": {
+      "description": "A storyboard's name; export.storyboards describes each. Held equal to the engine's table by a test.",
+      "enum": [
+        "transform",
+        "transform-loop",
+        "essay-loop",
+        "tour",
+        "reveal",
+        "morph",
+        "day",
+        "run"
+      ]
+    },
+    "View": {
+      "description": "A view the page can show.",
+      "enum": [
+        "geographic",
+        "map",
+        "linear",
+        "time"
+      ]
+    },
+    "Clock": {
+      "description": "A time of day, HH:MM or HH:MM:SS; past midnight stays past midnight (25:44 is 1:44 the next morning).",
+      "type": "string",
+      "pattern": "^[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?$"
+    },
+    "PageUrl": {
+      "description": "The page's own address, with its scheme. The desktop app serves a project's page on its own origin and passes that; the engine's default is the site's file.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9+.-]*://[^\\s]+$"
+    },
+    "AbsolutePath": {
+      "description": "A path the client owns, absolute, never inside the engine's own repository.",
+      "type": "string",
+      "minLength": 1
+    },
+    "Preset": {
+      "description": "One destination, with the dimensions and limits that destination has.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "enum": [
+            "still",
+            "video",
+            "vector"
+          ]
+        },
+        "format": {
+          "enum": [
+            "png",
+            "jpg",
+            "mp4",
+            "gif",
+            "svg"
+          ]
+        },
+        "view": {
+          "$ref": "#/$defs/View"
+        },
+        "labels": {
+          "type": "boolean"
+        },
+        "storyboard": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Video only: the storyboard the preset plays unless told otherwise."
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "The platform's upload limit, where it has one."
+        },
+        "frame_top": {
+          "type": "number"
+        },
+        "safe_zones": {
+          "type": "boolean",
+          "description": "Whether the platform draws its own interface over the image."
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "platform",
+        "width",
+        "height",
+        "kind",
+        "format",
+        "view",
+        "labels",
+        "storyboard",
+        "fps",
+        "max_bytes",
+        "frame_top",
+        "safe_zones",
+        "note"
+      ],
+      "additionalProperties": false
+    },
+    "ExportPresets": {
+      "type": "object",
+      "properties": {
+        "presets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Preset"
+          }
+        }
+      },
+      "required": [
+        "presets"
+      ],
+      "additionalProperties": false
+    },
+    "StoryboardBeat": {
+      "description": "A stretch of video with one set of state, as the storyboard is written. A field left null carries over from the beat before.",
+      "type": "object",
+      "properties": {
+        "secs": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "view": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/View"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "labels": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "at": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Clock"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "speed": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sweep": {
+          "type": "boolean"
+        },
+        "hours": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "span": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Clock"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tween": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "secs",
+        "view",
+        "labels",
+        "at",
+        "speed",
+        "sweep",
+        "hours",
+        "span",
+        "tween"
+      ],
+      "additionalProperties": false
+    },
+    "Storyboard": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "views": {
+          "type": "string",
+          "description": "The views it visits, in order, as a sentence fragment; empty for one view."
+        },
+        "seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "geographic": {
+          "type": "boolean",
+          "description": "Whether any beat needs the feed's geographic geometry."
+        },
+        "beats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StoryboardBeat"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "name",
+        "views",
+        "seconds",
+        "geographic",
+        "beats"
+      ],
+      "additionalProperties": false
+    },
+    "ExportStoryboards": {
+      "type": "object",
+      "properties": {
+        "storyboards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Storyboard"
+          }
+        }
+      },
+      "required": [
+        "storyboards"
+      ],
+      "additionalProperties": false
+    },
+    "ExportOptions": {
+      "description": "The dressing of an export; every field optional and defaulted as bin/export defaults it.",
+      "type": "object",
+      "properties": {
+        "view": {
+          "$ref": "#/$defs/View"
+        },
+        "labels": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "boolean",
+          "description": "The city and network over the map."
+        },
+        "clock": {
+          "type": "boolean"
+        },
+        "theme": {
+          "enum": [
+            "dark",
+            "light"
+          ]
+        },
+        "at": {
+          "$ref": "#/$defs/Clock",
+          "description": "The clock to start at; a still is taken here."
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Line labels to keep; the rest are hidden."
+        },
+        "storyboard": {
+          "$ref": "#/$defs/StoryboardName"
+        },
+        "quality": {
+          "enum": [
+            "draft",
+            "standard",
+            "high"
+          ],
+          "description": "draft: 1x and fast; standard: 2x, resampled to the preset's size; high: 2x, kept."
+        },
+        "fade": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tag": {
+          "$ref": "#/$defs/Token",
+          "description": "A filename suffix, so two dressings of one preset can share a folder."
+        },
+        "safe": {
+          "type": "boolean",
+          "description": "Draw the platform's safe zones; never for a deliverable."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExportPlanParams": {
+      "description": "Describe an export: what to capture and how to encode it. Pure and instant; nothing is written. A vector preset is refused (it is resolved from the built map, not captured).",
+      "type": "object",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "preset": {
+          "$ref": "#/$defs/PresetName"
+        },
+        "page": {
+          "$ref": "#/$defs/PageUrl"
+        },
+        "date": {
+          "$ref": "#/$defs/ServiceDate",
+          "description": "The service day the title names, when the caller knows it (the app's project does)."
+        },
+        "options": {
+          "$ref": "#/$defs/ExportOptions"
+        }
+      },
+      "required": [
+        "key",
+        "preset"
+      ],
+      "additionalProperties": false
+    },
+    "BeatPayload": {
+      "description": "A beat as the recorder takes it: times in seconds of the service day, the span resolved.",
+      "type": "object",
+      "properties": {
+        "secs": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "view": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/View"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "labels": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "at": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "speed": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sweep": {
+          "type": "boolean"
+        },
+        "hours": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lo": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "hi": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "tween": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "secs",
+        "view",
+        "labels",
+        "at",
+        "speed",
+        "sweep",
+        "hours",
+        "lo",
+        "hi",
+        "tween"
+      ],
+      "additionalProperties": false
+    },
+    "CaptureJob": {
+      "description": "One export, described: the capture half is the job the engine's own recorder takes (url, width, height in CSS pixels, scale, fps, format, settle, beats, at); the rest is what export.encode needs afterwards. Handed back to export.encode unchanged.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "preset": {
+          "$ref": "#/$defs/PresetName"
+        },
+        "mode": {
+          "enum": [
+            "still",
+            "video"
+          ]
+        },
+        "url": {
+          "$ref": "#/$defs/PageUrl"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scale": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "format": {
+          "enum": [
+            "png",
+            "jpg",
+            "mp4",
+            "gif"
+          ]
+        },
+        "settle": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Milliseconds to wait, with the clock stopped, for the page's first geometry pass and its fonts."
+        },
+        "beats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BeatPayload"
+          }
+        },
+        "keep": {
+          "type": "boolean",
+          "description": "Deliver the captured pixels as they are rather than resampling to the preset's size."
+        },
+        "crf": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fade": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stem": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "theme": {
+          "enum": [
+            "dark",
+            "light"
+          ]
+        },
+        "view": {
+          "$ref": "#/$defs/View"
+        },
+        "storyboard": {
+          "description": "Empty for a still.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/StoryboardName"
+            },
+            {
+              "const": ""
+            }
+          ]
+        },
+        "at": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "The clock, in seconds, a still is taken at; a video's beats seek for themselves."
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What a person should hear before the capture, such as a sweep too fast to read."
+        },
+        "filename": {
+          "type": "string",
+          "description": "stem plus the format's extension; the plan's convenience."
+        }
+      },
+      "required": [
+        "key",
+        "preset",
+        "mode",
+        "url",
+        "width",
+        "height",
+        "scale",
+        "fps",
+        "format",
+        "settle",
+        "beats",
+        "keep",
+        "crf",
+        "fade",
+        "stem",
+        "theme",
+        "view",
+        "storyboard",
+        "at",
+        "notes",
+        "filename"
+      ],
+      "additionalProperties": false
+    },
+    "Provenance": {
+      "description": "What the caller knows about the map that the atlas's data would not; it goes into the sidecar over the atlas's, field by field.",
+      "type": "object",
+      "properties": {
+        "service_date": {
+          "$ref": "#/$defs/ServiceDate"
+        },
+        "trips": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "caveats": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExportEncodeParams": {
+      "description": "The frames the client captured (a directory of 000000.png onwards), or its still, to the deliverable at dest with its sidecar beside it. The source is read and never touched; a cancel, a failure or a file over the platform's limit leaves nothing at dest.",
+      "type": "object",
+      "properties": {
+        "plan": {
+          "$ref": "#/$defs/CaptureJob"
+        },
+        "source": {
+          "$ref": "#/$defs/AbsolutePath",
+          "description": "The frames directory for a video plan, the captured still for a still plan."
+        },
+        "dest": {
+          "$ref": "#/$defs/AbsolutePath",
+          "description": "The file to write; its folder is created."
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        }
+      },
+      "required": [
+        "plan",
+        "source",
+        "dest"
+      ],
+      "additionalProperties": false
+    },
+    "ExportEncodeResult": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "path",
+              "bytes"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "sidecar": {
+          "type": "object",
+          "description": "The sidecar as written beside the file: what it is, the network's caveats, alt text.",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "files",
+        "sidecar"
+      ],
       "additionalProperties": false
     },
     "ErrorData": {

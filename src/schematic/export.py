@@ -35,11 +35,17 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
+from typing import Callable
 
-from . import feeds
+from . import feeds, loom
 from .config import REPO_ROOT
+
+# What an encode reports as it goes: a stage, a fraction and a sentence, the
+# shape the server's job/progress notification carries.
+Progress = Callable[[str, float, str], None]
 
 # Anchored to the repository, not to the engine's home: the recorder is code,
 # and the site's map folder is the site's, whatever SCHEMATIC_HOME says.
@@ -364,11 +370,13 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
             labels: bool | None = None, title: bool = True, clock: bool | None = None,
             theme: str = "dark", at: str | None = None, speed: float | None = None,
             lines: tuple[str, ...] = (), safe: bool = False,
-            page: str | None = None) -> str:
+            page: str | None = None, date: str | None = None) -> str:
     """The presentation-mode URL for a preset. Also what you paste into a browser.
 
     ``page`` is the page's own address when it is not the site's file: the
     desktop app serves a project's page on its own origin and passes it here.
+    ``date`` (YYYY-MM-DD) is the service day the title names when the caller
+    knows it; otherwise it is the atlas's.
     """
     feed = feeds.FEEDS[key]
     view = view or preset.view
@@ -391,7 +399,7 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
         # The service day, from the same networks.json the atlas prints. A
         # clock reading 07:14 does not say *when*, and these feeds are
         # snapshots -- an image outlives the page that explains it.
-        when = _provenance(key).get("service_date")
+        when = date or _provenance(key).get("service_date")
         if when:
             q["date"] = dt.date.fromisoformat(when).strftime("%A %-d %B %Y")
     if at:
@@ -591,23 +599,72 @@ def beat_payload(beats: tuple[Beat, ...],
     return out
 
 
+def _ffmpeg(args: list[str], *, progress: Progress | None = None,
+            frames: int | None = None, stage: str = "encode") -> None:
+    """Run one ffmpeg command, the way ``loom._run`` runs a tool: attached to
+    the caller's job, so a cancel ends it and the partial file can go; stderr
+    streamed to the job's log; and, given ``frames``, ffmpeg's own frame count
+    reported as progress."""
+    cmd = [ffmpeg_path(), "-y", "-loglevel", "error", "-nostats"]
+    if progress is not None:
+        cmd += ["-progress", "pipe:1"]
+    cmd += args
+    job = loom.current_job()
+    if job is not None and job.cancelled:
+        raise loom.Cancelled("ffmpeg: cancelled before it started")
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if job is not None and job._attach(proc):
+        proc.kill()
+    assert proc.stdout is not None and proc.stderr is not None
+    tail: list[str] = []
+
+    def pump_stderr() -> None:
+        for raw in iter(proc.stderr.readline, b""):
+            line = raw.decode(errors="replace").rstrip("\r\n")
+            tail.append(line)
+            if len(tail) > 15:
+                del tail[0]
+            if job is not None:
+                job.log(line)
+
+    pump = threading.Thread(target=pump_stderr, daemon=True)
+    pump.start()
+    for raw in iter(proc.stdout.readline, b""):
+        line = raw.decode(errors="replace").strip()
+        if progress is not None and frames and line.startswith("frame="):
+            try:
+                done = int(line[6:])
+            except ValueError:
+                continue
+            progress(stage, min(done / frames, 1.0), f"{min(done, frames)} of {frames} frames")
+    proc.wait()
+    pump.join()
+    if job is not None:
+        job._detach()
+        if job.cancelled:
+            raise loom.Cancelled("ffmpeg: cancelled")
+    if proc.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed ({proc.returncode}):\n" + "\n".join(tail))
+
+
 def _resample(src: Path, dest: Path, preset: Preset) -> None:
     """Down to the preset's exact size. Lanczos, because these maps are mostly
     one-pixel strokes and a box filter turns them to mush."""
     q = ["-q:v", "3"] if preset.fmt == "jpg" else []
-    subprocess.run([ffmpeg_path(), "-y", "-loglevel", "error", "-i", str(src),
-                    "-vf", f"scale={preset.width}:{preset.height}:flags=lanczos",
-                    *q, str(dest)], check=True)
+    _ffmpeg(["-i", str(src), "-vf", f"scale={preset.width}:{preset.height}:flags=lanczos",
+             *q, str(dest)])
 
 
 def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
-            crf: int = 20, keep: bool = False) -> None:
+            crf: int = 20, keep: bool = False, progress: Progress | None = None) -> None:
     """PNG sequence to a deliverable. Text never enters here.
 
     This ffmpeg has no drawtext, no subtitles and no freetype, so it cannot
     render a glyph. Every word in an export is drawn by the page.
     """
     src = str(frames / "%06d.png")
+    n = len(list(frames.glob("*.png")))
     if preset.fmt == "gif":
         # Two passes: a palette built from the actual frames, then applied.
         # A single pass would quantise to the default 216-colour cube and the
@@ -615,17 +672,15 @@ def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
         # its own: the frames are the caller's, and nothing is written there.
         with tempfile.TemporaryDirectory(prefix="legible-palette-") as tmp:
             palette = Path(tmp) / "palette.png"
-            subprocess.run([ffmpeg_path(), "-y", "-loglevel", "error", "-framerate",
-                            str(preset.fps), "-i", src, "-vf", "palettegen=stats_mode=diff",
-                            str(palette)], check=True)
-            subprocess.run([ffmpeg_path(), "-y", "-loglevel", "error", "-framerate",
-                            str(preset.fps), "-i", src, "-i", str(palette), "-lavfi",
-                            f"scale={preset.width}:{preset.height}:flags=lanczos[s];"
-                            "[s][1:v]paletteuse=dither=bayer:bayer_scale=3", str(dest)],
-                           check=True)
+            _ffmpeg(["-framerate", str(preset.fps), "-i", src,
+                     "-vf", "palettegen=stats_mode=diff", str(palette)],
+                    progress=progress, frames=n, stage="palette")
+            _ffmpeg(["-framerate", str(preset.fps), "-i", src, "-i", str(palette), "-lavfi",
+                     f"scale={preset.width}:{preset.height}:flags=lanczos[s];"
+                     "[s][1:v]paletteuse=dither=bayer:bayer_scale=3", str(dest)],
+                    progress=progress, frames=n)
         return
 
-    n = len(list(frames.glob("*.png")))
     dur = n / preset.fps
     vf = ["format=yuv420p"]
     if not keep:
@@ -633,8 +688,7 @@ def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
     if fade > 0:
         vf = [f"fade=t=in:st=0:d={fade}",
               f"fade=t=out:st={max(dur - fade, 0):.2f}:d={fade}"] + vf
-    subprocess.run([
-        ffmpeg_path(), "-y", "-loglevel", "error",
+    _ffmpeg([
         "-framerate", str(preset.fps), "-i", src,
         # Several platforms mishandle a video with no audio stream at all, and
         # give no useful error when they do.
@@ -642,7 +696,7 @@ def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
         "-vf", ",".join(vf),
         "-c:v", "libx264", "-profile:v", "high", "-preset", "slow", "-crf", str(crf),
         "-r", str(preset.fps), "-c:a", "aac", "-b:a", "96k", "-shortest",
-        "-movflags", "+faststart", str(dest)], check=True)
+        "-movflags", "+faststart", str(dest)], progress=progress, frames=n)
 
 
 def _vector(key: str, dest: Path, preset: Preset) -> list[Path]:
@@ -728,13 +782,15 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
          labels: bool | None = None, title: bool = True, clock: bool | None = None,
          at: str | None = None, lines: tuple[str, ...] = (),
          storyboard: str | None = None, quality: str = "standard", fade: float = 0.0,
-         safe: bool = False, tag: str = "", page: str | None = None) -> CaptureJob:
+         safe: bool = False, tag: str = "", page: str | None = None,
+         date: str | None = None) -> CaptureJob:
     """Describe an export without doing any of it.
 
     Pure: reads the registry and the atlas's data, touches no file, starts no
     browser, and knows nothing of the recorder. A vector preset is not a
     capture and is refused; ``run`` handles it. ``page`` is the page's own
-    address when it is not the site's file.
+    address when it is not the site's file, and ``date`` the service day its
+    title names, when the caller knows them; the desktop app knows both.
     """
     if key not in feeds.FEEDS:
         raise KeyError(f"unknown feed {key!r}")
@@ -750,7 +806,7 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
     stem = (f"{key}-{preset.name}" + (f"-{theme}" if theme != "dark" else "")
             + (f"-{tag}" if tag else ""))
     url = url_for(key, preset, view=view, labels=labels, title=title, clock=clock,
-                  theme=theme, at=at, lines=lines, safe=safe, page=page)
+                  theme=theme, at=at, lines=lines, safe=safe, page=page, date=date)
     beats: tuple[dict, ...] = ()
     notes: list[str] = []
     board = ""
@@ -799,23 +855,63 @@ def capture(job: CaptureJob, *, frames: Path | None = None, out: Path | None = N
     return out
 
 
-def encode(job: CaptureJob, source: Path, dest: Path) -> list[Path]:
+def sidecar_path(path: Path) -> Path:
+    """Where a deliverable's sidecar sits: beside it, with .json appended."""
+    return path.with_suffix(path.suffix + ".json")
+
+
+def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None = None,
+           progress: Progress | None = None) -> list[Path]:
     """What was captured -- a directory of frames, or one still -- to the
     deliverable at ``dest``, with its sidecar beside it. ``source`` is the
-    caller's: read, never written to, never removed. Returns what it wrote."""
+    caller's: read, never written to, never removed. ``provenance`` is what
+    the caller knows about the map that the atlas's data would not (the
+    desktop app's project has its own service day and diagnostics); it goes
+    into the sidecar over the atlas's. A cancel, a failure or a file over the
+    platform's limit leaves nothing behind. Returns what it wrote."""
     preset = PRESETS[job.preset]
     _guard_outside_repo(dest.parent)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    if job.mode == "video":
-        _encode(source, dest, preset, fade=job.fade, crf=job.crf, keep=job.keep)
-    elif job.keep:
-        shutil.copyfile(source, dest)
-    else:
-        _resample(source, dest, preset)
-    check_size(dest, preset)
-    _write_sidecar(job.key, preset, [dest], theme=job.theme, view=job.view,
-                   storyboard=job.storyboard)
+    try:
+        if job.mode == "video":
+            _encode(source, dest, preset, fade=job.fade, crf=job.crf, keep=job.keep,
+                    progress=progress)
+        elif job.keep:
+            shutil.copyfile(source, dest)
+        else:
+            _resample(source, dest, preset)
+        check_size(dest, preset)
+        _write_sidecar(job.key, preset, [dest], theme=job.theme, view=job.view,
+                       storyboard=job.storyboard, provenance=provenance)
+    except BaseException:
+        for path in (dest, sidecar_path(dest)):
+            path.unlink(missing_ok=True)
+        raise
+    if progress is not None:
+        progress("encode", 1.0, dest.name)
     return [dest]
+
+
+def preset_table() -> list[dict]:
+    """Every preset as data, for a client that offers them."""
+    return [{"name": p.name, "platform": p.platform, "width": p.width, "height": p.height,
+             "kind": p.kind, "format": p.fmt, "view": p.view, "labels": p.labels,
+             "storyboard": p.storyboard or None, "fps": p.fps, "max_bytes": p.max_bytes,
+             "frame_top": p.frame_top, "safe_zones": p.safe_zones, "note": p.note}
+            for p in PRESETS.values()]
+
+
+def storyboard_table() -> list[dict]:
+    """Every storyboard as data: its beats as written, and what they add up to."""
+    return [{"name": name,
+             "views": storyboard_views(name),
+             "seconds": sum(b.secs for b in beats),
+             "geographic": wants_geographic(storyboard=name),
+             "beats": [{"secs": b.secs, "view": b.view, "labels": b.labels, "at": b.at,
+                        "speed": b.speed, "sweep": b.sweep, "hours": b.hours,
+                        "span": list(b.span) if b.span else None, "tween": b.tween}
+                       for b in beats]}
+            for name, beats in STORYBOARDS.items()]
 
 
 def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = None,
@@ -862,11 +958,14 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
 
 
 def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
-                   theme: str, view: str, storyboard: str = "") -> None:
+                   theme: str, view: str, storyboard: str = "",
+                   provenance: dict | None = None) -> None:
     """What this file is, beside the file. Includes the caveats the atlas shows:
-    an image travels further than the page it came from."""
+    an image travels further than the page it came from. ``provenance`` from
+    the caller wins over the atlas's, field by field."""
     feed = feeds.FEEDS[key]
-    prov = _provenance(key)
+    prov = {**_provenance(key),
+            **{k: v for k, v in (provenance or {}).items() if v is not None}}
     stats = {k: prov[k] for k in ("stations", "lines") if k in prov} or _network_stats(key)
     for path in written:
         meta = {
@@ -892,7 +991,7 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
             "notes": list(feed.notes),
             "source": feed.url,
         }
-        path.with_suffix(path.suffix + ".json").write_text(json.dumps(meta, indent=2) + "\n")
+        sidecar_path(path).write_text(json.dumps(meta, indent=2) + "\n")
 
 
 def _provenance(key: str) -> dict:
@@ -928,9 +1027,8 @@ def _network_stats(key: str) -> dict:
 
 def poster(video: Path, dest: Path, at: float = 0.6) -> Path:
     """A representative frame, for a contact sheet or a video cover."""
-    subprocess.run([ffmpeg_path(), "-y", "-loglevel", "error", "-ss",
-                    f"{at * _duration(video):.2f}", "-i", str(video),
-                    "-frames:v", "1", "-q:v", "2", str(dest)], check=True)
+    _ffmpeg(["-ss", f"{at * _duration(video):.2f}", "-i", str(video),
+             "-frames:v", "1", "-q:v", "2", str(dest)])
     return dest
 
 
