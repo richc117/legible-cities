@@ -5,6 +5,33 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+The export module is three halves, so another process can do the middle.
+
+### Changed
+
+- **`export.plan`, `export.capture` and `export.encode`.** A plan describes an
+  export and is pure: no file, no browser, no reference to the recorder.
+  `capture` runs the recorder; `encode` turns a directory of frames, or a
+  still, into the deliverable and writes its sidecar, and never writes into
+  the frames it was given. `export.run` composes them; `bin/export` is
+  unchanged in what it takes and what it writes. The desktop app asks for a
+  plan and an encode over the protocol and captures for itself.
+- **One ffmpeg.** `SCHEMATIC_FFMPEG` names the ffmpeg every encode runs, with
+  ffprobe beside it; before, `engine.info` reported the variable while the
+  encoder ignored it.
+
+### Fixed
+
+- **A still is reproducible.** The recorder now stops the page's clock before
+  the settle wait in both modes and, for a still, seeks to the clock the
+  export asked for (`--at`, or the page's own 07:00), because the page's loop
+  has already run for the few frames between load and the recorder's first
+  word. A still exported before this landed wherever wall-time put the
+  trains; two exported now are the same picture. Every existing still differs
+  from a fresh one for that reason.
+
 ## [0.2.1] - 2026-09-08
 
 One fix, and it matters wherever a page is published.

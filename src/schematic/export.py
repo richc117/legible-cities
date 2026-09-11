@@ -14,6 +14,12 @@ Two paths, because the three views are not made in the same place:
   headless browser. The page is self-contained and loads over ``file://``, so
   there is no server to start.
 
+An export is three halves, so another process can do the middle: ``plan``
+describes a capture and is pure; ``capture`` runs the recorder; ``encode``
+turns what was captured into the deliverable and writes its sidecar. ``run``
+composes them for the CLI. The desktop app captures for itself (its ADR-024)
+and asks this module only for the plan and the encode.
+
 Nothing here writes inside the repository. Exports land on the Desktop.
 
     from schematic import export
@@ -24,11 +30,12 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import re
 import shutil
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from . import feeds
@@ -42,6 +49,33 @@ RECORDER = REPO_ROOT / "bin" / "_record.js"
 # Exports go to the Desktop, never into the repo: they are output, and the repo
 # is the method.
 DESKTOP = Path.home() / "Desktop" / "legible-cities"
+
+# Milliseconds the recorder allows, with the clock already stopped, for the
+# page's first geometry pass and its fonts. The payload is megabytes on the
+# larger networks.
+SETTLE_MS = 1200
+
+# Where the page's clock starts when the URL does not say (`let now = 7 * 3600`
+# in page.html; test_export.py holds the two together). A still is taken at
+# this clock unless `at` says otherwise, and the recorder seeks to it after
+# stopping the clock, because the page's own loop has already run for the
+# few frames between load and the recorder's first word.
+PAGE_START = "07:00"
+
+
+def ffmpeg_path() -> str:
+    """The ffmpeg every encode runs: ``SCHEMATIC_FFMPEG`` when set, else the
+    one on PATH. The one place the name lives, so a bundled binary reaches
+    every call and ``engine.info`` reports the same thing the encoder uses."""
+    return os.environ.get("SCHEMATIC_FFMPEG") or "ffmpeg"
+
+
+def ffprobe_path() -> str:
+    """ffprobe beside the ffmpeg ``SCHEMATIC_FFMPEG`` names, else the one on PATH."""
+    given = os.environ.get("SCHEMATIC_FFMPEG")
+    if given and "ffmpeg" in Path(given).name:
+        return str(Path(given).with_name(Path(given).name.replace("ffmpeg", "ffprobe", 1)))
+    return "ffprobe"
 
 
 # --------------------------------------------------------------------- palette
@@ -329,8 +363,13 @@ def frame_count(beats: tuple[Beat, ...], fps: int) -> int:
 def url_for(key: str, preset: Preset, *, view: str | None = None,
             labels: bool | None = None, title: bool = True, clock: bool | None = None,
             theme: str = "dark", at: str | None = None, speed: float | None = None,
-            lines: tuple[str, ...] = (), safe: bool = False) -> str:
-    """The presentation-mode URL for a preset. Also what you paste into a browser."""
+            lines: tuple[str, ...] = (), safe: bool = False,
+            page: str | None = None) -> str:
+    """The presentation-mode URL for a preset. Also what you paste into a browser.
+
+    ``page`` is the page's own address when it is not the site's file: the
+    desktop app serves a project's page on its own origin and passes it here.
+    """
     feed = feeds.FEEDS[key]
     view = view or preset.view
     if clock is None:
@@ -364,7 +403,8 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
     if safe:
         q["safe"] = "1"
     from urllib.parse import urlencode
-    return (MAPS_DIR / f"{key}.html").as_uri() + "?" + urlencode(q)
+    base = page or (MAPS_DIR / f"{key}.html").as_uri()
+    return base + "?" + urlencode(q)
 
 
 def wants_geographic(*, view: str | None = None, preset: Preset | None = None,
@@ -555,7 +595,7 @@ def _resample(src: Path, dest: Path, preset: Preset) -> None:
     """Down to the preset's exact size. Lanczos, because these maps are mostly
     one-pixel strokes and a box filter turns them to mush."""
     q = ["-q:v", "3"] if preset.fmt == "jpg" else []
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src),
+    subprocess.run([ffmpeg_path(), "-y", "-loglevel", "error", "-i", str(src),
                     "-vf", f"scale={preset.width}:{preset.height}:flags=lanczos",
                     *q, str(dest)], check=True)
 
@@ -571,16 +611,18 @@ def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
     if preset.fmt == "gif":
         # Two passes: a palette built from the actual frames, then applied.
         # A single pass would quantise to the default 216-colour cube and the
-        # agency line colours would shift.
-        palette = frames / "palette.png"
-        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(preset.fps),
-                        "-i", src, "-vf", "palettegen=stats_mode=diff", str(palette)],
-                       check=True)
-        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(preset.fps),
-                        "-i", src, "-i", str(palette), "-lavfi",
-                        f"scale={preset.width}:{preset.height}:flags=lanczos[s];"
-                        "[s][1:v]paletteuse=dither=bayer:bayer_scale=3", str(dest)],
-                       check=True)
+        # agency line colours would shift. The palette goes to a directory of
+        # its own: the frames are the caller's, and nothing is written there.
+        with tempfile.TemporaryDirectory(prefix="legible-palette-") as tmp:
+            palette = Path(tmp) / "palette.png"
+            subprocess.run([ffmpeg_path(), "-y", "-loglevel", "error", "-framerate",
+                            str(preset.fps), "-i", src, "-vf", "palettegen=stats_mode=diff",
+                            str(palette)], check=True)
+            subprocess.run([ffmpeg_path(), "-y", "-loglevel", "error", "-framerate",
+                            str(preset.fps), "-i", src, "-i", str(palette), "-lavfi",
+                            f"scale={preset.width}:{preset.height}:flags=lanczos[s];"
+                            "[s][1:v]paletteuse=dither=bayer:bayer_scale=3", str(dest)],
+                           check=True)
         return
 
     n = len(list(frames.glob("*.png")))
@@ -592,7 +634,7 @@ def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
         vf = [f"fade=t=in:st=0:d={fade}",
               f"fade=t=out:st={max(dur - fade, 0):.2f}:d={fade}"] + vf
     subprocess.run([
-        "ffmpeg", "-y", "-loglevel", "error",
+        ffmpeg_path(), "-y", "-loglevel", "error",
         "-framerate", str(preset.fps), "-i", src,
         # Several platforms mishandle a video with no audio stream at all, and
         # give no useful error when they do.
@@ -617,6 +659,165 @@ def _vector(key: str, dest: Path, preset: Preset) -> list[Path]:
     return out
 
 
+# The capture's supersampling and the encode's quality, by name. `scale`
+# supersamples the capture; `keep` decides whether the extra pixels are
+# delivered or spent on resampling. A platform that expects 1080 wide does
+# better with a clean 1080 than with a 2160 it downscales itself -- and these
+# maps are full of 1px strokes, which is exactly what a bad downscale ruins.
+# "high" keeps them, for print and retina.
+QUALITY = {
+    "draft": (1, True, 26),
+    "standard": (2, False, 20),
+    "high": (2, True, 16),
+}
+
+
+@dataclass(frozen=True)
+class CaptureJob:
+    """One export, described: what the recorder captures and what the encode
+    makes of it. The capture half is the shape ``bin/_record.js`` receives
+    (``recorder_job``); the rest is what ``encode`` needs afterwards, so one
+    object carries an export from the page's address to the file."""
+
+    key: str
+    preset: str
+    mode: str                          # still | video
+    url: str
+    width: int
+    height: int
+    scale: int
+    fps: int
+    format: str                        # png | jpg | mp4 | gif
+    settle: int                        # milliseconds, clock stopped
+    beats: tuple[dict, ...]            # empty for a still
+    keep: bool
+    crf: int
+    fade: float
+    stem: str
+    theme: str
+    view: str
+    storyboard: str                    # "" for a still
+    at: float | None = None            # the clock, in seconds, a still is taken at
+    notes: tuple[str, ...] = ()        # what a person should hear before the capture
+
+    @property
+    def filename(self) -> str:
+        return f"{self.stem}.{self.format}"
+
+    def to_dict(self) -> dict:
+        """JSON-ready, beats as lists. What ``export.plan`` answers over the protocol."""
+        out = asdict(self)
+        out["beats"] = list(self.beats)
+        out["notes"] = list(self.notes)
+        return out
+
+    def recorder_job(self, *, frames: Path | None = None, out: Path | None = None) -> dict:
+        """The job ``bin/_record.js`` takes, with where it should write."""
+        job = {"url": self.url, "width": self.width, "height": self.height,
+               "scale": self.scale, "fps": self.fps, "format": self.format,
+               "settle": self.settle, "mode": self.mode, "at": self.at}
+        if self.mode == "video":
+            job["beats"] = list(self.beats)
+            job["frames"] = str(frames)
+        else:
+            job["out"] = str(out)
+        return job
+
+
+def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = None,
+         labels: bool | None = None, title: bool = True, clock: bool | None = None,
+         at: str | None = None, lines: tuple[str, ...] = (),
+         storyboard: str | None = None, quality: str = "standard", fade: float = 0.0,
+         safe: bool = False, tag: str = "", page: str | None = None) -> CaptureJob:
+    """Describe an export without doing any of it.
+
+    Pure: reads the registry and the atlas's data, touches no file, starts no
+    browser, and knows nothing of the recorder. A vector preset is not a
+    capture and is refused; ``run`` handles it. ``page`` is the page's own
+    address when it is not the site's file.
+    """
+    if key not in feeds.FEEDS:
+        raise KeyError(f"unknown feed {key!r}")
+    if preset_name not in PRESETS:
+        raise KeyError(f"unknown preset {preset_name!r}")
+    preset = PRESETS[preset_name]
+    if preset.kind == "vector":
+        raise ValueError(f"{preset_name} is a vector preset: nothing to capture")
+    if quality not in QUALITY:
+        raise ValueError(f"quality is draft, standard or high, not {quality!r}")
+    check_geographic(key, view=view, preset=preset, storyboard=storyboard)
+    scale, keep, crf = QUALITY[quality]
+    stem = (f"{key}-{preset.name}" + (f"-{theme}" if theme != "dark" else "")
+            + (f"-{tag}" if tag else ""))
+    url = url_for(key, preset, view=view, labels=labels, title=title, clock=clock,
+                  theme=theme, at=at, lines=lines, safe=safe, page=page)
+    beats: tuple[dict, ...] = ()
+    notes: list[str] = []
+    board = ""
+    if preset.kind == "video":
+        board = storyboard or preset.storyboard
+        if board not in STORYBOARDS:
+            raise KeyError(f"unknown storyboard {board!r}")
+        # A sweep faster than this stops reading as motion: a train that lives
+        # 2,000 seconds appears in a handful of frames and jumps between them.
+        # Worth saying before spending a minute capturing it.
+        for b in STORYBOARDS[board]:
+            if b.sweep:
+                rate = sweep_rate(b, preset.fps, (0.0, 86_400.0))
+                if rate > READABLE_SWEEP:
+                    notes.append(f"this sweep advances {rate:.0f} simulated seconds per "
+                                 f"frame, so trains will jump rather than move. Narrow "
+                                 f"the beat's span, or lengthen it.")
+        # The clock bounds are the feed's, so a sweep with no explicit span
+        # covers whatever service day this network actually has.
+        beats = tuple(beat_payload(STORYBOARDS[board]))
+    # A video's beats pin the clock themselves; a still is pinned here.
+    pinned = _hms(at) if at else (_hms(PAGE_START) if preset.kind == "still" else None)
+    return CaptureJob(key=key, preset=preset.name, mode=preset.kind, url=url,
+                      width=preset.width, height=preset.height, scale=scale,
+                      fps=preset.fps, format=preset.fmt, settle=SETTLE_MS, beats=beats,
+                      keep=keep, crf=crf, fade=fade, stem=stem, theme=theme,
+                      view=view or preset.view, storyboard=board, at=pinned,
+                      notes=tuple(notes))
+
+
+def capture(job: CaptureJob, *, frames: Path | None = None, out: Path | None = None) -> Path:
+    """Run the recorder for a job: a video's frames into ``frames``, a still to
+    ``out``. Returns where it wrote. The one function here that knows the
+    recorder exists; the desktop app captures for itself (its ADR-024) and
+    never calls this."""
+    if job.mode == "video":
+        if frames is None:
+            raise ValueError("a video capture needs a frames directory")
+        frames.mkdir(parents=True, exist_ok=True)
+        _run_recorder(job.recorder_job(frames=frames))
+        return frames
+    if out is None:
+        raise ValueError("a still capture needs an output path")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    _run_recorder(job.recorder_job(out=out))
+    return out
+
+
+def encode(job: CaptureJob, source: Path, dest: Path) -> list[Path]:
+    """What was captured -- a directory of frames, or one still -- to the
+    deliverable at ``dest``, with its sidecar beside it. ``source`` is the
+    caller's: read, never written to, never removed. Returns what it wrote."""
+    preset = PRESETS[job.preset]
+    _guard_outside_repo(dest.parent)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if job.mode == "video":
+        _encode(source, dest, preset, fade=job.fade, crf=job.crf, keep=job.keep)
+    elif job.keep:
+        shutil.copyfile(source, dest)
+    else:
+        _resample(source, dest, preset)
+    check_size(dest, preset)
+    _write_sidecar(job.key, preset, [dest], theme=job.theme, view=job.view,
+                   storyboard=job.storyboard)
+    return [dest]
+
+
 def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = None,
         labels: bool | None = None, title: bool = True, clock: bool | None = None,
         at: str | None = None, lines: tuple[str, ...] = (),
@@ -624,10 +825,13 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
         safe: bool = False, tag: str = "", out: Path | None = None) -> list[Path]:
     """Export one network for one destination. Returns what it wrote.
 
-    ``clock`` and ``title`` are the two pieces of furniture the page draws over
-    the map; both off is the essay's own figure, which carries neither. ``tag``
-    goes into the filename, so two dressings of the same preset -- with the name
-    and without it -- can sit in one folder instead of overwriting each other.
+    ``plan``, then ``capture``, then ``encode``, in a working directory that
+    lives only as long as the export; a vector preset needs no browser and is
+    resolved straight from the built map. ``clock`` and ``title`` are the two
+    pieces of furniture the page draws over the map; both off is the essay's
+    own figure, which carries neither. ``tag`` goes into the filename, so two
+    dressings of the same preset -- with the name and without it -- can sit in
+    one folder instead of overwriting each other.
     """
     if key not in feeds.FEEDS:
         raise KeyError(f"unknown feed {key!r}")
@@ -638,62 +842,23 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
 
     if preset.kind == "vector":
         written = _vector(key, dest, preset)
-    else:
-        # `scale` supersamples the capture; `keep` decides whether the extra
-        # pixels are delivered or spent on resampling. A platform that expects
-        # 1080 wide does better with a clean 1080 than with a 2160 it downscales
-        # itself -- and these maps are full of 1px strokes, which is exactly what
-        # a bad downscale ruins. "high" keeps them, for print and retina.
-        scale, keep, crf = {
-            "draft": (1, True, 26),
-            "standard": (2, False, 20),
-            "high": (2, True, 16),
-        }[quality]
-        stem = (f"{key}-{preset.name}" + (f"-{theme}" if theme != "dark" else "")
-                + (f"-{tag}" if tag else ""))
-        url = url_for(key, preset, view=view, labels=labels, title=title,
-                      clock=clock, theme=theme, at=at, lines=lines, safe=safe)
-        job = {"url": url, "width": preset.width, "height": preset.height,
-               "scale": scale, "fps": preset.fps, "format": preset.fmt}
+        for path in written:
+            check_size(path, preset)
+        _write_sidecar(key, preset, written, theme=theme, view=view or preset.view)
+        return written
 
-        if preset.kind == "still":
-            path = dest / f"{stem}.{preset.fmt}"
-            if keep:
-                _run_recorder({**job, "mode": "still", "out": str(path)})
-            else:
-                with tempfile.TemporaryDirectory(prefix="legible-still-") as tmp:
-                    big = Path(tmp) / f"big.{preset.fmt}"
-                    _run_recorder({**job, "mode": "still", "out": str(big)})
-                    _resample(big, path, preset)
-            written = [path]
+    job = plan(key, preset_name, theme=theme, view=view, labels=labels, title=title,
+               clock=clock, at=at, lines=lines, storyboard=storyboard, quality=quality,
+               fade=fade, safe=safe, tag=tag)
+    for note in job.notes:
+        print(f"  note: {note}")
+    with tempfile.TemporaryDirectory(prefix="legible-capture-") as tmp:
+        work = Path(tmp)
+        if job.mode == "video":
+            source = capture(job, frames=work / "frames")
         else:
-            beats = STORYBOARDS[storyboard or preset.storyboard]
-            # A sweep faster than this stops reading as motion: a train that
-            # lives 2,000 seconds appears in a handful of frames and jumps
-            # between them. Worth saying before spending a minute capturing it.
-            for b in beats:
-                if b.sweep:
-                    rate = sweep_rate(b, preset.fps, (0.0, 86_400.0))
-                    if rate > READABLE_SWEEP:
-                        print(f"  note: this sweep advances {rate:.0f} simulated "
-                              f"seconds per frame, so trains will jump rather than "
-                              f"move. Narrow the beat's span, or lengthen it.")
-            with tempfile.TemporaryDirectory(prefix="legible-frames-") as tmp:
-                frames = Path(tmp)
-                # The clock bounds are the feed's, so a sweep with no explicit
-                # span covers whatever service day this network actually has.
-                _run_recorder({**job, "mode": "video", "frames": str(frames),
-                               "beats": beat_payload(beats)})
-                path = dest / f"{stem}.{preset.fmt}"
-                _encode(frames, path, preset, fade=fade, crf=crf, keep=keep)
-            written = [path]
-
-    for path in written:
-        check_size(path, preset)
-    _write_sidecar(key, preset, written, theme=theme, view=view or preset.view,
-                   storyboard=(storyboard or preset.storyboard)
-                   if preset.kind == "video" else "")
-    return written
+            source = capture(job, out=work / f"capture.{job.format}")
+        return encode(job, source, dest / job.filename)
 
 
 def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
@@ -763,14 +928,14 @@ def _network_stats(key: str) -> dict:
 
 def poster(video: Path, dest: Path, at: float = 0.6) -> Path:
     """A representative frame, for a contact sheet or a video cover."""
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss",
+    subprocess.run([ffmpeg_path(), "-y", "-loglevel", "error", "-ss",
                     f"{at * _duration(video):.2f}", "-i", str(video),
                     "-frames:v", "1", "-q:v", "2", str(dest)], check=True)
     return dest
 
 
 def _duration(path: Path) -> float:
-    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+    out = subprocess.run([ffprobe_path(), "-v", "error", "-show_entries", "format=duration",
                           "-of", "csv=p=0", str(path)], capture_output=True, text=True)
     try:
         return float(out.stdout.strip())
@@ -851,8 +1016,9 @@ def safe_preview(key: str, preset: Preset, *, out: Path | None = None,
     dest = desktop_dir(key, out) / "safe-area"
     dest.mkdir(parents=True, exist_ok=True)
     path = dest / f"{key}-{preset.name}-safe.png"
-    url = url_for(key, preset, view=view, theme=theme, safe=True)
-    _run_recorder({"url": url, "width": preset.width, "height": preset.height,
-                   "scale": 1, "fps": preset.fps, "format": "png",
-                   "mode": "still", "out": str(path)})
+    # A still of a video preset, at 1x: the plan's shape with the mode changed.
+    job = replace(plan(key, preset.name, theme=theme, view=view, safe=True, quality="draft"),
+                  mode="still", format="png", beats=(), storyboard="", notes=(),
+                  at=_hms(PAGE_START))
+    capture(job, out=path)
     return [path]

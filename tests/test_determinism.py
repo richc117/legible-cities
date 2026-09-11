@@ -10,10 +10,10 @@ content; the PNG container is not always identical between runs, and a hash
 would fail on a difference nobody can see. See "Compare pixels, not hashes" in
 CLAUDE.md.
 
-This covers the *video* path only. A still is captured after the page has been
-left running in real time for `settle` milliseconds, so its clock lands wherever
-wall-time put it and two stills of the same preset genuinely differ -- see
-"A still is not reproducible" in CLAUDE.md.
+The still path used to be the exception: the page was left running in real
+time for `settle` milliseconds before the shot, so its clock landed wherever
+wall-time put it. Since the export split (E10) the recorder stops the clock
+before that wait in both modes, and the guard below keeps it there.
 """
 
 import shutil
@@ -51,6 +51,17 @@ def test_capture_cancels_the_queued_frame():
     body = page[page.index("setCapture(on)"):]
     assert "cancelAnimationFrame" in body[:body.index("},")], \
         "setCapture no longer cancels the queued frame; captures will drift"
+
+
+def test_the_recorder_stops_the_clock_before_it_waits():
+    """`setCapture(true)` before the settle wait, stills included. Without it a
+    still's trains land wherever wall-time put them: six exports of one preset
+    once gave five distinct images."""
+    js = (config.REPO_ROOT / "bin" / "_record.js").read_text()
+    stop = js.index("__present.setCapture(true)")
+    pin = js.index("__present.seek(s), job.at")
+    wait = js.index("waitForTimeout(job.settle")
+    assert stop < pin < wait, "the recorder waits with the page's clock running, or unpinned"
 
 
 @needs_browser

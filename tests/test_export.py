@@ -5,7 +5,11 @@ by running ``bin/export`` -- what is worth asserting here is the arithmetic and
 the agreement between the three places the palette is written down.
 """
 
+import json
+import os
 import re
+import shutil
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 from unittest import mock
@@ -335,3 +339,153 @@ def test_a_storyboard_is_described_by_the_views_it_visits():
     # One view is not a sequence; fall back to the plain description.
     assert export.storyboard_alt("la-metro-rail", "run") == export.alt_text(
         "la-metro-rail", "map")
+
+
+# --------------------------------------------------------------- the halves
+
+
+def test_plan_is_pure_and_knows_no_recorder(tmp_path, monkeypatch):
+    """`plan` reads and never writes: the desktop app asks for one over the
+    protocol and captures for itself, so a plan that touched a file or
+    started a browser would be doing the app's work in the wrong process."""
+    import inspect
+    home = tmp_path / "home"
+    home.mkdir()
+    home.chmod(0o500)
+    monkeypatch.setenv(config.ENV, str(home))
+    monkeypatch.chdir(tmp_path)
+    try:
+        job = export.plan("la-metro-rail", "instagram-reel", quality="draft", tag="t")
+    finally:
+        home.chmod(0o700)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["home"]
+    assert list(home.iterdir()) == []
+    assert job.mode == "video" and job.format == "mp4"
+    assert (job.width, job.height, job.fps) == (1080, 1920, 30)
+    assert (job.scale, job.keep, job.crf) == (1, True, 26)
+    assert job.filename == "la-metro-rail-instagram-reel-t.mp4"
+    assert job.beats == tuple(export.beat_payload(export.STORYBOARDS["tour"]))
+    assert job.settle == export.SETTLE_MS
+    for fn in (export.plan, export.encode, export.CaptureJob.recorder_job):
+        source = inspect.getsource(fn)
+        assert "RECORDER" not in source and "_run_recorder" not in source, fn.__name__
+    flat = json.dumps(job.to_dict())
+    assert "_record" not in flat
+
+
+def test_a_still_is_pinned_to_the_pages_clock_and_the_two_agree():
+    """A still with no `at` is taken where the page's clock starts, and the
+    recorder seeks there after stopping the clock; a video's beats seek for
+    themselves."""
+    page = PAGE.read_text()
+    start = int(re.search(r"let now = (\d+) \* 3600", page).group(1))
+    assert export.PAGE_START == f"{start:02d}:00"
+    still = export.plan("la-metro-rail", "instagram-post")
+    assert still.at == start * 3600
+    assert still.recorder_job(out=Path("/x.png"))["at"] == start * 3600
+    assert export.plan("la-metro-rail", "instagram-post", at="09:30").at == 9 * 3600 + 30 * 60
+    assert export.plan("la-metro-rail", "instagram-reel").at is None
+
+
+def test_a_still_plans_a_still_and_a_vector_is_refused():
+    job = export.plan("cdmx-metro", "instagram-post", theme="light")
+    assert job.mode == "still" and job.beats == () and job.storyboard == ""
+    assert job.filename == "cdmx-metro-instagram-post-light.png"
+    rec = job.recorder_job(out=Path("/somewhere/x.png"))
+    assert rec["mode"] == "still" and rec["out"] == "/somewhere/x.png" and "beats" not in rec
+    with pytest.raises(ValueError, match="vector"):
+        export.plan("cdmx-metro", "portfolio-svg")
+
+
+def test_plan_takes_the_apps_page_address():
+    """The desktop app serves a project's page on its own origin."""
+    job = export.plan("la-metro-rail", "instagram-reel",
+                      page="app://local/projects/abc/la-metro-rail.html")
+    assert job.url.startswith("app://local/projects/abc/la-metro-rail.html?present=1")
+    assert "file://" not in job.url
+
+
+def test_plan_carries_the_sweep_note_rather_than_printing_it():
+    slow = export.plan("la-metro-rail", "portfolio-mp4", storyboard="transform")
+    assert slow.notes == ()
+    fast = export.plan("la-metro-rail", "portfolio-mp4", storyboard="day")
+    assert fast.notes and "simulated seconds per frame" in fast.notes[0]
+
+
+def test_ffmpeg_is_resolved_from_the_environment(monkeypatch):
+    monkeypatch.delenv("SCHEMATIC_FFMPEG", raising=False)
+    assert (export.ffmpeg_path(), export.ffprobe_path()) == ("ffmpeg", "ffprobe")
+    monkeypatch.setenv("SCHEMATIC_FFMPEG", "/bundle/bin/ffmpeg")
+    assert export.ffmpeg_path() == "/bundle/bin/ffmpeg"
+    assert export.ffprobe_path() == "/bundle/bin/ffprobe"
+    monkeypatch.setenv("SCHEMATIC_FFMPEG", "/bundle/bin/ffmpeg.exe")
+    assert export.ffprobe_path() == "/bundle/bin/ffprobe.exe"
+    # A wrapper that is not named for ffmpeg gets ffprobe from PATH.
+    monkeypatch.setenv("SCHEMATIC_FFMPEG", "/tmp/log-and-exec.sh")
+    assert export.ffprobe_path() == "ffprobe"
+
+
+needs_ffmpeg = pytest.mark.skipif(
+    not (shutil.which("ffmpeg") and shutil.which("ffprobe")), reason="needs ffmpeg on PATH")
+
+
+def _frames(into: Path, n: int = 12, size: int = 64) -> Path:
+    """A square crossing the frame: enough content that two encodes have
+    something to disagree about."""
+    from PIL import Image, ImageDraw
+    into.mkdir(parents=True, exist_ok=True)
+    for i in range(n):
+        im = Image.new("RGB", (size, size), "#15120f")
+        x = int(i / max(n - 1, 1) * (size - 12))
+        ImageDraw.Draw(im).rectangle([x, size // 2 - 6, x + 12, size // 2 + 6], fill="#e8b04a")
+        im.save(into / f"{i:06d}.png")
+    return into
+
+
+def _decoded(video: Path, into: Path) -> list:
+    from PIL import Image
+    into.mkdir()
+    subprocess.run([shutil.which("ffmpeg"), "-y", "-loglevel", "error", "-i", str(video),
+                    str(into / "%06d.png")], check=True)
+    return [Image.open(p).convert("RGB") for p in sorted(into.glob("*.png"))]
+
+
+@needs_ffmpeg
+def test_encode_reproduces_the_video_from_a_saved_frames_directory(tmp_path):
+    from PIL import ImageChops
+    frames = _frames(tmp_path / "frames")
+    before = sorted(p.name for p in frames.iterdir())
+    job = export.plan("la-metro-rail", "linkedin-video", quality="high")   # keep: no resample
+    a = export.encode(job, frames, tmp_path / "a" / job.filename)[0]
+    b = export.encode(job, frames, tmp_path / "b" / job.filename)[0]
+    assert sorted(p.name for p in frames.iterdir()) == before, "the frames are the caller's"
+    assert a.with_suffix(".mp4.json").exists()
+    da, db = _decoded(a, tmp_path / "da"), _decoded(b, tmp_path / "db")
+    assert len(da) == len(db) == 12
+    for x, y in zip(da, db):
+        worst = max(band[1] for band in ImageChops.difference(x, y).getextrema())
+        assert worst <= 8
+
+
+@needs_ffmpeg
+@pytest.mark.skipif(os.name != "posix", reason="a shell wrapper")
+def test_every_ffmpeg_call_goes_through_the_resolver(tmp_path, monkeypatch):
+    """With SCHEMATIC_FFMPEG pointing at a script that logs and execs, an
+    export's every ffmpeg call appears in the log: a bundled ffmpeg reaches
+    them all, and nothing falls back to PATH behind its back."""
+    log = tmp_path / "calls.log"
+    wrapper = tmp_path / "ffmpeg"
+    wrapper.write_text(f'#!/bin/sh\necho "$@" >> "{log}"\nexec "{shutil.which("ffmpeg")}" "$@"\n')
+    wrapper.chmod(0o755)
+    monkeypatch.setenv("SCHEMATIC_FFMPEG", str(wrapper))
+    frames = _frames(tmp_path / "frames")
+    gif = export.plan("la-metro-rail", "linkedin-gif")
+    export.encode(gif, frames, tmp_path / "out" / gif.filename)
+    still = export.plan("la-metro-rail", "bluesky")            # standard: resampled, jpg
+    big = tmp_path / "big.png"
+    from PIL import Image
+    Image.new("RGB", (400, 400), "#15120f").save(big)
+    export.encode(still, big, tmp_path / "out" / still.filename)
+    calls = log.read_text().splitlines()
+    assert len(calls) == 3, calls          # palettegen, paletteuse, the resample
+    assert all("-loglevel error" in c for c in calls)

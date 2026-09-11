@@ -38,7 +38,7 @@ from pylsp_jsonrpc.exceptions import (JsonRpcException, JsonRpcInvalidParams,
                                       JsonRpcRequestCancelled)
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 
-from . import __version__, config, feeds, loom, pipeline
+from . import __version__, config, export, feeds, loom, pipeline
 from .crs import to_mercator
 from .linegraph import LineGraph
 from .render import octilinearity
@@ -272,7 +272,7 @@ class EngineEndpoint(Endpoint):
             "protocol": PROTOCOL,
             "python": platform.python_version(),
             "loom": {"commit": None, "backend": "docker"},
-            "ffmpeg": shutil.which(os.environ.get("SCHEMATIC_FFMPEG") or "ffmpeg"),
+            "ffmpeg": shutil.which(export.ffmpeg_path()),
             "home": str(config.home()),
         }
 

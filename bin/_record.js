@@ -38,6 +38,13 @@ const job = JSON.parse(process.argv[2] || "{}");
   await page.goto(job.url, { waitUntil: "load" });
   await page.waitForFunction(() => window.__present && window.__present.state, null,
                              { timeout: 60000 });
+  // Stop the page's own clock before anything waits, stills included, and
+  // pin it: the loop has already run for the few frames between load and
+  // this line. The still path used to wait with it running, so a still's
+  // trains landed wherever wall-time put them; a still is now as
+  // reproducible as a frame. A video's first beat seeks for itself.
+  await page.evaluate(() => window.__present.setCapture(true));
+  if (job.at != null) await page.evaluate(s => window.__present.seek(s), job.at);
   // The payload is megabytes on the larger networks; let the first geometry
   // pass and the fonts settle before anything is measured or captured.
   await page.evaluate(() => document.fonts && document.fonts.ready);
