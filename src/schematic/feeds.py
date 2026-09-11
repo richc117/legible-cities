@@ -22,7 +22,7 @@ import threading
 import zipfile
 from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pandas as pd
 import requests
@@ -459,8 +459,14 @@ def _is_url(source: str) -> bool:
     return source.startswith(("http://", "https://"))
 
 
+class Interrupted(Exception):
+    """An add() stopped because its caller asked; nothing was kept."""
+
+
 def add(source: Path | str, *, key: str | None = None, name: str | None = None,
-        mode: str = "all", agency: str | None = None) -> Feed:
+        mode: str = "all", agency: str | None = None,
+        progress: "Callable[[str, int, int | None], None] | None" = None,
+        cancelled: "Callable[[], bool] | None" = None) -> Feed:
     """Add a feed a person chose, from a file or a URL, and keep it.
 
     The zip is fetched or copied into the cache, checked for the tables a
@@ -468,7 +474,9 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
     defaults to the first agency's name in the feed, ``key`` to a slug of the
     name made unique; a ``key`` given is checked for form and taken as is. A
     feed that fails the check leaves nothing behind. Raises FeedError with the
-    sentence to show.
+    sentence to show. ``progress(stage, done, total)`` hears the download's
+    bytes (``total`` None when the server did not say) and then the check;
+    ``cancelled()`` is asked between chunks, and a yes raises Interrupted.
     """
     source_text = str(source)
     what = source_text if _is_url(source_text) else Path(source_text).name
@@ -481,7 +489,7 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
     staging.parent.mkdir(parents=True, exist_ok=True)
     try:
         if _is_url(source_text):
-            staging.write_bytes(_download(source_text))
+            _download(source_text, staging, progress=progress, cancelled=cancelled)
             url = source_text
         else:
             src = Path(source_text)
@@ -489,7 +497,11 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
                 raise FeedError(f"{what} is not a file")
             shutil.copyfile(src, staging)
             url = ""
+        if progress is not None:
+            progress("check", 0, None)
         members = _check_gtfs(staging, what)
+        if progress is not None:
+            progress("check", 1, None)
         if name is None:
             name = _agency_name(staging, members) or Path(what).stem or "Feed"
         if key is None:
@@ -535,20 +547,37 @@ def inspect(key: str, *, anchor: "dt.date | None" = None):
     return inspection.inspect(key, anchor=anchor)
 
 
-def _download(url: str) -> bytes:
-    """The bytes at ``url``, or a FeedError; a page that is not a zip is refused."""
+def _download(url: str, dest: Path, *,
+              progress: "Callable[[str, int, int | None], None] | None" = None,
+              cancelled: "Callable[[], bool] | None" = None) -> Path:
+    """``url``'s bytes into ``dest``, streamed so a caller can watch and stop
+    it, or a FeedError; a page that is not a zip is refused and removed."""
     # Some agencies (MARTA) return 403 to a bare requests user-agent.
     try:
-        resp = requests.get(url, timeout=180, headers={
+        resp = requests.get(url, timeout=180, stream=True, headers={
             "User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)",
         })
         resp.raise_for_status()
+        length = resp.headers.get("Content-Length") if hasattr(resp, "headers") else None
+        total = int(length) if length and str(length).isdigit() else None
+        done = 0
+        with open(dest, "wb") as out:
+            for chunk in resp.iter_content(1 << 16):
+                if cancelled is not None and cancelled():
+                    raise Interrupted()
+                out.write(chunk)
+                done += len(chunk)
+                if progress is not None:
+                    progress("download", done, total)
     except requests.RequestException as exc:
+        dest.unlink(missing_ok=True)
         raise FeedError(f"{url} could not be fetched: {exc}") from exc
     # Fail loudly rather than caching an HTML error page as a "feed".
-    if not zipfile.is_zipfile(io.BytesIO(resp.content)):
-        raise FeedError(f"{url} did not return a zip ({len(resp.content)} bytes)")
-    return resp.content
+    if not zipfile.is_zipfile(dest):
+        size = dest.stat().st_size
+        dest.unlink(missing_ok=True)
+        raise FeedError(f"{url} did not return a zip ({size} bytes)")
+    return dest
 
 
 # One feed on disk at a time, per key: two requests for one feed (the service
@@ -572,11 +601,10 @@ def fetch(key: str, *, force: bool = False) -> Path:
             return feed.zip_path
         if not feed.url:
             raise FeedError(f"{key!r} was added from a file and its zip is gone; add it again")
-        content = _download(feed.url)
         # Whole or not at all: a quit mid-write must not leave a truncated
         # zip that the next call takes for the feed.
         partial = feed.zip_path.with_name(feed.zip_path.name + ".part")
-        partial.write_bytes(content)
+        _download(feed.url, partial)
         os.replace(partial, feed.zip_path)
         return feed.zip_path
 

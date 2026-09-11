@@ -69,8 +69,11 @@ def test_fetch_downloads_under_the_home_and_nowhere_else(home):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("agency.txt", "agency_id,agency_name\nx,X\n")
-    resp = mock.Mock(content=buf.getvalue())
+    payload = buf.getvalue()
+    # fetch streams the body, as a real response does; a Mock answers both.
+    resp = mock.Mock(content=payload, headers={"Content-Length": str(len(payload))})
     resp.raise_for_status = mock.Mock()
+    resp.iter_content = lambda size: iter([payload])
     with mock.patch.object(feeds.requests, "get", return_value=resp) as get:
         path = feeds.fetch("la-metro-rail")
     get.assert_called_once()

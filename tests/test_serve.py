@@ -321,7 +321,7 @@ def test_no_parameter_methods_refuse_parameters(client):
 
 
 def test_unknown_method_is_method_not_found(client):
-    assert client.call("feeds.list")["error"]["code"] == -32601
+    assert client.call("feeds.nothing")["error"]["code"] == -32601
 
 
 def test_unknown_feed_is_a_feed_error_with_a_hint(client):
@@ -373,6 +373,24 @@ BAD_PARAMS = [
     ("feeds.service", {"key": KEY, "anchor": None}, "FeedsServiceParams"),
     ("feeds.service", {"key": KEY, "lines": "A"}, "FeedsServiceParams"),
     ("feeds.service", {"key": KEY, "date": DATE}, "FeedsServiceParams"),
+    ("feeds.add", None, "FeedsAddParams"),
+    ("feeds.add", {}, "FeedsAddParams"),
+    ("feeds.add", {"source": ""}, "FeedsAddParams"),
+    ("feeds.add", {"source": "https://x.test/a.zip", "key": "Bad Key"}, "FeedsAddParams"),
+    ("feeds.add", {"source": "https://x.test/a.zip", "mode": "Tram!"}, "FeedsAddParams"),
+    ("feeds.add", {"source": "https://x.test/a.zip", "agency": ""}, "FeedsAddParams"),
+    ("feeds.add", {"source": "https://x.test/a.zip", "label_pattern": "x"}, "FeedsAddParams"),
+    ("feeds.remove", None, "FeedsRemoveParams"),
+    ("feeds.remove", {"key": "Nope"}, "FeedsRemoveParams"),
+    ("feeds.inspect", {}, "FeedsInspectParams"),
+    ("feeds.inspect", {"key": KEY, "anchor": "someday"}, "FeedsInspectParams"),
+    ("render.stage", {"key": KEY, "layout": NO_LAYOUT}, "RenderStageParams"),
+    ("render.stage", {"key": KEY, "layout": NO_LAYOUT, "stage": "render"}, "RenderStageParams"),
+    ("render.stage", {"key": KEY, "layout": NO_LAYOUT, "stage": "octi", "width": 0},
+     "RenderStageParams"),
+    ("render.stage", {"key": KEY, "layout": NO_LAYOUT, "stage": "octi", "labels": "yes"},
+     "RenderStageParams"),
+    ("render.stage", {"key": KEY, "stage": "octi"}, "RenderStageParams"),
     ("graph.build", {"key": KEY, "mode": "Tram!"}, "GraphBuildParams"),
     ("graph.build", {"key": KEY, "agency": ""}, "GraphBuildParams"),
     ("graph.build", {"key": KEY, "label_pattern": ""}, "GraphBuildParams"),
@@ -500,6 +518,15 @@ GOOD_PARAMS = [
     ("FeedsServiceParams", {"key": KEY}),
     ("FeedsServiceParams", {"key": KEY, "anchor": DATE}),
     ("FeedsServiceParams", {"key": KEY, "anchor": DATE, "lines": ["A", "E"]}),
+    ("FeedsAddParams", {"source": "https://x.test/a.zip"}),
+    ("FeedsAddParams", {"source": "/somewhere/a.zip", "key": "mine", "name": "Mine",
+                        "mode": "tram", "agency": "M"}),
+    ("FeedsRemoveParams", {"key": "mine"}),
+    ("FeedsInspectParams", {"key": KEY}),
+    ("FeedsInspectParams", {"key": KEY, "anchor": DATE}),
+    ("RenderStageParams", {"key": KEY, "layout": NO_LAYOUT, "stage": "gtfs2graph"}),
+    ("RenderStageParams", {"key": KEY, "layout": NO_LAYOUT, "stage": "octi", "width": 800,
+                           "labels": True}),
     ("GraphBuildParams", {"key": KEY}),
     ("GraphBuildParams", {"key": KEY, "force": True}),
     ("GraphBuildParams", {"key": KEY, "mode": "tram", "agency": "LACMTA",
@@ -1024,3 +1051,162 @@ def test_over_pipes_progress_and_cancellation(pipes, home):
     assert code == 0, err
     assert "cancelling request" in err
     assert not loom_containers()
+
+
+# ------------------------------------------------------------- the registry
+
+from test_feeds import GOOD, gtfs_zip  # the fixture zip the feed tests build
+
+
+def test_feeds_list_is_every_preset_and_what_was_added(client, home, tmp_path):
+    before = client.call("feeds.list")["result"]
+    check(before, "FeedsList")
+    keys = [f["key"] for f in before["feeds"]]
+    assert keys == list(feeds.FEEDS)
+    la = next(f for f in before["feeds"] if f["key"] == KEY)
+    assert la["source"] == "preset" and la["cached"] is True
+    assert la["label_pattern"] == feeds.FEEDS[KEY].label_pattern
+
+    src = gtfs_zip(tmp_path / "Metro de Prueba.zip")
+    msg_id = client.send("feeds.add", {"source": str(src)})
+    added = client.wait(msg_id)["result"]
+    check(added, "FeedRecord")
+    assert added["key"] == "metro-de-prueba" and added["source"] == "user"
+    assert added["cached"] is True and added["url"] == ""
+    # A file needs no download; the check reported once.
+    stages = [p["stage"] for p in client.notifications("job/progress", msg_id)]
+    assert stages == ["check"]
+
+    after = client.call("feeds.list")["result"]
+    assert [f["key"] for f in after["feeds"]] == keys + ["metro-de-prueba"]
+
+    # A new endpoint, as a new process would be, sees it too.
+    other = Client()
+    try:
+        again = other.call("feeds.list")["result"]
+        assert "metro-de-prueba" in [f["key"] for f in again["feeds"]]
+        inspected = other.call("feeds.inspect", {"key": "metro-de-prueba",
+                                                 "anchor": "2026-09-10"})["result"]
+        check(inspected, "Inspection")
+        assert [r["label"] for r in inspected["routes"]] == ["1"]
+    finally:
+        other.endpoint.close()
+
+    removed = client.call("feeds.remove", {"key": "metro-de-prueba"})["result"]
+    check(removed, "Ok")
+    assert "metro-de-prueba" not in feeds.all()
+    error = client.call("feeds.remove", {"key": KEY})["error"]
+    assert error["code"] == -32000 and error["data"]["kind"] == "feed"
+    assert "built-in" in error["data"]["hint"]
+
+
+def test_feeds_add_refuses_a_zip_without_a_timetable_with_the_named_sentence(client, home,
+                                                                              tmp_path):
+    tables = {k: v for k, v in GOOD.items() if k != "stop_times.txt"}
+    src = gtfs_zip(tmp_path / "partial.zip", tables)
+    error = client.call("feeds.add", {"source": str(src)})["error"]
+    assert error["code"] == -32000, error
+    check(error["data"], "ErrorData")
+    assert error["data"]["kind"] == "feed"
+    assert error["data"]["hint"] == ("partial.zip has no stop_times.txt, so there is no "
+                                     "timetable to animate")
+    # Nothing kept: no record, and no zip beyond the presets' (the module's
+    # home is shared, so the record file itself may exist, empty).
+    assert not any(f.source == "user" for f in feeds.all().values())
+    assert not list((home / "data" / "feeds").glob("partial*"))
+
+
+def test_feeds_add_by_url_reports_the_bytes_and_a_cancel_leaves_nothing(client, home, tmp_path,
+                                                                         monkeypatch):
+    payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
+
+    class Response:
+        content = payload
+
+        def __init__(self):
+            self.headers = {"Content-Length": str(len(payload))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            for i in range(0, len(self.content), 32):
+                time.sleep(0.005)
+                yield self.content[i:i + 32]
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    msg_id = client.send("feeds.add", {"source": "https://example.test/gtfs.zip",
+                                       "key": "remote", "name": "Remote"})
+    result = client.wait(msg_id)["result"]
+    check(result, "FeedRecord")
+    assert result["url"] == "https://example.test/gtfs.zip"
+    reports = client.notifications("job/progress", msg_id)
+    downloads = [p for p in reports if p["stage"] == "download"]
+    assert downloads and downloads[-1]["fraction"] == 1.0
+    assert "of" in downloads[-1]["message"] and "bytes" in downloads[-1]["message"]
+    assert reports[-1]["stage"] == "check"
+
+    # Cancelled during the download: the cancelled error, and nothing kept.
+    msg_id = client.send("feeds.add", {"source": "https://example.test/gtfs.zip",
+                                       "key": "stopped"})
+    wait_for(lambda: client.notifications("job/progress", msg_id), 10, "the first chunk")
+    client.notify("$/cancelRequest", {"id": msg_id})
+    error = client.wait(msg_id)["error"]
+    assert error["code"] == JsonRpcRequestCancelled.CODE
+    assert "stopped" not in feeds.all()
+    assert client.endpoint.jobs == {}
+
+
+def test_feeds_inspect_for_la_is_the_librarys_answer(client, home):
+    result = client.call("feeds.inspect", {"key": KEY, "anchor": "2026-09-10"})["result"]
+    check(result, "Inspection")
+    assert len(result["routes"]) == 6
+    assert [t["route_type"] for t in result["route_types"]] == [0, 1]
+    assert result["suggested_mode"] == "all"
+    assert result == feeds.inspect(KEY, anchor=dt.date(2026, 9, 10)).to_dict()
+
+
+LA_GRAPHS = config.REPO_ROOT / "data" / "graphs" / KEY
+needs_la_layout = pytest.mark.skipif(
+    not any(LA_GRAPHS.glob("*/03_octi.json")) if LA_GRAPHS.is_dir() else True,
+    reason="needs a stored Los Angeles layout in the checkout")
+
+
+@needs_la_layout
+def test_render_stage_draws_a_stored_stage_with_graph_builds_counts(client, home):
+    """The stage graphs the checkout stores for LA, copied under the home;
+    graph.build answers the set without running, and render.stage draws
+    from the same set, so the counts agree."""
+    shutil.copytree(LA_GRAPHS, home / "data" / "graphs" / KEY, dirs_exist_ok=True)
+    built = client.call("graph.build", {"key": KEY}, timeout=120)["result"]
+    for stage in ("gtfs2graph", "loom"):
+        result = client.call("render.stage", {"key": KEY, "layout": built["layout"],
+                                              "stage": stage, "width": 800},
+                             timeout=120)["result"]
+        check(result, "RenderStageResult")
+        assert result["svg"].lstrip().startswith("<svg")
+        assert result["counts"] == built["stages"][stage]
+        assert result["width"] > 0 and result["height"] > 0
+    missing = client.call("render.stage", {"key": KEY, "layout": NO_LAYOUT,
+                                           "stage": "octi"})["error"]
+    assert missing["code"] == -32000 and missing["data"]["kind"] == "layout"
+    assert "lay the feed out first" in missing["data"]["hint"]
+
+
+@needs_loom
+def test_a_feed_added_through_the_protocol_builds(client, home):
+    """The acceptance criterion: a feed added by the protocol survives a new
+    endpoint and lays out. LA's cached zip stands in for a download."""
+    src = home / "data" / "feeds" / f"{KEY}.zip"
+    added = client.call("feeds.add", {"source": str(src), "key": "la-user",
+                                      "name": "LA as a user feed"}, timeout=120)["result"]
+    assert added["source"] == "user"
+    other = Client()
+    try:
+        built = other.call("graph.build", {"key": "la-user"}, timeout=300)["result"]
+        check(built, "GraphBuildResult")
+        assert built["stages"]["octi"]["stations"] > 50
+    finally:
+        other.endpoint.close()
+    client.call("feeds.remove", {"key": "la-user"})
+

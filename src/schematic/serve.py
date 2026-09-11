@@ -43,7 +43,7 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 from . import __version__, config, export, feeds, loom, pipeline, schedule
 from .crs import to_mercator
 from .linegraph import LineGraph
-from .render import octilinearity
+from .render import octilinearity, stage as render_stage, summary as render_summary
 
 log = logging.getLogger(__name__)
 
@@ -440,6 +440,11 @@ class EngineEndpoint(Endpoint):
             "export.plan": self.export_plan,
             "export.encode": self.export_encode,
             "feeds.service": self.feeds_service,
+            "feeds.list": self.feeds_list,
+            "feeds.add": self.feeds_add,
+            "feeds.remove": self.feeds_remove,
+            "feeds.inspect": self.feeds_inspect,
+            "render.stage": self.render_stage,
         }, consumer, max_workers=max_workers)
 
     @property
@@ -608,6 +613,92 @@ class EngineEndpoint(Endpoint):
                     "busiest_weekday": day.isoformat(), "anchor": anchor.isoformat()}
 
         return self._job(work)
+    # -- the registry (E09c): what feeds there are, adding and forgetting one,
+    # and what is in one. The sentences are feeds.py's and inspection.py's.
+
+    def feeds_list(self, params: Any = None) -> dict[str, Any]:
+        _no_params("feeds.list", params)
+        return {"feeds": [_feed_record(f) for f in feeds.all().values()]}
+
+    def feeds_add(self, params: Any) -> Callable[[], Any]:
+        """A feed from a URL or a file the client owns. A long request: the
+        download reports its bytes, then the check reports once; a cancel
+        between chunks stops it and leaves nothing."""
+        left = _object("feeds.add", params)
+        source = left.pop("source", None)
+        if not isinstance(source, str) or not source or (
+                not source.startswith(("http://", "https://")) and not os.path.isabs(source)):
+            raise invalid_params("source must be a URL with its scheme, or an absolute path "
+                                 "to a zip the client owns")
+        key = _optional(left, "key", lambda v: isinstance(v, str) and bool(KEY_PATTERN.match(v)),
+                        "must be a feed key: lower-case letters, digits and hyphens")
+        name = _optional(left, "name", lambda v: isinstance(v, str) and 0 < len(v.strip()) <= 120,
+                         "must be text, up to 120 characters")
+        overrides = _overrides(left)
+        for extra in ("label_pattern", "label_strip"):
+            if extra in overrides:
+                raise invalid_params(f"feeds.add does not take {extra}")
+        _no_extra("feeds.add", left)
+
+        def work(job: loom.Job, progress: Progress) -> dict[str, Any]:
+            def report(stage: str, done: int, total: int | None) -> None:
+                if stage == "download":
+                    fraction = min(done / total, 1.0) if total else 0.0
+                    message = (f"downloaded {done:,} of {total:,} bytes" if total
+                               else f"downloaded {done:,} bytes")
+                    progress("download", fraction, message)
+                elif done:
+                    progress("check", 1.0, "checked the feed's tables")
+            feed = feeds.add(source, key=key, name=name.strip() if name else None,
+                             mode=overrides.get("mode", "all"), agency=overrides.get("agency"),
+                             progress=report, cancelled=lambda: job.cancelled)
+            return _feed_record(feed)
+
+        return self._job(work)
+
+    def feeds_remove(self, params: Any) -> dict[str, Any]:
+        left = _object("feeds.remove", params)
+        key = _feed_key(left.pop("key", None))
+        _no_extra("feeds.remove", left)
+        try:
+            feeds.remove(key)
+        except feeds.FeedError as exc:
+            raise EngineError("feed", str(exc)) from exc
+        return {"ok": True}
+
+    def feeds_inspect(self, params: Any) -> Callable[[], Any]:
+        """What is in a feed, as data, from the raw zip: a long request when
+        the feed is not cached, and a few seconds for a large one."""
+        left = _object("feeds.inspect", params)
+        key = _feed_key(left.pop("key", None))
+        anchor = _date(left.pop("anchor"), "anchor") if "anchor" in left else dt.date.today()
+        _no_extra("feeds.inspect", left)
+
+        def work(_job: loom.Job, _progress: Progress) -> dict[str, Any]:
+            return feeds.inspect(key, anchor=anchor).to_dict()
+
+        return self._job(work)
+
+    def render_stage(self, params: Any) -> Callable[[], Any]:
+        """One stored stage graph of a layout, drawn, with its counts (E15)."""
+        left = _object("render.stage", params)
+        key = _feed_key(left.pop("key", None))
+        layout = _layout(left.pop("layout", None))
+        stage = left.pop("stage", None)
+        if not isinstance(stage, str) or stage not in pipeline.STAGE_FILES:
+            raise invalid_params("stage must be one of " + ", ".join(pipeline.STAGE_FILES))
+        width = _positive(left, "width", 1200.0)
+        labels = _flag(left, "labels")
+        _no_extra("render.stage", left)
+
+        def work(_job: loom.Job, _progress: Progress) -> dict[str, Any]:
+            svg, counts = render_stage(key, stage, layout=layout, width=width, labels=labels)
+            width_px, height_px = counts.pop("width"), counts.pop("height")
+            return {"layout": layout, "stage": stage, "svg": svg,
+                    "width": width_px, "height": height_px, "counts": counts}
+
+        return self._job(work)
+
     # -- export: the two halves the desktop app cannot do itself. It captures
     # for itself (its ADR-024); there is no export.capture here.
 
@@ -662,10 +753,15 @@ class EngineEndpoint(Endpoint):
 
 
 def _stage_summary(graph: LineGraph) -> dict[str, Any]:
-    stations = len(graph.stations)
-    return {"nodes": len(graph.nodes), "stations": stations,
-            "junctions": len(graph.nodes) - stations, "edges": len(graph.edges),
-            "lines": list(graph.labels)}
+    return render_summary(graph)
+
+
+def _feed_record(feed: feeds.Feed) -> dict[str, Any]:
+    """A registry entry as the protocol shows it: the record, and whether its
+    zip is on disk, which is what "downloaded" means to a person."""
+    record = feed.to_dict()
+    record["cached"] = feed.zip_path.is_file()
+    return record
 
 
 def _diagnostics(result: pipeline.Result) -> dict[str, Any]:

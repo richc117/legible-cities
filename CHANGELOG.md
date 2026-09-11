@@ -31,6 +31,19 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
   timetable, an expired or unstarted calendar, a `calendar_dates.txt`-only
   schedule, routes without short names and a feed several operators share.
   Reads the raw zip, never `stop_times`, so New York inspects in seconds.
+- **`render.stage(key, stage, layout=, width=, labels=)`** (E15): one
+  stored stage graph, drawn as SVG with its counts, for a geographic view
+  beside the schematic map; by layout id or by the registry entry, with a
+  hint naming what builds a stage that is not stored. `render.summary()`
+  is the counts alone.
+- **The registry over the protocol** (E09c): `feeds.list` (every entry,
+  preset or user, with `cached`), `feeds.add` (a URL or an absolute path;
+  a long request reporting the download's bytes, then the check; a cancel
+  between chunks leaves nothing), `feeds.remove` (a preset is refused with
+  kind `feed`), `feeds.inspect` (the inspection, from an anchor) and
+  `render.stage` (by layout id; a stage not stored is kind `layout`).
+  Additive at protocol 1; the errors keep `kind: feed` and the sentences
+  `feeds.py` writes.
 
 ## [0.6.0] - 2026-09-10
 

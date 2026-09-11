@@ -12,7 +12,12 @@
     "export.storyboards": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/ExportStoryboards" } },
     "export.plan": { "params": { "$ref": "#/$defs/ExportPlanParams" }, "result": { "$ref": "#/$defs/CaptureJob" } },
     "export.encode": { "params": { "$ref": "#/$defs/ExportEncodeParams" }, "result": { "$ref": "#/$defs/ExportEncodeResult" } },
-    "feeds.service": { "params": { "$ref": "#/$defs/FeedsServiceParams" }, "result": { "$ref": "#/$defs/FeedsServiceResult" } }
+    "feeds.service": { "params": { "$ref": "#/$defs/FeedsServiceParams" }, "result": { "$ref": "#/$defs/FeedsServiceResult" } },
+    "feeds.list": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/FeedsList" } },
+    "feeds.add": { "params": { "$ref": "#/$defs/FeedsAddParams" }, "result": { "$ref": "#/$defs/FeedRecord" } },
+    "feeds.remove": { "params": { "$ref": "#/$defs/FeedsRemoveParams" }, "result": { "$ref": "#/$defs/Ok" } },
+    "feeds.inspect": { "params": { "$ref": "#/$defs/FeedsInspectParams" }, "result": { "$ref": "#/$defs/Inspection" } },
+    "render.stage": { "params": { "$ref": "#/$defs/RenderStageParams" }, "result": { "$ref": "#/$defs/RenderStageResult" } }
   },
   "notifications": {
     "job/progress": { "$ref": "#/$defs/JobProgress" },
@@ -1165,6 +1170,462 @@
       "required": [
         "files",
         "sidecar"
+      ],
+      "additionalProperties": false
+    },
+    "FeedRecord": {
+      "description": "A registry entry, preset or added by a person: what the engine knows about a feed before it reads it. `cached` says whether its zip is on disk.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "name": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "network": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "description": "Where the zip came from; empty for a feed added from a file."
+        },
+        "mode": {
+          "type": "string"
+        },
+        "label_pattern": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label_strip": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geographic": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source": {
+          "enum": [
+            "preset",
+            "user"
+          ],
+          "description": "Which half of the registry: a preset is curated in the engine and cannot be removed; a user feed was added through feeds.add."
+        },
+        "cached": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "key",
+        "name",
+        "city",
+        "network",
+        "url",
+        "mode",
+        "label_pattern",
+        "label_strip",
+        "agency",
+        "geographic",
+        "notes",
+        "source",
+        "cached"
+      ],
+      "additionalProperties": false
+    },
+    "FeedsList": {
+      "type": "object",
+      "properties": {
+        "feeds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FeedRecord"
+          }
+        }
+      },
+      "required": [
+        "feeds"
+      ],
+      "additionalProperties": false
+    },
+    "FeedsAddParams": {
+      "description": "Add a feed a person chose, from a URL or a zip the client owns, and keep it across restarts. A long request: the download reports its bytes as job/progress (stage download), then the check reports once (stage check). The zip must carry stops, routes, trips, stop_times and a calendar in one of its two forms; a refusal names the missing table and leaves nothing behind. The name defaults to the feed's first agency, the key to a slug of the name made unique.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A URL with its scheme, or an absolute path to a zip the client owns."
+        },
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "mode": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+(,[a-z0-9-]+)*$",
+          "description": "What gtfs2graph keeps of the feed (LOOM's -m); all when omitted. feeds.inspect suggests one."
+        },
+        "agency": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Keep only this agency_id; every operator when omitted."
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "FeedsRemoveParams": {
+      "description": "Forget a feed a person added, with its zips and its stored layouts. A preset is refused with kind feed.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "FeedsInspectParams": {
+      "description": "What is in a feed, as data, before anything is laid out: read from the raw zip, never the agency-filtered copy, so the answer is what a choice of mode and agency is made from. A long request when the feed is not cached; a few seconds for a large one. Never reads stop_times.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "anchor": {
+          "$ref": "#/$defs/ServiceDate",
+          "description": "The day the service choice scans from, as feeds.service takes it; the engine's today when omitted, and echoed."
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "Agency": {
+      "type": "object",
+      "properties": {
+        "agency_id": {
+          "type": "string"
+        },
+        "agency_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agency_id",
+        "agency_name"
+      ],
+      "additionalProperties": false
+    },
+    "Route": {
+      "type": "object",
+      "properties": {
+        "route_id": {
+          "type": "string"
+        },
+        "agency_id": {
+          "type": "string"
+        },
+        "short_name": {
+          "type": "string"
+        },
+        "long_name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string",
+          "description": "The label the map would draw: route_short_name, or the long name through the feed's label pattern, then the strip."
+        },
+        "route_type": {
+          "type": "integer",
+          "description": "GTFS route_type as published; -1 when missing."
+        },
+        "color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text_color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trips": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Rows in trips.txt; a headway-based trip is a template that expands into runs."
+        }
+      },
+      "required": [
+        "route_id",
+        "agency_id",
+        "short_name",
+        "long_name",
+        "label",
+        "route_type",
+        "color",
+        "text_color",
+        "trips"
+      ],
+      "additionalProperties": false
+    },
+    "RouteType": {
+      "type": "object",
+      "properties": {
+        "route_type": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string",
+          "description": "The GTFS name: tram, subway, rail, bus, ferry, cable tram, aerial lift, funicular, trolleybus, monorail; an extended code says which it folds onto."
+        },
+        "routes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trips": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "route_type",
+        "name",
+        "routes",
+        "trips"
+      ],
+      "additionalProperties": false
+    },
+    "StopCounts": {
+      "description": "Rows of stops.txt by location_type, and the total.",
+      "type": "object",
+      "properties": {
+        "stops": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "entrances": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generic_nodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "boarding_areas": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "stops",
+        "stations",
+        "entrances",
+        "generic_nodes",
+        "boarding_areas",
+        "total"
+      ],
+      "additionalProperties": false
+    },
+    "Inspection": {
+      "description": "A feed as the Inspect screen shows it.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The GTFS tables present, by stem."
+        },
+        "agencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Agency"
+          }
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Route"
+          }
+        },
+        "route_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RouteType"
+          }
+        },
+        "stops": {
+          "$ref": "#/$defs/StopCounts"
+        },
+        "trips": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "frequency_trips": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Trips with frequencies.txt windows: templates, expanded into runs when the day is built."
+        },
+        "service": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/FeedsServiceResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The window and the engine's day from the anchor, as feeds.service answers them; null when the feed has no calendar, with a warning saying so."
+        },
+        "suggested_mode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A LOOM mode from the route types: all for a feed with nothing but rail-like types, else the most common rail-like type, else the most common. The app shows it; the person decides."
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Sentences for a person: a headway-based timetable, an expired or unstarted calendar, a calendar_dates-only schedule, routes without short names, several operators in one feed."
+        }
+      },
+      "required": [
+        "key",
+        "name",
+        "tables",
+        "agencies",
+        "routes",
+        "route_types",
+        "stops",
+        "trips",
+        "frequency_trips",
+        "service",
+        "suggested_mode",
+        "warnings"
+      ],
+      "additionalProperties": false
+    },
+    "StageName": {
+      "description": "One of the pipeline's four stages, in order.",
+      "enum": [
+        "gtfs2graph",
+        "topo",
+        "loom",
+        "octi"
+      ]
+    },
+    "RenderStageParams": {
+      "description": "One stored stage graph of a layout, drawn as SVG, with its counts (E15): what a geographic view shows beside the schematic map. Never lays out; a stage that is not stored is refused with kind layout.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "layout": {
+          "$ref": "#/$defs/LayoutId"
+        },
+        "stage": {
+          "$ref": "#/$defs/StageName"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1200,
+          "description": "The drawing's width in CSS pixels; the canvas grows for labels."
+        },
+        "labels": {
+          "type": "boolean",
+          "default": false,
+          "description": "Draw station names."
+        }
+      },
+      "required": [
+        "key",
+        "layout",
+        "stage"
+      ],
+      "additionalProperties": false
+    },
+    "RenderStageResult": {
+      "type": "object",
+      "properties": {
+        "layout": {
+          "$ref": "#/$defs/LayoutId"
+        },
+        "stage": {
+          "$ref": "#/$defs/StageName"
+        },
+        "svg": {
+          "type": "string",
+          "description": "A self-contained SVG document, themed through CSS variables with literal fallbacks."
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "counts": {
+          "$ref": "#/$defs/StageSummary"
+        }
+      },
+      "required": [
+        "layout",
+        "stage",
+        "svg",
+        "width",
+        "height",
+        "counts"
       ],
       "additionalProperties": false
     },

@@ -196,8 +196,15 @@ def test_add_from_a_url_downloads_once_and_keeps_the_url(home, tmp_path, monkeyp
     class Response:
         content = payload
 
+        def __init__(self):
+            self.headers = {"Content-Length": str(len(payload))}
+
         def raise_for_status(self):
             pass
+
+        def iter_content(self, size):
+            for i in range(0, len(self.content), size):
+                yield self.content[i:i + size]
 
     monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: calls.append(url) or Response())
     feed = feeds.add("https://example.test/gtfs.zip")
@@ -211,8 +218,14 @@ def test_a_page_that_is_not_a_zip_is_refused(home, monkeypatch):
     class Response:
         content = b"<html>not found</html>"
 
+        def __init__(self):
+            self.headers = {}
+
         def raise_for_status(self):
             pass
+
+        def iter_content(self, size):
+            yield self.content
 
     monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
     with pytest.raises(feeds.FeedError, match="did not return a zip"):
@@ -306,3 +319,38 @@ def test_a_file_feed_whose_zip_is_gone_says_so(home, tmp_path):
     feed.zip_path.unlink()
     with pytest.raises(feeds.FeedError, match="add it again"):
         feeds.fetch("mine")
+
+
+def test_add_reports_the_download_and_the_check_and_stops_when_asked(home, tmp_path, monkeypatch):
+    payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
+
+    class Response:
+        content = payload
+
+        def __init__(self):
+            self.headers = {"Content-Length": str(len(payload))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            for i in range(0, len(self.content), 64):
+                yield self.content[i:i + 64]
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    seen = []
+    feeds.add("https://example.test/gtfs.zip", key="seen",
+              progress=lambda stage, done, total: seen.append((stage, done, total)))
+    downloads = [s for s in seen if s[0] == "download"]
+    assert downloads[-1] == ("download", len(payload), len(payload))
+    assert len(downloads) > 1
+    assert seen[-1] == ("check", 1, None)
+
+    # Cancelled after the first chunk: nothing is kept.
+    asked = []
+    with pytest.raises(feeds.Interrupted):
+        feeds.add("https://example.test/gtfs.zip", key="gone",
+                  cancelled=lambda: asked.append(1) or len(asked) > 1)
+    assert "gone" not in feeds.all()
+    assert sorted(p.name for p in config.feeds_dir().iterdir()) == ["seen.zip", "user-feeds.json"]
+
