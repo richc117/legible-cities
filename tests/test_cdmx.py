@@ -8,7 +8,7 @@ from collections import defaultdict, deque
 
 import pytest
 
-from schematic import config, feeds
+from schematic import config, feeds, pipeline
 from schematic.crs import to_mercator
 from schematic.linegraph import LineGraph
 from schematic.render import octilinearity
@@ -18,14 +18,14 @@ from schematic.schedule import (busiest_weekday, frequency_windows, match_stops,
 KEY = "cdmx-metro"
 
 pytestmark = pytest.mark.skipif(
-    not (config.graphs_dir() / KEY / "03_octi.json").exists(),
+    pipeline.stage_path(KEY, "octi") is None,
     reason="run the pipeline once to populate data/graphs",
 )
 
 
 @pytest.fixture(scope="module")
 def graph():
-    return LineGraph.from_geojson(config.graphs_dir() / KEY / "03_octi.json")
+    return LineGraph.from_geojson(pipeline.stage_path(KEY, "octi"))
 
 
 @pytest.fixture(scope="module")

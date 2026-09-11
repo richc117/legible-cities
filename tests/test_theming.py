@@ -9,7 +9,7 @@ import re
 
 import pytest
 
-from schematic import config
+from schematic import config, pipeline
 from schematic.crs import to_mercator
 from schematic.linegraph import LineGraph
 from schematic.render import Style, render
@@ -17,14 +17,14 @@ from schematic.render import Style, render
 KEY = "la-metro-rail"
 
 pytestmark = pytest.mark.skipif(
-    not (config.graphs_dir() / KEY / "03_octi.json").exists(),
+    pipeline.stage_path(KEY, "octi") is None,
     reason="run the pipeline once to populate data/graphs",
 )
 
 
 @pytest.fixture(scope="module")
 def graph():
-    return LineGraph.from_geojson(config.graphs_dir() / KEY / "03_octi.json").reproject(to_mercator)
+    return LineGraph.from_geojson(pipeline.stage_path(KEY, "octi")).reproject(to_mercator)
 
 
 def line_strokes(svg: str) -> set[str]:

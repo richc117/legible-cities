@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -30,7 +31,7 @@ import pytest
 from unittest import mock
 from jsonschema import Draft202012Validator
 
-from schematic import __version__, config, export, feeds, loom, schedule, serve
+from schematic import __version__, config, export, feeds, loom, pipeline, schedule, serve
 
 SCHEMA = serve.schema()
 KEY = "la-metro-rail"
@@ -257,8 +258,9 @@ def test_patterns_agree_with_the_schema():
     assert serve.KEY_PATTERN.pattern == defs["FeedKey"]["pattern"]
     assert serve.TOKEN_PATTERN.pattern == defs["Token"]["pattern"]
     assert serve.DATE_PATTERN.pattern == defs["ServiceDate"]["pattern"]
-    assert set(serve.KIND_BY_MODULE.values()) | {"engine", "io", "params"} \
-        == set(defs["ErrorData"]["properties"]["kind"]["enum"])
+    assert set(serve.KINDS) == set(defs["ErrorData"]["properties"]["kind"]["enum"])
+    assert serve.LAYOUT_PATTERN.pattern == defs["LayoutId"]["pattern"]
+    assert serve.MODE_PATTERN.pattern == defs["GraphBuildParams"]["properties"]["mode"]["pattern"]
     assert serve.CLOCK_PATTERN.pattern == defs["Clock"]["pattern"]
     assert serve.URL_PATTERN.pattern == defs["PageUrl"]["pattern"]
     assert serve.STEM_PATTERN.pattern == defs["CaptureJob"]["properties"]["stem"]["pattern"]
@@ -323,33 +325,66 @@ def test_unknown_feed_is_a_feed_error_with_a_hint(client):
     assert "not a registered feed" in error["data"]["hint"]
 
 
+NO_LAYOUT = "0" * 64  # well-formed, and stored nowhere
+
+
 def test_map_build_without_a_date_is_a_schema_error_not_a_default(client):
-    error = client.call("map.build", {"key": KEY})["error"]
+    error = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT})["error"]
     assert error["code"] == -32602
     check(error["data"], "ErrorData")
     assert error["data"]["kind"] == "params"
     assert "date is required" in error["data"]["hint"]
-    assert invalid({"key": KEY}, "MapBuildParams")
+    assert invalid({"key": KEY, "layout": NO_LAYOUT}, "MapBuildParams")
+
+
+def test_map_build_without_a_layout_is_refused_before_anything_runs(client):
+    """A map is drawn from a stored layout the caller names; the engine never
+    picks one, and never lays out on the way to a map."""
+    error = client.call("map.build", {"key": KEY, "date": DATE})["error"]
+    assert error["code"] == -32602
+    assert error["data"]["kind"] == "params"
+    assert "layout is required" in error["data"]["hint"]
+    assert invalid({"key": KEY, "date": DATE}, "MapBuildParams")
+    assert client.endpoint.jobs == {}
+
+
+def test_map_build_refuses_a_layout_that_is_not_stored(client, home):
+    error = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE},
+                        timeout=30)["error"]
+    assert error["code"] == -32000, error
+    check(error["data"], "ErrorData")
+    assert error["data"]["kind"] == "layout"
+    assert "lay the feed out first" in error["data"]["hint"]
 
 
 BAD_PARAMS = [
+    ("graph.build", {"key": KEY, "mode": "Tram!"}, "GraphBuildParams"),
+    ("graph.build", {"key": KEY, "agency": ""}, "GraphBuildParams"),
+    ("graph.build", {"key": KEY, "label_pattern": ""}, "GraphBuildParams"),
+    ("graph.build", {"key": KEY, "label_strip": 3}, "GraphBuildParams"),
+    ("map.build", {"key": KEY, "date": DATE}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": "not-a-layout", "date": DATE}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "force": True},
+     "MapBuildParams"),
     ("graph.build", None, "GraphBuildParams"),
     ("graph.build", [], "GraphBuildParams"),
     ("graph.build", {}, "GraphBuildParams"),
     ("graph.build", {"key": "../etc"}, "GraphBuildParams"),
     ("graph.build", {"key": "LA"}, "GraphBuildParams"),
     ("graph.build", {"key": KEY, "force": "yes"}, "GraphBuildParams"),
-    ("graph.build", {"key": KEY, "mode": "tram"}, "GraphBuildParams"),
-    ("map.build", {"key": KEY, "date": "11/09/2026"}, "MapBuildParams"),
-    ("map.build", {"key": KEY, "date": "2026-13-40"}, "MapBuildParams"),
-    ("map.build", {"key": KEY, "date": 20260911}, "MapBuildParams"),
-    ("map.build", {"key": KEY, "date": DATE, "out": "../x"}, "MapBuildParams"),
-    ("map.build", {"key": KEY, "date": DATE, "out": ".hidden"}, "MapBuildParams"),
-    ("map.build", {"key": KEY, "date": DATE, "out": "a/b"}, "MapBuildParams"),
-    ("map.build", {"key": KEY, "date": DATE, "width": 0}, "MapBuildParams"),
-    ("map.build", {"key": KEY, "date": DATE, "width": "wide"}, "MapBuildParams"),
-    ("map.build", {"key": KEY, "date": DATE, "line_order": "A,B"}, "MapBuildParams"),
-    ("map.build", {"key": KEY, "date": DATE, "style": {}}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": "11/09/2026"}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": "2026-13-40"}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": 20260911}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "out": "../x"}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "out": ".hidden"},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "out": "a/b"}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "width": 0}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "width": "wide"},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "line_order": "A,B"},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "style": {}}, "MapBuildParams"),
     ("export.plan", None, "ExportPlanParams"),
     ("export.plan", {}, "ExportPlanParams"),
     ("export.plan", {"key": KEY}, "ExportPlanParams"),
@@ -430,9 +465,18 @@ def test_hand_validation_refuses_what_the_schema_refuses(client, method, params,
     assert invalid(params, definition)
 
 
+def test_a_mode_loom_would_not_know_is_refused_by_hand(client):
+    """The schema can only hold the shape; the names are the server's."""
+    error = client.call("graph.build", {"key": KEY, "mode": "zeppelin"})["error"]
+    assert error["code"] == -32602 and error["data"]["kind"] == "params"
+    for mode in ("tram,subway", "rail,funicular", "all", "1"):
+        assert feeds.valid_mode(mode)
+
+
 def test_calendar_check_goes_past_the_pattern(client):
     # 2026-02-30 matches the pattern and is not a day.
-    error = client.call("map.build", {"key": KEY, "date": "2026-02-30"})["error"]
+    error = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT,
+                                      "date": "2026-02-30"})["error"]
     assert error["code"] == -32602
     assert "not a calendar day" in error["data"]["hint"]
 
@@ -440,9 +484,11 @@ def test_calendar_check_goes_past_the_pattern(client):
 GOOD_PARAMS = [
     ("GraphBuildParams", {"key": KEY}),
     ("GraphBuildParams", {"key": KEY, "force": True}),
-    ("MapBuildParams", {"key": KEY, "date": DATE}),
-    ("MapBuildParams", {"key": KEY, "date": DATE, "out": "p1", "width": 900,
-                        "line_order": ["A", "B"], "force": False}),
+    ("GraphBuildParams", {"key": KEY, "mode": "tram", "agency": "LACMTA",
+                          "label_pattern": "^Metro (.+) Line$", "label_strip": "-N$"}),
+    ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE}),
+    ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "out": "p1",
+                        "width": 900, "line_order": ["A", "B"]}),
     ("ExportPlanParams", {"key": KEY, "preset": "instagram-reel"}),
     ("ExportPlanParams", {"key": KEY, "preset": "instagram-post",
                           "page": "app://local/projects/p1/la-metro-rail.html", "date": DATE,
@@ -679,10 +725,20 @@ def test_graph_build_reports_four_stages(client, home):
     assert result["stages"]["octi"]["stations"] > 50
     assert result["stages"]["octi"]["octilinear"] > 0.95
     assert set(result["stages"]["octi"]["lines"]) >= {"A", "B", "C", "D", "E"}
+    # Stored under its id, with the meta beside it; the id is what the app keeps.
+    assert re.fullmatch(r"[0-9a-f]{64}", result["layout"])
+    layout_dir = home / "data" / "graphs" / KEY / result["layout"]
     for stage, path in result["paths"].items():
         assert Path(path).is_file()
-        assert Path(path).parent == home / "data" / "graphs" / KEY
+        assert Path(path).parent == layout_dir
+    assert (layout_dir / ".meta.json").is_file()
+    assert result["meta"]["feed"] == KEY and result["meta"]["migrated"] is False
+    assert pipeline.stored(KEY).id == result["layout"]
     assert client.endpoint.jobs == {}
+
+    # Asked again, the stored layout is answered without a stage running.
+    again = client.call("graph.build", {"key": KEY}, timeout=60)["result"]
+    assert again["layout"] == result["layout"]
 
 
 @needs_native
@@ -715,8 +771,9 @@ def test_graph_build_over_the_native_backend(client, home):
 
 @needs_loom
 def test_cancel_ends_the_loom_process_and_leaves_the_cache_alone(client, home):
-    cached = home / "data" / "graphs" / KEY / "00_gtfs2graph.json"
-    before = cached.stat().st_mtime_ns if cached.exists() else None
+    stored = pipeline.stored(KEY)
+    cached = None if stored is None else stored.paths["gtfs2graph"]
+    before = cached.stat().st_mtime_ns if cached is not None else None
 
     msg_id = client.send("graph.build", {"key": KEY, "force": True})
     wait_for(lambda: msg_id in client.endpoint.jobs
@@ -731,16 +788,15 @@ def test_cancel_ends_the_loom_process_and_leaves_the_cache_alone(client, home):
     assert client.endpoint.jobs == {}
     wait_for(lambda: not loom_containers(), 15, "the loom container to go")
     if before is not None:
-        assert cached.stat().st_mtime_ns == before, "a cancelled stage overwrote the cache"
+        assert cached.stat().st_mtime_ns == before, "a cancelled stage overwrote the layout"
+    assert not list((home / "data" / "graphs" / KEY).glob("*.building")), "a scratch was left"
 
 
 @needs_loom
-def test_a_mode_that_matches_nothing_returns_the_hint(client, home, monkeypatch):
-    for z in SOURCE_ZIPS:
-        shutil.copy(z, home / "data" / "feeds" / z.name.replace(KEY, "la-ferry"))
-    monkeypatch.setitem(feeds.FEEDS, "la-ferry",
-                        replace(feeds.FEEDS[KEY], key="la-ferry", mode="ferry"))
-    error = client.call("graph.build", {"key": "la-ferry"}, timeout=180)["error"]
+def test_a_mode_that_matches_nothing_returns_the_hint(client, home):
+    """An override on the request: LA has no ferries, so the layout it names
+    is empty and refused by name, and the registry's layout is untouched."""
+    error = client.call("graph.build", {"key": KEY, "mode": "ferry"}, timeout=180)["error"]
     assert error["code"] == -32000
     check(error["data"], "ErrorData")
     assert error["data"]["kind"] == "feed"
@@ -748,14 +804,21 @@ def test_a_mode_that_matches_nothing_returns_the_hint(client, home, monkeypatch)
     assert "'ferry'" in error["data"]["hint"]
 
 
+def stored_layout(client) -> str:
+    """The LA layout's id, from graph.build: instant once it is stored."""
+    return client.call("graph.build", {"key": KEY}, timeout=180)["result"]["layout"]
+
+
 @needs_loom
 def test_map_build_writes_under_out_and_reports_diagnostics(client, home):
-    msg_id = client.send("map.build", {"key": KEY, "date": DATE, "out": "p1"})
+    layout = stored_layout(client)
+    msg_id = client.send("map.build", {"key": KEY, "layout": layout, "date": DATE, "out": "p1"})
     response = client.wait(msg_id)
     assert "result" in response, response
     result = response["result"]
     check(result, "MapBuildResult")
 
+    assert result["layout"] == layout
     assert result["date"] == DATE
     for kind, path in result["files"].items():
         assert Path(path).is_file(), kind
@@ -776,6 +839,25 @@ def test_map_build_writes_under_out_and_reports_diagnostics(client, home):
                       "schedule", "render", "animate", "write"]
     fractions = [p["fraction"] for p in client.notifications("job/progress", msg_id)]
     assert fractions == sorted(fractions) and fractions[-1] == 1.0
+
+
+@needs_loom
+def test_map_build_never_lays_out(client, home, monkeypatch):
+    """With a stored layout the map is drawn without a LOOM process; asked
+    for a layout that is not stored it refuses rather than laying out."""
+    layout = stored_layout(client)
+
+    def no_loom(*args, **kwargs):
+        raise AssertionError("map.build started a LOOM process")
+
+    monkeypatch.setattr(loom, "execute", no_loom)
+    result = client.call("map.build", {"key": KEY, "layout": layout, "date": DATE, "out": "p2"},
+                         timeout=180)["result"]
+    assert result["layout"] == layout
+    error = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE},
+                        timeout=30)["error"]
+    assert error["code"] == -32000 and error["data"]["kind"] == "layout"
+    assert "lay the feed out first" in error["data"]["hint"]
 
 
 # ----------------------------------------------------------------- over pipes

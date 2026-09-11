@@ -8,9 +8,7 @@ import pytest
 from schematic import feeds
 
 # LOOM's -m accepts these names or raw GTFS route-type codes, comma separated.
-VALID_MOTS = {"all", "tram", "streetcar", "subway", "metro", "rail", "train", "bus",
-              "ferry", "boat", "ship", "cablecar", "gondola", "funicular", "coach",
-              "mono-rail", "monorail", "trolley", "trolleybus", "trolley-bus"}
+VALID_MOTS = feeds.MOTS
 
 
 @pytest.mark.parametrize("key,feed", sorted(feeds.FEEDS.items()))

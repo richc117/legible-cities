@@ -5,6 +5,42 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Added
+
+- **Layouts addressed by their inputs.** A layout is stored under the home
+  at `data/graphs/<feed>/<id>/` with a `.meta.json` beside its four stage
+  files, and `<id>` is the sha256 of everything that went into it: the
+  feed's bytes, the mode, the agency, the label options, the LOOM build and
+  the stage arguments. The same inputs name the same layout before anything
+  runs; a change to any of them names a new one and leaves the old
+  untouched. A layout is written whole into a scratch directory and moved
+  into place, so a cancel or a failure leaves nothing that looks finished,
+  and `force` replaces a stored layout only once the new set is whole. A
+  set from before layouts had names is migrated under its id, once, in
+  place. This is the determinism mechanism the desktop app's ADR-023 named
+  and its ADR-027 had to do without.
+- **`graph.build` takes `mode`, `agency`, `label_pattern` and
+  `label_strip`**, defaulting to the registry entry, and answers with the
+  layout's `layout` id and `meta`.
+
+### Changed
+
+- **`map.build` takes `layout` and never lays a feed out.** The id is
+  required, a layout that is not stored is refused with a hint to lay the
+  feed out first, `force` is gone, and the result names the layout it drew
+  from. A client that called `map.build` without a layout has to lay out
+  first now. The protocol number stays at 1, as the convention has it for
+  a change a client notices; the tag is the gate, and the desktop app pins
+  the next one. `ErrorData.kind` gains `layout`, for a layout named that is
+  not stored: nothing ran and nothing failed.
+- `pipeline.run` takes `layout=`; `pipeline.schematize` keeps its shape and
+  gains the overrides; `pipeline.lay_out` and `pipeline.stored` are the
+  layout's own functions; `feeds.normalize` and `feeds.tables` take a `Feed`
+  as well as a key, and a feed with overrides gets a normalised copy of its
+  own.
+
 ## [0.4.0] - 2026-09-10
 
 ### Added

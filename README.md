@@ -181,16 +181,25 @@ onto the network.
 
 `bin/run-all` runs every registered feed and prints a table of what worked.
 
-Feeds, cached graphs and output live under the repository (`data/feeds`,
+Feeds, layouts and output live under the repository (`data/feeds`,
 `data/graphs`, `out/`) unless `SCHEMATIC_HOME` names another folder, in which
 case the engine writes there and nowhere else. The site and `bin/` are code
-and stay put either way.
+and stay put either way. A layout - the four LOOM stages of one network - is
+stored at `data/graphs/<feed>/<id>/` with a `.meta.json` saying what went
+into it, and `<id>` is the hash of exactly that: the feed's bytes, the mode,
+the agency, the label options and the LOOM build. The same inputs name the
+same layout, a different input names a new one beside it, and a layout is
+never rewritten in place; `pipeline.run(..., force=True)` makes a new set and
+swaps it in whole. Because `octi` is not deterministic, the layout a map was
+drawn from is the only thing that reproduces it, which is why it is kept.
 
 `python -m schematic.serve` runs the engine as a JSON-RPC 2.0 server on stdin
 and stdout, framed like a language server, which is how the desktop app
-drives it: `engine.info`, `graph.build` and `map.build`, with progress and
-LOOM's log as notifications and `$/cancelRequest` to stop a run. The service
-day is a required parameter there, never picked by the engine. `--schema`
+drives it: `engine.info`, `graph.build` (which answers with the layout's id)
+and `map.build` (which takes that id and a service day, and never lays out
+on the way to a map), with progress and LOOM's log as notifications and
+`$/cancelRequest` to stop a run. The service day is a required parameter
+there, never picked by the engine. `--schema`
 prints the protocol's JSON Schema, from which the app generates its types.
 
 The notebooks in `notebooks/` walk the same pipeline one stage at a time, and

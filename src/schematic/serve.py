@@ -60,6 +60,9 @@ STEM_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 # sentence for a person was written.
 KIND_BY_MODULE = {"feeds": "feed", "pipeline": "feed", "schedule": "schedule",
                   "export": "export", "loom": "loom"}
+# Every kind the protocol names: the modules', the transport's, and the one
+# for a layout named that is not stored (nothing ran, nothing failed).
+KINDS = sorted(set(KIND_BY_MODULE.values()) | {"engine", "io", "params", "layout"})
 
 Progress = pipeline.Progress
 Work = Callable[[loom.Job, Progress], Any]
@@ -89,7 +92,9 @@ def invalid_params(hint: str) -> JsonRpcInvalidParams:
 def classify(exc: BaseException) -> EngineError:
     """Turn an exception out of the pipeline into an error a client can show."""
     frames = traceback.extract_tb(exc.__traceback__)
-    if isinstance(exc, loom.LoomError):
+    if isinstance(exc, pipeline.LayoutMissing):
+        kind = "layout"
+    elif isinstance(exc, loom.LoomError):
         kind = "loom"
     elif isinstance(exc, OSError):
         kind = "io"
@@ -157,6 +162,51 @@ def _token(value: Any) -> str:
     if not isinstance(value, str) or not TOKEN_PATTERN.match(value):
         raise invalid_params("out must be a folder name: letters, digits, dot, underscore "
                              "and hyphen, not starting with a dot, never a path")
+    return value
+
+
+# LOOM's -m: one or more of the names it knows, comma-joined, or route_types.
+MODE_PATTERN = re.compile(r"^[a-z0-9-]+(,[a-z0-9-]+)*$")
+LAYOUT_PATTERN = re.compile(pipeline.LAYOUT_ID_PATTERN)
+
+
+def _regex(value: Any) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        re.compile(value)
+    except re.error:
+        return False
+    return True
+
+
+def _overrides(left: dict[str, Any]) -> dict[str, Any]:
+    """What a build may change about the registry entry (``feeds.OVERRIDES``)."""
+    out: dict[str, Any] = {}
+    mode = _optional(left, "mode",
+                     lambda v: isinstance(v, str) and bool(MODE_PATTERN.match(v))
+                     and feeds.valid_mode(v),
+                     "must be what gtfs2graph -m takes: names such as tram, subway or rail, "
+                     "or route_type numbers, comma-joined")
+    if mode is not None:
+        out["mode"] = mode
+    agency = _optional(left, "agency", lambda v: isinstance(v, str) and 0 < len(v) <= 64,
+                       "must be an agency_id from the feed")
+    if agency is not None:
+        out["agency"] = agency
+    for name in ("label_pattern", "label_strip"):
+        pattern = _optional(left, name, _regex, "must be a regular expression")
+        if pattern is not None:
+            out[name] = pattern
+    return out
+
+
+def _layout(value: Any) -> str:
+    if value is None:
+        raise invalid_params("layout is required: the id graph.build answered with. A map is "
+                             "drawn from a stored layout and never lays one out itself.")
+    if not isinstance(value, str) or not LAYOUT_PATTERN.match(value):
+        raise invalid_params("layout must be a layout id: 64 hex digits, as graph.build reports")
     return value
 
 
@@ -256,8 +306,10 @@ def _beat_payload(value: Any, where: str) -> dict[str, Any]:
     if not _number(secs) or secs <= 0:
         raise invalid_params(f"{where} lasts no time")
     out: dict[str, Any] = {"secs": secs}
-    out["view"] = _optional(left, "view", lambda v: v in export.VIEWS, "names a view the page lacks")
-    out["labels"] = _optional(left, "labels", lambda v: isinstance(v, bool), "must be true or false")
+    out["view"] = _optional(left, "view", lambda v: v in export.VIEWS,
+                            "names a view the page lacks")
+    out["labels"] = _optional(left, "labels", lambda v: isinstance(v, bool),
+                              "must be true or false")
     for field in ("at", "speed", "hours", "lo", "hi", "tween"):
         out[field] = _optional(left, field, _number, "must be a number")
     sweep = left.pop("sweep", False)
@@ -352,7 +404,8 @@ def _provenance(value: Any) -> dict[str, Any] | None:
     if date is not None:
         out["service_date"] = _date(date).isoformat()
     for name in ("trips", "stations", "lines"):
-        v = _optional(left, name, lambda x: isinstance(x, int) and not isinstance(x, bool) and x >= 0,
+        v = _optional(left, name,
+                      lambda x: isinstance(x, int) and not isinstance(x, bool) and x >= 0,
                       "must be a count")
         if v is not None:
             out[name] = v
@@ -474,36 +527,42 @@ class EngineEndpoint(Endpoint):
         left = _object("graph.build", params)
         key = _feed_key(left.pop("key", None))
         force = _flag(left, "force")
+        overrides = _overrides(left)
         _no_extra("graph.build", left)
 
         def work(job: loom.Job, progress: Progress) -> dict[str, Any]:
-            paths = pipeline.schematize(key, force=force, progress=progress)
+            layout = pipeline.lay_out(key, force=force, progress=progress, **overrides)
+            paths = layout.paths
             octi = LineGraph.from_geojson(paths["octi"])
-            pipeline.require_edges(key, octi)
+            pipeline.require_edges(layout.feed, octi)
             stages = {stage: _stage_summary(LineGraph.from_geojson(path))
                       for stage, path in paths.items()}
             ok, total = octilinearity(octi.reproject(to_mercator))
             stages["octi"]["octilinear"] = ok / total if total else 0.0
-            return {"stages": stages, "paths": {s: str(p) for s, p in paths.items()}}
+            return {"layout": layout.id, "meta": layout.meta, "stages": stages,
+                    "paths": {s: str(p) for s, p in paths.items()}}
 
         return self._job(work)
 
     def map_build(self, params: Any) -> Callable[[], Any]:
         left = _object("map.build", params)
         key = _feed_key(left.pop("key", None))
+        layout = _layout(left.pop("layout", None))
         date = _date(left.pop("date", None))
         out = _token(left.pop("out")) if "out" in left else None
         width = _positive(left, "width", 1800.0)
         line_order = _strings(left, "line_order")
-        force = _flag(left, "force")
         _no_extra("map.build", left)
         folder = config.out_dir() / out if out else None
 
         def work(job: loom.Job, progress: Progress) -> dict[str, Any]:
-            result = pipeline.run(key, date=date, width=width, line_order=line_order,
-                                  force=force, out_dir=folder, progress=progress)
+            # From the stored layout, and never a layout of its own: a map
+            # that re-laid a network unasked would be a different map.
+            result = pipeline.run(key, layout=layout, date=date, width=width,
+                                  line_order=line_order, out_dir=folder, progress=progress)
             where = folder or config.out_dir()
             return {
+                "layout": result.layout,
                 "date": result.date.isoformat(),
                 "files": {"svg": str(where / f"{key}.svg"),
                           "html": str(where / f"{key}.html"),

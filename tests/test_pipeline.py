@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from schematic import animate, config, feeds
+from schematic import animate, config, feeds, pipeline
 from schematic.crs import to_mercator
 from schematic.linegraph import LineGraph
 from schematic.offsets import point_at
@@ -21,14 +21,14 @@ KEY = "la-metro-rail"
 LINES = set("ABCDEK")
 
 pytestmark = pytest.mark.skipif(
-    not (config.graphs_dir() / KEY / "03_octi.json").exists(),
-    reason="run the pipeline once to populate data/graphs",
+    pipeline.stage_path(KEY, "octi") is None,
+    reason="run the pipeline once to store a layout under data/graphs",
 )
 
 
 @pytest.fixture(scope="module")
 def graph_ll():
-    return LineGraph.from_geojson(config.graphs_dir() / KEY / "03_octi.json")
+    return LineGraph.from_geojson(pipeline.stage_path(KEY, "octi"))
 
 
 @pytest.fixture(scope="module")
@@ -63,7 +63,7 @@ def test_the_schematic_is_octilinear(graph):
 
 def test_geographic_input_was_not_already_octilinear(graph_ll):
     """Guards the test above from passing on an unschematised graph."""
-    raw = LineGraph.from_geojson(config.graphs_dir() / KEY / "00_gtfs2graph.json").reproject(to_mercator)
+    raw = LineGraph.from_geojson(pipeline.stage_path(KEY, "gtfs2graph")).reproject(to_mercator)
     ok, total = octilinearity(raw)
     assert ok / total < 0.5
 

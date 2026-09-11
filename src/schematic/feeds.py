@@ -7,12 +7,15 @@ downstream in the pipeline is city-specific.
 
 from __future__ import annotations
 
+import hashlib
 import io
+import json
 import re
 import shutil
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import requests
@@ -330,13 +333,6 @@ def fetch(key: str, *, force: bool = False) -> Path:
     return feed.zip_path
 
 
-
-
-# Not registered: WMATA (Washington DC Metro) publishes GTFS only behind an API
-# key at https://api.wmata.com/gtfs/rail-gtfs-static.zip. Add a Feed for it once
-# ``fetch`` learns to send a key header.
-
-
 # --------------------------------------------------------------------------
 # Normalisation
 # --------------------------------------------------------------------------
@@ -348,9 +344,65 @@ def fetch(key: str, *, force: bool = False) -> Path:
 # schedule side's labels from the same function so the two cannot disagree.
 
 
-def route_labels(key: str, routes: pd.DataFrame) -> pd.Series:
-    """The label each route should carry, indexed like ``routes``."""
+# What gtfs2graph's -m accepts, by name; a numeric route_type does too. A
+# registry entry joins several with commas ("tram,subway").
+MOTS = frozenset({"all", "tram", "streetcar", "subway", "metro", "rail", "train", "bus",
+                  "ferry", "boat", "ship", "cablecar", "gondola", "funicular", "coach",
+                  "mono-rail", "monorail", "trolley", "trolleybus", "trolley-bus"})
+
+
+def valid_mode(value: str) -> bool:
+    """One or more MOTs, comma-joined, each a name LOOM knows or a route_type."""
+    parts = value.split(",")
+    return bool(value) and all(part in MOTS or part.isdigit() for part in parts)
+
+
+# The registry fields a caller may override for one build: what LOOM keeps
+# (``mode``), which operator (``agency``) and how a line is labelled. Together
+# with the feed's bytes and the LOOM build they are what names a layout
+# (``pipeline.layout_inputs``).
+OVERRIDES = ("mode", "agency", "label_pattern", "label_strip")
+
+
+def resolved(key: str, **overrides: Any) -> Feed:
+    """The registry entry with any of ``OVERRIDES`` replaced. ``None`` means
+    the registry's value; an override equal to it changes nothing."""
+    unknown = set(overrides) - set(OVERRIDES)
+    if unknown:
+        raise TypeError(f"not something a build can override: {', '.join(sorted(unknown))}")
     feed = FEEDS[key]
+    given = {name: value for name, value in overrides.items() if value is not None}
+    return replace(feed, **given) if given else feed
+
+
+def variant(feed: Feed) -> str | None:
+    """How ``feed`` differs from its registry entry, as a short token that keys
+    its normalised copy on disk; None when it does not differ, so the copy the
+    site and the notebooks have always used keeps its name."""
+    base = FEEDS[feed.key]
+    diff = {name: getattr(feed, name) for name in OVERRIDES
+            if getattr(feed, name) != getattr(base, name)}
+    if not diff:
+        return None
+    return hashlib.sha256(json.dumps(diff, sort_keys=True).encode()).hexdigest()[:12]
+
+
+def normalized_path(feed: Feed) -> Path:
+    """Where ``feed``'s normalised copy lives: the registry's name, or the
+    variant's."""
+    token = variant(feed)
+    if token is None:
+        return feed.normalized_zip_path
+    return config.feeds_dir() / f"{feed.key}.{token}.normalized.zip"
+
+
+def _feed(feed_or_key: Feed | str) -> Feed:
+    return feed_or_key if isinstance(feed_or_key, Feed) else FEEDS[feed_or_key]
+
+
+def route_labels(feed_or_key: Feed | str, routes: pd.DataFrame) -> pd.Series:
+    """The label each route should carry, indexed like ``routes``."""
+    feed = _feed(feed_or_key)
     short = routes.get("route_short_name")
     long = routes.get("route_long_name")
 
@@ -375,15 +427,17 @@ def route_labels(key: str, routes: pd.DataFrame) -> pd.Series:
     return pd.Series([pick(i) for i in range(len(routes))], index=routes.index)
 
 
-def normalize(key: str, *, force: bool = False) -> Path:
+def normalize(feed_or_key: Feed | str, *, force: bool = False) -> Path:
     """Write a copy of the feed with ``route_short_name`` filled in.
 
     Returns the path to the normalised zip, which is what should be handed to
-    ``gtfs2graph``.
+    ``gtfs2graph``. A ``Feed`` with overrides gets a copy of its own, named by
+    ``variant``, so two builds with different agencies never share one.
     """
-    feed = FEEDS[key]
+    feed = _feed(feed_or_key)
+    key = feed.key
     src = fetch(key)
-    dst = feed.normalized_zip_path
+    dst = normalized_path(feed)
     if dst.exists() and not force and dst.stat().st_mtime >= src.stat().st_mtime:
         return dst
 
@@ -397,7 +451,7 @@ def normalize(key: str, *, force: bool = False) -> Path:
                  if n.endswith(".txt") and Path(n).stem in GTFS_TABLES
                  and Path(n).stem not in LOOM_SKIP]
         routes = read(zin, "routes.txt")
-        routes["route_short_name"] = route_labels(key, routes)
+        routes["route_short_name"] = route_labels(feed, routes)
 
         # Rewritten tables, by stem. Only what the agency filter touches.
         rewritten: dict[str, pd.DataFrame] = {"routes": routes}
@@ -432,12 +486,14 @@ def normalize(key: str, *, force: bool = False) -> Path:
     return dst
 
 
-def tables(key: str, *, normalized: bool = True) -> dict[str, pd.DataFrame]:
+def tables(feed_or_key: Feed | str, *, normalized: bool = True) -> dict[str, pd.DataFrame]:
     """Read every .txt in the feed zip as a DataFrame, keyed by table name.
 
-    Reads the normalised feed by default so route labels match the line graph.
+    Reads the normalised feed by default so route labels match the line graph;
+    a ``Feed`` with overrides reads the copy normalised with them.
     """
-    path = normalize(key) if normalized else fetch(key)
+    feed = _feed(feed_or_key)
+    path = normalize(feed) if normalized else fetch(feed.key)
     out: dict[str, pd.DataFrame] = {}
     with zipfile.ZipFile(path) as zf:
         for name in zf.namelist():

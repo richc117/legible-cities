@@ -74,14 +74,136 @@
       "required": ["engine", "protocol", "python", "loom", "ffmpeg", "home"],
       "additionalProperties": false
     },
-    "GraphBuildParams": {
-      "description": "Run gtfs2graph, topo, loom and octi for a registered feed, each stage cached under the home. Mode and agency come from the registry entry; passing them arrives with the native backend and user feeds.",
+    "LayoutId": {
+      "description": "A stored layout's id: the sha256, as 64 hex digits, of everything that went into it. The same feed, options and LOOM name the same id before anything runs; the desktop app stores it with a project.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "LayoutMeta": {
+      "description": "What a stored layout was made from, as written beside it in .meta.json. The inputs are what its id hashes; engine, made and migrated are not.",
       "type": "object",
       "properties": {
-        "key": { "$ref": "#/$defs/FeedKey" },
-        "force": { "type": "boolean", "default": false, "description": "Re-run every stage even if its output is cached. A new layout may place stations differently." }
+        "feed": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "feed_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The sha256 of the feed zip as downloaded."
+        },
+        "mode": {
+          "type": "string"
+        },
+        "agency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label_pattern": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label_strip": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "loom": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The LOOM commit the host passed as SCHEMATIC_LOOM_COMMIT; null when it was not told."
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "description": "The graph-to-graph stages and their arguments, in order."
+        },
+        "engine": {
+          "type": "string",
+          "description": "The engine version that made it."
+        },
+        "made": {
+          "type": "string",
+          "description": "When, as an ISO 8601 timestamp in UTC."
+        },
+        "migrated": {
+          "type": "boolean",
+          "description": "True for a set from before layouts had names, moved under its id once; its inputs are the feed and options as they were at migration."
+        }
       },
-      "required": ["key"],
+      "required": [
+        "feed",
+        "feed_sha256",
+        "mode",
+        "agency",
+        "label_pattern",
+        "label_strip",
+        "loom",
+        "stages",
+        "engine",
+        "made",
+        "migrated"
+      ],
+      "additionalProperties": false
+    },
+    "GraphBuildParams": {
+      "description": "Lay a registered feed out: gtfs2graph, topo, loom and octi, stored under the home as one layout named by the hash of its inputs (the feed's bytes, the mode, the agency, the label options, the LOOM build). The same inputs name the same layout; a layout already stored is answered without running anything. Mode, agency and the label options default to the registry entry.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "mode": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+(,[a-z0-9-]+)*$",
+          "description": "What gtfs2graph keeps of the feed (LOOM's -m): names such as tram, subway, rail, bus, ferry or all, or route_type numbers, comma-joined for several; the registry entry's when omitted."
+        },
+        "agency": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Keep only this agency_id; the registry entry's when omitted."
+        },
+        "label_pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A regular expression applied to route_long_name when route_short_name is blank; group 1 is the line's label."
+        },
+        "label_strip": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A regular expression removed from every label."
+        },
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Lay the feed out again under the same id. The stored layout stays until the new set is whole, then is replaced; a new layout may place stations differently."
+        }
+      },
+      "required": [
+        "key"
+      ],
       "additionalProperties": false
     },
     "StageSummary": {
@@ -100,45 +222,106 @@
     "GraphBuildResult": {
       "type": "object",
       "properties": {
+        "layout": {
+          "$ref": "#/$defs/LayoutId"
+        },
+        "meta": {
+          "$ref": "#/$defs/LayoutMeta"
+        },
         "stages": {
           "type": "object",
           "properties": {
-            "gtfs2graph": { "$ref": "#/$defs/StageSummary" },
-            "topo": { "$ref": "#/$defs/StageSummary" },
-            "loom": { "$ref": "#/$defs/StageSummary" },
-            "octi": { "$ref": "#/$defs/StageSummary" }
+            "gtfs2graph": {
+              "$ref": "#/$defs/StageSummary"
+            },
+            "topo": {
+              "$ref": "#/$defs/StageSummary"
+            },
+            "loom": {
+              "$ref": "#/$defs/StageSummary"
+            },
+            "octi": {
+              "$ref": "#/$defs/StageSummary"
+            }
           },
-          "required": ["gtfs2graph", "topo", "loom", "octi"],
+          "required": [
+            "gtfs2graph",
+            "topo",
+            "loom",
+            "octi"
+          ],
           "additionalProperties": false
         },
         "paths": {
           "type": "object",
-          "description": "Where each stage's GeoJSON is cached, as absolute paths under the home.",
+          "description": "Where each stage's GeoJSON is stored, as absolute paths under the home: graphs/<key>/<layout>/.",
           "properties": {
-            "gtfs2graph": { "type": "string" },
-            "topo": { "type": "string" },
-            "loom": { "type": "string" },
-            "octi": { "type": "string" }
+            "gtfs2graph": {
+              "type": "string"
+            },
+            "topo": {
+              "type": "string"
+            },
+            "loom": {
+              "type": "string"
+            },
+            "octi": {
+              "type": "string"
+            }
           },
-          "required": ["gtfs2graph", "topo", "loom", "octi"],
+          "required": [
+            "gtfs2graph",
+            "topo",
+            "loom",
+            "octi"
+          ],
           "additionalProperties": false
         }
       },
-      "required": ["stages", "paths"],
+      "required": [
+        "layout",
+        "meta",
+        "stages",
+        "paths"
+      ],
       "additionalProperties": false
     },
     "MapBuildParams": {
-      "description": "Draw the map and the animation page for a registered feed on one service day, from the cached stages (built first if missing).",
+      "description": "Draw the map and the animation page for a registered feed on one service day, from a stored layout. Never lays the feed out: a layout that is not stored is refused, with a hint to lay it out first.",
       "type": "object",
       "properties": {
-        "key": { "$ref": "#/$defs/FeedKey" },
-        "date": { "$ref": "#/$defs/ServiceDate" },
-        "out": { "$ref": "#/$defs/Token", "description": "The folder under the home's out/ to write into. Omitted, the files go into out/ itself." },
-        "width": { "type": "number", "exclusiveMinimum": 0, "default": 1800, "description": "The SVG's width in CSS pixels." },
-        "line_order": { "type": "array", "items": { "type": "string" }, "description": "Line labels in the order they stack on shared track; the rest follow." },
-        "force": { "type": "boolean", "default": false, "description": "Re-run the layout stages first. A new layout may place stations differently." }
+        "key": {
+          "$ref": "#/$defs/FeedKey"
+        },
+        "layout": {
+          "$ref": "#/$defs/LayoutId"
+        },
+        "date": {
+          "$ref": "#/$defs/ServiceDate"
+        },
+        "out": {
+          "$ref": "#/$defs/Token",
+          "description": "The folder under the home's out/ to write into. Omitted, the files go into out/ itself."
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1800,
+          "description": "The SVG's width in CSS pixels."
+        },
+        "line_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Line labels in the order they stack on shared track; the rest follow."
+        }
       },
-      "required": ["key", "date"],
+      "required": [
+        "key",
+        "layout",
+        "date"
+      ],
       "additionalProperties": false
     },
     "Diagnostics": {
@@ -198,21 +381,48 @@
     "MapBuildResult": {
       "type": "object",
       "properties": {
-        "date": { "$ref": "#/$defs/ServiceDate" },
+        "layout": {
+          "$ref": "#/$defs/LayoutId"
+        },
+        "date": {
+          "$ref": "#/$defs/ServiceDate"
+        },
         "files": {
           "type": "object",
           "properties": {
-            "svg": { "type": "string" },
-            "html": { "type": "string", "description": "The self-contained animation page." },
-            "positions": { "type": "string" }
+            "svg": {
+              "type": "string"
+            },
+            "html": {
+              "type": "string",
+              "description": "The self-contained animation page."
+            },
+            "positions": {
+              "type": "string"
+            }
           },
-          "required": ["svg", "html", "positions"],
+          "required": [
+            "svg",
+            "html",
+            "positions"
+          ],
           "additionalProperties": false
         },
-        "summary": { "type": "string", "description": "Result.summary(), the lines the CLI prints." },
-        "diagnostics": { "$ref": "#/$defs/Diagnostics" }
+        "summary": {
+          "type": "string",
+          "description": "Result.summary(), the lines the CLI prints."
+        },
+        "diagnostics": {
+          "$ref": "#/$defs/Diagnostics"
+        }
       },
-      "required": ["date", "files", "summary", "diagnostics"],
+      "required": [
+        "layout",
+        "date",
+        "files",
+        "summary",
+        "diagnostics"
+      ],
       "additionalProperties": false
     },
     "JobProgress": {
@@ -930,7 +1140,7 @@
       "description": "The `data` of an error response. `hint` is a sentence for a person and is what a UI shows; `detail` says where, for a log.",
       "type": "object",
       "properties": {
-        "kind": { "enum": ["params", "feed", "loom", "schedule", "export", "io", "engine"] },
+        "kind": { "enum": ["params", "feed", "loom", "schedule", "export", "io", "engine", "layout"] },
         "detail": { "type": "string" },
         "hint": { "type": "string" }
       },

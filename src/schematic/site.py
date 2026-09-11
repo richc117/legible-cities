@@ -322,7 +322,10 @@ def export_unlabelled(key: str, stage: str, name: str,
     that draws the finished map, pointed at an earlier stage or told to leave
     the labels off.
     """
-    graph = LineGraph.from_geojson(config.graphs_dir() / key / stage)
+    path = pipeline.stage_path(key, stage)
+    if path is None:
+        raise FileNotFoundError(f"{key} has no stored layout to draw the {stage} stage from")
+    graph = LineGraph.from_geojson(path)
     svg = render(graph.reproject(to_mercator), width=width,
                  style=Style(themed=True), labels=False).svg
     path = MAPS_DIR / name
@@ -336,8 +339,8 @@ def export_comparison(key: str, width: float = 1100.0) -> tuple[Path, Path]:
     The geographic side comes straight off the cached gtfs2graph stage, so the
     pair differs only in whether ``octi`` has run.
     """
-    return (export_unlabelled(key, "00_gtfs2graph.json", f"{key}-geographic.svg", width),
-            export_unlabelled(key, "03_octi.json", f"{key}-plain.svg", width))
+    return (export_unlabelled(key, "gtfs2graph", f"{key}-geographic.svg", width),
+            export_unlabelled(key, "octi", f"{key}-plain.svg", width))
 
 
 def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[NetworkEntry]:
@@ -370,8 +373,8 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
 
     export_comparison(FEATURED)
     for key in PLAIN:
-        if key != FEATURED and (config.graphs_dir() / key / "03_octi.json").exists():
-            export_unlabelled(key, "03_octi.json", f"{key}-plain.svg")
+        if key != FEATURED and pipeline.stored(key) is not None:
+            export_unlabelled(key, "octi", f"{key}-plain.svg")
 
     # After export_comparison, which is what draws the unlabelled map it reads.
     if FEATURED in keys:
