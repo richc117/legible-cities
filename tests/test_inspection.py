@@ -34,7 +34,8 @@ def test_a_small_feed_inspects_whole(home, tmp_path):
     assert d["routes"] == [{
         "route_id": "R1", "agency_id": "M", "short_name": "1", "long_name": "Linea 1",
         "label": "1", "route_type": 1, "color": None, "text_color": None, "trips": 1}]
-    assert d["route_types"] == [{"route_type": 1, "name": "subway", "routes": 1, "trips": 1}]
+    assert d["route_types"] == [{"route_type": 1, "name": "subway", "mode": "subway",
+                                 "routes": 1, "trips": 1}]
     assert d["stops"] == {"stops": 2, "stations": 0, "entrances": 0, "generic_nodes": 0,
                           "boarding_areas": 0, "total": 2}
     assert d["trips"] == 1 and d["frequency_trips"] == 0
@@ -67,6 +68,7 @@ def test_warnings_name_each_trap(home, tmp_path):
     # Three routes of types 1, 2 and 3: a bus is in the feed, so the
     # suggestion is the most common rail-like type, not "all".
     assert [e["route_type"] for e in result.route_types] == [1, 2, 3]
+    assert [e["mode"] for e in result.route_types] == ["subway", "rail", "bus"]
     assert result.suggested_mode in ("subway", "rail")
     assert [r["label"] for r in result.routes] == ["1", "Tren Suburbano", "Ruta 10"]
 

@@ -1410,6 +1410,10 @@
           "type": "string",
           "description": "The GTFS name: tram, subway, rail, bus, ferry, cable tram, aerial lift, funicular, trolleybus, monorail; an extended code says which it folds onto."
         },
+        "mode": {
+          "type": ["string", "null"],
+          "description": "The LOOM mode (gtfs2graph -m) that keeps this type, so a client can show which types a chosen mode draws; null for a type LOOM has no name for. The mode all keeps every type."
+        },
         "routes": {
           "type": "integer",
           "minimum": 0
@@ -1422,6 +1426,7 @@
       "required": [
         "route_type",
         "name",
+        "mode",
         "routes",
         "trips"
       ],

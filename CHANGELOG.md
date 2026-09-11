@@ -5,6 +5,15 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Added
+
+- **`feeds.inspect` names the LOOM mode per route type** (`route_types[].mode`),
+  so a client can show which of a feed's types a chosen mode keeps without
+  carrying the table itself; null for a type LOOM has no name for.
+  Additive at protocol 1.
+
 ## [0.7.0] - 2026-09-11
 
 ### Added

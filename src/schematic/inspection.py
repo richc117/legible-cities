@@ -136,7 +136,9 @@ def _route_types(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
         entry = by_type.setdefault(route["route_type"], {"routes": 0, "trips": 0})
         entry["routes"] += 1
         entry["trips"] += route["trips"]
-    return [{"route_type": code, "name": route_type_name(code), **counts}
+    # The LOOM mode that keeps each type, so a client can show which of the
+    # types a chosen mode draws without knowing the table itself.
+    return [{"route_type": code, "name": route_type_name(code), "mode": mode_for(code), **counts}
             for code, counts in sorted(by_type.items())]
 
 
