@@ -307,8 +307,6 @@ def _native_ready() -> bool:
                                for t in loom.TOOLS)
 
 
-needs_docker = pytest.mark.skipif(not (_docker_ready() and SOURCE_ZIP.exists()),
-                                  reason="needs docker, the loom image and the cached LA feed")
 needs_both = pytest.mark.skipif(
     not (_docker_ready() and _native_ready() and SOURCE_ZIP.exists()),
     reason=f"needs docker, the image, the cached LA feed and {loom.BIN_ENV} naming the binaries")

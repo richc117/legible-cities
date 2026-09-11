@@ -8,7 +8,8 @@ progress, cancellation and shutdown as the desktop app will see them.
 
 Everything that runs LOOM needs Docker and the image, and the LA feed from the
 developer's cache (copied into a scratch home so nothing here touches data/).
-Those tests skip where either is missing; the rest always run.
+Those tests skip where either is missing, and when ``SCHEMATIC_LOOM_BIN``
+chooses the native backend, which has a test of its own; the rest always run.
 """
 
 from __future__ import annotations
@@ -46,9 +47,14 @@ def _docker_ready() -> bool:
     return probe.returncode == 0
 
 
+# These drive LOOM through Docker and watch its containers, so they need the
+# Docker backend to be the one in use, not only Docker to exist: with
+# SCHEMATIC_LOOM_BIN set the engine runs the binaries and no container ever
+# starts. The native backend has its own test below.
 needs_loom = pytest.mark.skipif(
-    not (_docker_ready() and all(z.exists() for z in SOURCE_ZIPS)),
-    reason="needs docker, the loom image and the cached LA feed")
+    not (_docker_ready() and all(z.exists() for z in SOURCE_ZIPS))
+    or bool(os.environ.get(loom.BIN_ENV)),
+    reason=f"needs docker, the loom image and the cached LA feed, with {loom.BIN_ENV} unset")
 
 needs_native = pytest.mark.skipif(
     not (os.environ.get(loom.BIN_ENV) and all(z.exists() for z in SOURCE_ZIPS)),
