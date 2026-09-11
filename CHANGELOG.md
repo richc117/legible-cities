@@ -5,6 +5,23 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Added
+
+- **A feed registry in two halves.** The presets stay in `FEEDS`; the feeds a
+  person adds are kept in `user-feeds.json` beside the zips under the home,
+  so they survive a restart. `feeds.all()` is both, `feeds.get(key)` looks
+  in both and raises `FeedError` with a sentence otherwise, and every reader
+  of the registry goes through them. `feeds.add(source, key=, name=, mode=,
+  agency=)` takes a file or a URL, checks the zip for `stops`, `routes`,
+  `trips`, `stop_times` and a calendar in one of its two forms, names the
+  feed after its first agency and keys it by a unique slug, and leaves
+  nothing behind on refusal; `feeds.remove(key)` forgets a user feed with
+  its zips and stored layouts, and refuses a preset. `Feed.to_dict()` and
+  `Feed.from_dict()`; `Feed.source` says which half. Library only: the
+  protocol grows with E09c.
+
 ## [0.6.0] - 2026-09-10
 
 ### Added

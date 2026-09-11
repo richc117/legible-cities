@@ -193,7 +193,7 @@ def social_tags(key: str) -> str:
     if not origin():
         return ""
     config = _config()
-    feed = feeds.FEEDS[key]
+    feed = feeds.get(key)
     esc = html.escape
     return _SOCIAL.format(
         url=esc(page_url(key)),
@@ -345,7 +345,7 @@ def export_comparison(key: str, width: float = 1100.0) -> tuple[Path, Path]:
 
 def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[NetworkEntry]:
     """Build every city and copy its artifacts into the site."""
-    keys = keys or list(feeds.FEEDS)
+    keys = keys or list(feeds.all())
     MAPS_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -356,18 +356,18 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
                               social=social_tags(key))
         entries.append(NetworkEntry(
             key=key,
-            name=feeds.FEEDS[key].name,
-            city=feeds.FEEDS[key].city,
-            network=feeds.FEEDS[key].network,
+            name=feeds.get(key).name,
+            city=feeds.get(key).city,
+            network=feeds.get(key).network,
             stations=len(result.graph.stations),
             lines=result.graph.labels,
             trips=len(result.trips),
             date=result.date.isoformat(),
             svg=f"{key}.svg",
             animation=f"{key}.html",
-            feed_url=feeds.FEEDS[key].url,
+            feed_url=feeds.get(key).url,
             caveats=_caveats(result),
-            notes=list(feeds.FEEDS[key].notes),
+            notes=list(feeds.get(key).notes),
             issues=round(_issue_score(result), 4),
         ))
 

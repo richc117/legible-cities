@@ -1,12 +1,16 @@
 """GTFS feed registry and local cache.
 
 Feeds are downloaded once into ``data/feeds`` under the engine's home (see
-``config``) and reused. Add a city by adding a ``Feed`` to ``FEEDS`` -- nothing
-downstream in the pipeline is city-specific.
+``config``) and reused. The registry has two halves: the presets in ``FEEDS``,
+curated here in Python, and the feeds a person added, kept as JSON beside the
+zips (``user-feeds.json`` under the home) so they survive a restart. ``all()``
+is both, ``get(key)`` looks in both, ``add()`` and ``remove()`` change the
+second half only. Nothing downstream in the pipeline is city-specific.
 """
 
 from __future__ import annotations
 
+import builtins
 import hashlib
 import io
 import json
@@ -15,7 +19,7 @@ import re
 import shutil
 import threading
 import zipfile
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 from typing import Any
 
@@ -85,10 +89,32 @@ class Feed:
     # for.
     geographic: bool = True
     notes: tuple[str, ...] = ()
+    # "preset" for an entry of FEEDS, "user" for one a person added, which is
+    # the one kind ``remove`` will take away.
+    source: str = "preset"
 
     @property
     def zip_path(self) -> Path:
         return config.feeds_dir() / f"{self.key}.zip"
+
+    def to_dict(self) -> dict[str, Any]:
+        """The record as JSON holds it: every field, notes as a list."""
+        d = asdict(self)
+        d["notes"] = list(self.notes)
+        return d
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "Feed":
+        """A record back from JSON. A missing optional field takes its default;
+        an unknown one is ignored, so a record from a newer engine still reads."""
+        known = {f.name for f in fields(cls)}
+        given = {k: v for k, v in d.items() if k in known}
+        for name in ("key", "name", "url"):
+            if not isinstance(given.get(name), str):
+                raise FeedError(f"a feed record needs a {name}")
+        if "notes" in given:
+            given["notes"] = tuple(str(n) for n in given["notes"])
+        return cls(**given)
 
     @property
     def normalized_zip_path(self) -> Path:
@@ -316,6 +342,208 @@ FEEDS: dict[str, Feed] = {
 # ``fetch`` learns to send a key header.
 
 
+class FeedError(ValueError):
+    """Something about a feed a person can act on; str() is the sentence."""
+
+
+# --------------------------------------------------------------------------
+# The user half of the registry
+# --------------------------------------------------------------------------
+#
+# Feeds a person added, as one JSON file beside the zips under the home. Read
+# on every call rather than cached: the file is small, another process (the
+# app's, a notebook's) may have written it, and a stale copy is the kind of
+# bug nobody finds until a feed added yesterday is missing today.
+
+USER_FILE = "user-feeds.json"
+KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+# What a feed must contain to be laid out and animated: the graph side needs
+# stops, routes and trips; the schedule side needs stop_times and a calendar
+# in one of its two forms. Named in the sentence a person reads.
+REQUIRED_TABLES = ("stops", "routes", "trips", "stop_times")
+CALENDAR_TABLES = ("calendar", "calendar_dates")
+_user_lock = threading.Lock()
+
+
+def user_file() -> Path:
+    return config.feeds_dir() / USER_FILE
+
+
+def user_feeds() -> dict[str, Feed]:
+    """The feeds a person added, from disk; empty when there are none."""
+    path = user_file()
+    if not path.exists():
+        return {}
+    try:
+        records = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise FeedError(f"{USER_FILE} could not be read: {exc}") from exc
+    if not isinstance(records, list):
+        raise FeedError(f"{USER_FILE} is not a list of feeds")
+    out: dict[str, Feed] = {}
+    for record in records:
+        feed = Feed.from_dict({**record, "source": "user"})
+        out[feed.key] = feed
+    return out
+
+
+def _write_user_feeds(records: dict[str, Feed]) -> None:
+    """The whole file, written beside itself and moved into place."""
+    path = user_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps([f.to_dict() for f in records.values()], indent=2) + "\n"
+    tmp = path.with_name(path.name + ".part")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def all() -> dict[str, Feed]:  # noqa: A001 - the registry's own name for both halves
+    """Every feed: the presets, then the ones a person added."""
+    return {**FEEDS, **user_feeds()}
+
+
+def get(key: str) -> Feed:
+    """The feed for ``key``, from either half, or a FeedError naming it."""
+    feed = FEEDS.get(key)
+    if feed is None:
+        feed = user_feeds().get(key)
+    if feed is None:
+        raise FeedError(f"{key!r} is not a registered feed")
+    return feed
+
+
+def slug(name: str) -> str:
+    """A key from a name: lower-case letters, digits and hyphens, or "feed"."""
+    s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:64].strip("-")
+    return s or "feed"
+
+
+def _check_gtfs(path: Path, what: str) -> dict[str, str]:
+    """The tables a feed must carry, or a FeedError saying which is missing.
+    Returns the member name per table stem, so the caller can read agency.txt."""
+    if not zipfile.is_zipfile(path):
+        raise FeedError(f"{what} is not a zip file, so it is not a GTFS feed")
+    with zipfile.ZipFile(path) as zf:
+        members = {Path(n).stem: n for n in zf.namelist()
+                   if n.endswith(".txt") and not n.endswith("/")}
+    for stem in REQUIRED_TABLES:
+        if stem not in members:
+            why = ("so there is no timetable to animate" if stem == "stop_times"
+                   else "so there is no network to draw")
+            raise FeedError(f"{what} has no {stem}.txt, {why}")
+    if not any(stem in members for stem in CALENDAR_TABLES):
+        raise FeedError(f"{what} has neither calendar.txt nor calendar_dates.txt, "
+                        "so there is no service day to draw")
+    return members
+
+
+def _agency_name(path: Path, members: dict[str, str]) -> str | None:
+    """The first agency's name, when the feed says one."""
+    member = members.get("agency")
+    if member is None:
+        return None
+    try:
+        with zipfile.ZipFile(path) as zf:
+            df = pd.read_csv(io.BytesIO(zf.read(member)), dtype=str, skipinitialspace=True)
+    except (ValueError, OSError, KeyError):
+        return None
+    df.columns = [c.strip().lstrip("\ufeff") for c in df.columns]
+    if "agency_name" not in df.columns or df.empty:
+        return None
+    value = df["agency_name"].iloc[0]
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _is_url(source: str) -> bool:
+    return source.startswith(("http://", "https://"))
+
+
+def add(source: Path | str, *, key: str | None = None, name: str | None = None,
+        mode: str = "all", agency: str | None = None) -> Feed:
+    """Add a feed a person chose, from a file or a URL, and keep it.
+
+    The zip is fetched or copied into the cache, checked for the tables a
+    map and an animation need, and recorded in ``user-feeds.json``. ``name``
+    defaults to the first agency's name in the feed, ``key`` to a slug of the
+    name made unique; a ``key`` given is checked for form and taken as is. A
+    feed that fails the check leaves nothing behind. Raises FeedError with the
+    sentence to show.
+    """
+    source_text = str(source)
+    what = source_text if _is_url(source_text) else Path(source_text).name
+    if key is not None and not KEY_PATTERN.match(key):
+        raise FeedError("a feed key is lower-case letters, digits and hyphens, up to 64")
+    if not valid_mode(mode):
+        raise FeedError(f"{mode!r} is not a mode LOOM knows")
+
+    staging = config.feeds_dir() / f".adding-{os.getpid()}-{threading.get_ident()}.zip"
+    staging.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if _is_url(source_text):
+            staging.write_bytes(_download(source_text))
+            url = source_text
+        else:
+            src = Path(source_text)
+            if not src.is_file():
+                raise FeedError(f"{what} is not a file")
+            shutil.copyfile(src, staging)
+            url = ""
+        members = _check_gtfs(staging, what)
+        if name is None:
+            name = _agency_name(staging, members) or Path(what).stem or "Feed"
+        if key is None:
+            base = slug(name)
+            key = base
+            n = 2
+            while key in FEEDS or key in user_feeds():
+                key = f"{base[:60]}-{n}"
+                n += 1
+        with _user_lock:
+            users = user_feeds()
+            if key in FEEDS or key in users:
+                raise FeedError(f"{key!r} is already a feed; choose another key")
+            feed = Feed(key=key, name=name, url=url, mode=mode, agency=agency, source="user")
+            os.replace(staging, feed.zip_path)
+            users[key] = feed
+            _write_user_feeds(users)
+        return feed
+    finally:
+        staging.unlink(missing_ok=True)
+
+
+def remove(key: str) -> None:
+    """Forget a feed a person added, with its zips and its stored layouts.
+    A preset cannot be removed."""
+    if key in FEEDS:
+        raise FeedError(f"{key!r} is a built-in feed and cannot be removed")
+    with _user_lock:
+        users = user_feeds()
+        if key not in users:
+            raise FeedError(f"{key!r} is not a registered feed")
+        del users[key]
+        _write_user_feeds(users)
+    with _disk(key):
+        for path in config.feeds_dir().glob(f"{key}.*zip"):
+            path.unlink(missing_ok=True)
+        shutil.rmtree(config.graphs_dir() / key, ignore_errors=True)
+
+
+def _download(url: str) -> bytes:
+    """The bytes at ``url``, or a FeedError; a page that is not a zip is refused."""
+    # Some agencies (MARTA) return 403 to a bare requests user-agent.
+    try:
+        resp = requests.get(url, timeout=180, headers={
+            "User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)",
+        })
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        raise FeedError(f"{url} could not be fetched: {exc}") from exc
+    # Fail loudly rather than caching an HTML error page as a "feed".
+    if not zipfile.is_zipfile(io.BytesIO(resp.content)):
+        raise FeedError(f"{url} did not return a zip ({len(resp.content)} bytes)")
+    return resp.content
+
+
 # One feed on disk at a time, per key: two requests for one feed (the service
 # day and the layout, back to back) must not download or normalise it twice
 # into the same file, and a download must land whole or not at all.
@@ -330,24 +558,18 @@ def _disk(key: str) -> threading.Lock:
 
 def fetch(key: str, *, force: bool = False) -> Path:
     """Download a feed if it is not already cached. Returns the local zip path."""
-    feed = FEEDS[key]
+    feed = get(key)
     feed.zip_path.parent.mkdir(parents=True, exist_ok=True)
     with _disk(key):
         if feed.zip_path.exists() and not force:
             return feed.zip_path
-
-        # Some agencies (MARTA) return 403 to a bare requests user-agent.
-        resp = requests.get(feed.url, timeout=180, headers={
-            "User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)",
-        })
-        resp.raise_for_status()
-        # Fail loudly rather than caching an HTML error page as a "feed".
-        if not zipfile.is_zipfile(io.BytesIO(resp.content)):
-            raise RuntimeError(f"{feed.url} did not return a zip ({len(resp.content)} bytes)")
+        if not feed.url:
+            raise FeedError(f"{key!r} was added from a file and its zip is gone; add it again")
+        content = _download(feed.url)
         # Whole or not at all: a quit mid-write must not leave a truncated
         # zip that the next call takes for the feed.
         partial = feed.zip_path.with_name(feed.zip_path.name + ".part")
-        partial.write_bytes(resp.content)
+        partial.write_bytes(content)
         os.replace(partial, feed.zip_path)
         return feed.zip_path
 
@@ -373,7 +595,8 @@ MOTS = frozenset({"all", "tram", "streetcar", "subway", "metro", "rail", "train"
 def valid_mode(value: str) -> bool:
     """One or more MOTs, comma-joined, each a name LOOM knows or a route_type."""
     parts = value.split(",")
-    return bool(value) and all(part in MOTS or part.isdigit() for part in parts)
+    # builtins.all, not the registry's all() defined above.
+    return bool(value) and builtins.all(part in MOTS or part.isdigit() for part in parts)
 
 
 # The registry fields a caller may override for one build: what LOOM keeps
@@ -389,7 +612,7 @@ def resolved(key: str, **overrides: Any) -> Feed:
     unknown = set(overrides) - set(OVERRIDES)
     if unknown:
         raise TypeError(f"not something a build can override: {', '.join(sorted(unknown))}")
-    feed = FEEDS[key]
+    feed = get(key)
     given = {name: value for name, value in overrides.items() if value is not None}
     return replace(feed, **given) if given else feed
 
@@ -398,7 +621,7 @@ def variant(feed: Feed) -> str | None:
     """How ``feed`` differs from its registry entry, as a short token that keys
     its normalised copy on disk; None when it does not differ, so the copy the
     site and the notebooks have always used keeps its name."""
-    base = FEEDS[feed.key]
+    base = get(feed.key)
     diff = {name: getattr(feed, name) for name in OVERRIDES
             if getattr(feed, name) != getattr(base, name)}
     if not diff:
@@ -416,7 +639,7 @@ def normalized_path(feed: Feed) -> Path:
 
 
 def _feed(feed_or_key: Feed | str) -> Feed:
-    return feed_or_key if isinstance(feed_or_key, Feed) else FEEDS[feed_or_key]
+    return feed_or_key if isinstance(feed_or_key, Feed) else get(feed_or_key)
 
 
 def route_labels(feed_or_key: Feed | str, routes: pd.DataFrame) -> pd.Series:

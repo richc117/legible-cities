@@ -98,7 +98,7 @@ class Layout:
         registry may have gained an agency since, and this layout never
         applied one."""
         recorded = {name: self.meta[name] for name in feeds.OVERRIDES if name in self.meta}
-        return replace(feeds.FEEDS[self.key], **recorded)
+        return replace(feeds.get(self.key), **recorded)
 
 
 _digests: dict[tuple[str, int, int], str] = {}
@@ -184,7 +184,7 @@ def stored(key: str, **overrides: Any) -> Layout | None:
     feed is not on disk or the layout is not there. A set from before layouts
     had names is migrated on the way (see ``migrate``)."""
     feed = feeds.resolved(key, **overrides)
-    source = feeds.FEEDS[key].zip_path
+    source = feeds.get(key).zip_path
     if not source.is_file():
         return None
     inputs, layout = _address(feed, source)
@@ -394,7 +394,7 @@ def require_edges(feed_or_key: feeds.Feed | str, graph: LineGraph) -> None:
     """Refuse an empty graph with the sentence about modes. Raised here rather
     than returned so the error is the pipeline's, wherever it is checked. A
     ``Feed`` names the mode the layout was actually built with."""
-    feed = feed_or_key if isinstance(feed_or_key, feeds.Feed) else feeds.FEEDS[feed_or_key]
+    feed = feed_or_key if isinstance(feed_or_key, feeds.Feed) else feeds.get(feed_or_key)
     if not graph.edges:
         raise ValueError(
             f"{feed.key}: the line graph is empty -- gtfs2graph -m {feed.mode!r} "
@@ -425,7 +425,7 @@ class Result:
         ok, total = octilinearity(self.graph)
         peak = self.peak_concurrent()
         return "\n".join([
-            f"{feeds.FEEDS[self.key].name} -- {self.date:%A %d %B %Y}",
+            f"{feeds.get(self.key).name} -- {self.date:%A %d %B %Y}",
             f"  {self.graph.summary()}",
             f"  octilinear: {100 * ok / total:.1f}% of drawn length",
             f"  stops: {self.match.report()}",
@@ -492,7 +492,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     trips = trips_on(tables, date, match, lines)
     tick("schedule", f"{len(trips)} trips on {date:%A %-d %B %Y}; {match.report()}")
 
-    name = feeds.FEEDS[key].name
+    name = feeds.get(key).name
     # Themed by default: the CSS variables carry literal fallbacks, so a
     # standalone SVG is unchanged, while an embedding page can theme the
     # furniture without resorting to an invert filter over the line colours.
@@ -502,7 +502,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     # The loom stage, not gtfs2graph: same stations and the same solved line
     # ordering, so only the shape differs. See animate.geographic_tracks.
     geo = None
-    if feeds.FEEDS[key].geographic:
+    if feeds.get(key).geographic:
         geo_graph = LineGraph.from_geojson(paths["loom"]).reproject(to_mercator)
         geo = animate.geographic_tracks(geo_graph, graph, r)
 

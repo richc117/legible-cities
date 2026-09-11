@@ -142,7 +142,7 @@ def _no_extra(method: str, left: dict[str, Any]) -> None:
 def _feed_key(value: Any) -> str:
     if not isinstance(value, str) or not KEY_PATTERN.match(value):
         raise invalid_params("key must be a feed key: lower-case letters, digits and hyphens")
-    if value not in feeds.FEEDS:
+    if value not in feeds.all():
         raise EngineError("feed", f"{value!r} is not a registered feed")
     return value
 

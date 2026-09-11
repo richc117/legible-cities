@@ -14,7 +14,7 @@ from schematic import feeds, pipeline
 
 
 def main(keys: list[str]) -> int:
-    keys = keys or list(feeds.FEEDS)
+    keys = keys or list(feeds.all())
     rows, failures = [], []
     for key in keys:
         t0 = time.time()

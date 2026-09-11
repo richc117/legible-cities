@@ -378,7 +378,7 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
     ``date`` (YYYY-MM-DD) is the service day the title names when the caller
     knows it; otherwise it is the atlas's.
     """
-    feed = feeds.FEEDS[key]
+    feed = feeds.get(key)
     view = view or preset.view
     if clock is None:
         clock = preset.kind == "video"
@@ -437,7 +437,7 @@ def check_geographic(key: str, *, view: str | None = None,
     """
     if not wants_geographic(view=view, preset=preset, storyboard=storyboard):
         return
-    if feeds.FEEDS[key].geographic:
+    if feeds.get(key).geographic:
         return
     raise ValueError(
         f"{key!r} carries no geographic geometry, so the geographic view would "
@@ -445,7 +445,7 @@ def check_geographic(key: str, *, view: str | None = None,
         f"Feed in feeds.py and rebuild it (bin/build-site, or "
         f"schematic.site.export()); it is off by default because it is a "
         f"second copy of every track. Feeds that have it: "
-        + ", ".join(sorted(k for k, f in feeds.FEEDS.items() if f.geographic)))
+        + ", ".join(sorted(k for k, f in feeds.all().items() if f.geographic)))
 
 
 VIEW_PHRASE = {
@@ -480,7 +480,7 @@ def storyboard_alt(key: str, name: str, *, stations: int = 0, lines: int = 0) ->
     if len(seen) < 2:
         return alt_text(key, seen[0] if seen else "map", stations=stations, lines=lines)
 
-    feed = feeds.FEEDS[key]
+    feed = feeds.get(key)
     where = f"the {feed.city} {feed.network}".replace("the the ", "the ")
     steps = [VIEW_PHRASE.get(v, v) for v in seen]
     joined = ", then ".join(steps)
@@ -497,7 +497,7 @@ def storyboard_alt(key: str, name: str, *, stations: int = 0, lines: int = 0) ->
 def alt_text(key: str, view: str, *, stations: int = 0, lines: int = 0) -> str:
     """A description worth pasting. The project argues for legibility; an export
     that ships without one undercuts its own point."""
-    feed = feeds.FEEDS[key]
+    feed = feeds.get(key)
     where = f"the {feed.city} {feed.network}".replace("the the ", "the ")
     counts = []
     if lines:
@@ -792,7 +792,7 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
     address when it is not the site's file, and ``date`` the service day its
     title names, when the caller knows them; the desktop app knows both.
     """
-    if key not in feeds.FEEDS:
+    if key not in feeds.all():
         raise KeyError(f"unknown feed {key!r}")
     if preset_name not in PRESETS:
         raise KeyError(f"unknown preset {preset_name!r}")
@@ -929,7 +929,7 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
     dressings of the same preset -- with the name and without it -- can sit in
     one folder instead of overwriting each other.
     """
-    if key not in feeds.FEEDS:
+    if key not in feeds.all():
         raise KeyError(f"unknown feed {key!r}")
     preset = PRESETS[preset_name]
     check_geographic(key, view=view, preset=preset, storyboard=storyboard)
@@ -963,7 +963,7 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
     """What this file is, beside the file. Includes the caveats the atlas shows:
     an image travels further than the page it came from. ``provenance`` from
     the caller wins over the atlas's, field by field."""
-    feed = feeds.FEEDS[key]
+    feed = feeds.get(key)
     prov = {**_provenance(key),
             **{k: v for k, v in (provenance or {}).items() if v is not None}}
     stats = {k: prov[k] for k in ("stations", "lines") if k in prov} or _network_stats(key)
