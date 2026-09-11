@@ -94,6 +94,14 @@ def test_route_type_names_and_modes():
     assert inspection.route_type_name(99) == "type 99"
     assert inspection.mode_for(700) == "bus"
     assert inspection.mode_for(99) is None
+    # Coach is its own type to gtfs2graph: -m bus drops a 2xx route and
+    # -m coach keeps it (checked against the tool over a two-route feed).
+    assert inspection.mode_for(200) == "coach"
+    assert inspection.mode_for(201) == "coach"
+    assert inspection.route_type_name(200) == "coach"
+    assert inspection.route_type_name(201) == "coach (extended 201)"
+    assert inspection.modes_for(3) == ["bus"]
+    assert inspection.modes_for(201) == ["coach"]
     assert inspection.modes_for(0) == ["tram", "streetcar"]
     assert inspection.modes_for(1100) == []
     # Every alias is a name gtfs2graph takes, and every basic type has one.

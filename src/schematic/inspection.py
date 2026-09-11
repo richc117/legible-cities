@@ -34,18 +34,27 @@ ROUTE_TYPES: dict[int, tuple[str, str]] = {
     3: ("bus", "bus"), 4: ("ferry", "ferry"), 5: ("cable tram", "cablecar"),
     6: ("aerial lift", "gondola"), 7: ("funicular", "funicular"),
     11: ("trolleybus", "trolleybus"), 12: ("monorail", "monorail"),
+    # Coach is a type of its own to gtfs2graph, the extended 200 series:
+    # -m bus drops it and -m coach keeps it (checked against the tool).
+    200: ("coach", "coach"),
 }
-EXTENDED: dict[int, int] = {1: 2, 2: 3, 3: 2, 4: 1, 5: 1, 6: 1, 7: 3, 8: 11, 9: 0,
+EXTENDED: dict[int, int] = {1: 2, 2: 200, 3: 2, 4: 1, 5: 1, 6: 1, 7: 3, 8: 11, 9: 0,
                             10: 4, 12: 4, 13: 6, 14: 7}
 # The other names gtfs2graph's -m takes for each basic type (feeds.MOTS is
 # the whole list); a client that lets a person type a mode reads these to
 # say what it keeps, rather than carrying the table itself.
 ALIASES: dict[int, tuple[str, ...]] = {
     0: ("tram", "streetcar"), 1: ("subway", "metro"), 2: ("rail", "train"),
-    3: ("bus", "coach"), 4: ("ferry", "boat", "ship"), 5: ("cablecar",),
+    3: ("bus",), 4: ("ferry", "boat", "ship"), 5: ("cablecar",),
     6: ("gondola",), 7: ("funicular",), 11: ("trolleybus", "trolley", "trolley-bus"),
-    12: ("monorail", "mono-rail"),
+    12: ("monorail", "mono-rail"), 200: ("coach",),
 }
+
+# The basic types a route_type is one of, the coach series included, so a
+# name and a mode can be looked up for any code; the extended hundreds
+# fold onto them (a 2xx route is coach, and a 200-series code answers its
+# own name without "extended").
+BASIC = frozenset(ROUTE_TYPES)
 
 # Rail-like types: a feed with nothing else is drawn whole ("all"), as the
 # presets are, rather than filtered to its most common type.

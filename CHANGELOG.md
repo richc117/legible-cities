@@ -5,6 +5,15 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Fixed
+
+- **Coach is its own type to gtfs2graph.** `-m bus` drops a 200-series
+  route and `-m coach` keeps it, checked against the tool; the inspection
+  now names the 200 series `coach` with `coach` as its mode, rather than
+  folding it onto bus and listing `coach` as a name that keeps buses.
+
 ## [0.7.1] - 2026-09-11
 
 ### Added
