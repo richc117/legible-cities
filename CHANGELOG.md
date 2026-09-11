@@ -21,6 +21,16 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
   its zips and stored layouts, and refuses a preset. `Feed.to_dict()` and
   `Feed.from_dict()`; `Feed.source` says which half. Library only: the
   protocol grows with E09c.
+- **`feeds.inspect(key, anchor=)`**, what is in a feed as data, before
+  anything is laid out (`schematic.inspection`): the agencies; every route
+  with its names, the label the map would use, its type, colours and trip
+  count; a histogram of route types with their GTFS names; stops by
+  location type; the tables present; the service window and the engine's
+  day from the anchor, as `feeds.service` answers them; a suggested LOOM
+  mode from the types; and warnings as sentences, for a headway-based
+  timetable, an expired or unstarted calendar, a `calendar_dates.txt`-only
+  schedule, routes without short names and a feed several operators share.
+  Reads the raw zip, never `stop_times`, so New York inspects in seconds.
 
 ## [0.6.0] - 2026-09-10
 

@@ -11,6 +11,7 @@ second half only. Nothing downstream in the pipeline is city-specific.
 from __future__ import annotations
 
 import builtins
+import datetime as dt
 import hashlib
 import io
 import json
@@ -526,6 +527,12 @@ def remove(key: str) -> None:
         for path in config.feeds_dir().glob(f"{key}.*zip"):
             path.unlink(missing_ok=True)
         shutil.rmtree(config.graphs_dir() / key, ignore_errors=True)
+
+
+def inspect(key: str, *, anchor: "dt.date | None" = None):
+    """What is in ``key``'s feed, as data: see ``schematic.inspection``."""
+    from . import inspection  # here, not at the top: inspection reads this module
+    return inspection.inspect(key, anchor=anchor)
 
 
 def _download(url: str) -> bytes:
