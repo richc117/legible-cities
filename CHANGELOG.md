@@ -5,6 +5,32 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Added
+
+- **`feeds.service` over the protocol.** `{key, anchor?, lines?}` answers a
+  feed's service window and the busiest weekday scanning from the anchor,
+  which is the engine's today when omitted and is echoed either way, so a
+  client can store the choice and reproduce it. With `lines` the trips are
+  counted on the map's lines, as the map build counts them. A long request:
+  it downloads the feed when it is not cached, reads the calendar and the
+  trips (not `stop_times`), and honours a cancel when the read ends.
+  Additive at protocol 1.
+- **A feed is downloaded whole or not at all**, to a `.part` beside it and
+  moved into place, under one lock per feed: a quit mid-download no longer
+  leaves a truncated zip that the next call takes for the feed, and two
+  requests for one feed no longer write the same file at once.
+
+### Changed
+
+- **`busiest_weekday` takes its anchor as an argument.** It read the clock;
+  now the caller passes the day to scan from, and the same feed and anchor
+  give the same day on every machine, on any day it is asked. The mid-window
+  fallback for an anchor outside the window stays. `pipeline.run` passes
+  `anchor=` through and uses today without one, so `bin/run-all` and the
+  site behave as before.
+
 ## [0.5.0] - 2026-09-10
 
 ### Added

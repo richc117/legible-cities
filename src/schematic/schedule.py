@@ -97,9 +97,21 @@ def service_window(tables: dict[str, pd.DataFrame]) -> tuple[dt.date, dt.date]:
     return min(starts), max(ends)
 
 
+# The tables the service window and the busiest weekday read: enough to
+# choose a day without stop_times, which is most of a large feed.
+DAY_TABLES = frozenset({"trips", "routes", "calendar", "calendar_dates"})
+
+
 def busiest_weekday(tables: dict[str, pd.DataFrame],
-                    lines: set[str] | None = None) -> dt.date:
-    """A representative service date: the weekday in the feed window with the most trips."""
+                    lines: set[str] | None = None, *, anchor: dt.date) -> dt.date:
+    """A representative service date: the weekday in the feed window with the
+    most trips, scanning from ``anchor``.
+
+    The anchor is an argument and never the clock: the same feed and the same
+    anchor give the same day on every machine, on any day it is asked, which
+    is what lets a caller store the answer and reproduce it. A caller that
+    wants "around today" passes today.
+    """
     trips = tables["trips"]
     if lines is not None:
         trips = trips[trips["route_id"].isin(routes_matching(tables, lines))]
@@ -117,18 +129,16 @@ def busiest_weekday(tables: dict[str, pd.DataFrame],
                 best, best_n = day, n
         return best, best_n
 
-    # Anchor near today when the feed covers today: some feeds keep a window
+    # Scan from the anchor when the feed covers it: some feeds keep a window
     # spanning years (Miami's runs 2021-2027) whose opening weeks are long dead,
     # and scanning from the start finds nothing running.
     #
-    # When today is outside the window the feed has expired (or has not started),
-    # and clamping to the nearest edge lands on it exactly -- New Year's Eve, for
-    # Mexico City, which is a holiday and a poor sample. Take the middle of the
-    # window instead, which is an ordinary week by construction.
-    today = dt.date.today()
-    if start <= today <= end:
-        anchor = today
-    else:
+    # When the anchor is outside the window the feed has expired (or has not
+    # started), and clamping to the nearest edge lands on it exactly -- New
+    # Year's Eve, for Mexico City, which is a holiday and a poor sample. Take
+    # the middle of the window instead, which is an ordinary week by
+    # construction.
+    if not start <= anchor <= end:
         anchor = start + dt.timedelta(days=(end - start).days // 2)
     best, best_n = scan(anchor, 30)
 

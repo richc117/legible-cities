@@ -10,8 +10,10 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import re
 import shutil
+import threading
 import zipfile
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -314,23 +316,40 @@ FEEDS: dict[str, Feed] = {
 # ``fetch`` learns to send a key header.
 
 
+# One feed on disk at a time, per key: two requests for one feed (the service
+# day and the layout, back to back) must not download or normalise it twice
+# into the same file, and a download must land whole or not at all.
+_locks: dict[str, threading.Lock] = {}
+_locks_guard = threading.Lock()
+
+
+def _disk(key: str) -> threading.Lock:
+    with _locks_guard:
+        return _locks.setdefault(key, threading.Lock())
+
+
 def fetch(key: str, *, force: bool = False) -> Path:
     """Download a feed if it is not already cached. Returns the local zip path."""
     feed = FEEDS[key]
     feed.zip_path.parent.mkdir(parents=True, exist_ok=True)
-    if feed.zip_path.exists() and not force:
-        return feed.zip_path
+    with _disk(key):
+        if feed.zip_path.exists() and not force:
+            return feed.zip_path
 
-    # Some agencies (MARTA) return 403 to a bare requests user-agent.
-    resp = requests.get(feed.url, timeout=180, headers={
-        "User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)",
-    })
-    resp.raise_for_status()
-    # Fail loudly rather than caching an HTML error page as a "feed".
-    if not zipfile.is_zipfile(io.BytesIO(resp.content)):
-        raise RuntimeError(f"{feed.url} did not return a zip ({len(resp.content)} bytes)")
-    feed.zip_path.write_bytes(resp.content)
-    return feed.zip_path
+        # Some agencies (MARTA) return 403 to a bare requests user-agent.
+        resp = requests.get(feed.url, timeout=180, headers={
+            "User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)",
+        })
+        resp.raise_for_status()
+        # Fail loudly rather than caching an HTML error page as a "feed".
+        if not zipfile.is_zipfile(io.BytesIO(resp.content)):
+            raise RuntimeError(f"{feed.url} did not return a zip ({len(resp.content)} bytes)")
+        # Whole or not at all: a quit mid-write must not leave a truncated
+        # zip that the next call takes for the feed.
+        partial = feed.zip_path.with_name(feed.zip_path.name + ".part")
+        partial.write_bytes(resp.content)
+        os.replace(partial, feed.zip_path)
+        return feed.zip_path
 
 
 # --------------------------------------------------------------------------
@@ -438,8 +457,14 @@ def normalize(feed_or_key: Feed | str, *, force: bool = False) -> Path:
     key = feed.key
     src = fetch(key)
     dst = normalized_path(feed)
-    if dst.exists() and not force and dst.stat().st_mtime >= src.stat().st_mtime:
-        return dst
+    with _disk(key):
+        if dst.exists() and not force and dst.stat().st_mtime >= src.stat().st_mtime:
+            return dst
+        return _normalize(feed, src, dst)
+
+
+def _normalize(feed: Feed, src: Path, dst: Path) -> Path:
+    """The work of ``normalize``: read ``src``, write ``dst`` whole."""
 
     def read(zf: zipfile.ZipFile, name: str) -> pd.DataFrame:
         df = pd.read_csv(io.BytesIO(zf.read(name)), dtype=str, skipinitialspace=True)
@@ -486,11 +511,13 @@ def normalize(feed_or_key: Feed | str, *, force: bool = False) -> Path:
     return dst
 
 
-def tables(feed_or_key: Feed | str, *, normalized: bool = True) -> dict[str, pd.DataFrame]:
+def tables(feed_or_key: Feed | str, *, normalized: bool = True,
+           only: frozenset[str] | set[str] | None = None) -> dict[str, pd.DataFrame]:
     """Read every .txt in the feed zip as a DataFrame, keyed by table name.
 
     Reads the normalised feed by default so route labels match the line graph;
-    a ``Feed`` with overrides reads the copy normalised with them.
+    a ``Feed`` with overrides reads the copy normalised with them. ``only``
+    names the tables to read, for a caller that does not need stop_times.
     """
     feed = _feed(feed_or_key)
     path = normalize(feed) if normalized else fetch(feed.key)
@@ -499,6 +526,8 @@ def tables(feed_or_key: Feed | str, *, normalized: bool = True) -> dict[str, pd.
         for name in zf.namelist():
             stem = Path(name).stem
             if not name.endswith(".txt") or stem not in GTFS_TABLES:
+                continue
+            if only is not None and stem not in only:
                 continue
             with zf.open(name) as fh:
                 # skipinitialspace and the header strip handle feeds that pad

@@ -199,8 +199,10 @@ drives it: `engine.info`, `graph.build` (which answers with the layout's id)
 and `map.build` (which takes that id and a service day, and never lays out
 on the way to a map), with progress and LOOM's log as notifications and
 `$/cancelRequest` to stop a run. The service day is a required parameter
-there, never picked by the engine. `--schema`
-prints the protocol's JSON Schema, from which the app generates its types.
+of `map.build`, never picked on the way to a map; `feeds.service` is where
+a client asks for one, giving the day to scan from and the map's lines, and
+getting the feed's window and the busiest weekday back. `--schema` prints
+the protocol's JSON Schema, from which the app generates its types.
 
 The notebooks in `notebooks/` walk the same pipeline one stage at a time, and
 are the place to start if you want to see what each tool does.

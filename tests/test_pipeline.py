@@ -5,6 +5,7 @@ machine that has not run the pipeline yet. Run ``python -m schematic`` (or the
 notebooks) once to populate ``data/`` and they light up.
 """
 
+import datetime as dt
 import math
 
 import pytest
@@ -19,6 +20,8 @@ from schematic.schedule import (busiest_weekday, concurrent_trips, match_stops,
 
 KEY = "la-metro-rail"
 LINES = set("ABCDEK")
+# Inside the cached feed's window, so the scan starts here; an argument, not the clock.
+ANCHOR = dt.date(2026, 9, 10)
 
 pytestmark = pytest.mark.skipif(
     pipeline.stage_path(KEY, "octi") is None,
@@ -113,7 +116,7 @@ def test_no_two_lines_share_a_drawn_track(drawn):
 
 def test_every_trip_routes_onto_the_map(graph, graph_ll, tables, drawn):
     m = match_stops(graph_ll, tables)
-    date = busiest_weekday(tables, LINES)
+    date = busiest_weekday(tables, LINES, anchor=ANCHOR)
     trips = trips_on(tables, date, m, LINES)
     anim = animate.build(drawn, graph, trips, date)
     assert anim.unrouted == []
@@ -131,7 +134,7 @@ def test_trains_are_at_their_station_at_the_scheduled_time(graph_ll, tables, dra
     track-offset from the station centre -- not zero, but never more than that.
     """
     m = match_stops(graph_ll, tables)
-    date = busiest_weekday(tables, LINES)
+    date = busiest_weekday(tables, LINES, anchor=ANCHOR)
     trips = trips_on(tables, date, m, LINES)
     net = animate.RouteNetwork.build(drawn)
 
@@ -149,7 +152,7 @@ def test_trains_are_at_their_station_at_the_scheduled_time(graph_ll, tables, dra
 
 def test_concurrency_matches_an_independent_recount(graph_ll, tables):
     m = match_stops(graph_ll, tables)
-    date = busiest_weekday(tables, LINES)
+    date = busiest_weekday(tables, LINES, anchor=ANCHOR)
     trips = trips_on(tables, date, m, LINES)
     for hour in (6, 8, 12, 17, 23):
         sec = hour * 3600
@@ -160,6 +163,6 @@ def test_concurrency_matches_an_independent_recount(graph_ll, tables):
 def test_service_day_extends_past_midnight(graph_ll, tables):
     """LA runs trains after 24:00; those must not wrap to the start of the day."""
     m = match_stops(graph_ll, tables)
-    date = busiest_weekday(tables, LINES)
+    date = busiest_weekday(tables, LINES, anchor=ANCHOR)
     trips = trips_on(tables, date, m, LINES)
     assert max(t.end for t in trips) > 24 * 3600

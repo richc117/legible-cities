@@ -6,8 +6,10 @@
 The transport is the Language Server Protocol's: ``Content-Length`` framed
 messages on stdin and stdout, stderr for logs. Long requests stay open until
 they finish; while they run, ``job/progress`` and ``job/log`` notifications
-carry the request's id, and ``$/cancelRequest`` ends the LOOM process the
-request is waiting on and answers it with the cancelled error.
+carry the request's id, and ``$/cancelRequest`` ends the process the request
+is waiting on (a LOOM tool, or ffmpeg) and answers it with the cancelled
+error. A request that waits on no process (``feeds.service`` reads a
+calendar) runs to its end and is answered with the same error.
 
 Errors a person can act on are code -32000 with ``data: {kind, detail,
 hint}``: ``hint`` is the sentence the engine already raises, ``detail`` says
@@ -38,7 +40,7 @@ from pylsp_jsonrpc.exceptions import (JsonRpcException, JsonRpcInvalidParams,
                                       JsonRpcRequestCancelled)
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 
-from . import __version__, config, export, feeds, loom, pipeline
+from . import __version__, config, export, feeds, loom, pipeline, schedule
 from .crs import to_mercator
 from .linegraph import LineGraph
 from .render import octilinearity
@@ -145,17 +147,19 @@ def _feed_key(value: Any) -> str:
     return value
 
 
-def _date(value: Any) -> dt.date:
+def _date(value: Any, name: str = "date") -> dt.date:
     if value is None:
-        raise invalid_params(
-            "date is required: the service day to draw, as YYYY-MM-DD. The engine "
-            "never picks one, because its choice would depend on the day you asked.")
+        if name == "date":
+            raise invalid_params(
+                "date is required: the service day to draw, as YYYY-MM-DD. The engine "
+                "never picks one, because its choice would depend on the day you asked.")
+        raise invalid_params(f"{name} must be a calendar day as YYYY-MM-DD, or left out")
     if not isinstance(value, str) or not DATE_PATTERN.match(value):
-        raise invalid_params("date must be a calendar day as YYYY-MM-DD")
+        raise invalid_params(f"{name} must be a calendar day as YYYY-MM-DD")
     try:
         return dt.date.fromisoformat(value)
     except ValueError:
-        raise invalid_params(f"{value} is not a calendar day") from None
+        raise invalid_params(f"{name}: {value} is not a calendar day") from None
 
 
 def _token(value: Any) -> str:
@@ -435,6 +439,7 @@ class EngineEndpoint(Endpoint):
             "export.storyboards": self.export_storyboards,
             "export.plan": self.export_plan,
             "export.encode": self.export_encode,
+            "feeds.service": self.feeds_service,
         }, consumer, max_workers=max_workers)
 
     @property
@@ -488,7 +493,14 @@ class EngineEndpoint(Endpoint):
                 if job.cancelled:
                     raise JsonRpcRequestCancelled()
                 with loom.cancellable(job):
-                    return work(job, progress)
+                    result = work(job, progress)
+                # Work that starts no process cannot be interrupted, so a
+                # cancel that arrived while it ran is honoured here: the
+                # answer to a cancelled request is the cancelled error, never
+                # a result the client has stopped waiting for.
+                if job.cancelled:
+                    raise JsonRpcRequestCancelled()
+                return result
             except loom.Cancelled:
                 raise JsonRpcRequestCancelled() from None
             except JsonRpcException:
@@ -573,7 +585,29 @@ class EngineEndpoint(Endpoint):
 
         return self._job(work)
 
+    def feeds_service(self, params: Any) -> Callable[[], Any]:
+        """When a feed runs and which day to draw, from an anchor the caller
+        gives (today when it does not): the same feed and anchor answer the
+        same day on every machine, which is what lets a client store it. A
+        long request, because reading a large feed's tables takes seconds."""
+        left = _object("feeds.service", params)
+        key = _feed_key(left.pop("key", None))
+        anchor = _date(left.pop("anchor"), "anchor") if "anchor" in left else dt.date.today()
+        lines = _strings(left, "lines")
+        _no_extra("feeds.service", left)
 
+        def work(_job: loom.Job, _progress: Progress) -> dict[str, Any]:
+            # The calendar and the trips are all the day needs; stop_times,
+            # the bulk of a large feed, is left unread.
+            tables = feeds.tables(key, only=schedule.DAY_TABLES)
+            start, end = schedule.service_window(tables)
+            # Counted on the map's lines when the caller names them, as the
+            # map build counts, so the two agree on the day.
+            day = schedule.busiest_weekday(tables, set(lines) if lines else None, anchor=anchor)
+            return {"start": start.isoformat(), "end": end.isoformat(),
+                    "busiest_weekday": day.isoformat(), "anchor": anchor.isoformat()}
+
+        return self._job(work)
     # -- export: the two halves the desktop app cannot do itself. It captures
     # for itself (its ADR-024); there is no export.capture here.
 

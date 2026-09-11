@@ -6,6 +6,8 @@ actually resolves into a network rather than twelve unconnected stripes.
 
 from collections import defaultdict, deque
 
+import datetime as dt
+
 import pytest
 
 from schematic import config, feeds, pipeline
@@ -16,6 +18,8 @@ from schematic.schedule import (busiest_weekday, frequency_windows, match_stops,
                                 service_window, trips_on)
 
 KEY = "cdmx-metro"
+# Outside the feed's expired window, as today is: the scan starts mid-window.
+ANCHOR = dt.date(2026, 9, 10)
 
 pytestmark = pytest.mark.skipif(
     pipeline.stage_path(KEY, "octi") is None,
@@ -81,14 +85,14 @@ def test_the_schedule_is_headway_based(tables):
 
 def test_the_chosen_date_is_inside_the_expired_window(tables):
     start, end = service_window(tables)
-    date = busiest_weekday(tables)
+    date = busiest_weekday(tables, anchor=ANCHOR)
     assert start <= date <= end
     assert date.weekday() < 5
 
 
 def test_expansion_produces_a_full_day_of_service(graph, tables):
     lines = set(graph.labels)
-    date = busiest_weekday(tables, lines)
+    date = busiest_weekday(tables, lines, anchor=ANCHOR)
     trips = trips_on(tables, date, match_stops(graph, tables), lines)
     # 72 templates at two-to-four minute headways across the day.
     assert len(trips) > 5000

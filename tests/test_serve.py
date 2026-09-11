@@ -14,6 +14,7 @@ chooses the native backend, which has a test of its own; the rest always run.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import re
@@ -31,6 +32,8 @@ import pytest
 from unittest import mock
 from jsonschema import Draft202012Validator
 
+from pylsp_jsonrpc.exceptions import JsonRpcRequestCancelled
+
 from schematic import __version__, config, export, feeds, loom, pipeline, schedule, serve
 
 SCHEMA = serve.schema()
@@ -38,6 +41,10 @@ KEY = "la-metro-rail"
 DATE = "2026-09-11"
 
 SOURCE_ZIPS = [config.feeds_dir() / f"{KEY}{suffix}.zip" for suffix in ("", ".normalized")]
+# Mexico City's feed too, for the service day: its window has expired, which
+# is the case the anchor rule exists for. Copied when cached, skipped when not.
+CDMX = "cdmx-metro"
+CDMX_ZIPS = [config.feeds_dir() / f"{CDMX}{suffix}.zip" for suffix in ("", ".normalized")]
 
 
 def _docker_ready() -> bool:
@@ -103,7 +110,7 @@ def home(tmp_path_factory):
     so LOOM runs for LA once (about ten seconds) rather than per test."""
     root = tmp_path_factory.mktemp("home")
     (root / "data" / "feeds").mkdir(parents=True)
-    for z in SOURCE_ZIPS:
+    for z in SOURCE_ZIPS + CDMX_ZIPS:
         if z.exists():
             shutil.copy(z, root / "data" / "feeds" / z.name)
     patch = pytest.MonkeyPatch()
@@ -358,6 +365,14 @@ def test_map_build_refuses_a_layout_that_is_not_stored(client, home):
 
 
 BAD_PARAMS = [
+    ("feeds.service", None, "FeedsServiceParams"),
+    ("feeds.service", {}, "FeedsServiceParams"),
+    ("feeds.service", {"key": KEY, "anchor": "tomorrow"}, "FeedsServiceParams"),
+    ("feeds.service", {"key": KEY, "anchor": 20260910}, "FeedsServiceParams"),
+    ("feeds.service", {"key": KEY, "anchor": "2026-02-30"}, "FeedsServiceParams"),
+    ("feeds.service", {"key": KEY, "anchor": None}, "FeedsServiceParams"),
+    ("feeds.service", {"key": KEY, "lines": "A"}, "FeedsServiceParams"),
+    ("feeds.service", {"key": KEY, "date": DATE}, "FeedsServiceParams"),
     ("graph.build", {"key": KEY, "mode": "Tram!"}, "GraphBuildParams"),
     ("graph.build", {"key": KEY, "agency": ""}, "GraphBuildParams"),
     ("graph.build", {"key": KEY, "label_pattern": ""}, "GraphBuildParams"),
@@ -482,6 +497,9 @@ def test_calendar_check_goes_past_the_pattern(client):
 
 
 GOOD_PARAMS = [
+    ("FeedsServiceParams", {"key": KEY}),
+    ("FeedsServiceParams", {"key": KEY, "anchor": DATE}),
+    ("FeedsServiceParams", {"key": KEY, "anchor": DATE, "lines": ["A", "E"]}),
     ("GraphBuildParams", {"key": KEY}),
     ("GraphBuildParams", {"key": KEY, "force": True}),
     ("GraphBuildParams", {"key": KEY, "mode": "tram", "agency": "LACMTA",
@@ -670,7 +688,7 @@ def test_cancel_ends_ffmpeg_and_leaves_no_partial_file(client, tmp_path):
 def test_errors_are_classified_by_the_module_that_wrote_the_sentence():
     tables = {"trips": pd.DataFrame({"service_id": [], "route_id": []})}
     try:
-        schedule.busiest_weekday(tables)
+        schedule.busiest_weekday(tables, anchor=dt.date(2026, 9, 10))
     except ValueError as exc:
         error = serve.classify(exc)
     check(error.data, "ErrorData")
@@ -700,9 +718,100 @@ def test_errors_are_classified_by_the_module_that_wrote_the_sentence():
     assert "KeyError" in error.data["detail"]
 
 
+def test_a_cancel_that_arrives_while_a_request_waits_on_no_process_is_honoured(client):
+    """feeds.service starts no process, so a cancel cannot interrupt it: the
+    work runs to its end, and the request is answered with the cancelled
+    error and never with a result the client has stopped waiting for."""
+    endpoint = client.endpoint
+    endpoint._request_id = 41
+
+    def work(job, _progress):
+        client.notify("$/cancelRequest", {"id": 41})
+        assert job.cancelled
+        return {"answered": "anyway"}
+
+    run = endpoint._job(work)
+    endpoint._request_id = None
+    assert 41 in endpoint.jobs
+    with pytest.raises(JsonRpcRequestCancelled):
+        run()
+    assert endpoint.jobs == {}
+
+
 def test_cancel_for_an_unknown_request_is_ignored(client, caplog):
     client.notify("$/cancelRequest", {"id": 999})
     assert client.out == []
+
+
+# ----------------------------------------------------------- the service day
+
+needs_feed = pytest.mark.skipif(not all(z.exists() for z in SOURCE_ZIPS),
+                                reason="needs the cached LA feed")
+needs_cdmx = pytest.mark.skipif(not all(z.exists() for z in CDMX_ZIPS),
+                                reason="needs the cached Mexico City feed")
+
+
+@needs_feed
+def test_feeds_service_answers_the_window_and_the_day_from_the_anchor(client, home):
+    """What the library says, over the protocol: the feed's window, and the
+    busiest weekday scanning from the anchor, which is echoed so the caller
+    can store it. No LOOM: the calendar is read, nothing is laid out."""
+    tables = feeds.tables(KEY)
+    start, end = schedule.service_window(tables)
+    anchor = dt.date(2026, 9, 10)
+    result = client.call("feeds.service", {"key": KEY, "anchor": anchor.isoformat()},
+                         timeout=120)["result"]
+    check(result, "FeedsServiceResult")
+    day = schedule.busiest_weekday(tables, anchor=anchor)
+    assert result == {"start": start.isoformat(), "end": end.isoformat(),
+                      "busiest_weekday": day.isoformat(), "anchor": "2026-09-10"}
+    assert client.endpoint.jobs == {}
+
+    # On the map's lines the trips are counted as the map build counts them.
+    lines = ["A", "E"]
+    on_lines = client.call("feeds.service", {"key": KEY, "anchor": anchor.isoformat(),
+                                             "lines": lines}, timeout=120)["result"]
+    check(on_lines, "FeedsServiceResult")
+    assert on_lines["busiest_weekday"] == schedule.busiest_weekday(
+        tables, set(lines), anchor=anchor).isoformat()
+    assert on_lines["anchor"] == "2026-09-10"
+
+    # Without an anchor the engine's today is used, and echoed: read before
+    # and after the call, since the call may straddle midnight.
+    before = dt.date.today()
+    today = client.call("feeds.service", {"key": KEY}, timeout=120)["result"]
+    after = dt.date.today()
+    check(today, "FeedsServiceResult")
+    assert today["anchor"] in {before.isoformat(), after.isoformat()}
+    assert today["busiest_weekday"] == schedule.busiest_weekday(
+        tables, anchor=dt.date.fromisoformat(today["anchor"])).isoformat()
+
+
+@needs_cdmx
+def test_feeds_service_on_an_expired_feed_still_answers_a_day_inside_its_window(client, home):
+    tables = feeds.tables(CDMX)
+    start, end = schedule.service_window(tables)
+    result = client.call("feeds.service", {"key": CDMX, "anchor": "2026-09-10"},
+                         timeout=120)["result"]
+    check(result, "FeedsServiceResult")
+    assert (result["start"], result["end"]) == (start.isoformat(), end.isoformat())
+    assert start <= dt.date.fromisoformat(result["busiest_weekday"]) <= end
+    assert result["busiest_weekday"] == schedule.busiest_weekday(
+        tables, anchor=dt.date(2026, 9, 10)).isoformat()
+
+
+def test_feeds_service_refuses_an_unknown_feed_and_a_bad_anchor(client):
+    error = client.call("feeds.service", {"key": "not-a-feed"})["error"]
+    assert error["code"] == -32000 and error["data"]["kind"] == "feed"
+    error = client.call("feeds.service", {"key": KEY, "anchor": "2026-02-30"})["error"]
+    assert error["code"] == -32602 and "not a calendar day" in error["data"]["hint"]
+    assert error["data"]["hint"].startswith("anchor: ")
+    # A null anchor is refused as an anchor, not with map.build's sentence
+    # about a date the engine never picks: this method picks one.
+    error = client.call("feeds.service", {"key": KEY, "anchor": None})["error"]
+    assert error["code"] == -32602
+    assert error["data"]["hint"].startswith("anchor must be a calendar day")
+    assert "left out" in error["data"]["hint"]
 
 
 # ---------------------------------------------------------------- with LOOM

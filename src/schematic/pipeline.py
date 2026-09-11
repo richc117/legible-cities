@@ -440,6 +440,7 @@ class Result:
 
 
 def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
+        anchor: dt.date | None = None,
         width: float = 1800.0, style: Style | None = None,
         line_order: list[str] | None = None, force: bool = False,
         out_dir: Path | None = None, back: str = "index.html",
@@ -450,7 +451,9 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     ``layout`` names a stored layout to draw from, and then nothing is laid
     out: a missing one is refused. Without it the feed's registry entry is
     laid out if it is not stored yet (``force`` again), which is what the
-    command line and the site want. ``back`` is the href the animation
+    command line and the site want. ``date`` is the service day; without
+    one the busiest weekday is chosen scanning from ``anchor``, which is
+    today unless the caller says otherwise. ``back`` is the href the animation
     page's back-link points at. The default is the sibling gallery in
     ``out/``; the site passes its own atlas URL, because a relative
     "index.html" resolves to /maps/index.html there.
@@ -485,7 +488,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     tables = feeds.tables(found.feed)
     lines = set(graph_ll.labels)
     match = match_stops(graph_ll, tables)
-    date = date or busiest_weekday(tables, lines)
+    date = date or busiest_weekday(tables, lines, anchor=anchor or dt.date.today())
     trips = trips_on(tables, date, match, lines)
     tick("schedule", f"{len(trips)} trips on {date:%A %-d %B %Y}; {match.report()}")
 

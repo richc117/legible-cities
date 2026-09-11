@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Legible Cities engine protocol, version 1",
-  "description": "JSON-RPC 2.0 over stdin/stdout with Content-Length framing. `methods` maps each request to the schema of its params and result; `notifications` maps each notification to the schema of its params. Long requests (graph.build, map.build, export.encode) stay open until done and send job/progress and job/log carrying the request's id meanwhile; $/cancelRequest ends the process they are waiting on (a LOOM tool, or ffmpeg) and they answer with the cancelled error (-32800). The export methods are the two halves of an export a client cannot do itself: export.plan describes one and is pure, export.encode turns the frames the client captured into the file; there is no export.capture, because the desktop app captures for itself. Errors a person can act on are code -32000 with `data` of the ErrorData shape; bad parameters are -32602 with the same shape and kind `params`.",
+  "description": "JSON-RPC 2.0 over stdin/stdout with Content-Length framing. `methods` maps each request to the schema of its params and result; `notifications` maps each notification to the schema of its params. Long requests (graph.build, map.build, export.encode, feeds.service) stay open until done and send job/progress and job/log carrying the request's id meanwhile; $/cancelRequest ends the process they are waiting on (a LOOM tool, or ffmpeg) and they answer with the cancelled error (-32800). feeds.service starts no process: a cancel is answered with the same error once its read finishes. The export methods are the two halves of an export a client cannot do itself: export.plan describes one and is pure, export.encode turns the frames the client captured into the file; there is no export.capture, because the desktop app captures for itself. Errors a person can act on are code -32000 with `data` of the ErrorData shape; bad parameters are -32602 with the same shape and kind `params`.",
   "protocol": 1,
   "methods": {
     "engine.info": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/EngineInfo" } },
@@ -11,7 +11,8 @@
     "export.presets": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/ExportPresets" } },
     "export.storyboards": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/ExportStoryboards" } },
     "export.plan": { "params": { "$ref": "#/$defs/ExportPlanParams" }, "result": { "$ref": "#/$defs/CaptureJob" } },
-    "export.encode": { "params": { "$ref": "#/$defs/ExportEncodeParams" }, "result": { "$ref": "#/$defs/ExportEncodeResult" } }
+    "export.encode": { "params": { "$ref": "#/$defs/ExportEncodeParams" }, "result": { "$ref": "#/$defs/ExportEncodeResult" } },
+    "feeds.service": { "params": { "$ref": "#/$defs/FeedsServiceParams" }, "result": { "$ref": "#/$defs/FeedsServiceResult" } }
   },
   "notifications": {
     "job/progress": { "$ref": "#/$defs/JobProgress" },
@@ -46,8 +47,39 @@
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
     },
+    "FeedsServiceParams": {
+      "description": "Ask when a feed runs and which day to draw: its service window and the busiest weekday scanning from an anchor. A long request, like graph.build: it downloads the feed when it is not cached and reads its calendar and trips, and sends no progress.",
+      "type": "object",
+      "properties": {
+        "key": { "$ref": "#/$defs/FeedKey" },
+        "anchor": {
+          "$ref": "#/$defs/ServiceDate",
+          "description": "The day to scan from; the engine's today when omitted, and echoed either way so a caller can store it. An anchor outside the window scans from the window's middle."
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The lines the map draws, as graph.build names them in stages.octi.lines. Trips are counted on those lines, as the map build counts them, so the day is the map's; every trip in the feed counts when omitted."
+        }
+      },
+      "required": ["key"],
+      "additionalProperties": false
+    },
+    "FeedsServiceResult": {
+      "type": "object",
+      "properties": {
+        "start": { "$ref": "#/$defs/ServiceDate", "description": "The first day the feed's calendar covers." },
+        "end": { "$ref": "#/$defs/ServiceDate", "description": "The last." },
+        "busiest_weekday": { "$ref": "#/$defs/ServiceDate", "description": "The weekday in the window with the most trips, scanning from the anchor: the same feed and anchor give the same day on every machine." },
+        "anchor": { "$ref": "#/$defs/ServiceDate", "description": "The anchor the choice was made from." }
+      },
+      "required": ["start", "end", "busiest_weekday", "anchor"],
+      "additionalProperties": false
+    },
     "ServiceDate": {
-      "description": "A calendar day, YYYY-MM-DD. The engine never picks one: its choice would depend on the day the request was made.",
+      "description": "A calendar day, YYYY-MM-DD. map.build never picks one, because its choice would depend on the day the request was made; feeds.service picks one from an anchor the caller gives.",
       "type": "string",
       "format": "date",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"

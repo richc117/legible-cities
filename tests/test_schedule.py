@@ -91,7 +91,10 @@ def test_busiest_weekday_from_calendar_dates_only():
             {"service_id": "sat", "date": "20260307", "exception_type": "1"},
         ]),
     }
-    assert busiest_weekday(tables) == dt.date(2026, 3, 5)
+    # From an anchor inside the window, and from one before it (the scan
+    # then starts mid-window and falls back to the start): the same day.
+    assert busiest_weekday(tables, anchor=dt.date(2026, 3, 5)) == dt.date(2026, 3, 5)
+    assert busiest_weekday(tables, anchor=dt.date(2026, 1, 1)) == dt.date(2026, 3, 5)
 
 
 # --------------------------------------------------------------------------
@@ -176,8 +179,35 @@ def test_expired_feed_picks_a_date_inside_its_own_window():
             "thursday": "1", "friday": "1", "saturday": "0", "sunday": "0",
             "start_date": "20241201", "end_date": "20251231"}]),
     }
-    d = busiest_weekday(tables)
+    d = busiest_weekday(tables, anchor=dt.date(2026, 9, 10))
     assert dt.date(2024, 12, 1) <= d <= dt.date(2025, 12, 31)
     assert d.weekday() < 5
     # Not pinned to either edge.
     assert d not in (dt.date(2024, 12, 1), dt.date(2025, 12, 31))
+
+
+# The anchor is an argument, never the clock: the same feed and anchor give
+# the same day on every machine, on any day it is asked. Pinned on two real
+# feeds, one anchor inside each window and one outside; the values are those
+# of the feed editions cached here, so a different edition skips rather than
+# fails.
+REAL = [
+    ("la-metro-rail", (dt.date(2026, 8, 29), dt.date(2026, 9, 12)),
+     [(dt.date(2026, 9, 10), dt.date(2026, 9, 10)), (dt.date(2020, 1, 1), dt.date(2026, 9, 8))]),
+    ("cdmx-metro", (dt.date(2024, 12, 1), dt.date(2025, 12, 31)),
+     [(dt.date(2025, 6, 16), dt.date(2025, 6, 16)), (dt.date(2026, 9, 10), dt.date(2025, 6, 16))]),
+]
+
+
+@pytest.mark.parametrize("key,window,cases", REAL, ids=[r[0] for r in REAL])
+def test_the_same_anchor_gives_the_same_day_on_any_machine(key, window, cases):
+    from schematic import feeds
+    from schematic.schedule import busiest_weekday, service_window
+    if not feeds.FEEDS[key].zip_path.exists():
+        pytest.skip(f"{key} is not downloaded")
+    tables = feeds.tables(key)
+    if service_window(tables) != window:
+        pytest.skip(f"{key} is another edition than the one these days were pinned on")
+    for anchor, expected in cases:
+        assert busiest_weekday(tables, anchor=anchor) == expected
+        assert busiest_weekday(tables, anchor=anchor) == expected, "and again"
