@@ -1,0 +1,8 @@
+LA Metro Rail -- Wednesday 02 September 2026
+  110 nodes (110 stations, 0 junctions), 113 edges, lines: A, B, C, D, E, K
+  octilinear: 99.9% of drawn length
+  stops: matched 114/114 stops (100%) [station_id=110, parent_station=3, name=1]
+  trips: 1236 routed onto 28 distinct paths
+  degraded: 0 trips skipped an unmatched stop, 0 borrowed another line's track
+  labels dropped: 3
+  peak concurrent trains: 72

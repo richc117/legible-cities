@@ -16,6 +16,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from . import config, feeds, pipeline
+# ISSUE_WEIGHTS is re-exported: the tests read the weights from here.
+from .diagnostics import ISSUE_WEIGHTS as ISSUE_WEIGHTS
+from .diagnostics import caveats as _caveats_of
+from .diagnostics import issue_score as _issue_score_of
 # By name, not as a module: this file already has an export() of its own, and
 # `from . import export` would be shadowed by it.
 from .export import PALETTES, padded_box, resolve
@@ -244,74 +248,16 @@ class NetworkEntry:
     issues: float
 
 
+# The caveats and the issue score are the diagnostics module's: the same
+# sentences and the same number the desktop app shows (E05).
+
+
 def _caveats(result: pipeline.Result) -> list[str]:
-    """What the pipeline had to fudge, phrased so a reader knows what it means.
-
-    A bare count is alarming without being informative -- "6,627 trips" sounds
-    catastrophic until you know it means a quarter of the hops are drawn one
-    track over. Each line here says the consequence, not just the number.
-    """
-    out: list[str] = []
-    m, a = result.match, result.animation
-    trips = max(len(result.trips), 1)
-
-    if m.unmatched:
-        total = len(m.stop_to_node) + len(m.unmatched)
-        out.append(f"{len(m.unmatched):,} of {total:,} stops could not be placed "
-                   f"on the map, so trains pass straight through them")
-    if a.unrouted:
-        out.append(f"{len(a.unrouted):,} trips could not be traced across the "
-                   f"network at all and are not shown")
-    if a.trips_with_skipped_calls:
-        pct = 100 * a.trips_with_skipped_calls / trips
-        out.append(f"{a.trips_with_skipped_calls:,} trips ({pct:.0f}%) skip a "
-                   f"stop the map does not carry")
-    if a.trips_with_borrowed_track:
-        pct = 100 * a.trips_with_borrowed_track / trips
-        out.append(f"{a.trips_with_borrowed_track:,} trips ({pct:.0f}%) run part "
-                   f"of the way on a neighbouring line's track, because the "
-                   f"schematiser did not attribute that segment to their line. "
-                   f"They follow the right corridor, but not always the right "
-                   f"parallel track")
-    if result.render.dropped_labels:
-        n = len(result.render.dropped_labels)
-        out.append(f"{n:,} station name{'s' if n > 1 else ''} had nowhere to sit "
-                   f"without overlapping another and {'are' if n > 1 else 'is'} "
-                   f"not drawn")
-    return out
-
-
-# What each class of imperfection costs a reader, relative to the others. An
-# unplaced stop and an untraceable trip are structural -- the map is missing
-# something the timetable has. A skipped call is a hole in one trip. Borrowed
-# track is the mildest: the train follows the right corridor, one parallel
-# track over, which at this scale is a few pixels. A dropped label costs a name,
-# not a train.
-ISSUE_WEIGHTS = {"unplaced": 3.0, "unrouted": 3.0, "skipped": 2.0,
-                 "borrowed": 1.0, "unlabelled": 1.0}
+    return _caveats_of(result.diagnostics())
 
 
 def _issue_score(result: pipeline.Result) -> float:
-    """How much of this network the pipeline had to fudge, as one number.
-
-    Proportions, never counts: New York has more of everything, including
-    stations, and ranking by raw totals would just re-sort the atlas by size.
-    Zero means every stop placed, every trip traced on its own track, and every
-    name drawn. Sorts the atlas, and is worth reading beside ``_caveats``, which
-    says the same things in words.
-    """
-    m, a = result.match, result.animation
-    trips = max(len(result.trips), 1)
-    stops = max(len(m.stop_to_node) + len(m.unmatched), 1)
-    stations = max(len(result.graph.stations), 1)
-    fractions = {
-        "unplaced": len(m.unmatched) / stops,
-        "unrouted": len(a.unrouted) / trips,
-        "skipped": a.trips_with_skipped_calls / trips,
-        "borrowed": a.trips_with_borrowed_track / trips,
-        "unlabelled": len(result.render.dropped_labels) / stations,
-    }
-    return sum(ISSUE_WEIGHTS[k] * v for k, v in fractions.items())
+    return _issue_score_of(result.diagnostics())
 
 
 def export_unlabelled(key: str, stage: str, name: str,

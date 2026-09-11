@@ -450,6 +450,16 @@
         },
         "diagnostics": {
           "$ref": "#/$defs/Diagnostics"
+        },
+        "caveats": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "What the build had to fudge, as sentences a person can read: the atlas's caveats, from the same numbers."
+        },
+        "issues": {
+          "type": "number",
+          "minimum": 0,
+          "description": "How much of the network the build had to fudge, as one weighted proportion; 0 is clean. What the atlas is ordered by."
         }
       },
       "required": [
@@ -457,7 +467,9 @@
         "date",
         "files",
         "summary",
-        "diagnostics"
+        "diagnostics",
+        "caveats",
+        "issues"
       ],
       "additionalProperties": false
     },

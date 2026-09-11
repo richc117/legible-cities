@@ -7,6 +7,17 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 ## [Unreleased]
 
+### Added
+
+- **Diagnostics as data** (`schematic.diagnostics`, E05). `Result.diagnostics()`
+  builds one `Diagnostics` from a build; `to_dict()` is the block `map.build`
+  has always sent, unchanged; `summary()` renders the lines the command line
+  prints, byte for byte as before; `caveats()` and `issue_score()` are the
+  atlas's sentences and its ordering number, moved here from the site, which
+  now reads them. `map.build`'s result gains `caveats` and `issues` beside
+  `diagnostics`, so the desktop app shows the same words and the same number
+  as the site. Additive at protocol 1.
+
 ### Fixed
 
 - **Coach is its own type to gtfs2graph.** `-m bus` drops a 200-series

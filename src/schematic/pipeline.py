@@ -32,9 +32,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import __version__, animate, config, feeds, loom
+from . import diagnostics as diagnostics_module
 from .crs import to_mercator
 from .linegraph import LineGraph
-from .render import RenderResult, Style, octilinearity, render
+from .render import RenderResult, Style, render
 from .schedule import (StopMatch, Trip, busiest_weekday, match_stops, trips_on)
 
 # The LOOM stages, in order, with the arguments we run them with. Kept as data
@@ -421,22 +422,13 @@ class Result:
                        if t["k"][0][0] <= h * 3600 <= t["k"][-1][0])
                    for h in range(24))
 
+    def diagnostics(self) -> diagnostics_module.Diagnostics:
+        """The build's numbers, as data: one rendering for the terminal, the
+        site and the app (``diagnostics.py``)."""
+        return diagnostics_module.Diagnostics.of(self)
+
     def summary(self) -> str:
-        ok, total = octilinearity(self.graph)
-        peak = self.peak_concurrent()
-        return "\n".join([
-            f"{feeds.get(self.key).name} -- {self.date:%A %d %B %Y}",
-            f"  {self.graph.summary()}",
-            f"  octilinear: {100 * ok / total:.1f}% of drawn length",
-            f"  stops: {self.match.report()}",
-            f"  trips: {len(self.trips)} routed onto {len(self.animation.paths)} distinct paths"
-            + (f", {len(self.animation.unrouted)} UNROUTED" if self.animation.unrouted else ""),
-            f"  degraded: {self.animation.trips_with_skipped_calls} trips skipped an "
-            f"unmatched stop, {self.animation.trips_with_borrowed_track} borrowed another "
-            f"line's track",
-            f"  labels dropped: {len(self.render.dropped_labels)}",
-            f"  peak concurrent trains: {peak}",
-        ])
+        return self.diagnostics().summary()
 
 
 def run(key: str, *, layout: str | None = None, date: dt.date | None = None,

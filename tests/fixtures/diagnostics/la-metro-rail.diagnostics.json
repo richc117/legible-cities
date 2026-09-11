@@ -1,0 +1,35 @@
+{
+ "degraded": {
+  "borrowed_track": 0,
+  "skipped_calls": 0
+ },
+ "edges": 113,
+ "junctions": 0,
+ "labels_dropped": 3,
+ "lines": [
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "K"
+ ],
+ "octilinear": 0.9986744160761651,
+ "peak_concurrent": 72,
+ "stations": 110,
+ "stops": {
+  "by": {
+   "name": 1,
+   "parent_station": 3,
+   "station_id": 110
+  },
+  "matched": 114,
+  "total": 114,
+  "unmatched": []
+ },
+ "trips": {
+  "paths": 28,
+  "total": 1236,
+  "unrouted": 0
+ }
+}

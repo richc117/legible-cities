@@ -40,7 +40,7 @@ from pylsp_jsonrpc.exceptions import (JsonRpcException, JsonRpcInvalidParams,
                                       JsonRpcRequestCancelled)
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 
-from . import __version__, config, export, feeds, loom, pipeline, schedule
+from . import __version__, config, diagnostics, export, feeds, loom, pipeline, schedule
 from .crs import to_mercator
 from .linegraph import LineGraph
 from .render import octilinearity, stage as render_stage, summary as render_summary
@@ -578,14 +578,17 @@ class EngineEndpoint(Endpoint):
             result = pipeline.run(key, layout=layout, date=date, width=width,
                                   line_order=line_order, out_dir=folder, progress=progress)
             where = folder or config.out_dir()
+            diag = result.diagnostics()
             return {
                 "layout": result.layout,
                 "date": result.date.isoformat(),
                 "files": {"svg": str(where / f"{key}.svg"),
                           "html": str(where / f"{key}.html"),
                           "positions": str(where / f"{key}.positions.json")},
-                "summary": result.summary(),
-                "diagnostics": _diagnostics(result),
+                "summary": diag.summary(),
+                "diagnostics": diag.to_dict(),
+                "caveats": diagnostics.caveats(diag),
+                "issues": round(diagnostics.issue_score(diag), 4),
             }
 
         return self._job(work)
@@ -766,31 +769,6 @@ def _feed_record(feed: feeds.Feed) -> dict[str, Any]:
     record = feed.to_dict()
     record["cached"] = feed.zip_path.is_file()
     return record
-
-
-def _diagnostics(result: pipeline.Result) -> dict[str, Any]:
-    """``Result.summary()`` as data, in the same order."""
-    ok, total = octilinearity(result.graph)
-    match, anim = result.match, result.animation
-    stations = len(result.graph.stations)
-    return {
-        "stations": stations,
-        "junctions": len(result.graph.nodes) - stations,
-        "edges": len(result.graph.edges),
-        "lines": list(result.graph.labels),
-        "octilinear": ok / total if total else 0.0,
-        "stops": {"matched": len(match.stop_to_node),
-                  "total": len(match.stop_to_node) + len(match.unmatched),
-                  "by": {"station_id": match.by_id, "parent_station": match.by_parent,
-                         "name": match.by_name},
-                  "unmatched": list(match.unmatched[:8])},
-        "trips": {"total": len(result.trips), "paths": len(anim.paths),
-                  "unrouted": len(anim.unrouted)},
-        "degraded": {"skipped_calls": anim.trips_with_skipped_calls,
-                     "borrowed_track": anim.trips_with_borrowed_track},
-        "labels_dropped": len(result.render.dropped_labels),
-        "peak_concurrent": result.peak_concurrent(),
-    }
 
 
 # ------------------------------------------------------------------- transport

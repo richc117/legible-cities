@@ -1,0 +1,8 @@
+Mexico City Metro -- Tuesday 01 July 2025
+  167 nodes (165 stations, 2 junctions), 183 edges, lines: 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, L12
+  octilinear: 99.3% of drawn length
+  stops: matched 195/195 stops (100%) [station_id=163, parent_station=0, name=32]
+  trips: 8360 routed onto 24 distinct paths
+  degraded: 0 trips skipped an unmatched stop, 2090 borrowed another line's track
+  labels dropped: 3
+  peak concurrent trains: 248
