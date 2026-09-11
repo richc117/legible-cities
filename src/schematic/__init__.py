@@ -4,4 +4,4 @@
 # two together) rather than read from package metadata, so a checkout that
 # is on sys.path without being installed still knows what it is. Bump both,
 # add the CHANGELOG entry, and tag: see CONTRIBUTING.md.
-__version__ = "0.4.0"
+__version__ = "0.5.0"
