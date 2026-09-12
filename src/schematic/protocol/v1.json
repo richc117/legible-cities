@@ -1398,13 +1398,17 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "pattern": "^[0-9A-F]{6}$",
+          "description": "route_color as the spec asks for it: six hex digits, upper case, without the hash. Null when the feed leaves it out or writes something that is not a colour, which a client must not paint with."
         },
         "text_color": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "pattern": "^[0-9A-F]{6}$",
+          "description": "route_text_color on the same terms as color."
         },
         "trips": {
           "type": "integer",

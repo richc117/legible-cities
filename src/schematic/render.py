@@ -85,18 +85,32 @@ def _path_d(points: list[Coord]) -> str:
             + "".join(f" L {x:.2f} {y:.2f}" for x, y in pts[1:]))
 
 
-def _color(hexish: str | None, fallback: str) -> str:
-    if not hexish:
-        return fallback
-    return hexish if hexish.startswith("#") else f"#{hexish}"
-
-
 # A colour a caller chooses is written the one way, ``#rrggbb``: what the
 # schema says, what the server checks, and what this module refuses
 # otherwise. GTFS's own six digits without the hash are the feed's, not a
-# caller's, and ``_color`` keeps taking them.
+# caller's, and ``_color`` keeps taking them -- but it holds them to the same
+# six digits, because a feed is an agency's file and reaches a ``stroke``
+# attribute, where a quote would end the attribute and start markup.
 HEX_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
 _HEX_COLOR = re.compile(HEX_COLOR_PATTERN)
+
+
+def _color(hexish: str | None, fallback: str) -> str:
+    """The feed's own ``route_color`` as GTFS writes it -- six hex digits,
+    with or without the hash -- else ``fallback``. Anything else is dropped
+    rather than refused: one unusable row in ``routes.txt`` must not stop a
+    city being drawn, and the caller has nothing to correct."""
+    if not isinstance(hexish, str) or not hexish:
+        return fallback
+    value = hexish if hexish.startswith("#") else f"#{hexish}"
+    return value if _HEX_COLOR.match(value) else fallback
+
+
+def _attr(value: str) -> str:
+    """A value on its way into an attribute. Colours go through here too:
+    validated or not, nothing this module writes into markup is trusted to
+    be free of a quote."""
+    return html.escape(str(value), quote=True)
 
 
 def check_color(value: object, what: str) -> str:
@@ -295,14 +309,15 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     # Identified so a consumer that changes the viewBox can grow it to match.
     out.append(f'<rect id="backdrop" x="{min_x:.2f}" y="{min_y:.2f}" '
                f'width="{w:.2f}" height="{h:.2f}" '
-               f'fill="{style.var("bg", style.background)}"/>')
+               f'fill="{_attr(style.var("bg", style.background))}"/>')
 
     out.append('<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">')
     for label in order:
         if label not in colors:
             continue
         out.append(f'<g class="line" data-line="{html.escape(label)}" '
-                   f'stroke="{colors[label]}" stroke-width="{style.line_width:.2f}">')
+                   f'stroke="{_attr(colors[label])}" '
+                   f'stroke-width="{style.line_width:.2f}">')
         for tp in tracks.values():
             if tp.label == label:
                 # The endpoints let a consumer re-aim this segment at a
@@ -319,8 +334,8 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
         x, y = node_xy[node.id]
         r = style.interchange_radius if len(routes_at.get(node.id, ())) > 1 else style.station_radius
         out.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{r:.2f}" '
-                   f'fill="{style.var("station-fill", style.station_fill)}" '
-                   f'stroke="{style.var("station-stroke", style.station_stroke_color)}" '
+                   f'fill="{_attr(style.var("station-fill", style.station_fill))}" '
+                   f'stroke="{_attr(style.var("station-stroke", style.station_stroke_color))}" '
                    f'stroke-width="{style.station_stroke:.2f}" '
                    f'data-node="{html.escape(node.id)}" '
                    f'data-station-id="{html.escape(node.station_id or "")}"/>')
@@ -328,13 +343,13 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
 
     if placements:
         out.append(f'<g id="labels" font-size="{style.label_size:.1f}" '
-                   f'fill="{style.var("label", style.label_color)}">')
+                   f'fill="{_attr(style.var("label", style.label_color))}">')
         for p in placements:
             transform = (f' transform="rotate({p.rotate:.0f} {p.x:.2f} {p.y:.2f})"'
                          if p.rotate else "")
             # A haloed label sits over a line; the stroke is painted behind the
             # glyphs so the name stays legible against the colour.
-            halo = (f' stroke="{style.var("bg", style.background)}" stroke-width="3.2"'
+            halo = (f' stroke="{_attr(style.var("bg", style.background))}" stroke-width="3.2"'
                     f' paint-order="stroke" stroke-linejoin="round"' if p.haloed else "")
             out.append(f'<text x="{p.x:.2f}" y="{p.y:.2f}" text-anchor="{p.anchor}"'
                        f' data-node="{html.escape(p.key)}"'

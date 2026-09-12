@@ -1295,8 +1295,12 @@ __SOCIAL__
     chip.setAttribute("role", "button");
     chip.setAttribute("tabindex", "0");
     chip.setAttribute("aria-pressed", "true");
-    chip.innerHTML = '<span class="dot" style="background:' +
-      (data.lines[r] || "#333") + '"></span>' + r;
+    // Built as nodes, not markup: both halves come from an agency's feed --
+    // the label and the colour -- and a line named with a tag would run here.
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.background = data.lines[r] || "#333";
+    chip.append(dot, r);
     const toggle = () => {
       setRoute(r, chip.getAttribute("aria-pressed") !== "true");
       draw();

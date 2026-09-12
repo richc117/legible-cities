@@ -16,6 +16,7 @@ inspects in a few seconds rather than a minute.
 from __future__ import annotations
 
 import datetime as dt
+import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -119,6 +120,16 @@ def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
+def _hex_color(value: Any) -> str | None:
+    """A GTFS colour as the six hex digits the spec asks for, uppercased and
+    without the hash, or None. Feeds publish anything in these columns, and
+    this one goes out over the protocol to a client that will paint with it
+    -- and paint, in a browser, is a place markup can start."""
+    text = _text(value)
+    text = text[1:] if text.startswith("#") else text
+    return text.upper() if re.fullmatch(r"[0-9a-fA-F]{6}", text) else None
+
+
 def _int(value: Any, default: int = 0) -> int:
     try:
         return int(str(value).strip())
@@ -152,8 +163,8 @@ def _routes(feed: feeds.Feed, tables: dict[str, pd.DataFrame]) -> list[dict[str,
             "long_name": _text(row.get("route_long_name")),
             "label": str(labels.iloc[i]),
             "route_type": _int(row.get("route_type"), -1),
-            "color": _text(row.get("route_color")).upper() or None,
-            "text_color": _text(row.get("route_text_color")).upper() or None,
+            "color": _hex_color(row.get("route_color")),
+            "text_color": _hex_color(row.get("route_text_color")),
             "trips": int(per_route.get(route_id, 0)),
         })
     return out

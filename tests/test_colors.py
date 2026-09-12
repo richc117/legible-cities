@@ -133,7 +133,9 @@ def test_without_overrides_the_page_changes_only_by_the_missing_entries(tmp_path
     the page around its data and the data apart from ``lines`` hash the same,
     and ``lines`` gains exactly the two lines the feed leaves uncoloured. Over
     the stored stage graph, not a regeneration, because a regeneration also
-    moves geometry (app ADR-023)."""
+    moves geometry (app ADR-023). ``page_without_data`` is re-pinned whenever
+    ``page.html`` changes on purpose -- E24 rebuilt the line chips out of DOM
+    nodes -- and the other three hashes are the ones that must not move."""
     snapshot = json.loads((SNAPSHOTS / "pittsburgh-t.json").read_text())
     stored = _stored("pittsburgh-t")
     if stored.id != snapshot["layout"]:

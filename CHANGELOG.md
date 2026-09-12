@@ -15,6 +15,19 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
   -- fell through to the commit: the request answered with the cancelled
   error while the feed sat in the registry and its zip in the cache. It is
   asked once more before anything is kept, and the staging file goes with it.
+- **A feed's own colours cannot become markup** (E24). `route_color` reached
+  the SVG's `stroke` attribute exactly as the agency published it, on the
+  same line as the label beside it, which was escaped -- so a colour of
+  `"><script>` closed the attribute and opened an element of the feed's
+  choosing, in the desktop app, in the animation page and on every map the
+  site publishes. The feed's colour is now held to the same six hex digits a
+  caller's override has always been held to, falling back to the default the
+  way a missing colour already did, and every colour is escaped on its way
+  into an attribute regardless. `feeds.inspect` reports `color` and
+  `text_color` as six upper-case hex digits without the hash, or null, rather
+  than whatever the column held. The line chips in the animation page are
+  built from DOM nodes instead of `innerHTML`, so a line *named* with a tag
+  cannot run either. A map drawn from a well-formed feed is byte-identical.
 
 ## [0.8.0] - 2026-09-11
 

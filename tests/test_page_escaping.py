@@ -64,3 +64,19 @@ def test_the_unescaped_form_would_have_broken_out():
 def test_ordinary_data_is_unchanged_apart_from_the_escapes():
     data = {"trips": [{"line": "A", "at": 1.5}], "labels": True}
     assert json.loads(_json_for_script(data)) == data
+
+
+def test_the_line_chips_are_built_as_nodes_and_not_as_markup():
+    """The route chips carry two things straight from an agency's feed -- the
+    line's label and its colour -- and they used to be assembled by string
+    into ``innerHTML``. A line named ``<img src=x onerror=...>`` therefore ran
+    in the reader's browser, on the desktop app's page and on the site's.
+
+    Guarded as text, because the behaviour it is about needs a browser: the
+    label and the colour must reach the DOM as a node and an attribute, never
+    as markup.
+    """
+    start = _HTML.index('chip.className = "chip"')
+    block = _HTML[start:_HTML.index("lines.appendChild(chip)", start)]
+    assert "innerHTML" not in block, "a chip is built from feed text; keep it off markup sinks"
+    assert "chip.append(dot, r)" in block
