@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 
 from .labels import Placement, Quad, Station, place, polyline_quads
 from .names import display_name
-from .linegraph import Coord, LineGraph
+from .linegraph import Coord, LineGraph, ordered_labels
 from .offsets import (cumulative_lengths, dedupe, offset_polyline, point_at,
                       track_offset)
 
@@ -219,7 +219,8 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
 
     ``colors`` overrides a line's colour by label, over the feed's own and
     before the style's default (``line_colors``); ``line_order`` is the
-    stacking on shared track."""
+    stacking on shared track, the lines it leaves out following the ones
+    it names."""
     style = style or Style()
     proj = Projection.fit(graph, width)
     tracks = build_tracks(graph, proj, style)
@@ -231,7 +232,9 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
         for end in (e.src, e.dst):
             routes_at.setdefault(end, set()).update(ln.label for ln in e.lines)
 
-    order = line_order or sorted(colors)
+    # A caller's order is a preference, not a whitelist: a line it leaves
+    # out is drawn after the ones it names rather than not drawn at all.
+    order = ordered_labels(line_order, sorted(colors))
 
     # --- labels ---------------------------------------------------------
     placements: list[Placement] = []

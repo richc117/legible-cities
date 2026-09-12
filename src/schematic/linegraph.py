@@ -163,3 +163,21 @@ class LineGraph:
         st = self.stations
         return (f"{len(self.nodes)} nodes ({len(st)} stations, {len(self.nodes) - len(st)} junctions), "
                 f"{len(self.edges)} edges, lines: {', '.join(self.labels)}")
+
+
+def ordered_labels(order: list[str] | None, labels: list[str]) -> list[str]:
+    """``order`` first, then every label it leaves out, in ``labels``' order.
+
+    A caller's line order is a preference, not a whitelist: a line it does
+    not name is drawn after the ones it does, never dropped. A label the
+    graph does not carry is ignored, as an override for one is, and a label
+    named twice is kept once, so a line is never drawn twice.
+    """
+    known = set(labels)
+    named: list[str] = []
+    seen: set[str] = set()
+    for label in order or ():
+        if label in known and label not in seen:
+            seen.add(label)
+            named.append(label)
+    return named + [label for label in labels if label not in seen]

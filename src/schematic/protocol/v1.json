@@ -364,7 +364,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Line labels in the order they stack on shared track; the rest follow."
+          "description": "Line labels in the order they stack on shared track, the later over the earlier. A line the list leaves out follows the ones it names, and a label the layout does not carry is ignored, so a partial or stale order never drops a line."
         }
       },
       "required": [

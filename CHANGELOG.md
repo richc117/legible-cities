@@ -5,6 +5,21 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Fixed
+
+- **A line order no longer drops the lines it leaves out.** `line_order` was
+  documented as the stacking on shared track with "the rest follow", and was
+  a whitelist instead: `render` drew the labels it named and no others, and
+  `linear.build` laid out the same, so an order naming two lines of six drew
+  two and lost four -- on the map, in the page's rows and in the time chart
+  alike. It is a preference again, as it says: the lines it names first, in
+  that order, then everything else in the order it would have had anyway. A
+  label the layout does not carry is ignored, as an override for one is, and
+  a label named twice is drawn once. A build with no order is byte-identical
+  to before.
+
 ## [0.8.1] - 2026-09-12
 
 ### Fixed

@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
-from .linegraph import LineGraph
+from .linegraph import LineGraph, ordered_labels
 
 
 @dataclass
@@ -191,8 +191,8 @@ def _branches(adj: dict[str, set[str]], nodes: set[str],
 
 
 def build(graph: LineGraph, order: list[str] | None = None) -> LinearLayout:
-    """Lay out every line in the graph."""
-    labels = order or graph.labels
+    """Lay out every line in the graph, ``order`` first and the rest after."""
+    labels = ordered_labels(order, graph.labels)
     lines: list[Line] = []
     for label in labels:
         adj, nodes = _adjacency(graph, label)

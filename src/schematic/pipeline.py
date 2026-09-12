@@ -450,7 +450,8 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     colour by label and ``default_color`` is the colour of a line the feed
     leaves uncoloured, both written ``#rrggbb`` and both reaching the map
     and the page alike (``render.line_colors``); ``line_order`` is the
-    stacking on shared track. ``back`` is the href the animation page's
+    stacking on shared track, the later over the earlier; the lines it
+    leaves out follow the ones it names rather than going undrawn. ``back`` is the href the animation page's
     back-link points at. The default is the sibling gallery in ``out/``;
     the site passes its own atlas URL, because a relative "index.html"
     resolves to /maps/index.html there.
