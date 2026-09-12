@@ -655,8 +655,8 @@ class EngineEndpoint(Endpoint):
 
     def feeds_add(self, params: Any) -> Callable[[], Any]:
         """A feed from a URL or a file the client owns. A long request: the
-        download reports its bytes, then the check reports once; a cancel
-        between chunks stops it and leaves nothing."""
+        download reports its bytes, then the check reports once; a cancel is
+        honoured until the moment the feed is kept and leaves nothing."""
         left = _object("feeds.add", params)
         source = left.pop("source", None)
         if not isinstance(source, str) or not source or (

@@ -355,6 +355,50 @@ def test_add_reports_the_download_and_the_check_and_stops_when_asked(home, tmp_p
     assert sorted(p.name for p in config.feeds_dir().iterdir()) == ["seen.zip", "user-feeds.json"]
 
 
+def test_a_cancel_after_the_download_leaves_no_feed(home, tmp_path, monkeypatch):
+    """E23: the cancel used to be asked only between the download's chunks,
+    so a yes that arrived after the last one fell through to the commit --
+    the server re-checks once the work returns and answered the request with
+    the cancelled error while the feed sat in the registry."""
+    payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
+
+    class Response:
+        headers = {"Content-Length": str(len(payload))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            for i in range(0, len(payload), 64):
+                yield payload[i:i + 64]
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stages = []
+    with pytest.raises(feeds.Interrupted):
+        feeds.add("https://example.test/gtfs.zip", key="late",
+                  progress=lambda stage, done, total: stages.append(stage),
+                  # Not cancelled while the bytes arrive; cancelled once the
+                  # feed has been checked, which is where the defect lived.
+                  cancelled=lambda: "check" in stages)
+    assert stages.count("check") == 2, "the download ran to its end and the feed was checked"
+    assert "late" not in feeds.all()
+    assert feeds.user_feeds() == {}
+    assert not list(config.feeds_dir().glob("*.zip"))
+
+
+def test_a_cancel_on_a_file_add_leaves_no_feed(home, tmp_path):
+    """The same guarantee for a zip the client owns. Nothing asks the cancel
+    while ``shutil.copyfile`` runs, so the one check before the commit is
+    what makes this path answerable at all."""
+    src = gtfs_zip(tmp_path / "local.zip")
+    with pytest.raises(feeds.Interrupted):
+        feeds.add(src, key="local", cancelled=lambda: True)
+    assert "local" not in feeds.all()
+    assert feeds.user_feeds() == {}
+    assert not list(config.feeds_dir().glob("*.zip"))
+    assert src.is_file(), "the source the client owns is left where it was"
+
+
 def test_an_empty_agency_means_every_operator_where_the_entry_names_one():
     cdmx = feeds.get("cdmx-metro")
     assert cdmx.agency == "METRO"

@@ -1292,7 +1292,7 @@
       "additionalProperties": false
     },
     "FeedsAddParams": {
-      "description": "Add a feed a person chose, from a URL or a zip the client owns, and keep it across restarts. A long request: the download reports its bytes as job/progress (stage download), then the check reports once (stage check). The zip must carry stops, routes, trips, stop_times and a calendar in one of its two forms; a refusal names the missing table and leaves nothing behind. The name defaults to the feed's first agency, the key to a slug of the name made unique.",
+      "description": "Add a feed a person chose, from a URL or a zip the client owns, and keep it across restarts. A long request: the download reports its bytes as job/progress (stage download), then the check reports once (stage check). The zip must carry stops, routes, trips, stop_times and a calendar in one of its two forms; a refusal names the missing table and leaves nothing behind. A cancel is honoured until the moment the feed is kept, and answers with the cancelled error (-32800): the feed is then in neither the registry nor the cache, so a client told an add was cancelled need not go looking for one. The name defaults to the feed's first agency, the key to a slug of the name made unique.",
       "type": "object",
       "properties": {
         "source": {

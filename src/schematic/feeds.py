@@ -476,7 +476,9 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
     feed that fails the check leaves nothing behind. Raises FeedError with the
     sentence to show. ``progress(stage, done, total)`` hears the download's
     bytes (``total`` None when the server did not say) and then the check;
-    ``cancelled()`` is asked between chunks, and a yes raises Interrupted.
+    ``cancelled()`` is asked between chunks and once more before the feed is
+    kept, so a yes at any point raises Interrupted and leaves no feed in the
+    registry and nothing on disk -- whichever source it came from.
     """
     source_text = str(source)
     what = source_text if _is_url(source_text) else Path(source_text).name
@@ -511,6 +513,13 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
             while key in FEEDS or key in user_feeds():
                 key = f"{base[:60]}-{n}"
                 n += 1
+        # The last word before anything is kept. Asking only between chunks
+        # left a cancel that arrived after the final chunk -- or during a
+        # file copy, which asks nothing -- to fall through to the commit: the
+        # caller was told the add was cancelled while the feed sat in the
+        # registry. The ``finally`` below takes the staging file with it.
+        if cancelled is not None and cancelled():
+            raise Interrupted()
         with _user_lock:
             users = user_feeds()
             if key in FEEDS or key in users:

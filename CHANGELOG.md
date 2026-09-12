@@ -5,6 +5,17 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Fixed
+
+- **A cancelled `feeds.add` keeps no feed** (E23). The cancel was asked only
+  between the download's chunks, so one that arrived after the last chunk --
+  or at any point of an add from a file, which asks nothing while it copies
+  -- fell through to the commit: the request answered with the cancelled
+  error while the feed sat in the registry and its zip in the cache. It is
+  asked once more before anything is kept, and the staging file goes with it.
+
 ## [0.8.0] - 2026-09-11
 
 ### Added
