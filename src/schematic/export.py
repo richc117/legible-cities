@@ -34,6 +34,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 from dataclasses import asdict, dataclass, replace
@@ -571,9 +572,13 @@ def _run_recorder(job: dict) -> None:
     # recorder prints after a good capture must not raise while being read.
     proc = subprocess.run(["node", str(RECORDER), json.dumps(job)],
                           capture_output=True, encoding="utf-8", errors="replace")
+    # Shown in the console's own codec with a replacement for what it cannot
+    # hold: a strict code page (Windows, redirected to a file) would otherwise
+    # raise on a line the recorder wrote. A UTF-8 terminal sees it unchanged.
+    codec = getattr(sys.stdout, "encoding", None) or "utf-8"
     for line in (proc.stdout + proc.stderr).splitlines():
         if line.strip():
-            print("  " + line)
+            print(("  " + line).encode(codec, "replace").decode(codec), flush=True)
     if proc.returncode:
         raise RuntimeError("capture failed")
 
@@ -1038,7 +1043,8 @@ def poster(video: Path, dest: Path, at: float = 0.6) -> Path:
 
 def _duration(path: Path) -> float:
     out = subprocess.run([ffprobe_path(), "-v", "error", "-show_entries", "format=duration",
-                          "-of", "csv=p=0", str(path)], capture_output=True, text=True)
+                          "-of", "csv=p=0", str(path)], capture_output=True,
+                         encoding="utf-8", errors="replace")
     try:
         return float(out.stdout.strip())
     except ValueError:

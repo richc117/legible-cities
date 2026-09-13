@@ -23,8 +23,10 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
   took the platform's line separator. `python -m schematic.serve --schema`
   writes its bytes past the console's text layer, which on Windows turned
   each newline into CRLF and so moved the hash the desktop app pins; and the
-  export's recorder output is read as UTF-8, so a console line outside the
-  code page no longer raises after a capture that succeeded. A page, and the
+  export's recorder output is read as UTF-8 and echoed in the console's own
+  codec with a replacement character, so a line outside the code page no
+  longer raises after a capture that succeeded, whether it is read or
+  printed (ffprobe's output is read as UTF-8 too). A page, and the
   schema, generated on a UTF-8 machine are byte-identical to before.
 - **The service day is written without `%-d`** (E19), a glibc and BSD
   extension the Windows C runtime refuses with a `ValueError`, so a build

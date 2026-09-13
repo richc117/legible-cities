@@ -175,7 +175,9 @@ def test_a_page_is_byte_identical_under_c_and_cp1252_and_utf8(tmp_path):
     # The environments really were different: the bare calls are right only
     # under UTF-8. (Under an ASCII C locale the dash is refused; under cp1252
     # it is one byte and every newline is CRLF.)
-    assert (utf8 / "control.txt").read_bytes() == "—\n".encode("utf-8")
+    # A bare write_text still translates the newline, so the UTF-8 leg's is
+    # the platform's own (the child and this process share it).
+    assert (utf8 / "control.txt").read_bytes() == ("—" + os.linesep).encode("utf-8")
     if (c / "encoding.txt").read_text(encoding="ascii").lower().replace("-", "") in {
             "ascii", "usascii", "ansi_x3.41968"}:
         assert (c / "control.txt").read_bytes() == b"refused"
@@ -265,22 +267,45 @@ def test_every_day_of_a_leap_year_reads_as_python_writes_it_in_english():
 
 # ----------------------------------------------------------------- the guard
 
-# ZipFile.open is binary whatever it is given; these are the names the
-# package binds a ZipFile to.
-_ZIP_HANDLES = {"zf", "zin", "zout"}
+# Receivers whose ``open`` is not a text open of a path, or whose mode sits at
+# argument 0 only by accident of the name: ZipFile handles are binary, and
+# os.open takes integer flags.
+_NOT_A_TEXT_OPEN = {"zf", "zin", "zout", "os"}
+# Module-level opens: the file name is argument 0 and the mode argument 1.
+# gzip.open alone defaults to binary.
+_MODULE_OPENS = {"io": "r", "builtins": "r", "codecs": "r", "gzip": "rb"}
+# Where text= means a text-mode pipe rather than, say, a label's text.
+_SUBPROCESS_CALLS = {"run", "Popen", "check_output", "check_call", "call"}
 
 
-def _keywords(call: ast.Call) -> set[str]:
-    return {k.arg for k in call.keywords if k.arg}
+def _given(call: ast.Call, name: str) -> bool:
+    """The keyword is passed with a value that means something: ``None`` is
+    the platform default, and ``encoding="locale"`` asks for it by name."""
+    for k in call.keywords:
+        if k.arg == name:
+            value = k.value
+            if isinstance(value, ast.Constant) and (
+                    value.value is None or (name == "encoding" and value.value == "locale")):
+                return False
+            return True
+    return False
 
 
-def _mode(call: ast.Call, position: int) -> str | None:
+def _is_true(call: ast.Call, name: str) -> bool:
+    return any(k.arg == name and not (isinstance(k.value, ast.Constant) and not k.value.value)
+               for k in call.keywords)
+
+
+def _mode(call: ast.Call, position: int, default: str) -> str | None:
     for k in call.keywords:
         if k.arg == "mode":
-            return k.value.value if isinstance(k.value, ast.Constant) else None
-    if len(call.args) > position and isinstance(call.args[position], ast.Constant):
-        return call.args[position].value
-    return "r" if len(call.args) <= position else None
+            value = k.value
+            return value.value if isinstance(value, ast.Constant) and isinstance(
+                value.value, str) else None
+    if len(call.args) <= position:
+        return default
+    arg = call.args[position]
+    return arg.value if isinstance(arg, ast.Constant) and isinstance(arg.value, str) else None
 
 
 def _findings(path: Path) -> list[str]:
@@ -296,23 +321,33 @@ def _findings(path: Path) -> list[str]:
                 say(node, "a %- strftime directive (the Windows C runtime refuses it)")
         if not isinstance(node, ast.Call):
             continue
-        func, kw = node.func, _keywords(node)
+        func = node.func
         name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
         receiver = func.value if isinstance(func, ast.Attribute) else None
-        if name == "read_text" and "encoding" not in kw:
+        if name == "read_text" and not _given(node, "encoding"):
             say(node, "read_text without encoding=")
-        if name == "write_text" and not {"encoding", "newline"} <= kw:
+        if name == "write_text" and not (_given(node, "encoding") and _given(node, "newline")):
             say(node, "write_text without both encoding= and newline=")
         if name == "open":
-            if isinstance(receiver, ast.Name) and receiver.id in _ZIP_HANDLES:
+            module = receiver.id if isinstance(receiver, ast.Name) else None
+            if module in _NOT_A_TEXT_OPEN:
                 continue
-            mode = _mode(node, 0 if isinstance(func, ast.Attribute) else 1)
+            if receiver is None:                    # open(file, mode)
+                mode = _mode(node, 1, "r")
+            elif module in _MODULE_OPENS:           # io.open(file, mode)
+                mode = _mode(node, 1, _MODULE_OPENS[module])
+            else:                                   # a path: p.open(mode)
+                mode = _mode(node, 0, "r")
             if mode is None:
                 say(node, "open with a mode this guard cannot read")
-            elif "b" not in mode and "encoding" not in kw:
+            elif "b" not in mode and not _given(node, "encoding"):
                 say(node, "a text-mode open without encoding=")
-        if name == "to_csv" and "lineterminator" not in kw:
+        if name == "to_csv" and not _given(node, "lineterminator"):
             say(node, "to_csv without lineterminator= (it defaults to os.linesep)")
+        if (name in _SUBPROCESS_CALLS
+                and (_is_true(node, "text") or _is_true(node, "universal_newlines"))
+                and not _given(node, "encoding")):
+            say(node, "a text-mode subprocess without encoding= (it decodes with the locale's)")
         if (path.name == "serve.py" and name == "write"
                 and isinstance(receiver, ast.Attribute) and receiver.attr == "stdout"):
             say(node, "sys.stdout.write (text mode; CRLF on Windows): write bytes to the buffer")
@@ -330,20 +365,63 @@ def test_no_strftime_extension_or_platform_shaped_text_io_is_left_in_the_package
 
 
 def test_the_guard_sees_what_it_is_for(tmp_path):
+    defects = [
+        # (line, whether the guard must flag it)
+        ("import sys, io, gzip, subprocess", False),
+        ("from pathlib import Path", False),
+        ('f"{d:%A %-d}"', True),
+        ("Path('a').read_text()", True),
+        ("Path('a').write_text('x', encoding='utf-8')", True),
+        ("open('a', 'w')", True),
+        ("Path('a').open()", True),
+        ("open('a', 'rb')", False),
+        ("zf.open('a')", False),
+        ("df.to_csv(buf, index=False)", True),
+        ("sys.stdout.write('x')", True),
+        ("sys.stdout.buffer.write(b'x')", False),
+        # A file name with a "b" in it is not a binary mode.
+        ("io.open('lib.json')", True),
+        ("io.open('lib.json', 'rb')", False),
+        ("codecs.open('lib.json', 'w')", True),
+        ("gzip.open('lib.json')", False),
+        ("gzip.open('lib.json', 'rt')", True),
+        ("Path('a').read_text(encoding=None)", True),
+        ("Path('a').read_text(encoding='locale')", True),
+        ("Path('a').write_text('x', encoding='utf-8', newline=None)", True),
+        ("open('a', 'w', encoding=None)", True),
+        ("Path('a').write_text('x', encoding='utf-8', newline='\\n')", False),
+        ("subprocess.run(['x'], text=True)", True),
+        ("subprocess.run(['x'], universal_newlines=True)", True),
+        ("subprocess.run(['x'], text=True, encoding=None)", True),
+        ("subprocess.run(['x'], text=True, encoding='utf-8')", False),
+        ("subprocess.run(['x'], encoding='utf-8', errors='replace')", False),
+        ("subprocess.run(['x'], text=False)", False),
+        ("os.open('a', os.O_RDONLY)", False),
+        ("subprocess.check_output(['x'], text=flag)", True),
+        ("Station(text=name, x=1)", False),
+    ]
     bad = tmp_path / "serve.py"
-    bad.write_text(
-        "import sys\n"
-        "from pathlib import Path\n"
-        "f\"{d:%A %-d}\"\n"
-        "Path('a').read_text()\n"
-        "Path('a').write_text('x', encoding='utf-8')\n"
-        "open('a', 'w')\n"
-        "Path('a').open()\n"
-        "open('a', 'rb')\n"
-        "zf.open('a')\n"
-        "df.to_csv(buf, index=False)\n"
-        "sys.stdout.write('x')\n"
-        "sys.stdout.buffer.write(b'x')\n",
-        encoding="utf-8", newline="\n")
-    lines = sorted(int(f.split(":")[1]) for f in _findings(bad))
-    assert lines == [3, 4, 5, 6, 7, 10, 11]
+    bad.write_text("\n".join(line for line, _ in defects) + "\n",
+                   encoding="utf-8", newline="\n")
+    flagged = sorted(int(f.split(":")[1]) for f in _findings(bad))
+    expected = [n for n, (_, flag) in enumerate(defects, start=1) if flag]
+    assert flagged == expected, "\n".join(_findings(bad))
+
+
+def test_a_recorder_line_the_console_cannot_hold_does_not_raise(monkeypatch):
+    """The recorder's output is shown on the engine's stdout, which on Windows
+    redirected to a file is a strict code page."""
+    import io
+
+    from schematic import export
+
+    def recorder(*_args, **_kwargs):
+        return subprocess.CompletedProcess([], 0, stdout="captured 東京 — ok\n", stderr="")
+
+    monkeypatch.setattr(export.subprocess, "run", recorder)
+    raw = io.BytesIO()
+    console = io.TextIOWrapper(raw, encoding="cp1252", newline="\r\n")
+    monkeypatch.setattr(sys, "stdout", console)
+    export._run_recorder({})
+    console.flush()
+    assert raw.getvalue() == "  captured ?? — ok\r\n".encode("cp1252")
