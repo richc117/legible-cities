@@ -36,7 +36,8 @@ from . import diagnostics as diagnostics_module
 from .crs import to_mercator
 from .linegraph import LineGraph
 from .render import RenderResult, Style, check_color, render
-from .schedule import (StopMatch, Trip, busiest_weekday, match_stops, trips_on)
+from .schedule import (StopMatch, Trip, busiest_weekday, match_stops, service_day_text,
+                       trips_on)
 
 # The LOOM stages, in order, with the arguments we run them with. Kept as data
 # so a notebook can print the pipeline or re-run one stage with a tweak.
@@ -155,7 +156,7 @@ def read_layout(key: str, layout: str) -> Layout | None:
     if not meta_path.is_file() or not all((d / name).is_file() for name in STAGE_FILES.values()):
         return None
     try:
-        meta = json.loads(meta_path.read_text())
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     return Layout(key=key, id=layout, dir=d, meta=meta)
@@ -267,7 +268,7 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
     try:
         graph = loom.gtfs2graph(feeds.normalize(feed), "-m", feed.mode)
         out = scratch / STAGE_FILES["gtfs2graph"]
-        out.write_text(json.dumps(graph))
+        out.write_text(json.dumps(graph), encoding="utf-8", newline="\n")
         _report(progress, "gtfs2graph", _fraction("gtfs2graph", stages), out)
         payload = out.read_bytes()
         for tool, args in stages:
@@ -278,7 +279,8 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
         meta = {**inputs, "engine": __version__,
                 "made": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
                 "migrated": False}
-        (scratch / META_FILE).write_text(json.dumps(meta, indent=2) + "\n")
+        (scratch / META_FILE).write_text(json.dumps(meta, indent=2) + "\n",
+                                         encoding="utf-8", newline="\n")
     except BaseException:
         # A cancel, a failure, an interrupt: the scratch goes, the stored
         # layout, if there was one, was never touched.
@@ -368,7 +370,8 @@ def migrate(key: str, layout: str, inputs: dict[str, Any]) -> Layout | None:
         meta = {**inputs, "engine": __version__,
                 "made": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
                 "migrated": True}
-        (scratch / META_FILE).write_text(json.dumps(meta, indent=2) + "\n")
+        (scratch / META_FILE).write_text(json.dumps(meta, indent=2) + "\n",
+                                         encoding="utf-8", newline="\n")
         os.replace(scratch, target)
     return read_layout(key, layout)
 
@@ -488,7 +491,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     match = match_stops(graph_ll, tables)
     date = date or busiest_weekday(tables, lines, anchor=anchor or dt.date.today())
     trips = trips_on(tables, date, match, lines)
-    tick("schedule", f"{len(trips)} trips on {date:%A %-d %B %Y}; {match.report()}")
+    tick("schedule", f"{len(trips)} trips on {service_day_text(date)}; {match.report()}")
 
     name = feeds.get(key).name
     # Themed by default: the CSS variables carry literal fallbacks, so a
@@ -513,11 +516,11 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
 
     out = out_dir or config.out_dir()
     out.mkdir(parents=True, exist_ok=True)
-    (out / f"{key}.svg").write_text(r.svg)
+    (out / f"{key}.svg").write_text(r.svg, encoding="utf-8", newline="\n")
     animate.write(anim, r.svg, out, stem=key, back=back, icons=icons,
                   social=social,
-                  title=f"{name} — {date:%A %-d %B %Y}", name=name,
-                  subtitle=f"{len(trips):,} trips · {date:%A %-d %B %Y}")
+                  title=f"{name} — {service_day_text(date)}", name=name,
+                  subtitle=f"{len(trips):,} trips · {service_day_text(date)}")
     tick("write", str(out))
 
     return Result(key=key, date=date, layout=found.id, graph=graph, render=r, trips=trips,

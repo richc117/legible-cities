@@ -5,6 +5,28 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Fixed
+
+- **A page is the same bytes whatever the machine's locale** (E19). Every
+  text file the engine reads or writes -- the animation page and its
+  template, the SVG, the positions file, a layout's stored stages and
+  `.meta.json`, an export's sidecar, the site's data -- named no encoding,
+  so it took the locale's. On Windows, where the desktop app's Python
+  predates the UTF-8 default, the title's em dash went out as the single
+  cp1252 byte 0x97 into a page declaring UTF-8, a station name outside the
+  code page raised instead of being written, and every newline became CRLF;
+  with the C locale and UTF-8 mode off, `import schematic.animate` failed on
+  `page.html`'s own bytes. They are all UTF-8 with LF line endings now. A
+  page generated on a UTF-8 machine is byte-identical to before.
+- **The service day is written without `%-d`** (E19), a glibc and BSD
+  extension the Windows C runtime refuses with a `ValueError`, so a build
+  there failed at the schedule stage. The weekday and month now come from
+  fixed English names rather than `%A` and `%B`, so the page's header, an
+  export's title and the command line's summary no longer change language
+  with `LC_TIME`. Under an English locale every one reads exactly as before.
+
 ## [0.8.2] - 2026-09-12
 
 ### Fixed

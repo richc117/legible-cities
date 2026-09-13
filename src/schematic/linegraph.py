@@ -69,7 +69,7 @@ class LineGraph:
     @classmethod
     def from_geojson(cls, obj: dict[str, Any] | str | Path) -> LineGraph:
         if isinstance(obj, (str, Path)):
-            obj = json.loads(Path(obj).read_text())
+            obj = json.loads(Path(obj).read_text(encoding="utf-8"))
 
         nodes: dict[str, Node] = {}
         edges: list[Edge] = []

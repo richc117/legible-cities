@@ -42,6 +42,7 @@ from typing import Callable
 
 from . import feeds, loom
 from .config import REPO_ROOT
+from .schedule import service_day_text
 
 # What an encode reports as it goes: a stage, a fraction and a sentence, the
 # shape the server's job/progress notification carries.
@@ -401,7 +402,7 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
         # snapshots -- an image outlives the page that explains it.
         when = date or _provenance(key).get("service_date")
         if when:
-            q["date"] = dt.date.fromisoformat(when).strftime("%A %-d %B %Y")
+            q["date"] = service_day_text(dt.date.fromisoformat(when))
     if at:
         q["at"] = at
     if speed is not None:
@@ -531,7 +532,7 @@ def _labels_from_svg(key: str) -> list[str]:
     svg = MAPS_DIR / f"{key}.svg"
     if not svg.exists():
         return []
-    return sorted(set(re.findall(r'data-line="([^"]+)"', svg.read_text())))
+    return sorted(set(re.findall(r'data-line="([^"]+)"', svg.read_text(encoding="utf-8"))))
 
 
 def keep_except(key: str, drop: tuple[str, ...]) -> tuple[str, ...]:
@@ -704,11 +705,11 @@ def _vector(key: str, dest: Path, preset: Preset) -> list[Path]:
     source = MAPS_DIR / f"{key}.svg"
     if not source.exists():
         raise FileNotFoundError(f"{source} is missing; run bin/build-site first")
-    svg = source.read_text()
+    svg = source.read_text(encoding="utf-8")
     out = []
     for theme, palette in PALETTES.items():
         path = dest / f"{key}-{theme}.svg"
-        path.write_text(resolve(svg, palette))
+        path.write_text(resolve(svg, palette), encoding="utf-8", newline="\n")
         out.append(path)
     return out
 
@@ -991,7 +992,8 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
             "notes": list(feed.notes),
             "source": feed.url,
         }
-        sidecar_path(path).write_text(json.dumps(meta, indent=2) + "\n")
+        sidecar_path(path).write_text(json.dumps(meta, indent=2) + "\n",
+                                      encoding="utf-8", newline="\n")
 
 
 def _provenance(key: str) -> dict:
@@ -1004,7 +1006,7 @@ def _provenance(key: str) -> dict:
     path = REPO_ROOT / "site" / "src" / "_data" / "networks.json"
     if not path.exists():
         return {}
-    for entry in json.loads(path.read_text()).get("networks", []):
+    for entry in json.loads(path.read_text(encoding="utf-8")).get("networks", []):
         if entry["key"] == key:
             return {"service_date": entry["date"],
                     "stations": entry["stations"],
@@ -1020,7 +1022,7 @@ def _network_stats(key: str) -> dict:
     svg = MAPS_DIR / f"{key}.svg"
     if not svg.exists():
         return {}
-    text = svg.read_text()
+    text = svg.read_text(encoding="utf-8")
     return {"stations": text.count("<circle"),
             "lines": len(set(re.findall(r'data-line="([^"]+)"', text)))}
 
@@ -1088,7 +1090,7 @@ def contact_sheet(paths: list[Path], dest: Path, columns: int = 3) -> Path:
                        f'fill="{fg}" opacity="0.75">{label}</text>')
         out.append("</svg>")
         sheet = work / "sheet.svg"
-        sheet.write_text("\n".join(out))
+        sheet.write_text("\n".join(out), encoding="utf-8", newline="\n")
         subprocess.run(["rsvg-convert", "-w", str(w), "-f", "png",
                         "-o", str(dest), str(sheet)], check=True)
     return dest

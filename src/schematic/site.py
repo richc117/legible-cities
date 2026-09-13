@@ -56,7 +56,7 @@ def path_prefix() -> str:
     config = SRC_DIR / "_data" / "site.json"
     prefix = "/"
     if config.exists():
-        prefix = json.loads(config.read_text()).get("pathPrefix") or "/"
+        prefix = json.loads(config.read_text(encoding="utf-8")).get("pathPrefix") or "/"
     return "/" + prefix.strip("/") + "/" if prefix.strip("/") else "/"
 
 
@@ -82,7 +82,7 @@ def origin() -> str:
     config = SRC_DIR / "_data" / "site.json"
     if not config.exists():
         return ""
-    return (json.loads(config.read_text()).get("origin") or "").rstrip("/")
+    return (json.loads(config.read_text(encoding="utf-8")).get("origin") or "").rstrip("/")
 
 
 def card_url() -> str:
@@ -139,7 +139,7 @@ def og_card(key: str = FEATURED, *, size: tuple[int, int] = CARD_SIZE) -> Path |
               f"regenerated (it is committed; run site.export() to rebuild it)")
         return None
 
-    svg = resolve(src.read_text(), PALETTES["dark"])
+    svg = resolve(src.read_text(encoding="utf-8"), PALETTES["dark"])
     match = _VIEWBOX.search(svg)
     if not match:
         print(f"  note: {src.name} has no viewBox; share card skipped")
@@ -150,7 +150,7 @@ def og_card(key: str = FEATURED, *, size: tuple[int, int] = CARD_SIZE) -> Path |
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     dest = ASSETS_DIR / CARD_NAME
     staged = ASSETS_DIR / f".{CARD_NAME}.svg"
-    staged.write_text(svg)
+    staged.write_text(svg, encoding="utf-8", newline="\n")
     try:
         subprocess.run(["rsvg-convert", "-w", str(size[0]), "-h", str(size[1]),
                         "-f", "png", "-o", str(dest), str(staged)], check=True)
@@ -184,7 +184,7 @@ _SOCIAL = """<link rel="canonical" href="{url}">
 
 def _config() -> dict:
     config = SRC_DIR / "_data" / "site.json"
-    return json.loads(config.read_text()) if config.exists() else {}
+    return json.loads(config.read_text(encoding="utf-8")) if config.exists() else {}
 
 
 def social_tags(key: str) -> str:
@@ -275,7 +275,7 @@ def export_unlabelled(key: str, stage: str, name: str,
     svg = render(graph.reproject(to_mercator), width=width,
                  style=Style(themed=True), labels=False).svg
     path = MAPS_DIR / name
-    path.write_text(svg)
+    path.write_text(svg, encoding="utf-8", newline="\n")
     return path
 
 
@@ -343,5 +343,6 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
         "featured": FEATURED,
         "networks": [asdict(e) for e in entries],
     }
-    (DATA_DIR / "networks.json").write_text(json.dumps(payload, indent=2) + "\n")
+    (DATA_DIR / "networks.json").write_text(json.dumps(payload, indent=2) + "\n",
+                                            encoding="utf-8", newline="\n")
     return entries

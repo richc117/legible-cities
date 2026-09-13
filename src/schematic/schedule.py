@@ -45,6 +45,26 @@ def format_gtfs_time(seconds: int) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
+# English and fixed rather than strftime's %A and %B, which follow LC_TIME:
+# the page is English throughout, and its header should not change language
+# with whoever ran the build. Nor %-d for the unpadded day, which is a glibc
+# and BSD extension the Windows C runtime refuses with a ValueError.
+_DAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+_MONTH_NAMES = ("January", "February", "March", "April", "May", "June", "July",
+                "August", "September", "October", "November", "December")
+
+
+def service_day_text(date: dt.date, *, pad: bool = False) -> str:
+    """``Saturday 5 September 2026``, the service day as a page names it.
+
+    ``pad`` writes the day in two digits (``Saturday 05 September 2026``),
+    which is what the command line's summary has always printed. The same
+    text on every platform and under every locale.
+    """
+    day = f"{date.day:02d}" if pad else str(date.day)
+    return f"{_DAY_NAMES[date.weekday()]} {day} {_MONTH_NAMES[date.month - 1]} {date.year}"
+
+
 def active_services(tables: dict[str, pd.DataFrame], date: dt.date) -> set[str]:
     """service_ids running on ``date``, applying calendar_dates exceptions."""
     stamp = date.strftime("%Y%m%d")

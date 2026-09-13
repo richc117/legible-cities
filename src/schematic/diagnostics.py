@@ -16,6 +16,8 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from .schedule import service_day_text
+
 if TYPE_CHECKING:
     from .pipeline import Result
 
@@ -126,7 +128,7 @@ class Diagnostics:
                   f"name={s.by_name}]"
                   + (f"; unmatched: {list(s.unmatched)}" if s.unmatched else ""))
         return "\n".join([
-            f"{self.name} -- {self.date:%A %d %B %Y}",
+            f"{self.name} -- {service_day_text(self.date, pad=True)}",
             (f"  {self.stations + self.junctions} nodes ({self.stations} stations, "
              f"{self.junctions} junctions), {self.edges} edges, lines: {', '.join(self.lines)}"),
             f"  octilinear: {100 * self.octilinear:.1f}% of drawn length",

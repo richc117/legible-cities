@@ -461,8 +461,14 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
     out_dir.mkdir(parents=True, exist_ok=True)
     data = animation.to_json()
 
+    # UTF-8 and LF whatever the platform says, here and wherever the engine
+    # reads or writes text. The page declares <meta charset="utf-8">, and a
+    # bare write_text uses the locale's encoding: on Windows, where the
+    # pinned Python predates the UTF-8 default, that wrote the title's em
+    # dash as one cp1252 byte and refused a station name outside the code
+    # page. A text-mode write there also turns every \n into \r\n.
     json_path = out_dir / f"{stem}.positions.json"
-    json_path.write_text(json.dumps(data, separators=(",", ":")))
+    json_path.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8", newline="\n")
 
     html_path = out_dir / f"{stem}.html"
     html_path.write_text(
@@ -482,7 +488,8 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
              .replace("__SUBTITLE__", html_escape(subtitle))
              .replace("__BACK__", html_escape(back))
              .replace("__SVG__", svg)
-             .replace("__DATA__", _json_for_script(data)))
+             .replace("__DATA__", _json_for_script(data)),
+        encoding="utf-8", newline="\n")
     return json_path, html_path
 
 
@@ -515,8 +522,8 @@ def _json_for_script(data: object) -> str:
             .replace("&", "\\u0026"))
 
 
-_HTML = (_PAGE_DIR / "page.html").read_text()
-_PRESENT_JS = (_PAGE_DIR / "present.js").read_text()
+_HTML = (_PAGE_DIR / "page.html").read_text(encoding="utf-8")
+_PRESENT_JS = (_PAGE_DIR / "present.js").read_text(encoding="utf-8")
 
 # The toolbar's view icons, as data URIs for the same single-file reason.
 # Base64 of the file exactly as Esri published it: their licence permits
