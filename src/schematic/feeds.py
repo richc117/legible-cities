@@ -394,7 +394,7 @@ def _write_user_feeds(records: dict[str, Feed]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps([f.to_dict() for f in records.values()], indent=2) + "\n"
     tmp = path.with_name(path.name + ".part")
-    tmp.write_text(text, encoding="utf-8")
+    tmp.write_text(text, encoding="utf-8", newline="\n")
     os.replace(tmp, path)
 
 
@@ -774,7 +774,10 @@ def _normalize(feed: Feed, src: Path, dst: Path) -> Path:
 
         def encode(df: pd.DataFrame) -> bytes:
             buf = io.StringIO()
-            df.to_csv(buf, index=False)
+            # LF, not pandas' os.linesep default, so the normalised copy is the
+            # same bytes on every platform. (A layout's id hashes the raw zip,
+            # not this copy.)
+            df.to_csv(buf, index=False, lineterminator="\n")
             return buf.getvalue().encode()
 
         tmp = dst.with_suffix(".tmp")

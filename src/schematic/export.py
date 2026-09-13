@@ -567,8 +567,10 @@ def check_size(path: Path, preset: Preset) -> None:
 
 
 def _run_recorder(job: dict) -> None:
+    # UTF-8 and forgiving, not text=True's locale codec: a console line the
+    # recorder prints after a good capture must not raise while being read.
     proc = subprocess.run(["node", str(RECORDER), json.dumps(job)],
-                          capture_output=True, text=True)
+                          capture_output=True, encoding="utf-8", errors="replace")
     for line in (proc.stdout + proc.stderr).splitlines():
         if line.strip():
             print("  " + line)

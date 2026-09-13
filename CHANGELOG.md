@@ -18,8 +18,14 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
   cp1252 byte 0x97 into a page declaring UTF-8, a station name outside the
   code page raised instead of being written, and every newline became CRLF;
   with the C locale and UTF-8 mode off, `import schematic.animate` failed on
-  `page.html`'s own bytes. They are all UTF-8 with LF line endings now. A
-  page generated on a UTF-8 machine is byte-identical to before.
+  `page.html`'s own bytes. They are all UTF-8 with LF line endings now, and
+  so are the tables pandas rewrites into a feed's normalised copy, which
+  took the platform's line separator. `python -m schematic.serve --schema`
+  writes its bytes past the console's text layer, which on Windows turned
+  each newline into CRLF and so moved the hash the desktop app pins; and the
+  export's recorder output is read as UTF-8, so a console line outside the
+  code page no longer raises after a capture that succeeded. A page, and the
+  schema, generated on a UTF-8 machine are byte-identical to before.
 - **The service day is written without `%-d`** (E19), a glibc and BSD
   extension the Windows C runtime refuses with a `ValueError`, so a build
   there failed at the schedule stage. The weekday and month now come from

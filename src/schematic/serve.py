@@ -842,7 +842,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="print the protocol's JSON Schema and exit")
     args = parser.parse_args(argv)
     if args.schema:
-        sys.stdout.write(json.dumps(schema(), indent=2) + "\n")
+        # Bytes, not text: a text-mode stdout on Windows turns the newline
+        # into CRLF, and the desktop app pins this output by its hash.
+        sys.stdout.buffer.write((json.dumps(schema(), indent=2) + "\n").encode("utf-8"))
+        sys.stdout.buffer.flush()
         return 0
 
     level = os.environ.get("SCHEMATIC_LOG", "info").upper()

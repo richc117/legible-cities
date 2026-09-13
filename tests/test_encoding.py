@@ -13,14 +13,16 @@ refuses, and with ``%A``/``%B``, which follow ``LC_TIME``.
 
 macOS and Linux have no cp1252 locale to switch to, so the Windows case is
 simulated in a child process: ``open`` is wrapped so that a text open with no
-encoding gets cp1252 and a write with no newline gets CRLF, which is what
-Windows does. Each child also writes a control file the bare way and the test
-checks it came out wrong, so a simulation that silently stopped biting would
-fail here rather than pass.
+encoding gets cp1252 and a write with no newline gets CRLF, ``os.linesep`` is
+CRLF (pandas' ``to_csv`` reads it), and stdout is a text stream that writes
+CRLF, which is what Windows does. Each child also makes the old, bare calls
+into control files and the test checks they came out wrong, so a simulation
+that silently stopped biting would fail here rather than pass.
 """
 
 from __future__ import annotations
 
+import ast
 import datetime as dt
 import json
 import os
@@ -32,23 +34,28 @@ from pathlib import Path
 import pytest
 
 import schematic
+from schematic import config
 from schematic.schedule import service_day_text
+from test_feeds import GOOD, gtfs_zip
 
 SRC = Path(schematic.__file__).parent
 
 STATIONS = ["Łódź Fabryczna", "東京", "Zürich HB"]
 
-# Run in a child process under a chosen locale. Writes a page, its SVG and
-# its positions file the way pipeline.run does, then a control file the old,
-# bare way.
+# Run in a child process under a chosen locale. Every file it keeps is one the
+# engine wrote: a page and its positions file the way pipeline.run writes them,
+# a user feed's record and its normalised routes table, and the protocol's
+# schema as --schema prints it. Then the old, bare calls, into control files.
 CHILD = r'''
-import builtins, io, json, sys
+import builtins, io, json, locale, os, sys, zipfile
 from pathlib import Path
 
 out = Path(sys.argv[1])
 simulate = sys.argv[2] == "cp1252"
+(out / "encoding.txt").write_bytes(locale.getencoding().encode("ascii"))
 
 if simulate:
+    os.linesep = "\r\n"
     _open = io.open
 
     def windows_open(file, mode="r", buffering=-1, encoding=None, errors=None,
@@ -86,17 +93,46 @@ graph = graph.reproject(to_mercator)
 name = "Łódź"
 day = dt.date(2026, 9, 5)
 r = render(graph, title=name)
-(out / "page.svg").write_text(r.svg, encoding="utf-8", newline="\n")
 anim = animate.build(r, graph, [], day)
 animate.write(anim, r.svg, out, stem="page", name=name,
               title=f"{name} — {service_day_text(day)}",
               subtitle=f"0 trips · {service_day_text(day)}")
 
-# The control: the bare call the engine used to make.
+# A feed a person added, named outside the code page: the registry's record
+# and the copy normalised for LOOM, whose routes table pandas writes.
+from schematic import config, feeds
+feed = feeds.add(Path(sys.argv[4]), key="lodz", name=stations[0])
+(out / "user-feeds.json").write_bytes(feeds.user_file().read_bytes())
+with zipfile.ZipFile(feeds.normalize(feed)) as zf:
+    (out / "routes.txt").write_bytes(zf.read("routes.txt"))
+
+# --schema, into a stdout that is a text stream the way a console's is.
+from schematic import serve
+real = sys.stdout
+with open(out / "schema.json", "wb") as raw:
+    sys.stdout = io.TextIOWrapper(raw, encoding="cp1252" if simulate else "utf-8",
+                                  newline="\r\n" if simulate else None)
+    try:
+        serve.main(["--schema"])
+        sys.stdout.flush()
+    finally:
+        sys.stdout.detach()
+        sys.stdout = real
+
+# The controls: the bare calls the engine used to make.
 try:
     (out / "control.txt").write_text("—\n")
 except UnicodeError:
     (out / "control.txt").write_bytes(b"refused")
+import pandas as pd
+buf = io.StringIO()
+pd.DataFrame({"a": ["x"]}).to_csv(buf, index=False)
+(out / "control.csv").write_bytes(buf.getvalue().encode("utf-8"))
+with open(out / "control-stdout.txt", "wb") as raw:
+    stream = io.TextIOWrapper(raw, encoding="utf-8", newline="\r\n" if simulate else None)
+    stream.write("x\n")
+    stream.flush()
+    stream.detach()
 '''
 
 
@@ -119,10 +155,16 @@ def _generate(tmp_path: Path, mode: str) -> Path:
     out.mkdir()
     script = tmp_path / "child.py"
     script.write_text(CHILD, encoding="utf-8")
+    source = tmp_path / "feed.zip"
+    if not source.exists():
+        tables = {**GOOD, "routes.txt": ("route_id,agency_id,route_short_name,route_long_name,"
+                                         "route_type\nR1,M,,Linia Łódź 東京,1\n")}
+        gtfs_zip(source, tables)
+    env = _child_env("utf-8" if mode == "utf-8" else "c")
+    env[config.ENV] = str(tmp_path / f"home-{mode}")
     proc = subprocess.run(
-        [sys.executable, str(script), str(out), mode, json.dumps(STATIONS)],
-        env=_child_env("utf-8" if mode == "utf-8" else "c"),
-        capture_output=True, timeout=120)
+        [sys.executable, str(script), str(out), mode, json.dumps(STATIONS), str(source)],
+        env=env, capture_output=True, timeout=120)
     assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
     return out
 
@@ -130,14 +172,21 @@ def _generate(tmp_path: Path, mode: str) -> Path:
 def test_a_page_is_byte_identical_under_c_and_cp1252_and_utf8(tmp_path):
     utf8, c, cp1252 = (_generate(tmp_path, mode) for mode in ("utf-8", "c", "cp1252"))
 
-    # The environments really were different: the bare write is right only
-    # under UTF-8. (Under the C locale ASCII refuses the dash; under cp1252
-    # it is one byte and the newline is CRLF.)
+    # The environments really were different: the bare calls are right only
+    # under UTF-8. (Under an ASCII C locale the dash is refused; under cp1252
+    # it is one byte and every newline is CRLF.)
     assert (utf8 / "control.txt").read_bytes() == "—\n".encode("utf-8")
-    assert (c / "control.txt").read_bytes() == b"refused"
+    if (c / "encoding.txt").read_text(encoding="ascii").lower().replace("-", "") in {
+            "ascii", "usascii", "ansi_x3.41968"}:
+        assert (c / "control.txt").read_bytes() == b"refused"
+    # Elsewhere (Windows, musl) the C locale is not ASCII, and the C leg is a
+    # second UTF-8 or code-page run: its bytes are still held below.
     assert (cp1252 / "control.txt").read_bytes() == b"\x97\r\n"
+    assert (cp1252 / "control.csv").read_bytes() == b"a\r\nx\r\n"
+    assert (cp1252 / "control-stdout.txt").read_bytes() == b"x\r\n"
 
-    for name in ("page.html", "page.positions.json", "page.svg"):
+    for name in ("page.html", "page.positions.json", "user-feeds.json", "routes.txt",
+                 "schema.json"):
         expected = (utf8 / name).read_bytes()
         assert (c / name).read_bytes() == expected, f"{name} differs under LC_ALL=C"
         assert (cp1252 / name).read_bytes() == expected, f"{name} differs under cp1252"
@@ -146,17 +195,23 @@ def test_a_page_is_byte_identical_under_c_and_cp1252_and_utf8(tmp_path):
 
     page = (utf8 / "page.html").read_bytes()
     assert "<title>Łódź — Saturday 5 September 2026</title>".encode() in page
+    assert "Linia Łódź 東京".encode() in (utf8 / "routes.txt").read_bytes()
+    # The schema as a person's shell gets it, byte for byte.
+    run = subprocess.run([sys.executable, "-m", "schematic.serve", "--schema"],
+                         capture_output=True, timeout=120, check=True)
+    assert (cp1252 / "schema.json").read_bytes() == run.stdout
 
 
 def test_a_station_name_outside_the_code_page_round_trips(tmp_path):
     out = _generate(tmp_path, "cp1252")
     page = (out / "page.html").read_bytes().decode("utf-8")
-    svg = (out / "page.svg").read_bytes().decode("utf-8")
+    svg = page[page.index("<svg"):page.index("</svg>")]
     for station in STATIONS:
         assert station in svg, f"{station} is not drawn"
-        assert station in page, f"{station} is not in the page"
     names = json.loads((out / "page.positions.json").read_bytes())["linear"]["names"]
     assert sorted(names.values()) == sorted(STATIONS)
+    records = json.loads((out / "user-feeds.json").read_bytes())
+    assert [r["name"] for r in records] == [STATIONS[0]]
 
 
 def test_the_animation_module_imports_under_the_c_locale(tmp_path):
@@ -192,35 +247,103 @@ def test_the_summary_keeps_its_two_digit_day():
     assert service_day_text(dt.date(2025, 7, 1), pad=True) == "Tuesday 01 July 2025"
 
 
-def test_every_day_of_a_year_matches_the_english_names():
-    """Against the numbers alone, so no locale is consulted on either side."""
-    days = "Monday Tuesday Wednesday Thursday Friday Saturday Sunday".split()
-    months = ("January February March April May June July August September "
-              "October November December").split()
+def test_every_day_of_a_leap_year_reads_as_python_writes_it_in_english():
+    """The oracle is ``strftime`` in this process, which is English: Python
+    starts in the C locale for ``LC_TIME`` and nothing here calls
+    ``setlocale``. Only the portable directives are used on this side."""
+    import locale
+    assert locale.setlocale(locale.LC_TIME) in {"C", "POSIX"}, "the oracle needs LC_TIME=C"
     day = dt.date(2024, 1, 1)
+    seen = 0
     while day.year == 2024:
-        assert service_day_text(day) == (
-            f"{days[day.weekday()]} {day.day} {months[day.month - 1]} {day.year}")
+        assert service_day_text(day) == f"{day:%A} {day.day} {day:%B} {day.year}"
+        assert service_day_text(day, pad=True) == f"{day:%A %d %B %Y}"
         day += dt.timedelta(days=1)
+        seen += 1
+    assert seen == 366
 
 
-def test_no_strftime_extension_or_bare_text_io_is_left_in_the_package():
-    """Guarded as text, because the failures it is about only happen on
-    another platform: ``%-d`` raises on Windows, and a text open without an
-    encoding takes whatever the locale says."""
-    for path in sorted(SRC.glob("*.py")):
-        code = [line for line in path.read_text(encoding="utf-8").splitlines()
-                if not line.lstrip().startswith("#")]
-        text = "\n".join(code)
-        assert not re.search(r"%-[A-Za-z]", text), f"{path.name} uses a %- directive"
-        for call in re.finditer(r"\.(read_text|write_text)\(", text):
-            args, depth, i = [], 1, call.end()
-            while depth:
-                ch = text[i]
-                depth += ch == "("
-                depth -= ch == ")"
-                args.append(ch)
-                i += 1
-            assert "encoding=" in "".join(args), (
-                f"{path.name}: {call.group(1)} without an encoding near "
-                f"{text[call.start() - 40:call.end()]!r}")
+# ----------------------------------------------------------------- the guard
+
+# ZipFile.open is binary whatever it is given; these are the names the
+# package binds a ZipFile to.
+_ZIP_HANDLES = {"zf", "zin", "zout"}
+
+
+def _keywords(call: ast.Call) -> set[str]:
+    return {k.arg for k in call.keywords if k.arg}
+
+
+def _mode(call: ast.Call, position: int) -> str | None:
+    for k in call.keywords:
+        if k.arg == "mode":
+            return k.value.value if isinstance(k.value, ast.Constant) else None
+    if len(call.args) > position and isinstance(call.args[position], ast.Constant):
+        return call.args[position].value
+    return "r" if len(call.args) <= position else None
+
+
+def _findings(path: Path) -> list[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    found = []
+
+    def say(node: ast.AST, what: str) -> None:
+        found.append(f"{path.name}:{node.lineno}: {what}")
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if re.search(r"%-[A-Za-z]", node.value):
+                say(node, "a %- strftime directive (the Windows C runtime refuses it)")
+        if not isinstance(node, ast.Call):
+            continue
+        func, kw = node.func, _keywords(node)
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+        receiver = func.value if isinstance(func, ast.Attribute) else None
+        if name == "read_text" and "encoding" not in kw:
+            say(node, "read_text without encoding=")
+        if name == "write_text" and not {"encoding", "newline"} <= kw:
+            say(node, "write_text without both encoding= and newline=")
+        if name == "open":
+            if isinstance(receiver, ast.Name) and receiver.id in _ZIP_HANDLES:
+                continue
+            mode = _mode(node, 0 if isinstance(func, ast.Attribute) else 1)
+            if mode is None:
+                say(node, "open with a mode this guard cannot read")
+            elif "b" not in mode and "encoding" not in kw:
+                say(node, "a text-mode open without encoding=")
+        if name == "to_csv" and "lineterminator" not in kw:
+            say(node, "to_csv without lineterminator= (it defaults to os.linesep)")
+        if (path.name == "serve.py" and name == "write"
+                and isinstance(receiver, ast.Attribute) and receiver.attr == "stdout"):
+            say(node, "sys.stdout.write (text mode; CRLF on Windows): write bytes to the buffer")
+    return found
+
+
+def test_no_strftime_extension_or_platform_shaped_text_io_is_left_in_the_package():
+    """Guarded as source, because the failures it is about happen only on
+    another platform: ``%-d`` raises on Windows, a text open without an
+    encoding takes whatever the locale says, and a text write without a
+    newline, ``to_csv`` without a terminator and a text-mode stdout all write
+    CRLF there."""
+    found = [f for path in sorted(SRC.glob("*.py")) for f in _findings(path)]
+    assert not found, "\n".join(found)
+
+
+def test_the_guard_sees_what_it_is_for(tmp_path):
+    bad = tmp_path / "serve.py"
+    bad.write_text(
+        "import sys\n"
+        "from pathlib import Path\n"
+        "f\"{d:%A %-d}\"\n"
+        "Path('a').read_text()\n"
+        "Path('a').write_text('x', encoding='utf-8')\n"
+        "open('a', 'w')\n"
+        "Path('a').open()\n"
+        "open('a', 'rb')\n"
+        "zf.open('a')\n"
+        "df.to_csv(buf, index=False)\n"
+        "sys.stdout.write('x')\n"
+        "sys.stdout.buffer.write(b'x')\n",
+        encoding="utf-8", newline="\n")
+    lines = sorted(int(f.split(":")[1]) for f in _findings(bad))
+    assert lines == [3, 4, 5, 6, 7, 10, 11]
