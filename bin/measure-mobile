@@ -33,7 +33,7 @@ const MIN_TAP = 44;
     });
     const page = await ctx.newPage();
 
-    for (const [url, label] of [["/", "essay"], ["/atlas/", "atlas"], ["/framework/", "framework"]]) {
+    for (const [url, label] of [["/", "essay"], ["/atlas/", "atlas"], ["/framework/", "framework"], ["/app/", "app"]]) {
       await page.goto(BASE + url, { waitUntil: "networkidle" });
       const m = await page.evaluate(() => {
         const de = document.documentElement;
@@ -56,12 +56,21 @@ const MIN_TAP = 44;
         document.querySelectorAll("svg, iframe").forEach(el => {
           if (el.getBoundingClientRect().width > window.innerWidth + 1) overflowing++;
         });
-        return { scrollW: de.scrollWidth, innerW: window.innerWidth, minTap, smallest, overflowing };
+        // The header is one row that must fit: the page does not scroll when
+        // the nav outgrows it, the theme switch simply leaves the screen. The
+        // brand keeps a visible gap from the first link, too.
+        const wrap = document.querySelector(".site-header .wrap").getBoundingClientRect();
+        const brand = document.querySelector(".brand").getBoundingClientRect();
+        const nav = document.querySelector(".site-nav").getBoundingClientRect();
+        const headerFits = nav.right <= wrap.right + 1 && nav.left - brand.right >= 8
+                           && nav.bottom - nav.top < 2 * brand.height;
+        return { scrollW: de.scrollWidth, innerW: window.innerWidth, minTap, smallest, overflowing, headerFits };
       });
       const noScroll = m.scrollW <= m.innerW + 1;
       console.log(`${bad(noScroll)}  ${label.padEnd(9)} no page h-scroll` +
                   `   ${bad(m.overflowing === 0)}  maps fit width (${m.overflowing} overflow)` +
-                  `   ${bad(m.minTap >= MIN_TAP)}  min tap ${m.minTap}px "${m.smallest}"`);
+                  `   ${bad(m.minTap >= MIN_TAP)}  min tap ${m.minTap}px "${m.smallest}"` +
+                  `   ${bad(m.headerFits)}  header fits`);
     }
 
     for (const city of ["la-metro-rail", "nyc-subway"]) {

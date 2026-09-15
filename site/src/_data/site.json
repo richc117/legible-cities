@@ -11,6 +11,14 @@
     "github": "https://github.com/richc117",
     "portfolio": "https://www.richardcaballero.com"
   },
+  "app": {
+    "repo": "https://github.com/richc117/legible-cities-app",
+    "download": "https://github.com/richc117/legible-cities-app/releases",
+    "install": "https://github.com/richc117/legible-cities-app/blob/main/docs/install.md",
+    "licence": "https://github.com/richc117/legible-cities-app/blob/main/LICENSE",
+    "notices": "https://github.com/richc117/legible-cities-app/blob/main/THIRD_PARTY_NOTICES.md",
+    "signed": false
+  },
   "pathPrefix": "/legible-cities/",
   "origin": "https://richc117.github.io",
   "card": {

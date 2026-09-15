@@ -35,11 +35,29 @@ const strip = u => u.replace(BASE, "") || "/";
   };
 
   // Primary nav reaches every page.
-  for (const [label, want] of [["Atlas", "/atlas/"], ["Framework", "/framework/"]]) {
+  for (const [label, want] of [["Atlas", "/atlas/"], ["Framework", "/framework/"], ["App", "/app/"]]) {
     await page.goto(BASE + "/", { waitUntil: "networkidle" });
     await page.locator(`.site-nav a:text-is("${label}")`).click();
     await page.waitForLoadState("networkidle");
     expect(strip(page.url()), want, `nav "${label}"`);
+  }
+
+  // The app page's download link is read from site.json and has to change the
+  // day a release is published, so it is checked against that one value
+  // rather than against a URL written down a second time here.
+  {
+    const app = require(path.join(__dirname, "..", "site", "src", "_data", "site.json")).app;
+    await page.goto(BASE + "/app/", { waitUntil: "networkidle" });
+    const hrefs = await page.locator("#download a").evaluateAll(as => as.map(a => a.href));
+    expect(hrefs.includes(app.download), true, "app page links the download");
+    expect(hrefs.includes(app.install), true, "app page links the install guide");
+    // Screenshots are lazy, so each is scrolled to and decoded before it is
+    // judged; an image never asked for is neither complete nor broken.
+    const broken = await page.locator("main img").evaluateAll(imgs => Promise.all(imgs.map(i => {
+      i.scrollIntoView();
+      return i.decode().then(() => 0, () => 1);
+    })).then(r => r.reduce((a, b) => a + b, 0)));
+    expect(broken, 0, "app page screenshots load");
   }
 
   // The essay's embedded maps are the animation page in presentation mode,

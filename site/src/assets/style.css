@@ -670,13 +670,18 @@ blockquote p:last-child {
     font-size: 17px;
   }
 
-  /* Keeps "Legible Cities" on one line beside the nav at 360px. */
-  .brand {
-    font-size: 0.95rem;
+  /* Keeps "Legible Cities" on one line beside the nav at 360px, with the theme
+     switch on screen. Three nav links and a 46px touch switch leave no room at
+     the desktop size: at 0.95rem and a 0.7rem gap the switch ran 29px off the
+     right edge of a 360px phone once the App link arrived, and nothing
+     scrolled to say so. bin/measure-mobile now measures it. */
+  .brand,
+  .site-nav a {
+    font-size: 0.85rem;
   }
 
   .site-nav {
-    gap: 0.7rem;
+    gap: 0.5rem;
   }
 
   main {
