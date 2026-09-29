@@ -3,8 +3,8 @@ layout: layouts/base.njk
 permalink: /app/
 title: Desktop app
 description: Legible Cities for macOS and Windows. Turn a city’s GTFS timetable into a schematic map and a running animation, and export stills, reels and GIFs, all on your own computer.
-# Screenshots of the app. Empty on purpose: a slot renders nothing until its
-# `src` is set, so the page reads whole without them. When one is added:
+# Screenshots of the app. A slot renders nothing until its `src` is set, so
+# the page reads whole without one. When one is added or retaken:
 #   - the file goes in site/src/assets/ (never site/src/maps/, which is
 #     gitignored wholesale and so never deploys), as a PNG or JPEG;
 #   - check the picture itself for leaks before committing it: no user name
@@ -16,29 +16,29 @@ description: Legible Cities for macOS and Windows. Turn a city’s GTFS timetabl
 #   - `alt` says what is on the screen, not that it is a screenshot.
 screenshots:
   - slot: library
-    src: ""
+    src: "app-library.png"
     width: 1600
     height: 1000
-    alt: ""
-    caption: The Library, where every project and every feed you have added lives.
+    alt: "The Library with one project, LA Metro Rail, above a grid of sample cities: LA Metro Rail, BART, TriMet MAX, the New York City Subway and others, each saying which modes it keeps and whether it has been downloaded."
+    caption: The first screen. Your projects come first, then the sample cities, then any feeds you have added.
   - slot: inspect
-    src: ""
+    src: "app-inspect.png"
     width: 1600
     height: 1000
-    alt: ""
-    caption: Inspecting a feed before laying it out, with the network drawn where it really runs.
+    alt: "Cell 01 open under the map of Los Angeles Metro Rail: the heading Where the routes run, the gtfs2graph and loom stages, counts of 114 stations and 6 lines, and the six lines drawn along their real courses."
+    caption: Cell 01, Data, reading a feed before it is laid out, with the network drawn where it really runs.
   - slot: map
-    src: ""
+    src: "app-map.png"
     width: 1600
     height: 1000
-    alt: ""
-    caption: A laid-out project, with its lines’ colours, order and theme.
+    alt: "A project named LA Metro Rail: six numbered steps down the side, all ready, and a dark schematic map of six coloured lines above the cells, with cell 02 open on a line of eight stages that ends Laid out."
+    caption: A project as a notebook of six cells, under a map that stays in view while you work down them.
   - slot: export
-    src: ""
+    src: "app-export.png"
     width: 1600
     height: 1000
-    alt: ""
-    caption: The Export tab, previewing a preset inside its safe zones.
+    alt: "Cell 06 open: where the map was, a tall reel frame titled Los Angeles, Metro Rail, with bands shaded at its top, bottom and right edge; below it the preset reads instagram-reel, 1080 by 1920, video, MP4."
+    caption: Cell 06, Export, previewing a preset inside its safe zones.
 ---
 {# Every outside link on this page comes from `site.app` in _data/site.json, so
    the day a release is published there is one place to change.
@@ -50,9 +50,9 @@ screenshots:
     <h1>Desktop app</h1>
     <p class="lead">
       The pipeline that drew every map on this site, behind a window, for
-      people who do not use a terminal. It runs on macOS and Windows, and
-      it is pre-alpha: expect rough edges, and expect things to change
-      between releases.
+      people who do not use a terminal. It runs on macOS and Windows. It
+      is new: expect rough edges, and expect things to change between
+      releases.
     </p>
   </header>
   <p>
@@ -67,18 +67,29 @@ screenshots:
 
 <section class="wrap">
   <h2>What it does</h2>
+  <p>
+    <strong>Start from a sample city</strong>, one of the networks the atlas
+    already draws: one press makes a project, downloads the feed and lays it
+    out. Or <strong>start from your own feed</strong>, a GTFS zip on your
+    computer or one at a web address.
+  </p>
+  <p>
+    A project opens as a notebook of six numbered cells, under a map that
+    stays in view while you work down them:
+  </p>
   <ol>
-    <li><strong>Add a feed</strong> from a zip on your computer, a web
-      address, or the networks it already knows.</li>
-    <li><strong>Inspect it</strong>: routes, agencies, the service window, and
-      the network drawn where it really runs, so you can choose which mode and
-      which operator to keep.</li>
-    <li><strong>Lay it out</strong> with one button. The layout is computed
-      once and stored, so every map and export drawn from it afterwards
-      matches.</li>
-    <li><strong>Style it</strong>: each line&rsquo;s colour, the order lines
-      stack in, and a dark or sepia theme.</li>
-    <li><strong>Export it</strong> as a still, a reel or a GIF, from presets for
+    <li><strong>Data.</strong> Read what is in the feed: its routes,
+      operators and service window, and the network drawn where it really
+      runs. Choose which mode and which operator to keep.</li>
+    <li><strong>Process.</strong> Lay the network out, stage by stage, and
+      read what the build had to fudge. The layout is computed once and
+      stored, so every map and export drawn from it afterwards matches.</li>
+    <li><strong>Frame and service day.</strong> Pick the day the map is drawn
+      for, scrub its clock, play the day and set the speed.</li>
+    <li><strong>Style.</strong> A dark or a sepia map.</li>
+    <li><strong>Lines.</strong> Each line&rsquo;s colour, and the order the
+      lines stack in.</li>
+    <li><strong>Export.</strong> A still, a reel or a GIF, from presets for
       each platform.</li>
   </ol>
 </section>
