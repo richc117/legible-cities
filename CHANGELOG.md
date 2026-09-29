@@ -5,6 +5,30 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Added
+
+- **A long request logs a line of its own for every stage** (E37). A
+  request's `job/log` lines were the LOOM tools' stderr and nothing else,
+  and the native tools write nothing when they succeed, so a `graph.build`
+  or `map.build` that went well sent no log at all, and the desktop app's
+  log panel was empty after every good run. Each stage now logs what it made
+  and how long it took, in stage order. The four LOOM stages give the
+  graph's summary (`gtfs2graph: 114 nodes (114 stations, 0 junctions), 112
+  edges, lines: A, B, C, D, E, K (12.2 s)`), timed from after the feed is
+  normalised to before the output is read back; `schedule`, `render` and
+  `animate` give the sentence their progress already carries; `write` names
+  its three files (`<key>.svg, <key>.html and <key>.positions.json`) where
+  its progress message names the folder. A layout read from the store
+  rather than made says so in one line instead (`layout 1a2b3c4d: read from
+  the store; nothing was laid out`), with how long the request waited when
+  another was building it. A tool's stderr still arrives beside them, and no
+  line of the engine's own names a path. Level `info`, no schema change, and
+  progress messages are unchanged; outside a request (the command line, the
+  site) nothing is logged and no stage is read back for a line. A layout
+  found in the store is now reported outside the process's layout lock.
+
 ## [0.8.3] - 2026-09-12
 
 ### Fixed

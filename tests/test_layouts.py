@@ -9,8 +9,10 @@ Docker, binaries or a feed. What needs the real thing is in test_serve.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
+import re
 import shutil
 import threading
 import zipfile
@@ -273,8 +275,12 @@ def test_two_builds_of_one_layout_at_once_make_one_layout(home, monkeypatch):
     layouts: list[pipeline.Layout] = []
     threads: list[threading.Thread] = []
 
+    heard: list[str] = []
+
     def second() -> None:
-        layouts.append(pipeline.lay_out(KEY))
+        # Its own request: what it hears is its own, never the first build's.
+        with loom.cancellable(loom.Job(log=heard.append)):
+            layouts.append(pipeline.lay_out(KEY))
 
     def slow_first(tool: str) -> None:
         if tool == "topo" and not threads:
@@ -291,6 +297,9 @@ def test_two_builds_of_one_layout_at_once_make_one_layout(home, monkeypatch):
     assert [l.id for l in layouts] == [first.id]
     assert fake.calls.count("topo") == 1, "one build, not two"
     assert ids_under(KEY) == [first.id]
+    assert len(heard) == 1, heard
+    assert re.match(rf"^layout {first.id[:8]}: read from the store; nothing was laid out "
+                    r"\(waited \d+\.\d s for another build of it\)$", heard[0]), heard
 
 
 def test_a_sweep_leaves_a_live_builds_scratch_alone(home, monkeypatch):
@@ -328,3 +337,89 @@ def test_stage_path_and_stored_never_download_or_build(home, monkeypatch):
     feeds.FEEDS[KEY].zip_path.unlink()
     assert pipeline.stored(KEY) is None
     assert fake.calls == []
+
+
+# ------------------------------------------------------------ the job's log
+
+STAGE_LINE = re.compile(r"^(gtfs2graph|topo|loom|octi): \d+ nodes \(\d+ stations, \d+ junctions\), "
+                        r"\d+ edges, lines: .* \(\d+\.\d s\)$")
+
+
+def test_a_layout_logs_a_line_for_every_stage_in_order_and_names_no_path(home, monkeypatch):
+    """E37. The request's log was the LOOM tools' stderr alone, and the native
+    tools write nothing when they succeed, so a layout that went well logged
+    nothing. Each stage now says what it made and how long it took."""
+    FakeLoom(monkeypatch)
+    heard: list[str] = []
+    with loom.cancellable(loom.Job(log=heard.append)):
+        made = pipeline.lay_out(KEY)
+    assert [line.split(":", 1)[0] for line in heard] == ["gtfs2graph", "topo", "loom", "octi"]
+    assert all(STAGE_LINE.match(line) for line in heard), heard
+    assert not any(str(home) in line or "/" in line for line in heard), heard
+
+    # The same layout again is read, not made, and the log says so once.
+    heard.clear()
+    with loom.cancellable(loom.Job(log=heard.append)):
+        pipeline.lay_out(KEY)
+    assert heard == [f"layout {made.id[:8]}: read from the store; nothing was laid out"]
+
+
+def test_outside_a_request_no_stage_is_read_back_for_a_line(home, monkeypatch):
+    """The command line and the site have no job and ask for no progress:
+    the lines are a request's, and a stage's output is not parsed to make
+    one that nobody hears."""
+    FakeLoom(monkeypatch)
+
+    def refuse(_path):
+        raise AssertionError("a stage was read back for a line nobody hears")
+
+    monkeypatch.setattr(pipeline.LineGraph, "from_geojson", refuse)
+    assert loom.current_job() is None
+    pipeline.lay_out(KEY)
+
+
+def test_progress_is_unchanged_when_a_job_hears_the_lines(home, monkeypatch):
+    """The log is beside the progress, not instead of it: each stage's
+    message is the graph's summary, as before E37."""
+    FakeLoom(monkeypatch)
+    reported: list[tuple[str, str]] = []
+    with loom.cancellable(loom.Job(log=lambda _line: None)):
+        made = pipeline.lay_out(KEY, progress=lambda stage, _f, m: reported.append((stage, m)))
+    assert reported == [(stage, pipeline.LineGraph.from_geojson(path).summary())
+                        for stage, path in made.paths.items()]
+
+
+def write_timetabled_feed(path: Path) -> None:
+    """The small feed with a timetable: a train from A to B on every day."""
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("agency.txt", "agency_id,agency_name,agency_timezone\n"
+                                  "LACMTA,Metro,America/Los_Angeles\n")
+        zf.writestr("routes.txt", "route_id,agency_id,route_short_name,route_long_name,route_type\n"
+                                  "r1,LACMTA,A,Metro A Line,0\n")
+        zf.writestr("calendar.txt",
+                    "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,"
+                    "start_date,end_date\ns1,1,1,1,1,1,1,1,20260101,20271231\n")
+        zf.writestr("trips.txt", "route_id,service_id,trip_id\nr1,s1,t1\n")
+        zf.writestr("stops.txt", "stop_id,stop_name,stop_lat,stop_lon\n"
+                                 "a,A,34.0,-118.2\nb,B,34.1,-118.3\n")
+        zf.writestr("stop_times.txt", "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
+                                      "t1,08:00:00,08:00:00,a,1\nt1,08:10:00,08:10:00,b,2\n")
+
+
+def test_a_draw_logs_its_stages_and_never_a_path(home, monkeypatch, tmp_path):
+    """E37 for ``map.build``: a draw from a stored layout says it was read,
+    then a line for each of its own stages with its time, and the write
+    names its three files and never the folder they went to or the home."""
+    write_timetabled_feed(feeds.FEEDS[KEY].zip_path)
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    out = tmp_path / "out"
+    heard: list[str] = []
+    with loom.cancellable(loom.Job(log=heard.append)):
+        pipeline.run(KEY, layout=made.id, date=dt.date(2026, 9, 10), out_dir=out)
+    assert heard[0] == f"layout {made.id[:8]}: read from the store; nothing was laid out"
+    assert [line.split(":", 1)[0] for line in heard[1:]] == [
+        "schedule", "render", "animate", "write"]
+    assert all(re.search(r" \(\d+\.\d s\)$", line) for line in heard[1:]), heard
+    assert heard[-1].startswith(f"write: {KEY}.svg, {KEY}.html and {KEY}.positions.json (")
+    assert not any(str(home) in line or str(out) in line for line in heard), heard

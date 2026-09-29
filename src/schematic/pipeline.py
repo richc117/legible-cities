@@ -27,6 +27,7 @@ import re
 import shutil
 import tempfile
 import threading
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
@@ -231,19 +232,27 @@ def lay_out(key: str, *, force: bool = False,
     # One build of one layout at a time in this process: a second caller
     # for the same id -- two projects on one feed -- waits for the first
     # and reads what it stored rather than building beside it.
+    waited = 0.0
     while True:
         with _lock:
             in_flight = _building.get((key, layout))
             if in_flight is None:
+                existing = None
                 if not force:
                     existing = read_layout(key, layout) or _migrated(feed, layout, inputs)
-                    if existing is not None:
-                        for stage, path in existing.paths.items():
-                            _report(progress, stage, _fraction(stage, stages), path)
-                        return existing
-                _building[(key, layout)] = threading.Event()
+                if existing is None:
+                    _building[(key, layout)] = threading.Event()
                 break
+        began = time.monotonic()
         in_flight.wait()
+        waited += time.monotonic() - began
+    # Reported outside the lock: a report parses four files and writes to the
+    # client, and nothing else in the process should wait on either.
+    if existing is not None:
+        for stage, path in existing.paths.items():
+            _report(progress, stage, _fraction(stage, stages), path)
+        _from_store(existing, waited)
+        return existing
     try:
         return _build(feed, layout, inputs, stages, progress)
     finally:
@@ -266,16 +275,21 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
     # another can tell a live build from what a crash left.
     scratch = Path(tempfile.mkdtemp(prefix=f"{layout}.building-{os.getpid()}-", dir=folder))
     try:
-        graph = loom.gtfs2graph(feeds.normalize(feed), "-m", feed.mode)
+        normalized = feeds.normalize(feed)
+        # From here: normalizing is the feed's, not gtfs2graph's. The native
+        # backend's first unpack of the zip is inside the call and counted.
+        since = time.monotonic()
+        graph = loom.gtfs2graph(normalized, "-m", feed.mode)
         out = scratch / STAGE_FILES["gtfs2graph"]
         out.write_text(json.dumps(graph), encoding="utf-8", newline="\n")
-        _report(progress, "gtfs2graph", _fraction("gtfs2graph", stages), out)
+        _stage_done(progress, "gtfs2graph", _fraction("gtfs2graph", stages), out, since)
         payload = out.read_bytes()
         for tool, args in stages:
+            since = time.monotonic()
             payload = json.dumps(loom.run(tool, payload, *args)).encode()
             out = scratch / STAGE_FILES[tool]
             out.write_bytes(payload)
-            _report(progress, tool, _fraction(tool, stages), out)
+            _stage_done(progress, tool, _fraction(tool, stages), out, since)
         meta = {**inputs, "engine": __version__,
                 "made": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
                 "migrated": False}
@@ -394,6 +408,50 @@ def _report(progress: Progress | None, stage: str, fraction: float, path: Path) 
         progress(stage, fraction, LineGraph.from_geojson(path).summary())
 
 
+def _log(line: str) -> None:
+    """A line of the engine's own in the running request's log (E37).
+
+    A request's log was the LOOM tools' stderr and nothing else, and the
+    native tools write nothing when they succeed, so a run that went well
+    sent no ``job/log`` at all. These lines say what each stage did. Outside
+    a request there is no job and nothing is written: the command line and
+    the site have ``Result.summary()``.
+
+    Never a path: the client redacts a web address's secrets in a log line
+    but not a file's location, so a file is named by its name alone.
+    """
+    job = loom.current_job()
+    if job is not None:
+        job.log(line)
+
+
+def _took(since: float) -> str:
+    """How long since ``since`` (``time.monotonic()``), as a line says it."""
+    return f"{time.monotonic() - since:.1f} s"
+
+
+def _stage_done(progress: Progress | None, stage: str, fraction: float, path: Path,
+                since: float) -> None:
+    """A LOOM stage has written ``path``: report it, and log it with its time,
+    taken before the file is read back, which is not the stage's."""
+    took = _took(since)
+    if progress is None and loom.current_job() is None:
+        return
+    summary = LineGraph.from_geojson(path).summary()
+    if progress is not None:
+        progress(stage, fraction, summary)
+    _log(f"{stage}: {summary} ({took})")
+
+
+def _from_store(layout: Layout, waited: float = 0.0) -> None:
+    """Say that a layout was read, not made: its stages did not run here.
+    A request that waited for another's build of it says how long."""
+    line = f"layout {layout.id[:8]}: read from the store; nothing was laid out"
+    if waited > 0:
+        line += f" (waited {waited:.1f} s for another build of it)"
+    _log(line)
+
+
 def require_edges(feed_or_key: feeds.Feed | str, graph: LineGraph) -> None:
     """Refuse an empty graph with the sentence about modes. Raised here rather
     than returned so the error is the pipeline's, wherever it is checked. A
@@ -465,6 +523,16 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         if progress is not None:
             progress(stage, (steps.index(stage) + 1) / len(steps), message)
 
+    # The draw's own stages, logged as the layout's are: what each did and
+    # how long it took, from the end of the one before (E37). The clock
+    # starts once the layout is in hand, below.
+
+    def done(stage: str, message: str, line: str | None = None) -> None:
+        nonlocal since
+        tick(stage, message)
+        _log(f"{stage}: {line if line is not None else message} ({_took(since)})")
+        since = time.monotonic()
+
     if layout is not None:
         found = read_layout(key, layout)
         if found is None:
@@ -473,10 +541,12 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         if progress is not None:
             for stage, path in found.paths.items():
                 _report(lambda st, _f, m: tick(st, m), stage, 0.0, path)
+        _from_store(found)
     else:
         found = lay_out(key, force=force,
                         progress=(lambda stage, _f, m: tick(stage, m)) if progress else None)
     paths = found.paths
+    since = time.monotonic()
 
     # Match stops against the unprojected graph -- station_id is what matters
     # there, and reprojecting is only needed for geometry.
@@ -491,7 +561,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     match = match_stops(graph_ll, tables)
     date = date or busiest_weekday(tables, lines, anchor=anchor or dt.date.today())
     trips = trips_on(tables, date, match, lines)
-    tick("schedule", f"{len(trips)} trips on {service_day_text(date)}; {match.report()}")
+    done("schedule", f"{len(trips)} trips on {service_day_text(date)}; {match.report()}")
 
     name = feeds.get(key).name
     # Themed by default: the CSS variables carry literal fallbacks, so a
@@ -502,7 +572,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         style = replace(style, default_line_color=check_color(default_color, "default_color"))
     r = render(graph, width=width, style=style, title=name, line_order=line_order,
                colors=colors)
-    tick("render", f"{len(r.dropped_labels)} labels dropped")
+    done("render", f"{len(r.dropped_labels)} labels dropped")
     # The loom stage, not gtfs2graph: same stations and the same solved line
     # ordering, so only the shape differs. See animate.geographic_tracks.
     geo = None
@@ -511,7 +581,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         geo = animate.geographic_tracks(geo_graph, graph, r)
 
     anim = animate.build(r, graph, trips, date, geo, line_order=line_order)
-    tick("animate", f"{len(anim.paths)} distinct paths"
+    done("animate", f"{len(anim.paths)} distinct paths"
          + (f", {len(anim.unrouted)} unrouted" if anim.unrouted else ""))
 
     out = out_dir or config.out_dir()
@@ -521,7 +591,9 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
                   social=social,
                   title=f"{name} — {service_day_text(date)}", name=name,
                   subtitle=f"{len(trips):,} trips · {service_day_text(date)}")
-    tick("write", str(out))
+    # The progress message has always been the folder; the log line names
+    # the files and never where they are (see ``_log``).
+    done("write", str(out), f"{key}.svg, {key}.html and {key}.positions.json")
 
     return Result(key=key, date=date, layout=found.id, graph=graph, render=r, trips=trips,
                   match=match, animation=anim, paths=paths)

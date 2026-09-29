@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from schematic import animate, pipeline
+from schematic import animate, loom, pipeline
 from schematic.crs import to_mercator
 from schematic.linegraph import LineGraph
 from schematic.render import Style, check_color, line_colors, render
@@ -150,3 +150,20 @@ def test_without_overrides_the_page_changes_only_by_the_missing_entries(tmp_path
     rest = {k: v for k, v in data.items() if k != "lines"}
     assert sha(json.dumps(rest, sort_keys=True, separators=(",", ":"))) == snapshot["data_without_lines"]
     assert data["lines"] == {**snapshot["lines"], "MI": DEFAULT, "DQI": DEFAULT}
+
+
+def test_a_draw_logs_its_own_stages_and_no_path(tmp_path):
+    """E37. A draw from a stored layout says the layout was read, then a line
+    for each of its own stages with its time; the write names the files and
+    never the folder they went to."""
+    stored = _stored("pittsburgh-t")
+    heard: list[str] = []
+    with loom.cancellable(loom.Job(log=heard.append)):
+        pipeline.run("pittsburgh-t", layout=stored.id, date=DAY, out_dir=tmp_path)
+    assert heard[0] == f"layout {stored.id[:8]}: read from the store; nothing was laid out"
+    assert [line.split(":", 1)[0] for line in heard[1:]] == [
+        "schedule", "render", "animate", "write"]
+    assert all(re.search(r" \(\d+\.\d s\)$", line) for line in heard[1:]), heard
+    assert heard[-1].startswith(
+        "write: pittsburgh-t.svg, pittsburgh-t.html and pittsburgh-t.positions.json (")
+    assert not any(str(tmp_path) in line for line in heard), heard
