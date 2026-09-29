@@ -530,3 +530,190 @@ def test_the_watcher_is_the_calling_threads_alone(home, tmp_path, monkeypatch):
         other.join(10)
     assert done and done[0].read_bytes() == payload
     assert heard == []
+
+
+# -- an address in a sentence, without its secrets (issue 32) ----------------
+
+@pytest.mark.parametrize("url,said", [
+    ("https://example.test/gtfs.zip", "https://example.test/gtfs.zip"),
+    ("https://example.test:8443/a/b.zip", "https://example.test:8443/a/b.zip"),
+    ("https://someone:pw@feeds.example.test/gtfs.zip",
+     "https://<redacted>@feeds.example.test/gtfs.zip"),
+    ("https://example.test/g.zip?api_key=S3CRET&format=zip",
+     "https://example.test/g.zip?api_key=<redacted>&format=<redacted>"),
+    ("https://example.test/g.zip?a=1&key=S3;v=2",
+     "https://example.test/g.zip?a=<redacted>&key=<redacted>;v=<redacted>"),
+    ("http://example.test/f.zip?s3cr3t", "http://example.test/f.zip?<redacted>"),
+    ("https://example.test/f.zip?QUJDRA==", "https://example.test/f.zip?<redacted>"),
+    ("https://example.test/f.zip?empty=", "https://example.test/f.zip?empty="),
+    ("https://example.test/feed#access_token=zzz", "https://example.test/feed#<redacted>"),
+    ("https://example.test/feed#", "https://example.test/feed#"),
+    ("http://[2001:db8::1]/g.zip?key=S3", "http://[2001:db8::1]/g.zip?key=<redacted>"),
+    ("https://u:p@example.test/g.zip?k=v#f",
+     "https://<redacted>@example.test/g.zip?k=<redacted>#<redacted>"),
+    ("", ""),
+])
+def test_an_address_is_shown_without_its_secrets(url, said):
+    assert feeds.shown(url) == said
+    assert feeds.shown(said) == said, "a second pass changes nothing"
+
+
+KEYED = "https://someone:pw@example.test/feeds/gtfs.zip?api_key=S3CRET#tok"
+SECRETS = ("S3CRET", "someone", "pw@", "tok")
+
+
+def _says_nothing_secret(text: str) -> None:
+    for secret in SECRETS:
+        assert secret not in text, f"{secret!r} is in {text!r}"
+
+
+def test_a_refused_page_names_the_address_without_its_key(home, monkeypatch):
+    class Response:
+        headers: dict = {}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            yield b"<html>not found</html>"
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    with pytest.raises(feeds.FeedError) as refused:
+        feeds.add(KEYED)
+    said = str(refused.value)
+    assert said.startswith("https://<redacted>@example.test/feeds/gtfs.zip?api_key=<redacted>")
+    assert "did not return a zip" in said
+    _says_nothing_secret(said)
+
+
+@pytest.mark.parametrize("raised,why", [
+    (lambda: _http_error(404), "the server answered 404 Not Found"),
+    (lambda: _http_error(599), "the server answered 599"),
+    (lambda: feeds.requests.ConnectTimeout(f"timed out for url: {KEYED}"),
+     "the server did not answer in time"),
+    (lambda: feeds.requests.exceptions.SSLError(f"bad certificate for url: {KEYED}"),
+     "a secure connection could not be made"),
+    (lambda: feeds.requests.ConnectionError(
+        "HTTPSConnectionPool(host='example.test', port=443): Max retries exceeded "
+        "with url: /feeds/gtfs.zip?api_key=S3CRET"), "the server could not be reached"),
+    (lambda: feeds.requests.TooManyRedirects(f"Exceeded 30 redirects for {KEYED}"),
+     "it redirected too many times"),
+    (lambda: feeds.requests.RequestException(f"something about {KEYED}"),
+     "the request failed (RequestException)"),
+])
+def test_a_failed_download_says_why_in_our_words_and_carries_no_cause(home, monkeypatch,
+                                                                      raised, why):
+    """``requests`` and urllib3 repeat the address in their own text, so
+    neither that text nor the exception itself travels with the refusal: a
+    logged traceback prints a cause's message in full."""
+    def get(url, **kw):
+        assert url == KEYED, "the fetch itself asks for the whole address"
+        raise raised()
+
+    monkeypatch.setattr(feeds.requests, "get", get)
+    with pytest.raises(feeds.FeedError) as refused:
+        feeds.add(KEYED)
+    said = str(refused.value)
+    assert said == ("https://<redacted>@example.test/feeds/gtfs.zip?api_key=<redacted>"
+                    f"#<redacted> could not be fetched: {why}")
+    assert refused.value.__cause__ is None and refused.value.__suppress_context__
+    import traceback
+    printed = "".join(traceback.format_exception(refused.value))
+    _says_nothing_secret(printed)
+    assert list(config.feeds_dir().glob("*.zip")) == []
+
+
+def _http_error(status: int):
+    class Answer:
+        status_code = status
+        reason = f"nope, for url: {KEYED}"
+    return feeds.requests.HTTPError(f"{status} Client Error: nope for url: {KEYED}",
+                                    response=Answer())
+
+
+def test_a_keyed_address_is_kept_whole_to_fetch_and_named_from_its_path(home, tmp_path,
+                                                                       monkeypatch):
+    """The record keeps the address as it was given, since that is what a
+    later fetch asks for; the name a feed with no agency takes comes from the
+    path's file, never from the query."""
+    tables = {k: v for k, v in GOOD.items() if k != "agency.txt"}
+    payload = gtfs_zip(tmp_path / "remote.zip", tables).read_bytes()
+
+    class Response:
+        headers = {"Content-Length": str(len(payload))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            yield payload
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    feed = feeds.add("https://example.test/feeds/Springfield.zip?api_key=S3CRET")
+    assert feed.url == "https://example.test/feeds/Springfield.zip?api_key=S3CRET"
+    assert (feed.name, feed.key) == ("Springfield", "springfield")
+
+
+def test_a_missing_table_names_the_address_without_its_key(home, tmp_path, monkeypatch):
+    tables = {k: v for k, v in GOOD.items() if k != "stops.txt"}
+    payload = gtfs_zip(tmp_path / "remote.zip", tables).read_bytes()
+
+    class Response:
+        headers: dict = {}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            yield payload
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    with pytest.raises(feeds.FeedError, match="has no stops.txt") as refused:
+        feeds.add(KEYED)
+    _says_nothing_secret(str(refused.value))
+
+
+def test_a_presets_refusal_names_its_public_address_whole(home, monkeypatch):
+    """A preset's address is in the registry for anyone to read, so a failed
+    fetch of one names it as it is, query included; only the library's own
+    text is kept out, as for every feed."""
+    url = "https://example.test/t.zip?alt=media"
+    monkeypatch.setitem(feeds.FEEDS, "t", feeds.Feed(key="t", name="T", url=url))
+
+    def get(asked, **kw):
+        raise feeds.requests.ConnectionError(f"Max retries exceeded with url: {asked}")
+
+    monkeypatch.setattr(feeds.requests, "get", get)
+    with pytest.raises(feeds.FeedError) as refused:
+        feeds.fetch("t")
+    assert str(refused.value) == f"{url} could not be fetched: the server could not be reached"
+
+
+def test_a_persons_feed_fetched_again_names_its_address_without_its_key(home, tmp_path,
+                                                                       monkeypatch):
+    """A feed added from a keyed link and fetched again later - its zip gone -
+    fails with the same care as the add did."""
+    payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
+
+    class Response:
+        headers = {"Content-Length": str(len(payload))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            yield payload
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    feed = feeds.add(KEYED, key="mine")
+    feed.zip_path.unlink()
+
+    def get(asked, **kw):
+        assert asked == KEYED
+        raise _http_error(403)
+
+    monkeypatch.setattr(feeds.requests, "get", get)
+    with pytest.raises(feeds.FeedError) as refused:
+        feeds.fetch("mine")
+    assert "could not be fetched: the server answered 403 Forbidden" in str(refused.value)
+    _says_nothing_secret(str(refused.value))

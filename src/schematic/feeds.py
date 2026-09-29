@@ -21,9 +21,11 @@ import shutil
 import threading
 import zipfile
 from contextlib import contextmanager
+from http import HTTPStatus
 from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 from typing import Any, Callable, Iterator
+from urllib.parse import urlsplit
 
 import pandas as pd
 import requests
@@ -98,6 +100,13 @@ class Feed:
     @property
     def zip_path(self) -> Path:
         return config.feeds_dir() / f"{self.key}.zip"
+
+    @property
+    def shown_url(self) -> str:
+        """The address as text that leaves the engine may carry it: a preset's
+        as the registry has it, which is public and is the credit the feed is
+        owed, and a person's own without its secrets (``shown``)."""
+        return self.url if self.source == "preset" else shown(self.url)
 
     def to_dict(self) -> dict[str, Any]:
         """The record as JSON holds it: every field, notes as a list."""
@@ -460,6 +469,90 @@ def _is_url(source: str) -> bool:
     return source.startswith(("http://", "https://"))
 
 
+# What a secret in an address is replaced with. The desktop app's own
+# redaction uses the same marker, so a line redacted here is unchanged by it.
+REDACTED = "<redacted>"
+
+
+def _shown_query(query: str) -> str:
+    """A query without its ``?``: each value replaced, and a part with no name,
+    or with only ``=`` padding after its first ``=``, replaced whole."""
+    parts = re.split(r"([&;])", query)
+    for i in range(0, len(parts), 2):
+        part = parts[i]
+        if not part:
+            continue
+        equals = part.find("=")
+        if equals < 0 or re.fullmatch(r"=+", part[equals + 1:]):
+            parts[i] = REDACTED
+        elif equals < len(part) - 1:
+            parts[i] = part[:equals + 1] + REDACTED
+    return "".join(parts)
+
+
+def shown(url: str) -> str:
+    """``url`` as a message, a log line or a file beside an export may carry it.
+
+    A feed a person added can come from a keyed link (``...?api_key=...``), and
+    a message is something they may later paste into a bug report. What is kept
+    is what says where the feed came from: the scheme, the host and its port,
+    the path, and the names of the query's parameters. The user information,
+    every query value and the fragment become a marker. A token carried as a
+    path segment is not covered: nothing says which segment is the secret.
+
+    The whole address stays on the record and is what ``fetch`` asks for;
+    this is only for text that leaves the engine.
+    """
+    match = re.match(r"[A-Za-z][A-Za-z0-9+.-]*://", url)
+    scheme = match.group(0) if match else ""
+    rest = url[len(scheme):]
+    fragment = ""
+    at = rest.find("#")
+    if at >= 0:
+        fragment = "#" if at == len(rest) - 1 else f"#{REDACTED}"
+        rest = rest[:at]
+    query = ""
+    at = rest.find("?")
+    if at >= 0:
+        query = "?" + _shown_query(rest[at + 1:])
+        rest = rest[:at]
+    at = rest.find("/")
+    authority, path = (rest[:at], rest[at:]) if at >= 0 else (rest, "")
+    at = authority.rfind("@")
+    if at >= 0:
+        authority = f"{REDACTED}@{authority[at + 1:]}"
+    return scheme + authority + path + query + fragment
+
+
+def _why(exc: Exception) -> str:
+    """Why a download failed, in words of our own.
+
+    Never the exception's text: ``requests`` and urllib3 both repeat the
+    address in theirs (``404 Client Error: ... for url: ...``, ``Max retries
+    exceeded with url: /gtfs.zip?api_key=...``), query and all.
+    """
+    if isinstance(exc, requests.HTTPError):
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if isinstance(status, int):
+            try:
+                return f"the server answered {status} {HTTPStatus(status).phrase}"
+            except ValueError:
+                return f"the server answered {status}"
+    if isinstance(exc, requests.Timeout):
+        return "the server did not answer in time"
+    if isinstance(exc, requests.exceptions.SSLError):
+        return "a secure connection could not be made"
+    if isinstance(exc, requests.ConnectionError):
+        return "the server could not be reached"
+    if isinstance(exc, requests.TooManyRedirects):
+        return "it redirected too many times"
+    if isinstance(exc, (requests.exceptions.MissingSchema,
+                        requests.exceptions.InvalidSchema,
+                        requests.exceptions.InvalidURL)):
+        return "the address is not one that can be fetched"
+    return f"the request failed ({type(exc).__name__})"
+
+
 class Interrupted(Exception):
     """An add() or a download stopped because its caller asked; nothing was kept."""
 
@@ -482,7 +575,15 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
     registry and nothing on disk -- whichever source it came from.
     """
     source_text = str(source)
-    what = source_text if _is_url(source_text) else Path(source_text).name
+    from_url = _is_url(source_text)
+    # How the source is named in a sentence, and what the feed is called when
+    # it names no agency: an address without its secrets, and the file's name
+    # from the address's path alone, never from its query.
+    what = shown(source_text) if from_url else Path(source_text).name
+    try:
+        fallback = Path(urlsplit(source_text).path if from_url else source_text).stem
+    except ValueError:
+        fallback = ""
     if key is not None and not KEY_PATTERN.match(key):
         raise FeedError("a feed key is lower-case letters, digits and hyphens, up to 64")
     if not valid_mode(mode):
@@ -491,7 +592,7 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
     staging = config.feeds_dir() / f".adding-{os.getpid()}-{threading.get_ident()}.zip"
     staging.parent.mkdir(parents=True, exist_ok=True)
     try:
-        if _is_url(source_text):
+        if from_url:
             _download(source_text, staging, progress=progress, cancelled=cancelled)
             url = source_text
         else:
@@ -506,7 +607,7 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
         if progress is not None:
             progress("check", 1, None)
         if name is None:
-            name = _agency_name(staging, members) or Path(what).stem or "Feed"
+            name = _agency_name(staging, members) or fallback or "Feed"
         if key is None:
             base = slug(name)
             key = base
@@ -557,11 +658,14 @@ def inspect(key: str, *, anchor: "dt.date | None" = None):
     return inspection.inspect(key, anchor=anchor)
 
 
-def _download(url: str, dest: Path, *,
+def _download(url: str, dest: Path, *, named: str | None = None,
               progress: "Callable[[str, int, int | None], None] | None" = None,
               cancelled: "Callable[[], bool] | None" = None) -> Path:
     """``url``'s bytes into ``dest``, streamed so a caller can watch and stop
-    it, or a FeedError; a page that is not a zip is refused and removed."""
+    it, or a FeedError; a page that is not a zip is refused and removed.
+    ``named`` is how a refusal names the address: without its secrets unless
+    the caller says otherwise, as it does for a preset's public one."""
+    named = shown(url) if named is None else named
     # Some agencies (MARTA) return 403 to a bare requests user-agent.
     resp = None
     try:
@@ -582,7 +686,9 @@ def _download(url: str, dest: Path, *,
                     progress("download", done, total)
     except requests.RequestException as exc:
         dest.unlink(missing_ok=True)
-        raise FeedError(f"{url} could not be fetched: {exc}") from exc
+        # No cause carried: the traceback a failed request is logged with
+        # would print the exception's own text, which names the address whole.
+        raise FeedError(f"{named} could not be fetched: {_why(exc)}") from None
     finally:
         # A cancelled download's connection goes now, not at collection. A
         # cancel is asked between chunks, so on a server that has stopped
@@ -594,7 +700,7 @@ def _download(url: str, dest: Path, *,
     if not zipfile.is_zipfile(dest):
         size = dest.stat().st_size
         dest.unlink(missing_ok=True)
-        raise FeedError(f"{url} did not return a zip ({size} bytes)")
+        raise FeedError(f"{named} did not return a zip ({size} bytes)")
     return dest
 
 
@@ -660,7 +766,8 @@ def fetch(key: str, *, force: bool = False) -> Path:
             # before a byte is fetched.
             if cancelled is not None and cancelled():
                 raise Interrupted()
-            _download(feed.url, partial, progress=progress, cancelled=cancelled)
+            _download(feed.url, partial, named=feed.shown_url,
+                      progress=progress, cancelled=cancelled)
             # The last word, as ``add`` has it: a cancel after the final chunk
             # is still a cancel, and nothing is kept.
             if cancelled is not None and cancelled():

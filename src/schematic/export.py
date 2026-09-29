@@ -997,7 +997,10 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
             # What the atlas says about this network, carried with the picture.
             "caveats": prov.get("caveats", []),
             "notes": list(feed.notes),
-            "source": feed.url,
+            # A person's own feed without its secrets: the file sits beside
+            # a picture that is made to be shared, and a feed they added can
+            # come from a keyed link. A preset's is public, and written whole.
+            "source": feed.shown_url,
         }
         sidecar_path(path).write_text(json.dumps(meta, indent=2) + "\n",
                                       encoding="utf-8", newline="\n")

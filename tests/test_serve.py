@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import os
 import re
 import shutil
@@ -1191,6 +1192,51 @@ def test_feeds_add_by_url_reports_the_bytes_and_a_cancel_leaves_nothing(client, 
     assert error["code"] == JsonRpcRequestCancelled.CODE
     assert "stopped" not in feeds.all()
     assert client.endpoint.jobs == {}
+
+
+def test_a_failed_add_from_a_keyed_address_tells_nobody_the_key(client, home, monkeypatch,
+                                                               caplog):
+    """Issue 32. A feed can be added from a keyed link, and what a failed add
+    says goes to three places a person may share: the error a client shows,
+    its detail, and the traceback this process logs. None of them names the
+    key, the user or the fragment, and ``requests``' own sentence - which
+    repeats the address - is in none of them."""
+    keyed = "https://someone:pw@example.test/feeds/gtfs.zip?api_key=S3CRET#tok"
+
+    class Answer:
+        status_code = 403
+        reason = "Forbidden"
+
+    def get(url, **kw):
+        assert url == keyed, "the fetch itself asks for the whole address"
+        raise feeds.requests.HTTPError(f"403 Client Error: Forbidden for url: {url}",
+                                       response=Answer())
+
+    monkeypatch.setattr(feeds.requests, "get", get)
+    # The module's home is shared, so other tests' feeds may be in it.
+    before = sorted(feeds.all())
+    # The level the engine logs at unless SCHEMATIC_LOG says otherwise. At
+    # debug the protocol library prints every request as it arrived, which is
+    # the address as the client gave it: a person who asks for the wire gets
+    # the wire.
+    with caplog.at_level("INFO"):
+        error = client.wait(client.send("feeds.add", {"source": keyed}))["error"]
+    assert error["code"] == -32000, error
+    check(error["data"], "ErrorData")
+    assert error["data"]["kind"] == "feed"
+    assert error["data"]["hint"] == (
+        "https://<redacted>@example.test/feeds/gtfs.zip?api_key=<redacted>#<redacted> "
+        "could not be fetched: the server answered 403 Forbidden")
+    logged = "\n".join(
+        [r.getMessage() for r in caplog.records]
+        + [logging.Formatter().formatException(r.exc_info)
+           for r in caplog.records if r.exc_info])
+    assert "could not be fetched" in logged, "the failure was logged, with its traceback"
+    assert keyed not in json.dumps(client.out)
+    for text in (json.dumps(error), logged, json.dumps(client.out)):
+        for secret in ("S3CRET", "someone", "pw@", "tok", "Client Error"):
+            assert secret not in text, f"{secret!r} is in {text!r}"
+    assert sorted(feeds.all()) == before, "nothing was kept"
 
 
 def test_feeds_inspect_for_la_is_the_librarys_answer(client, home):

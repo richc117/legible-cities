@@ -489,3 +489,38 @@ def test_every_ffmpeg_call_goes_through_the_resolver(tmp_path, monkeypatch):
     calls = log.read_text().splitlines()
     assert len(calls) == 3, calls          # palettegen, paletteuse, the resample
     assert all("-loglevel error" in c for c in calls)
+
+
+def test_the_sidecar_names_a_persons_source_without_its_secrets(tmp_path, monkeypatch):
+    """The file beside an export travels with the picture, and a feed a person
+    added can come from a keyed link (issue 32). The record keeps the address
+    whole; the sidecar says where the feed came from and nothing else."""
+    keyed = "https://someone:pw@example.test/feeds/gtfs.zip?api_key=S3CRET#tok"
+    mine = feeds.Feed(key="keyed", name="Keyed", url=keyed, city="Springfield",
+                      network="Transit", source="user")
+    monkeypatch.setattr(feeds, "get", lambda key: mine)
+    written = tmp_path / "keyed.png"
+    written.write_bytes(b"png")
+    export._write_sidecar("keyed", export.PRESETS["bluesky"], [written],
+                          theme="dark", view="schematic")
+    text = export.sidecar_path(written).read_text(encoding="utf-8")
+    assert json.loads(text)["source"] == (
+        "https://<redacted>@example.test/feeds/gtfs.zip?api_key=<redacted>#<redacted>")
+    for secret in ("S3CRET", "someone", "pw@", "tok"):
+        assert secret not in text
+    assert mine.url == keyed
+
+
+def test_the_sidecar_names_a_presets_source_as_the_registry_has_it(tmp_path):
+    """A preset's address is public and is the credit the feed is owed. One
+    of them carries a query (Mexico City's ``?alt=media``), which a redaction
+    applied to every feed alike would have turned into a marker."""
+    assert any("?" in feed.url for feed in feeds.FEEDS.values())
+    for key, feed in feeds.FEEDS.items():
+        assert feed.shown_url == feed.url, key
+    written = tmp_path / "cdmx.png"
+    written.write_bytes(b"png")
+    export._write_sidecar("cdmx-metro", export.PRESETS["bluesky"], [written],
+                          theme="dark", view="schematic")
+    meta = json.loads(export.sidecar_path(written).read_text(encoding="utf-8"))
+    assert meta["source"] == feeds.FEEDS["cdmx-metro"].url

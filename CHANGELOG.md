@@ -5,6 +5,33 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Fixed
+
+- **A feed's address leaves the engine without its secrets** (issue 32). A
+  feed a person adds can come from a keyed link (`...?api_key=...`), and
+  the engine wrote that address whole into three places a person may later
+  share: the sentence of a failed download, the traceback logged with it,
+  and the `.json` written beside every export, whose `source` is the
+  feed's address. Text that leaves the engine now names a person's feed by
+  scheme, host, path and the names of its query's parameters, with the
+  user information, every query value and the fragment replaced by
+  `<redacted>` (`feeds.shown`, the marker and the rule the desktop app's
+  own redaction uses, so a line redacted here is unchanged by it). A
+  failed download says why in the engine's own words ("the server answered
+  403 Forbidden", "the server could not be reached") rather than in
+  `requests`' text, which repeats the address, and carries no cause, so
+  the logged traceback has nothing to print it from. A feed with no agency
+  name is named from the file in the address's path, never from its query.
+  A preset's address is public and is written as the registry has it. The
+  record still holds a person's address whole, since that is what a later
+  fetch asks for, and `feeds.list` answers it whole. Not covered: a token
+  carried as a path segment, which nothing marks as a secret; and the
+  debug level (`SCHEMATIC_LOG=debug`), where the protocol library prints
+  each request as it arrived. No method or shape changed and the schema's
+  bytes did not move.
+
 ## [0.10.0] - 2026-09-28
 
 ### Added
