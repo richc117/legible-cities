@@ -407,3 +407,126 @@ def test_an_empty_agency_means_every_operator_where_the_entry_names_one():
     assert feeds.resolved("cdmx-metro", agency=feeds.NO_AGENCY).agency is None
     assert feeds.resolved("cdmx-metro", agency="SUB").agency == "SUB"
 
+
+
+# ------------------------------------------------- a preset's first download
+#
+# E36. A preset's zip is fetched the first time something needs it, deep in a
+# layout or an inspection. Inside ``watched`` that download reports its bytes
+# and stops on a cancel, leaving nothing, as a person's own feed's does.
+
+
+def _preset(monkeypatch, payload: bytes, *, chunk: int = 64):
+    """A preset ``t`` whose URL is answered by ``payload`` in ``chunk``s."""
+    monkeypatch.setitem(feeds.FEEDS, "t", feeds.Feed(key="t", name="T",
+                                                     url="https://example.test/t.zip"))
+    gets = []
+
+    class Response:
+        headers = {"Content-Length": str(len(payload))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            for i in range(0, len(payload), chunk):
+                yield payload[i:i + chunk]
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: gets.append(url) or Response())
+    return gets
+
+
+def test_a_watched_fetch_reports_its_bytes_and_a_cached_one_nothing(home, tmp_path, monkeypatch):
+    payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
+    gets = _preset(monkeypatch, payload)
+    heard = []
+    with feeds.watched(lambda stage, done, total: heard.append((stage, done, total)), None):
+        path = feeds.fetch("t")
+    assert path.read_bytes() == payload
+    assert len(heard) > 1 and all(stage == "download" for stage, _d, _t in heard)
+    assert heard[-1] == ("download", len(payload), len(payload))
+
+    heard.clear()
+    with feeds.watched(lambda *a: heard.append(a), None):
+        assert feeds.fetch("t") == path
+    assert heard == [] and gets == ["https://example.test/t.zip"], "cached: no download, no report"
+
+
+def test_a_cancelled_fetch_keeps_nothing_and_the_next_downloads_afresh(home, tmp_path, monkeypatch):
+    payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
+    gets = _preset(monkeypatch, payload)
+    asked = []
+    with feeds.watched(None, lambda: asked.append(1) or len(asked) > 1):
+        with pytest.raises(feeds.Interrupted):
+            feeds.fetch("t")
+    assert sorted(p.name for p in config.feeds_dir().iterdir()) == [], "no zip and no .part"
+
+    # Outside a request nothing is watched, and the feed is fetched whole.
+    assert feeds.fetch("t").read_bytes() == payload
+    assert len(gets) == 2, "downloaded afresh"
+
+
+def test_a_cancel_after_the_last_chunk_still_keeps_nothing(home, tmp_path, monkeypatch):
+    """The download ran to its end and the cancel came after: whole or not at
+    all, so the zip is not kept - as add() has it since E23."""
+    payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
+    _preset(monkeypatch, payload)
+    seen = []
+    with feeds.watched(lambda stage, done, total: seen.append(done),
+                       lambda: bool(seen) and seen[-1] == len(payload)):
+        with pytest.raises(feeds.Interrupted):
+            feeds.fetch("t")
+    assert seen[-1] == len(payload)
+    assert list(config.feeds_dir().iterdir()) == []
+
+
+def test_a_download_that_fails_midway_leaves_no_part_file(home, tmp_path, monkeypatch):
+    """Whatever stops a download after its first bytes - here the connection
+    dropping, which is not a refusal ``_download`` cleans up itself - the
+    ``.part`` goes with it (E36)."""
+    payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
+    monkeypatch.setitem(feeds.FEEDS, "t", feeds.Feed(key="t", name="T",
+                                                     url="https://example.test/t.zip"))
+
+    class Response:
+        headers = {"Content-Length": str(len(payload))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            yield payload[:64]
+            raise OSError("connection reset")
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    with feeds.watched(None, None):
+        with pytest.raises(OSError):
+            feeds.fetch("t")
+    assert list(config.feeds_dir().iterdir()) == []
+
+
+def test_an_already_cancelled_request_fetches_nothing(home, tmp_path, monkeypatch):
+    """A request that waited on the feed's lock while another's download was
+    cancelled may have been cancelled itself: it asks before fetching a byte."""
+    gets = _preset(monkeypatch, gtfs_zip(tmp_path / "remote.zip").read_bytes())
+    with feeds.watched(None, lambda: True):
+        with pytest.raises(feeds.Interrupted):
+            feeds.fetch("t")
+    assert gets == []
+    assert list(config.feeds_dir().iterdir()) == []
+
+
+def test_the_watcher_is_the_calling_threads_alone(home, tmp_path, monkeypatch):
+    """A download on another thread, outside any request, is not reported to
+    this one's watcher and ignores its cancel."""
+    import threading
+
+    payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
+    _preset(monkeypatch, payload)
+    heard, done = [], []
+    with feeds.watched(lambda *a: heard.append(a), lambda: True):
+        other = threading.Thread(target=lambda: done.append(feeds.fetch("t")))
+        other.start()
+        other.join(10)
+    assert done and done[0].read_bytes() == payload
+    assert heard == []

@@ -20,9 +20,10 @@ import re
 import shutil
 import threading
 import zipfile
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 import pandas as pd
 import requests
@@ -460,7 +461,7 @@ def _is_url(source: str) -> bool:
 
 
 class Interrupted(Exception):
-    """An add() stopped because its caller asked; nothing was kept."""
+    """An add() or a download stopped because its caller asked; nothing was kept."""
 
 
 def add(source: Path | str, *, key: str | None = None, name: str | None = None,
@@ -562,6 +563,7 @@ def _download(url: str, dest: Path, *,
     """``url``'s bytes into ``dest``, streamed so a caller can watch and stop
     it, or a FeedError; a page that is not a zip is refused and removed."""
     # Some agencies (MARTA) return 403 to a bare requests user-agent.
+    resp = None
     try:
         resp = requests.get(url, timeout=180, stream=True, headers={
             "User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)",
@@ -581,6 +583,13 @@ def _download(url: str, dest: Path, *,
     except requests.RequestException as exc:
         dest.unlink(missing_ok=True)
         raise FeedError(f"{url} could not be fetched: {exc}") from exc
+    finally:
+        # A cancelled download's connection goes now, not at collection. A
+        # cancel is asked between chunks, so on a server that has stopped
+        # sending it waits for the next chunk or the read timeout.
+        close = getattr(resp, "close", None)
+        if close is not None:
+            close()
     # Fail loudly rather than caching an HTML error page as a "feed".
     if not zipfile.is_zipfile(dest):
         size = dest.stat().st_size
@@ -601,19 +610,64 @@ def _disk(key: str) -> threading.Lock:
         return _locks.setdefault(key, threading.Lock())
 
 
+# Who hears a download that happens inside a request, per thread (E36). A
+# preset's zip is fetched the first time anything needs it, deep inside a
+# layout, an inspection or a service-day read, through callers that know
+# nothing of the request; the request's own thread says, once, who wants the
+# bytes and who may stop them, as ``loom.cancellable`` does for a tool.
+_watch = threading.local()
+
+DownloadProgress = Callable[[str, int, "int | None"], None]
+
+
+@contextmanager
+def watched(progress: DownloadProgress | None,
+            cancelled: Callable[[], bool] | None) -> Iterator[None]:
+    """Run the block with any download ``fetch`` makes reporting its bytes to
+    ``progress(stage, done, total)`` and asking ``cancelled()`` between chunks
+    and once more before the zip is kept."""
+    previous = getattr(_watch, "hooks", None)
+    _watch.hooks = (progress, cancelled)
+    try:
+        yield
+    finally:
+        _watch.hooks = previous
+
+
 def fetch(key: str, *, force: bool = False) -> Path:
-    """Download a feed if it is not already cached. Returns the local zip path."""
+    """Download a feed if it is not already cached. Returns the local zip path.
+
+    Inside ``watched`` the download reports its bytes and can be cancelled:
+    a cancel raises Interrupted and caches nothing, so the next call
+    downloads afresh. A feed already cached reports nothing.
+    """
     feed = get(key)
     feed.zip_path.parent.mkdir(parents=True, exist_ok=True)
+    progress, cancelled = getattr(_watch, "hooks", None) or (None, None)
     with _disk(key):
         if feed.zip_path.exists() and not force:
             return feed.zip_path
         if not feed.url:
             raise FeedError(f"{key!r} was added from a file and its zip is gone; add it again")
         # Whole or not at all: a quit mid-write must not leave a truncated
-        # zip that the next call takes for the feed.
+        # zip that the next call takes for the feed, and neither may a cancel,
+        # a refusal or a failure (the .part goes with any of them).
         partial = feed.zip_path.with_name(feed.zip_path.name + ".part")
-        _download(feed.url, partial)
+        try:
+            # A request that waited here for another's download, which was
+            # cancelled and kept nothing, may have been cancelled itself
+            # meanwhile: the lock's wait cannot be interrupted, so ask now,
+            # before a byte is fetched.
+            if cancelled is not None and cancelled():
+                raise Interrupted()
+            _download(feed.url, partial, progress=progress, cancelled=cancelled)
+            # The last word, as ``add`` has it: a cancel after the final chunk
+            # is still a cancel, and nothing is kept.
+            if cancelled is not None and cancelled():
+                raise Interrupted()
+        except BaseException:
+            partial.unlink(missing_ok=True)
+            raise
         os.replace(partial, feed.zip_path)
         return feed.zip_path
 

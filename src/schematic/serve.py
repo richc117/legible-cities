@@ -7,9 +7,10 @@ The transport is the Language Server Protocol's: ``Content-Length`` framed
 messages on stdin and stdout, stderr for logs. Long requests stay open until
 they finish; while they run, ``job/progress`` and ``job/log`` notifications
 carry the request's id, and ``$/cancelRequest`` ends the process the request
-is waiting on (a LOOM tool, or ffmpeg) and answers it with the cancelled
-error. A request that waits on no process (``feeds.service`` reads a
-calendar) runs to its end and is answered with the same error.
+is waiting on (a LOOM tool, or ffmpeg), or stops a feed it is downloading
+between chunks and caches nothing, and answers it with the cancelled error.
+Work that waits on neither (``feeds.service`` reading a calendar) runs to its
+end and is answered with the same error.
 
 Errors a person can act on are code -32000 with ``data: {kind, detail,
 hint}``: ``hint`` is the sentence the engine already raises, ``detail`` says
@@ -524,7 +525,12 @@ class EngineEndpoint(Endpoint):
             try:
                 if job.cancelled:
                     raise JsonRpcRequestCancelled()
-                with loom.cancellable(job):
+                # A feed downloaded anywhere inside the work - a preset's
+                # zip fetched the first time a layout, an inspection or a
+                # service-day read needs it - reports its bytes as stage
+                # download and stops on a cancel, leaving nothing (E36).
+                with loom.cancellable(job), feeds.watched(_download_report(progress),
+                                                          lambda: job.cancelled):
                     result = work(job, progress)
                 # Work that starts no process cannot be interrupted, so a
                 # cancel that arrived while it ran is honoured here: the
@@ -533,7 +539,9 @@ class EngineEndpoint(Endpoint):
                 if job.cancelled:
                     raise JsonRpcRequestCancelled()
                 return result
-            except loom.Cancelled:
+            except (loom.Cancelled, feeds.Interrupted):
+                # A tool ended by the cancel, or a download stopped by it
+                # (E36): the cancelled error, whatever the work was.
                 raise JsonRpcRequestCancelled() from None
             except JsonRpcException:
                 raise
@@ -678,12 +686,11 @@ class EngineEndpoint(Endpoint):
         _no_extra("feeds.add", left)
 
         def work(job: loom.Job, progress: Progress) -> dict[str, Any]:
+            feeds_report = _download_report(progress)
+
             def report(stage: str, done: int, total: int | None) -> None:
                 if stage == "download":
-                    fraction = min(done / total, 1.0) if total else 0.0
-                    message = (f"downloaded {done:,} of {total:,} bytes" if total
-                               else f"downloaded {done:,} bytes")
-                    progress("download", fraction, message)
+                    feeds_report(stage, done, total)
                 elif done:
                     progress("check", 1.0, "checked the feed's tables")
             feed = feeds.add(source, key=key, name=name.strip() if name else None,
@@ -787,6 +794,21 @@ class EngineEndpoint(Endpoint):
                     "sidecar": sidecar}
 
         return self._job(work)
+
+
+def _download_report(progress: Progress) -> feeds.DownloadProgress:
+    """A download's bytes as job/progress, stage ``download``: the fraction
+    of the bytes when the server said how many, else 0, and the sentence
+    ``feeds.add`` has always sent. One function for an add and for a
+    preset's first fetch inside any long request (E36)."""
+    def report(stage: str, done: int, total: int | None) -> None:
+        if stage != "download":
+            return
+        fraction = min(done / total, 1.0) if total else 0.0
+        message = (f"downloaded {done:,} of {total:,} bytes" if total
+                   else f"downloaded {done:,} bytes")
+        progress("download", fraction, message)
+    return report
 
 
 def _stage_summary(graph: LineGraph) -> dict[str, Any]:

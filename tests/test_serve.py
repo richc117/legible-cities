@@ -1176,8 +1176,11 @@ def test_feeds_add_by_url_reports_the_bytes_and_a_cancel_leaves_nothing(client, 
     reports = client.notifications("job/progress", msg_id)
     downloads = [p for p in reports if p["stage"] == "download"]
     assert downloads and downloads[-1]["fraction"] == 1.0
-    assert "of" in downloads[-1]["message"] and "bytes" in downloads[-1]["message"]
-    assert reports[-1]["stage"] == "check"
+    # The sentence feeds.add has always sent, word for word: E36 moved its
+    # making into one function shared with a preset's download.
+    assert re.fullmatch(r"downloaded [\d,]+ of [\d,]+ bytes", downloads[-1]["message"])
+    assert reports[-1] == {"id": msg_id, "stage": "check", "fraction": 1.0,
+                           "message": "checked the feed's tables"}
 
     # Cancelled during the download: the cancelled error, and nothing kept.
     msg_id = client.send("feeds.add", {"source": "https://example.test/gtfs.zip",
@@ -1243,3 +1246,69 @@ def test_a_feed_added_through_the_protocol_builds(client, home):
         other.endpoint.close()
     client.call("feeds.remove", {"key": "la-user"})
 
+
+
+def test_a_long_request_reports_a_presets_download_and_a_cancel_keeps_nothing(client, tmp_path,
+                                                                                monkeypatch):
+    """E36, over the protocol: a feed downloaded inside any long request - here
+    the work fetches a preset, as a first layout or inspection does - reports
+    stage download with its bytes, and a cancel during it answers the
+    cancelled error and caches nothing."""
+    import zipfile
+
+    monkeypatch.setenv(config.ENV, str(tmp_path))
+    source = tmp_path / "remote.zip"
+    with zipfile.ZipFile(source, "w") as z:
+        z.writestr("agency.txt", "agency_id,agency_name\nA,A\n")
+    payload = source.read_bytes()
+    monkeypatch.setitem(feeds.FEEDS, "t", feeds.Feed(key="t", name="T",
+                                                     url="https://example.test/t.zip"))
+
+    class Response:
+        headers = {"Content-Length": str(len(payload))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            for i in range(0, len(payload), 32):
+                yield payload[i:i + 32]
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    endpoint = client.endpoint
+
+    endpoint._request_id = 51
+    run = endpoint._job(lambda _job, _progress: {"zip": feeds.fetch("t").name})
+    endpoint._request_id = None
+    assert run() == {"zip": "t.zip"}
+    progress = client.notifications("job/progress", 51)
+    assert progress and all(p["stage"] == "download" for p in progress)
+    assert progress[-1]["fraction"] == 1.0
+    assert progress[-1]["message"] == f"downloaded {len(payload):,} of {len(payload):,} bytes"
+
+    feeds.get("t").zip_path.unlink()
+    endpoint._request_id = 52
+
+    def cancelled_midway(job, _progress):
+        original = feeds.requests.get
+
+        def get(url, **kw):
+            response = original(url, **kw)
+            chunks = response.iter_content
+
+            def iter_content(size):
+                for i, chunk in enumerate(chunks(size)):
+                    if i == 1:
+                        client.notify("$/cancelRequest", {"id": 52})
+                    yield chunk
+            response.iter_content = iter_content
+            return response
+
+        monkeypatch.setattr(feeds.requests, "get", get)
+        return feeds.fetch("t")
+
+    run = endpoint._job(cancelled_midway)
+    endpoint._request_id = None
+    with pytest.raises(JsonRpcRequestCancelled):
+        run()
+    assert sorted(p.name for p in config.feeds_dir().iterdir()) == []
