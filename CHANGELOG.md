@@ -5,6 +5,18 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.9.1] - 2026-09-28
+
+### Changed
+
+- **A layout read from the store says only that** (E37). Its log line was
+  `layout 1a2b3c4d: read from the store; nothing was laid out`, true of the
+  request that read it and false of the run a client shows: the desktop
+  app lays out and then draws, two requests in one log, so the draw's line
+  followed the layout's four stage lines and seemed to deny them. It is
+  `layout 1a2b3c4d: read from the store` now, still with how long the
+  request waited when another was building it.
+
 ## [0.9.0] - 2026-09-28
 
 ### Added
