@@ -160,7 +160,7 @@ def test_a_draw_logs_its_own_stages_and_no_path(tmp_path):
     heard: list[str] = []
     with loom.cancellable(loom.Job(log=heard.append)):
         pipeline.run("pittsburgh-t", layout=stored.id, date=DAY, out_dir=tmp_path)
-    assert heard[0] == f"layout {stored.id[:8]}: read from the store; nothing was laid out"
+    assert heard[0] == f"layout {stored.id[:8]}: read from the store"
     assert [line.split(":", 1)[0] for line in heard[1:]] == [
         "schedule", "render", "animate", "write"]
     assert all(re.search(r" \(\d+\.\d s\)$", line) for line in heard[1:]), heard

@@ -444,9 +444,13 @@ def _stage_done(progress: Progress | None, stage: str, fraction: float, path: Pa
 
 
 def _from_store(layout: Layout, waited: float = 0.0) -> None:
-    """Say that a layout was read, not made: its stages did not run here.
-    A request that waited for another's build of it says how long."""
-    line = f"layout {layout.id[:8]}: read from the store; nothing was laid out"
+    """Say that a layout was read, not made: its stages did not run in this
+    request. A request that waited for another's build of it says how long.
+
+    It does not say "nothing was laid out" (it did at 0.9.0): a client that
+    lays out and then draws sends two requests and shows one log, where the
+    draw's line followed the layout's four and read as a denial of them."""
+    line = f"layout {layout.id[:8]}: read from the store"
     if waited > 0:
         line += f" (waited {waited:.1f} s for another build of it)"
     _log(line)

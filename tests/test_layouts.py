@@ -298,7 +298,7 @@ def test_two_builds_of_one_layout_at_once_make_one_layout(home, monkeypatch):
     assert fake.calls.count("topo") == 1, "one build, not two"
     assert ids_under(KEY) == [first.id]
     assert len(heard) == 1, heard
-    assert re.match(rf"^layout {first.id[:8]}: read from the store; nothing was laid out "
+    assert re.match(rf"^layout {first.id[:8]}: read from the store "
                     r"\(waited \d+\.\d s for another build of it\)$", heard[0]), heard
 
 
@@ -361,7 +361,7 @@ def test_a_layout_logs_a_line_for_every_stage_in_order_and_names_no_path(home, m
     heard.clear()
     with loom.cancellable(loom.Job(log=heard.append)):
         pipeline.lay_out(KEY)
-    assert heard == [f"layout {made.id[:8]}: read from the store; nothing was laid out"]
+    assert heard == [f"layout {made.id[:8]}: read from the store"]
 
 
 def test_outside_a_request_no_stage_is_read_back_for_a_line(home, monkeypatch):
@@ -417,7 +417,7 @@ def test_a_draw_logs_its_stages_and_never_a_path(home, monkeypatch, tmp_path):
     heard: list[str] = []
     with loom.cancellable(loom.Job(log=heard.append)):
         pipeline.run(KEY, layout=made.id, date=dt.date(2026, 9, 10), out_dir=out)
-    assert heard[0] == f"layout {made.id[:8]}: read from the store; nothing was laid out"
+    assert heard[0] == f"layout {made.id[:8]}: read from the store"
     assert [line.split(":", 1)[0] for line in heard[1:]] == [
         "schedule", "render", "animate", "write"]
     assert all(re.search(r" \(\d+\.\d s\)$", line) for line in heard[1:]), heard
