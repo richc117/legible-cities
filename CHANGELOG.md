@@ -5,6 +5,29 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.10.0] - 2026-09-28
+
+### Added
+
+- **A preset's first download reports its bytes and honours a cancel**
+  (E36). A preset's zip is fetched the first time something needs it --
+  inside `graph.build`, `feeds.inspect`, `feeds.service` or `map.build` --
+  and that download reported nothing and could not be stopped: a cancel was
+  honoured only once it had finished, and the zip was kept. Inside any long
+  request it now reports `job/progress` with stage `download` when it
+  happens, once per chunk, with the fraction of the download's own bytes
+  and the sentence `feeds.add` sends ("downloaded 65,536 of 1,732,403
+  bytes"), and a cancel
+  between chunks or after the last one answers the cancelled error
+  (-32800) and caches nothing: no zip and no `.part`, so the next request
+  downloads afresh; a request that waited for another's cancelled download
+  of the same feed asks its own cancel before fetching. A feed already on
+  disk reports no download. The
+  protocol's description of `job/progress` and `feeds.service` says so; no
+  method or shape changed, so this is additive at protocol 1. The download
+  is watched per request thread (`feeds.watched`), as a LOOM tool is
+  (`loom.cancellable`), rather than threaded through every caller.
+
 ## [0.9.1] - 2026-09-28
 
 ### Changed
