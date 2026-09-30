@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Desktop app | Legible Cities</title>
+    <meta name="description" content="Legible Cities for macOS and Windows. Turn a city’s GTFS timetable into a schematic map and a running animation, and export stills, reels and GIFs, all on your own computer.">
+    <meta name="theme-color" content="#15120f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Legible Cities">
+    <link rel="icon" href="/legible-cities/favicon.ico" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="/legible-cities/assets/favicon/favicon.svg">
+    <link rel="icon" type="image/png" sizes="96x96" href="/legible-cities/assets/favicon/favicon-96x96.png">
+    <link rel="apple-touch-icon" href="/legible-cities/assets/favicon/apple-touch-icon.png">
+    <link rel="manifest" href="/legible-cities/assets/favicon/site.webmanifest">
+
+    
+    <link rel="canonical" href="https://richc117.github.io/legible-cities/app/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Legible Cities">
+    <meta property="og:title" content="Desktop app">
+    <meta property="og:description" content="Legible Cities for macOS and Windows. Turn a city’s GTFS timetable into a schematic map and a running animation, and export stills, reels and GIFs, all on your own computer.">
+    <meta property="og:url" content="https://richc117.github.io/legible-cities/app/">
+    <meta property="og:image" content="https://richc117.github.io/legible-cities/assets/og-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Schematic map of the Los Angeles Metro Rail, with every segment running horizontally, vertically or at forty-five degrees.">
+    
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://richc117.github.io/legible-cities/assets/og-card.png">
+
+    <link rel="stylesheet" href="/legible-cities/assets/style.css">
+    <script src="/legible-cities/assets/theme.js"></script>
+    <script defer src="/legible-cities/assets/embed.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        
+        <a class="brand" href="/legible-cities/" >Legible Cities</a>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="/legible-cities/atlas/" >Atlas</a>
+          <a href="/legible-cities/framework/" >Framework</a>
+          <a href="/legible-cities/app/" aria-current="page">App</a>
+          <label class="theme-switch" aria-label="Toggle color theme">
+            <input id="theme-toggle" type="checkbox" role="switch" aria-label="Theme toggle">
+            <span class="slider" aria-hidden="true"></span>
+          </label>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      
+<section class="wrap">
+  <header class="essay-header">
+    <h1>Desktop app</h1>
+    <p class="lead">
+      The pipeline that drew every map on this site, behind a window, for
+      people who do not use a terminal. It runs on macOS and Windows. It
+      is new: expect rough edges, and expect things to change between
+      releases.
+    </p>
+  </header>
+  <p>
+    Give it a city&rsquo;s published GTFS timetable and it makes the same
+    things the <a href="/legible-cities/atlas/">atlas</a> is made of: a
+    schematic map straightened onto a 45&deg; grid, and a running animation of
+    the service day across it. Then it exports them as stills, reels and GIFs
+    sized for Instagram, LinkedIn, Bluesky and X. Everything happens
+    on your own computer.
+  </p>
+</section>
+
+<section class="wrap">
+  <h2>What it does</h2>
+  <p>
+    <strong>Start from a sample city</strong>, one of the networks the atlas
+    already draws: one press makes a project, downloads the feed and lays it
+    out. Or <strong>start from your own feed</strong>, a GTFS zip on your
+    computer or one at a web address.
+  </p>
+  <p>
+    A project opens as a notebook of six numbered cells, under a map that
+    stays in view while you work down them:
+  </p>
+  <ol>
+    <li><strong>Data.</strong> Read what is in the feed: its routes,
+      operators and service window, and the network drawn where it really
+      runs. Choose which mode and which operator to keep.</li>
+    <li><strong>Process.</strong> Lay the network out, stage by stage, and
+      read what the build had to fudge. The layout is computed once and
+      stored, so every map and export drawn from it afterwards matches.</li>
+    <li><strong>Frame and service day.</strong> Pick the day the map is drawn
+      for, scrub its clock, play the day and set the speed.</li>
+    <li><strong>Style.</strong> A dark or a sepia map.</li>
+    <li><strong>Lines.</strong> Each line&rsquo;s colour, and the order the
+      lines stack in.</li>
+    <li><strong>Export.</strong> A still, a reel or a GIF, from presets for
+      each platform.</li>
+  </ol>
+</section>
+
+
+
+
+<figure class="figure" id="screenshot-library">
+  <img src="/legible-cities/assets/app-library.png" width="1600" height="1000"
+       loading="lazy" decoding="async" alt="The Library with one project, LA Metro Rail, above a grid of sample cities: LA Metro Rail, BART, TriMet MAX, the New York City Subway and others, each saying which modes it keeps and whether it has been downloaded.">
+  <figcaption>The first screen, with your projects, the sample cities and the feeds you have added.</figcaption>
+</figure>
+
+<figure class="figure" id="screenshot-inspect">
+  <img src="/legible-cities/assets/app-inspect.png" width="1600" height="1000"
+       loading="lazy" decoding="async" alt="Cell 01 open under the map of Los Angeles Metro Rail: the heading Where the routes run, the gtfs2graph and loom stages, counts of 114 stations and 6 lines, and the six lines drawn along their real courses.">
+  <figcaption>Cell 01, Data, reading a feed before it is laid out, with the network drawn where it really runs.</figcaption>
+</figure>
+
+<figure class="figure" id="screenshot-map">
+  <img src="/legible-cities/assets/app-map.png" width="1600" height="1000"
+       loading="lazy" decoding="async" alt="A project named LA Metro Rail: six numbered steps down the side, all ready, and a dark schematic map of six coloured lines above the cells, with cell 02 open on a line of eight stages that ends Laid out.">
+  <figcaption>A project as a notebook of six cells, under a map that stays in view while you work down them.</figcaption>
+</figure>
+
+<figure class="figure" id="screenshot-export">
+  <img src="/legible-cities/assets/app-export.png" width="1600" height="1000"
+       loading="lazy" decoding="async" alt="Cell 06 open: where the map was, a tall reel frame titled Los Angeles, Metro Rail, with bands shaded at its top, bottom and right edge; below it the preset reads instagram-reel, 1080 by 1920, video, MP4.">
+  <figcaption>Cell 06, Export, previewing a preset inside its safe zones.</figcaption>
+</figure>
+
+
+<section class="wrap" id="download">
+  <h2>Download</h2>
+  <p>
+    <strong><a href="https://github.com/richc117/legible-cities-app/releases" target="_blank" rel="noopener noreferrer">Download Legible Cities from the Releases page</a></strong>,
+    choosing the file for your computer from the release&rsquo;s Assets:
+  </p>
+  <ul>
+    <li>a Mac with Apple silicon: the file ending in <code>-mac-arm64.dmg</code></li>
+    <li>a Mac with an Intel processor: <code>-mac-x64.dmg</code></li>
+    <li>a Windows PC: <code>-windows-x64-setup.exe</code></li>
+  </ul>
+  
+  <p>
+    <strong>The installers are not signed yet.</strong> The first time you open
+    the app, macOS or Windows will warn you before letting it run. The
+    <a href="https://github.com/richc117/legible-cities-app/blob/main/docs/install.md" target="_blank" rel="noopener noreferrer">install guide</a>
+    shows how to get past that warning on each system, what the app writes and
+    where, and how to remove it completely.
+  </p>
+  
+
+  <h3>What you need</h3>
+  <ul>
+    <li>A Mac with macOS 13 Ventura or later, Apple silicon or Intel; or a PC
+      with Windows 10 or Windows 11, 64-bit.</li>
+    <li>About 1&nbsp;GB of free disk space for the app, and more for the feeds
+      you add and the maps and videos you make.</li>
+    <li>An internet connection only to download a feed from its web address.
+      Laying out a map and exporting it happen on your computer, and the app
+      carries everything it runs: there is nothing else to install.</li>
+  </ul>
+</section>
+
+<hr class="rule">
+
+<section class="wrap credits">
+  <h2>Licence and credit</h2>
+
+  <h3>Free software</h3>
+  <p>
+    The app is released under the
+    <a href="https://github.com/richc117/legible-cities-app/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">GNU General Public License, version 3 or later</a>.
+    Its <a href="https://github.com/richc117/legible-cities-app" target="_blank" rel="noopener noreferrer">source is on GitHub</a>,
+    and every release carries, beside the installers, the source of the
+    GPL-licensed software bundled inside them. Every component the app
+    bundles, with its licence, is listed in the
+    <a href="https://github.com/richc117/legible-cities-app/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener noreferrer">third-party notices</a>,
+    which the app also opens from its own Settings.
+  </p>
+
+  <h3>LOOM — Hannah Bast, Patrick Brosi and Sabine Storandt</h3>
+  <p>
+    The schematisation inside the app is
+    <a href="https://github.com/ad-freiburg/loom" target="_blank" rel="noopener noreferrer">LOOM</a>,
+    from the Chair of Algorithms and Data Structures at the University of
+    Freiburg: the same four stages described on the
+    <a href="/legible-cities/framework/">framework</a> page, built as native
+    programs for each system and bundled, so the app needs no Docker. LOOM is
+    released under the GPL-3.0. Its Windows build uses the compatibility
+    changes of
+    <a href="https://github.com/transportforcairo/loom-windows-port" target="_blank" rel="noopener noreferrer">Transport for Cairo&rsquo;s Windows port</a>.
+  </p>
+
+  <h3>Esri — Calcite UI icons</h3>
+  <p>
+    The four view icons in the animation page the app shows are
+    <a href="https://developers.arcgis.com/calcite-design-system/icons/" target="_blank" rel="noopener noreferrer">Calcite UI icons</a>,
+    copyright Esri, redistributed unmodified under the terms of the Esri Master
+    License Agreement. They are not open source.
+  </p>
+
+  <h3>The transit agencies</h3>
+  <p>
+    A map made with the app derives from the feed it was made from, and remains
+    subject to that agency&rsquo;s terms. The rest of the people this project
+    rests on are credited on the <a href="/legible-cities/framework/">framework</a>
+    page.
+  </p>
+</section>
+
+    </main>
+
+    <footer class="site-footer wrap">
+      <span class="byline">
+        A project by
+        <a href="https://www.richardcaballero.com" target="_blank" rel="noopener noreferrer">Richard Caballero</a>
+      </span>
+      <a href="/legible-cities/framework/">Credits</a>
+      
+      <a href="https://github.com/richc117" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://www.linkedin.com/in/ricaball/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </footer>
+  </body>
+</html>

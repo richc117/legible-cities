@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1719" height="1575" viewBox="-36.60 -32.58 1719.06 1574.69" data-viewbox-nolabels="-36.60 -31.00 1667.60 1573.11" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+<title>Metro Transit Light Rail</title>
+<rect id="backdrop" x="-36.60" y="-32.58" width="1719.06" height="1574.69" fill="var(--map-bg, #ffffff)"/>
+<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<g class="line" data-line="Airport Shuttle" stroke="#00539f" stroke-width="7.00">
+<path id="t10_Airport_Shuttle" data-src="0xaaaaffd4d450" data-dst="0xaaaaffdb0200" d="M 361.16 943.89 L 361.16 1038.43"/>
+<path id="t17_Airport_Shuttle" data-src="0xaaaaffdb0200" data-dst="0xaaaaffd0d780" d="M 361.16 1038.43 L 361.16 1132.96"/>
+</g>
+<g class="line" data-line="METRO Blue Line" stroke="#00539f" stroke-width="7.00">
+<path id="t0_METRO_Blue_Line" data-src="0xaaaaffcdb1d0" data-dst="0xaaaaffdeea70" d="M 355.56 1416.57 L 355.56 1511.11"/>
+<path id="t3_METRO_Blue_Line" data-src="0xaaaaffcea6b0" data-dst="0xaaaaffef6cc0" d="M 131.18 301.04 L 96.17 266.03 L 95.45 265.31 L 94.83 264.68 L 94.29 264.15 L 93.39 263.25 L 92.99 262.85 L 92.60 262.46 L 92.19 262.05 L 91.76 261.62 L 80.63 250.48"/>
+<path id="t4_METRO_Blue_Line" data-src="0xaaaaffcf0cc0" data-dst="0xaaaaffcfc220" d="M 355.56 1227.50 L 355.56 1322.04"/>
+<path id="t6_METRO_Blue_Line" data-src="0xaaaaffcfc220" data-dst="0xaaaaffcdb1d0" d="M 355.56 1322.04 L 355.56 1416.57"/>
+<path id="t9_METRO_Blue_Line" data-src="0xaaaaffd0d780" data-dst="0xaaaaffcf0cc0" d="M 355.56 1132.96 L 355.56 1227.50"/>
+<path id="t10_METRO_Blue_Line" data-src="0xaaaaffd4d450" data-dst="0xaaaaffdb0200" d="M 349.96 943.89 L 349.96 1038.43"/>
+<path id="t12_METRO_Blue_Line" data-src="0xaaaaffd6d8e0" data-dst="0xaaaaffd4d450" d="M 355.56 849.35 L 355.56 943.89"/>
+<path id="t14_METRO_Blue_Line" data-src="0xaaaaffd8dd70" data-dst="0xaaaaffd6d8e0" d="M 355.56 754.82 L 355.56 849.35"/>
+<path id="t16_METRO_Blue_Line" data-src="0xaaaaffdae420" data-dst="0xaaaaffd8dd70" d="M 355.56 660.28 L 355.56 754.82"/>
+<path id="t17_METRO_Blue_Line" data-src="0xaaaaffdb0200" data-dst="0xaaaaffd0d780" d="M 349.96 1038.43 L 349.96 1132.96"/>
+<path id="t19_METRO_Blue_Line" data-src="0xaaaaffdd0690" data-dst="0xaaaaffdae420" d="M 355.56 565.74 L 355.56 660.28"/>
+<path id="t21_METRO_Blue_Line" data-src="0xaaaaffe10fb0" data-dst="0xaaaaffdd0690" d="M 311.47 489.25 L 352.23 530.01 L 353.13 530.91 L 353.85 531.65 L 354.41 532.27 L 354.83 532.82 L 355.13 533.32 L 355.34 533.82 L 355.46 534.36 L 355.53 534.98 L 355.55 535.71 L 355.56 536.60 L 355.56 536.66 L 355.56 565.74"/>
+<path id="t23_METRO_Blue_Line" data-src="0xaaaaffe31160" data-dst="0xaaaaffe10fb0" d="M 244.63 422.40 L 263.34 441.12 L 264.07 441.85 L 264.69 442.47 L 265.23 443.00 L 266.12 443.90 L 266.52 444.30 L 266.92 444.69 L 267.32 445.10 L 267.76 445.54 L 311.47 489.25"/>
+<path id="t25_METRO_Blue_Line" data-src="0xaaaaffe518d0" data-dst="0xaaaaffeb45d0" d="M 5.60 71.50 L 5.60 0.00"/>
+<path id="t27_METRO_Blue_Line" data-src="0xaaaaffe961f0" data-dst="0xaaaaffe518d0" d="M 5.60 142.99 L 5.60 71.50"/>
+<path id="t28_METRO_Blue_Line" data-src="0xaaaaffed4a60" data-dst="0xaaaaffcea6b0" d="M 181.74 351.60 L 131.18 301.04"/>
+<path id="t29_METRO_Blue_Line" data-src="0xaaaaffed4a60" data-dst="0xaaaaffe31160" d="M 177.78 355.56 L 244.63 422.40"/>
+<path id="t30_METRO_Blue_Line" data-src="0xaaaaffed6830" data-dst="0xaaaaffe961f0" d="M 30.07 199.93 L 7.29 177.15 L 6.42 176.28 L 5.80 175.64 L 5.45 175.24 L 5.35 175.12 L 5.44 175.27 L 5.57 175.59 L 5.63 175.82 L 5.62 175.75 L 5.60 175.30 L 5.60 174.50 L 5.60 174.45 L 5.60 142.99"/>
+<path id="t31_METRO_Blue_Line" data-src="0xaaaaffef6cc0" data-dst="0xaaaaffed6830" d="M 80.63 250.48 L 30.07 199.93"/>
+</g>
+<g class="line" data-line="METRO Green Line" stroke="#008144" stroke-width="7.00">
+<path id="t1_METRO_Green_Line" data-src="0xaaaaffce1850" data-dst="0xaaaafff76130" d="M 730.86 355.56 L 651.85 355.56"/>
+<path id="t2_METRO_Green_Line" data-src="0xaaaaffce39a0" data-dst="0xaaaaffcfa450" d="M 1520.99 355.56 L 1441.98 355.56"/>
+<path id="t3_METRO_Green_Line" data-src="0xaaaaffcea6b0" data-dst="0xaaaaffef6cc0" d="M 123.26 308.96 L 88.25 273.95 L 87.53 273.23 L 86.91 272.60 L 86.37 272.07 L 85.47 271.17 L 85.07 270.77 L 84.68 270.38 L 84.27 269.97 L 83.84 269.53 L 72.71 258.40"/>
+<path id="t5_METRO_Green_Line" data-src="0xaaaaffcfa450" data-dst="0xaaaaffd0caf0" d="M 1441.98 355.56 L 1362.96 355.56"/>
+<path id="t7_METRO_Green_Line" data-src="0xaaaaffd0b1c0" data-dst="0xaaaafff378c0" d="M 414.81 355.56 L 335.80 355.56"/>
+<path id="t8_METRO_Green_Line" data-src="0xaaaaffd0caf0" data-dst="0xaaaaffd6b830" d="M 1362.96 355.56 L 1283.95 355.56"/>
+<path id="t11_METRO_Green_Line" data-src="0xaaaaffd6b830" data-dst="0xaaaaffd8bcc0" d="M 1283.95 355.56 L 1204.94 355.56"/>
+<path id="t13_METRO_Green_Line" data-src="0xaaaaffd8bcc0" data-dst="0xaaaafff55ca0" d="M 1204.94 355.56 L 1125.93 355.56"/>
+<path id="t15_METRO_Green_Line" data-src="0xaaaaffdac370" data-dst="0xaaaafff35810" d="M 572.84 355.56 L 493.83 355.56"/>
+<path id="t18_METRO_Green_Line" data-src="0xaaaaffdce5e0" data-dst="0xaaaaffe94140" d="M 1046.91 355.56 L 967.90 355.56"/>
+<path id="t20_METRO_Green_Line" data-src="0xaaaaffe0ef00" data-dst="0xaaaaffe2f390" d="M 888.89 355.56 L 809.88 355.56"/>
+<path id="t22_METRO_Green_Line" data-src="0xaaaaffe2f390" data-dst="0xaaaaffce1850" d="M 809.88 355.56 L 730.86 355.56"/>
+<path id="t24_METRO_Green_Line" data-src="0xaaaaffe4f820" data-dst="0xaaaaffce39a0" d="M 1600.00 355.56 L 1520.99 355.56"/>
+<path id="t25_METRO_Green_Line" data-src="0xaaaaffe518d0" data-dst="0xaaaaffeb45d0" d="M -5.60 71.50 L -5.60 0.00"/>
+<path id="t26_METRO_Green_Line" data-src="0xaaaaffe94140" data-dst="0xaaaaffe0ef00" d="M 967.90 355.56 L 888.89 355.56"/>
+<path id="t27_METRO_Green_Line" data-src="0xaaaaffe961f0" data-dst="0xaaaaffe518d0" d="M -5.60 142.99 L -5.60 71.50"/>
+<path id="t28_METRO_Green_Line" data-src="0xaaaaffed4a60" data-dst="0xaaaaffcea6b0" d="M 173.82 359.52 L 123.26 308.96"/>
+<path id="t30_METRO_Green_Line" data-src="0xaaaaffed6830" data-dst="0xaaaaffe961f0" d="M 22.15 207.85 L -0.64 185.06 L -1.57 184.13 L -2.38 183.29 L -3.15 182.44 L -3.90 181.47 L -4.60 180.31 L -5.14 178.99 L -5.44 177.68 L -5.56 176.52 L -5.60 175.51 L -5.60 174.53 L -5.60 174.45 L -5.60 142.99"/>
+<path id="t31_METRO_Green_Line" data-src="0xaaaaffef6cc0" data-dst="0xaaaaffed6830" d="M 72.71 258.40 L 22.15 207.85"/>
+<path id="t32_METRO_Green_Line" data-src="0xaaaafff35810" data-dst="0xaaaaffd0b1c0" d="M 493.83 355.56 L 414.81 355.56"/>
+<path id="t33_METRO_Green_Line" data-src="0xaaaafff375e0" data-dst="0xaaaaffed4a60" d="M 256.79 355.56 L 177.78 355.56"/>
+<path id="t34_METRO_Green_Line" data-src="0xaaaafff378c0" data-dst="0xaaaafff375e0" d="M 335.80 355.56 L 256.79 355.56"/>
+<path id="t35_METRO_Green_Line" data-src="0xaaaafff55ca0" data-dst="0xaaaaffdce5e0" d="M 1125.93 355.56 L 1046.91 355.56"/>
+<path id="t36_METRO_Green_Line" data-src="0xaaaafff76130" data-dst="0xaaaaffdac370" d="M 651.85 355.56 L 572.84 355.56"/>
+</g>
+</g>
+<g id="stations">
+<circle cx="355.56" cy="1416.57" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffcdb1d0" data-station-id="51437"/>
+<circle cx="730.86" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffce1850" data-station-id="56037"/>
+<circle cx="1520.99" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffce39a0" data-station-id="56027"/>
+<circle cx="127.22" cy="305.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffcea6b0" data-station-id="56330"/>
+<circle cx="355.56" cy="1227.50" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffcf0cc0" data-station-id="53280"/>
+<circle cx="1441.98" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffcfa450" data-station-id="56028"/>
+<circle cx="355.56" cy="1322.04" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffcfc220" data-station-id="51436"/>
+<circle cx="414.81" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffd0b1c0" data-station-id="56041"/>
+<circle cx="1362.96" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffd0caf0" data-station-id="56015"/>
+<circle cx="355.56" cy="1132.96" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffd0d780" data-station-id="51435"/>
+<circle cx="355.56" cy="943.89" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffd4d450" data-station-id="51418"/>
+<circle cx="1283.95" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffd6b830" data-station-id="56030"/>
+<circle cx="355.56" cy="849.35" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffd6d8e0" data-station-id="51432"/>
+<circle cx="1204.94" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffd8bcc0" data-station-id="56013"/>
+<circle cx="355.56" cy="754.82" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffd8dd70" data-station-id="51416"/>
+<circle cx="572.84" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffdac370" data-station-id="56039"/>
+<circle cx="355.56" cy="660.28" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffdae420" data-station-id="51415"/>
+<circle cx="355.56" cy="1038.43" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffdb0200" data-station-id="51419"/>
+<circle cx="1046.91" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffdce5e0" data-station-id="56033"/>
+<circle cx="355.56" cy="565.74" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffdd0690" data-station-id="51429"/>
+<circle cx="355.56" cy="1511.11" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffdeea70" data-station-id="51405"/>
+<circle cx="888.89" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffe0ef00" data-station-id="56009"/>
+<circle cx="311.47" cy="489.25" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffe10fb0" data-station-id="51428"/>
+<circle cx="809.88" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffe2f390" data-station-id="56036"/>
+<circle cx="244.63" cy="422.40" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffe31160" data-station-id="51412"/>
+<circle cx="1600.00" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffe4f820" data-station-id="56026"/>
+<circle cx="0.00" cy="71.50" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffe518d0" data-station-id="56335"/>
+<circle cx="967.90" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffe94140" data-station-id="56010"/>
+<circle cx="0.00" cy="142.99" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffe961f0" data-station-id="56332"/>
+<circle cx="0.00" cy="0.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffeb45d0" data-station-id="56339"/>
+<circle cx="177.78" cy="355.56" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffed4a60" data-station-id="51411"/>
+<circle cx="26.11" cy="203.89" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffed6830" data-station-id="51408"/>
+<circle cx="76.67" cy="254.44" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaffef6cc0" data-station-id="51424"/>
+<circle cx="493.83" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaafff35810" data-station-id="56040"/>
+<circle cx="256.79" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaafff375e0" data-station-id="56001"/>
+<circle cx="335.80" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaafff378c0" data-station-id="56002"/>
+<circle cx="1125.93" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaafff55ca0" data-station-id="56012"/>
+<circle cx="651.85" cy="355.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaafff76130" data-station-id="56038"/>
+</g>
+<g id="labels" font-size="11.0" fill="var(--map-label, #111111)">
+<text x="145.32" y="305.00" text-anchor="start" data-node="0xaaaaffcea6b0">U.S. Bank Stadium</text>
+<text x="373.66" y="1132.96" text-anchor="start" data-node="0xaaaaffd0d780">Terminal 2</text>
+<text x="373.66" y="943.89" text-anchor="start" data-node="0xaaaaffd4d450">Fort Snelling</text>
+<text x="373.66" y="1038.43" text-anchor="start" data-node="0xaaaaffdb0200">Terminal 1</text>
+<text x="18.10" y="71.50" text-anchor="start" data-node="0xaaaaffe518d0">Target Field Station Platform 1</text>
+<text x="18.10" y="142.99" text-anchor="start" data-node="0xaaaaffe961f0">Warehouse District Hennepin Ave</text>
+<text x="18.10" y="0.00" text-anchor="start" data-node="0xaaaaffeb45d0">Target Field Station Platform 2</text>
+<text x="164.98" y="368.35" text-anchor="end" data-node="0xaaaaffed4a60" transform="rotate(-45 164.98 368.35)">Cedar Riverside</text>
+<text x="44.21" y="203.89" text-anchor="start" data-node="0xaaaaffed6830">Nicollet Mall</text>
+<text x="94.77" y="254.44" text-anchor="start" data-node="0xaaaaffef6cc0">Government Plaza</text>
+<text x="368.06" y="1416.57" text-anchor="start" data-node="0xaaaaffcdb1d0">30th Ave</text>
+<text x="739.70" y="346.72" text-anchor="start" data-node="0xaaaaffce1850" transform="rotate(-45 739.70 346.72)">Fairview Ave</text>
+<text x="1529.83" y="346.72" text-anchor="start" data-node="0xaaaaffce39a0" transform="rotate(-45 1529.83 346.72)">Central Station</text>
+<text x="368.06" y="1227.50" text-anchor="start" data-node="0xaaaaffcf0cc0">American Blvd</text>
+<text x="1450.81" y="346.72" text-anchor="start" data-node="0xaaaaffcfa450" transform="rotate(-45 1450.81 346.72)">10th St</text>
+<text x="368.06" y="1322.04" text-anchor="start" data-node="0xaaaaffcfc220">Bloomington Central</text>
+<text x="423.65" y="346.72" text-anchor="start" data-node="0xaaaaffd0b1c0" transform="rotate(-45 423.65 346.72)">Stadium Village</text>
+<text x="1371.80" y="346.72" text-anchor="start" data-node="0xaaaaffd0caf0" transform="rotate(-45 1371.80 346.72)">Robert St</text>
+<text x="1292.79" y="346.72" text-anchor="start" data-node="0xaaaaffd6b830" transform="rotate(-45 1292.79 346.72)">Capitol / Rice St</text>
+<text x="368.06" y="849.35" text-anchor="start" data-node="0xaaaaffd6d8e0">VA Medical Center</text>
+<text x="1213.78" y="346.72" text-anchor="start" data-node="0xaaaaffd8bcc0" transform="rotate(-45 1213.78 346.72)">Western Ave</text>
+<text x="368.06" y="754.82" text-anchor="start" data-node="0xaaaaffd8dd70">50th St / Minnehaha Park</text>
+<text x="581.68" y="346.72" text-anchor="start" data-node="0xaaaaffdac370" transform="rotate(-45 581.68 346.72)">Westgate Station</text>
+<text x="368.06" y="660.28" text-anchor="start" data-node="0xaaaaffdae420">46th St</text>
+<text x="1055.75" y="346.72" text-anchor="start" data-node="0xaaaaffdce5e0" transform="rotate(-45 1055.75 346.72)">Victoria St</text>
+<text x="368.06" y="565.74" text-anchor="start" data-node="0xaaaaffdd0690">38th St</text>
+<text x="368.06" y="1511.11" text-anchor="start" data-node="0xaaaaffdeea70">Mall of America</text>
+<text x="897.73" y="346.72" text-anchor="start" data-node="0xaaaaffe0ef00" transform="rotate(-45 897.73 346.72)">Hamline Ave</text>
+<text x="323.97" y="489.25" text-anchor="start" data-node="0xaaaaffe10fb0">Lake St - Midtown</text>
+<text x="818.72" y="346.72" text-anchor="start" data-node="0xaaaaffe2f390" transform="rotate(-45 818.72 346.72)">Snelling Ave</text>
+<text x="257.13" y="422.40" text-anchor="start" data-node="0xaaaaffe31160">Franklin Ave</text>
+<text x="1608.84" y="346.72" text-anchor="start" data-node="0xaaaaffe4f820" transform="rotate(-45 1608.84 346.72)">Union Depot</text>
+<text x="976.74" y="346.72" text-anchor="start" data-node="0xaaaaffe94140" transform="rotate(-45 976.74 346.72)">Lexington Pkwy</text>
+<text x="502.67" y="346.72" text-anchor="start" data-node="0xaaaafff35810" transform="rotate(-45 502.67 346.72)">Prospect Park</text>
+<text x="265.63" y="346.72" text-anchor="start" data-node="0xaaaafff375e0" transform="rotate(-45 265.63 346.72)">West Bank</text>
+<text x="344.64" y="346.72" text-anchor="start" data-node="0xaaaafff378c0" transform="rotate(-45 344.64 346.72)">East Bank</text>
+<text x="1134.76" y="346.72" text-anchor="start" data-node="0xaaaafff55ca0" transform="rotate(-45 1134.76 346.72)">Dale St</text>
+<text x="660.69" y="346.72" text-anchor="start" data-node="0xaaaafff76130" transform="rotate(-45 660.69 346.72)">Raymond Ave</text>
+</g>
+<g id="trains"></g>
+</svg>

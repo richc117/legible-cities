@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1986" height="2218" viewBox="-152.10 -187.00 1985.72 2218.00" data-viewbox-nolabels="-31.00 -31.00 1667.60 2062.00" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+<title>Miami Metrorail &amp; Metromover</title>
+<rect id="backdrop" x="-152.10" y="-187.00" width="1985.72" height="2218.00" fill="var(--map-bg, #ffffff)"/>
+<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<g class="line" data-line="2600" stroke="#ff8040" stroke-width="7.00">
+<path id="t1_2600" data-src="0xaaaaf3482d10" data-dst="0xaaaaf35d0ad0" d="M 1192.53 692.53 L 1195.32 695.32 L 1196.59 696.58 L 1197.63 697.59 L 1198.51 698.38 L 1199.27 698.98 L 1199.98 699.40 L 1200.68 699.69 L 1201.44 699.87 L 1202.31 699.96 L 1203.34 699.99 L 1204.59 700.00 L 1204.68 700.00 L 1293.15 700.00"/>
+<path id="t3_2600" data-src="0xaaaaf34857e0" data-dst="0xaaaaf349f0f0" d="M 1300.00 905.60 L 1400.00 905.60"/>
+<path id="t5_2600" data-src="0xaaaaf34857e0" data-dst="0xaaaaf3697e80" d="M 1300.00 900.00 L 1204.68 900.00 L 1203.41 900.00 L 1202.37 900.04 L 1201.49 900.12 L 1200.73 900.29 L 1200.02 900.57 L 1199.32 900.99 L 1198.56 901.58 L 1197.69 902.35 L 1196.66 903.35 L 1195.41 904.59 L 1195.32 904.68 L 1104.68 995.32 L 1103.66 996.34 L 1103.28 996.72"/>
+<path id="t7_2600" data-src="0xaaaaf349e540" data-dst="0xaaaaf3743ec0" d="M 456.59 0.00 L 495.32 0.00 L 496.59 0.00 L 497.63 0.04 L 498.51 0.12 L 499.27 0.29 L 499.98 0.57 L 500.68 0.99 L 501.44 1.58 L 502.31 2.35 L 503.34 3.35 L 504.59 4.59 L 504.68 4.68 L 577.14 77.14"/>
+<path id="t11_2600" data-src="0xaaaaf34b6c40" data-dst="0xaaaaf3671010" d="M 1511.20 700.00 L 1511.20 800.00"/>
+<path id="t16_2600" data-src="0xaaaaf34dc5a0" data-dst="0xaaaaf3670d30" d="M 936.07 1163.93 L 904.68 1195.32 L 903.66 1196.34 L 902.78 1197.22 L 902.03 1197.97 L 901.36 1198.64 L 900.76 1199.24 L 900.20 1199.80 L 899.65 1200.35 L 899.08 1200.92 L 898.46 1201.54 L 897.78 1202.22 L 896.08 1203.92 L 804.68 1295.32 L 803.66 1296.34 L 802.78 1297.22 L 802.03 1297.97 L 801.36 1298.64 L 800.76 1299.24 L 800.20 1299.80 L 799.65 1300.35 L 799.08 1300.92 L 798.46 1301.54 L 768.86 1331.14"/>
+<path id="t19_2600" data-src="0xaaaaf3559380" data-dst="0xaaaaf349f0f0" d="M 1500.00 900.00 L 1400.00 900.00"/>
+<path id="t21_2600" data-src="0xaaaaf355b6e0" data-dst="0xaaaaf34a25c0" d="M 267.21 1832.79 L 204.68 1895.32 L 203.66 1896.34 L 202.78 1897.22 L 202.03 1897.97 L 201.36 1898.64 L 200.76 1899.24 L 200.20 1899.80 L 199.65 1900.35 L 199.08 1900.92 L 198.46 1901.54 L 100.00 2000.00"/>
+<path id="t23_2600" data-src="0xaaaaf3582830" data-dst="0xaaaaf3482d10" d="M 1119.39 619.39 L 1192.53 692.53"/>
+<path id="t25_2600" data-src="0xaaaaf35d07f0" data-dst="0xaaaaf3622a90" d="M 601.64 1498.36 L 601.36 1498.64 L 600.76 1499.24 L 600.20 1499.80 L 599.65 1500.35 L 599.08 1500.92 L 598.46 1501.54 L 597.78 1502.22 L 596.08 1503.92 L 504.68 1595.32 L 503.66 1596.34 L 502.78 1597.22 L 502.03 1597.97 L 501.36 1598.64 L 500.76 1599.24 L 500.20 1599.80 L 499.65 1600.35 L 499.08 1600.92 L 498.46 1601.54 L 497.78 1602.22 L 434.43 1665.57"/>
+<path id="t26_2600" data-src="0xaaaaf35d0ad0" data-dst="0xaaaaf36e6120" d="M 1293.15 700.00 L 1396.58 700.00"/>
+<path id="t28_2600" data-src="0xaaaaf3622a90" data-dst="0xaaaaf355b6e0" d="M 434.43 1665.57 L 404.68 1695.32 L 403.66 1696.34 L 402.78 1697.22 L 402.03 1697.97 L 401.36 1698.64 L 400.76 1699.24 L 400.20 1699.80 L 399.65 1700.35 L 399.08 1700.92 L 398.46 1701.54 L 397.78 1702.22 L 396.08 1703.92 L 304.68 1795.32 L 303.66 1796.34 L 302.78 1797.22 L 302.03 1797.97 L 301.36 1798.64 L 300.76 1799.24 L 300.20 1799.80 L 299.65 1800.35 L 299.08 1800.92 L 298.46 1801.54 L 267.21 1832.79"/>
+<path id="t29_2600" data-src="0xaaaaf3647e10" data-dst="0xaaaaf374fd10" d="M 0.00 0.00 L 152.20 0.00"/>
+<path id="t30_2600" data-src="0xaaaaf3649be0" data-dst="0xaaaaf3582830" d="M 1046.26 546.26 L 1095.32 595.32 L 1096.34 596.34 L 1097.22 597.22 L 1097.97 597.97 L 1098.64 598.64 L 1099.24 599.24 L 1099.80 599.80 L 1100.35 600.35 L 1100.92 600.92 L 1101.54 601.54 L 1102.22 602.22 L 1119.39 619.39"/>
+<path id="t32_2600" data-src="0xaaaaf3670d30" data-dst="0xaaaaf35d07f0" d="M 768.86 1331.14 L 704.68 1395.32 L 703.66 1396.34 L 702.78 1397.22 L 702.03 1397.97 L 701.36 1398.64 L 700.76 1399.24 L 700.20 1399.80 L 699.65 1400.35 L 699.08 1400.92 L 698.46 1401.54 L 604.68 1495.32 L 603.66 1496.34 L 602.78 1497.22 L 601.64 1498.36"/>
+<path id="t33_2600" data-src="0xaaaaf3671010" data-dst="0xaaaaf3559380" d="M 1511.20 800.00 L 1511.20 900.00"/>
+<path id="t34_2600" data-src="0xaaaaf3697e80" data-dst="0xaaaaf34dc5a0" d="M 1103.28 996.72 L 1102.78 997.22 L 1102.03 997.97 L 1101.36 998.64 L 1100.76 999.24 L 1100.20 999.80 L 1099.65 1000.35 L 1099.08 1000.92 L 1098.46 1001.54 L 1097.78 1002.22 L 1096.99 1003.01 L 1004.68 1095.32 L 1003.66 1096.34 L 1002.78 1097.22 L 1002.03 1097.97 L 1001.36 1098.64 L 1000.76 1099.24 L 1000.20 1099.80 L 999.65 1100.35 L 999.08 1100.92 L 998.46 1101.54 L 936.07 1163.93"/>
+<path id="t36_2600" data-src="0xaaaaf36e6120" data-dst="0xaaaaf34b6c40" d="M 1396.58 700.00 L 1500.00 700.00"/>
+<path id="t37_2600" data-src="0xaaaaf36e6400" data-dst="0xaaaaf3649be0" d="M 973.13 473.13 L 995.32 495.32 L 996.34 496.34 L 997.22 497.22 L 997.97 497.97 L 998.64 498.64 L 999.24 499.24 L 999.80 499.80 L 1000.35 500.35 L 1000.92 500.92 L 1001.54 501.54 L 1046.26 546.26"/>
+<path id="t38_2600" data-src="0xaaaaf37325f0" data-dst="0xaaaaf36e6400" d="M 900.00 400.00 L 973.13 473.13"/>
+<path id="t39_2600" data-src="0xaaaaf3738070" data-dst="0xaaaaf349e540" d="M 304.40 0.00 L 456.59 0.00"/>
+<path id="t40_2600" data-src="0xaaaaf3743ec0" data-dst="0xaaaaf3751840" d="M 577.14 77.14 L 595.32 95.32 L 596.34 96.34 L 597.22 97.22 L 597.97 97.97 L 598.64 98.64 L 599.24 99.24 L 599.80 99.80 L 600.35 100.35 L 600.92 100.92 L 601.54 101.54 L 684.76 184.76"/>
+<path id="t41_2600" data-src="0xaaaaf374fd10" data-dst="0xaaaaf3738070" d="M 152.20 0.00 L 304.40 0.00"/>
+<path id="t42_2600" data-src="0xaaaaf3751840" data-dst="0xaaaaf3754ea0" d="M 684.76 184.76 L 695.32 195.32 L 696.34 196.34 L 697.22 197.22 L 697.97 197.97 L 698.64 198.64 L 699.24 199.24 L 699.80 199.80 L 700.35 200.35 L 700.92 200.92 L 701.54 201.54 L 792.38 292.38"/>
+<path id="t44_2600" data-src="0xaaaaf3754ea0" data-dst="0xaaaaf37325f0" d="M 792.38 292.38 L 796.34 296.34 L 797.22 297.22 L 797.97 297.97 L 798.64 298.64 L 799.24 299.24 L 799.80 299.80 L 800.35 300.35 L 800.92 300.92 L 801.54 301.54 L 900.00 400.00"/>
+<path id="t45_2600" data-src="0xaaaaf3759740" data-dst="0xaaaaf37325f0" d="M 800.00 500.00 L 900.00 400.00"/>
+</g>
+<g class="line" data-line="MMI" stroke="#ff8000" stroke-width="7.00">
+<path id="t0_MMI" data-src="0xaaaaf346b500" data-dst="0xaaaaf3495800" d="M 1574.76 1005.60 L 1595.35 1005.60 L 1597.50 1005.58 L 1599.88 1005.34 L 1603.03 1004.02 L 1605.07 1000.97 L 1605.54 998.29 L 1605.60 996.16 L 1605.60 995.32 L 1605.60 949.52"/>
+<path id="t6_MMI" data-src="0xaaaaf3495800" data-dst="0xaaaaf3753370" d="M 1605.60 949.52 L 1605.60 874.76"/>
+<path id="t10_MMI" data-src="0xaaaaf34b6c40" data-dst="0xaaaaf34dfd80" d="M 1503.96 696.04 L 1603.96 796.04"/>
+<path id="t11_MMI" data-src="0xaaaaf34b6c40" data-dst="0xaaaaf3671010" d="M 1488.80 700.00 L 1488.80 800.00"/>
+<path id="t12_MMI" data-src="0xaaaaf34c2fb0" data-dst="0xaaaaf3559380" d="M 1500.00 1000.00 L 1500.00 900.00"/>
+<path id="t13_MMI" data-src="0xaaaaf34c2fb0" data-dst="0xaaaaf346b500" d="M 1500.00 1005.60 L 1574.76 1005.60"/>
+<path id="t33_MMI" data-src="0xaaaaf3671010" data-dst="0xaaaaf3559380" d="M 1488.80 800.00 L 1488.80 900.00"/>
+<path id="t43_MMI" data-src="0xaaaaf3753370" data-dst="0xaaaaf34dfd80" d="M 1605.60 874.76 L 1605.60 800.00"/>
+</g>
+<g class="line" data-line="MMO" stroke="#008000" stroke-width="7.00">
+<path id="t0_MMO" data-src="0xaaaaf346b500" data-dst="0xaaaaf3495800" d="M 1574.76 994.40 L 1595.29 994.40 L 1596.90 994.38 L 1597.10 994.36 L 1595.59 995.00 L 1594.45 996.70 L 1594.37 997.17 L 1594.40 996.00 L 1594.40 995.32 L 1594.40 949.52"/>
+<path id="t2_MMO" data-src="0xaaaaf3483ea0" data-dst="0xaaaaf35a9980" d="M 1379.81 1079.81 L 1395.32 1095.32 L 1396.72 1096.71 L 1397.85 1097.75 L 1398.79 1098.44 L 1399.61 1098.79 L 1400.39 1098.79 L 1401.21 1098.44 L 1402.15 1097.75 L 1403.28 1096.71 L 1404.68 1095.32 L 1440.38 1059.62"/>
+<path id="t3_MMO" data-src="0xaaaaf34857e0" data-dst="0xaaaaf349f0f0" d="M 1300.00 894.40 L 1400.00 894.40"/>
+<path id="t4_MMO" data-src="0xaaaaf34857e0" data-dst="0xaaaaf34c12b0" d="M 1300.00 900.00 L 1200.00 1000.00"/>
+<path id="t6_MMO" data-src="0xaaaaf3495800" data-dst="0xaaaaf3753370" d="M 1594.40 949.52 L 1594.40 874.76"/>
+<path id="t8_MMO" data-src="0xaaaaf349f0f0" data-dst="0xaaaaf34da090" d="M 1400.00 900.00 L 1340.38 959.62"/>
+<path id="t9_MMO" data-src="0xaaaaf34a22e0" data-dst="0xaaaaf34c2fb0" d="M 1400.00 1000.00 L 1500.00 1000.00"/>
+<path id="t10_MMO" data-src="0xaaaaf34b6c40" data-dst="0xaaaaf34dfd80" d="M 1496.04 703.96 L 1596.04 803.96"/>
+<path id="t11_MMO" data-src="0xaaaaf34b6c40" data-dst="0xaaaaf3671010" d="M 1500.00 700.00 L 1500.00 800.00"/>
+<path id="t13_MMO" data-src="0xaaaaf34c2fb0" data-dst="0xaaaaf346b500" d="M 1500.00 994.40 L 1574.76 994.40"/>
+<path id="t14_MMO" data-src="0xaaaaf34da090" data-dst="0xaaaaf3582550" d="M 1340.38 959.62 L 1304.68 995.32 L 1303.29 996.72 L 1302.25 997.85 L 1301.56 998.79 L 1301.21 999.61 L 1301.21 1000.39 L 1301.56 1001.21 L 1302.25 1002.15 L 1303.29 1003.28 L 1304.68 1004.68 L 1320.19 1020.19"/>
+<path id="t15_MMO" data-src="0xaaaaf34da370" data-dst="0xaaaaf34d6e30" d="M 1600.00 466.67 L 1600.00 400.00"/>
+<path id="t17_MMO" data-src="0xaaaaf34dfd80" data-dst="0xaaaaf35f5b70" d="M 1600.00 800.00 L 1600.00 733.33"/>
+<path id="t18_MMO" data-src="0xaaaaf3532590" data-dst="0xaaaaf3649ec0" d="M 1600.00 666.67 L 1600.00 600.00"/>
+<path id="t20_MMO" data-src="0xaaaaf3559380" data-dst="0xaaaaf34a22e0" d="M 1500.00 900.00 L 1400.00 1000.00"/>
+<path id="t22_MMO" data-src="0xaaaaf3582550" data-dst="0xaaaaf3483ea0" d="M 1320.19 1020.19 L 1379.81 1079.81"/>
+<path id="t24_MMO" data-src="0xaaaaf35a9980" data-dst="0xaaaaf34c2fb0" d="M 1440.38 1059.62 L 1500.00 1000.00"/>
+<path id="t27_MMO" data-src="0xaaaaf35f5b70" data-dst="0xaaaaf3532590" d="M 1600.00 733.33 L 1600.00 666.67"/>
+<path id="t31_MMO" data-src="0xaaaaf3649ec0" data-dst="0xaaaaf36befd0" d="M 1600.00 600.00 L 1600.00 533.33"/>
+<path id="t33_MMO" data-src="0xaaaaf3671010" data-dst="0xaaaaf3559380" d="M 1500.00 800.00 L 1500.00 900.00"/>
+<path id="t35_MMO" data-src="0xaaaaf36befd0" data-dst="0xaaaaf34da370" d="M 1600.00 533.33 L 1600.00 466.67"/>
+<path id="t43_MMO" data-src="0xaaaaf3753370" data-dst="0xaaaaf34dfd80" d="M 1594.40 874.76 L 1594.40 800.00"/>
+</g>
+</g>
+<g id="stations">
+<circle cx="1574.76" cy="1000.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf346b500" data-station-id="823"/>
+<circle cx="1192.53" cy="692.53" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3482d10" data-station-id="9506"/>
+<circle cx="1379.81" cy="1079.81" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3483ea0" data-station-id="817"/>
+<circle cx="1300.00" cy="900.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34857e0" data-station-id="820"/>
+<circle cx="1600.00" cy="949.52" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3495800" data-station-id="840"/>
+<circle cx="456.59" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf349e540" data-station-id="9492"/>
+<circle cx="1400.00" cy="900.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf349f0f0" data-station-id="9514"/>
+<circle cx="1400.00" cy="1000.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34a22e0" data-station-id="815"/>
+<circle cx="100.00" cy="2000.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34a25c0" data-station-id="9529"/>
+<circle cx="1500.00" cy="700.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34b6c40" data-station-id="837"/>
+<circle cx="1200.00" cy="1000.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34c12b0" data-station-id="821"/>
+<circle cx="1500.00" cy="1000.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34c2fb0" data-station-id="807"/>
+<circle cx="1600.00" cy="400.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34d6e30" data-station-id="831"/>
+<circle cx="1340.38" cy="959.62" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34da090" data-station-id="819"/>
+<circle cx="1600.00" cy="466.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34da370" data-station-id="796"/>
+<circle cx="936.07" cy="1163.93" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34dc5a0" data-station-id="9519"/>
+<circle cx="1600.00" cy="800.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf34dfd80" data-station-id="811"/>
+<circle cx="1600.00" cy="666.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3532590" data-station-id="827"/>
+<circle cx="1500.00" cy="900.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3559380" data-station-id="834"/>
+<circle cx="267.21" cy="1832.79" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf355b6e0" data-station-id="9527"/>
+<circle cx="1320.19" cy="1020.19" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3582550" data-station-id="804"/>
+<circle cx="1119.39" cy="619.39" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3582830" data-station-id="9505"/>
+<circle cx="1440.38" cy="1059.62" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf35a9980" data-station-id="816"/>
+<circle cx="601.64" cy="1498.36" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf35d07f0" data-station-id="9522"/>
+<circle cx="1293.15" cy="700.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf35d0ad0" data-station-id="9508"/>
+<circle cx="1600.00" cy="733.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf35f5b70" data-station-id="826"/>
+<circle cx="434.43" cy="1665.57" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3622a90" data-station-id="9524"/>
+<circle cx="0.00" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3647e10" data-station-id="9486"/>
+<circle cx="1046.26" cy="546.26" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3649be0" data-station-id="9503"/>
+<circle cx="1600.00" cy="600.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3649ec0" data-station-id="798"/>
+<circle cx="768.86" cy="1331.14" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3670d30" data-station-id="9521"/>
+<circle cx="1500.00" cy="800.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3671010" data-station-id="813"/>
+<circle cx="1103.28" cy="996.72" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3697e80" data-station-id="9517"/>
+<circle cx="1600.00" cy="533.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf36befd0" data-station-id="797"/>
+<circle cx="1396.58" cy="700.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf36e6120" data-station-id="9510"/>
+<circle cx="973.13" cy="473.13" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf36e6400" data-station-id="9500"/>
+<circle cx="304.40" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3738070" data-station-id="9491"/>
+<circle cx="577.14" cy="77.14" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3743ec0" data-station-id="9494"/>
+<circle cx="152.20" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf374fd10" data-station-id="9489"/>
+<circle cx="684.76" cy="184.76" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3751840" data-station-id="9497"/>
+<circle cx="1600.00" cy="874.76" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3753370" data-station-id="810"/>
+<circle cx="792.38" cy="292.38" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3754ea0" data-station-id="9499"/>
+<circle cx="800.00" cy="500.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaf3759740" data-station-id="10495"/>
+</g>
+<g id="labels" font-size="11.0" fill="var(--map-label, #111111)">
+<text x="1483.24" y="683.24" text-anchor="end" data-node="0xaaaaf34b6c40" transform="rotate(45 1483.24 683.24)">WILKIE D FERGUSON METROMOVER</text>
+<text x="1479.48" y="888.15" text-anchor="end" data-node="0xaaaaf3559380" transform="rotate(30 1479.48 888.15)">MIAMI AVENUE METROMOVER</text>
+<text x="1476.30" y="800.00" text-anchor="end" data-node="0xaaaaf3671010">GOVERNMENT CENTER METROMOVER</text>
+<text x="1565.71" y="1015.68" text-anchor="end" data-node="0xaaaaf346b500" transform="rotate(-60 1565.71 1015.68)">BAYFRONT PARK METROMOVER</text>
+<text x="1287.20" y="887.20" text-anchor="end" data-node="0xaaaaf34857e0" transform="rotate(45 1287.20 887.20)">BRICKELL METROMOVER</text>
+<text x="1618.10" y="949.52" text-anchor="start" data-node="0xaaaaf3495800">FIRST STREET METROMOVER</text>
+<text x="1370.22" y="882.80" text-anchor="end" data-node="0xaaaaf349f0f0" transform="rotate(30 1370.22 882.80)">BRICKELL STATION RAIL SOUTHBOUND</text>
+<text x="1512.67" y="978.05" text-anchor="start" data-node="0xaaaaf34c2fb0" transform="rotate(-60 1512.67 978.05)">KNIGHT CENTER METROMOVER</text>
+<text x="1618.10" y="800.00" text-anchor="start" data-node="0xaaaaf34dfd80">COLLEGE NORTH METROMOVER</text>
+<text x="1618.10" y="874.76" text-anchor="start" data-node="0xaaaaf3753370">COLLEGE BAYSIDE METROMOVER</text>
+<text x="1201.36" y="683.69" text-anchor="start" data-node="0xaaaaf3482d10" transform="rotate(-45 1201.36 683.69)">UHEALTH JACKSON STATION RAIL SOUTHBOUND</text>
+<text x="1370.97" y="1088.65" text-anchor="end" data-node="0xaaaaf3483ea0" transform="rotate(-45 1370.97 1088.65)">FIFTH STREET METROMOVER</text>
+<text x="465.43" y="-8.84" text-anchor="start" data-node="0xaaaaf349e540" transform="rotate(-45 465.43 -8.84)">TRI-RAIL STATION RAIL SOUTHBOUND</text>
+<text x="1400.00" y="1018.75" text-anchor="middle" data-node="0xaaaaf34a22e0">THIRD STREET METROMOVER</text>
+<text x="87.50" y="2000.00" text-anchor="end" data-node="0xaaaaf34a25c0">DADELAND SOUTH STAT.RAIL NORTHBOUND</text>
+<text x="1191.16" y="1008.84" text-anchor="end" data-node="0xaaaaf34c12b0" transform="rotate(-45 1191.16 1008.84)">FINANCIAL DISTRICT METROMOVER</text>
+<text x="1612.50" y="400.00" text-anchor="start" data-node="0xaaaaf34d6e30">SCHOOL BOARD METROMOVER</text>
+<text x="1612.50" y="466.67" text-anchor="start" data-node="0xaaaaf34da370">ADRIENNE ARSHT CENTER METROMOVER</text>
+<text x="923.57" y="1163.93" text-anchor="end" data-node="0xaaaaf34dc5a0">COCONUT GROVE STAT. RAIL NORTHBOUND</text>
+<text x="1612.50" y="666.67" text-anchor="start" data-node="0xaaaaf3532590">MIAMI WORLDCENTER</text>
+<text x="254.71" y="1832.79" text-anchor="end" data-node="0xaaaaf355b6e0">DADELAND NORTH STAT.RAIL NORTHBOUND</text>
+<text x="1311.35" y="1029.03" text-anchor="end" data-node="0xaaaaf3582550" transform="rotate(-45 1311.35 1029.03)">BRICKELL CITY CENTRE METROMOVER</text>
+<text x="1128.23" y="610.56" text-anchor="start" data-node="0xaaaaf3582830" transform="rotate(-45 1128.23 610.56)">SANTA CLARA STATION RAIL NORTHBOUND</text>
+<text x="1412.88" y="1107.26" text-anchor="end" data-node="0xaaaaf35a9980" transform="rotate(-60 1412.88 1107.26)">RIVERWALK METROMOVER</text>
+<text x="589.14" y="1498.36" text-anchor="end" data-node="0xaaaaf35d07f0">UNIVERSITY STATION RAIL SOUTHBOUND</text>
+<text x="1293.15" y="718.75" text-anchor="middle" data-node="0xaaaaf35d0ad0">CULMER STATION RAIL SOUTHBOUND</text>
+<text x="1612.50" y="733.33" text-anchor="start" data-node="0xaaaaf35f5b70">FREEDOM TOWER METROMOVER</text>
+<text x="421.93" y="1665.57" text-anchor="end" data-node="0xaaaaf3622a90">SOUTH MIAMI STATION RAIL SOUTHBOUND</text>
+<text x="8.84" y="-8.84" text-anchor="start" data-node="0xaaaaf3647e10" transform="rotate(-45 8.84 -8.84)">PALMETTO STATION RAIL SOUTHBOUND</text>
+<text x="1055.10" y="537.42" text-anchor="start" data-node="0xaaaaf3649be0" transform="rotate(-45 1055.10 537.42)">ALLAPATTAH STATION RAIL NORTHBOUND</text>
+<text x="1612.50" y="600.00" text-anchor="start" data-node="0xaaaaf3649ec0">ELEVENTH STREET METROMOVER</text>
+<text x="756.36" y="1331.14" text-anchor="end" data-node="0xaaaaf3670d30">DOUGLAS ROAD STAT. RAIL NORTHBOUND</text>
+<text x="1094.45" y="987.88" text-anchor="end" data-node="0xaaaaf3697e80" transform="rotate(45 1094.45 987.88)">VIZCAYA STATION RAIL NORTHBOUND</text>
+<text x="1612.50" y="533.33" text-anchor="start" data-node="0xaaaaf36befd0">MUSEUM PARK METROMOVER</text>
+<text x="981.97" y="464.29" text-anchor="start" data-node="0xaaaaf36e6400" transform="rotate(-45 981.97 464.29)">EARLINGTON HTS.STAT.RAIL SOUTHBOUND</text>
+<text x="313.23" y="-8.84" text-anchor="start" data-node="0xaaaaf3738070" transform="rotate(-45 313.23 -8.84)">HIALEAH STATION RAIL NORTHBOUND</text>
+<text x="589.64" y="77.14" text-anchor="start" data-node="0xaaaaf3743ec0">NORTHSIDE STATION RAIL SOUTHBOUND</text>
+<text x="161.04" y="-8.84" text-anchor="start" data-node="0xaaaaf374fd10" transform="rotate(-45 161.04 -8.84)">OKEECHOBEE STATION RAIL NORTHBOUND</text>
+<text x="697.26" y="184.76" text-anchor="start" data-node="0xaaaaf3751840">M.L. KING STATION RAIL NORTHBOUND</text>
+<text x="804.88" y="292.38" text-anchor="start" data-node="0xaaaaf3754ea0">BROWNSVILLE STATION RAIL NORTHBOUND</text>
+<text x="787.50" y="500.00" text-anchor="end" data-node="0xaaaaf3759740">MIAMI INTERNATIONAL AIRPORT STATION NORTHBOUND</text>
+<text x="1327.88" y="959.62" text-anchor="end" data-node="0xaaaaf34da090" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">TENTH STREET PROMANADE METROMOVER</text>
+<text x="1396.58" y="735.62" text-anchor="middle" data-node="0xaaaaf36e6120" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">HISTORIC OVERTOWN/LYRIC THEATRE STAT.RAIL SOUTHBOUND</text>
+</g>
+<g id="trains"></g>
+</svg>

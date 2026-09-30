@@ -1,0 +1,775 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1797" height="2410" viewBox="-31.00 -32.58 1796.86 2410.25" data-viewbox-nolabels="-31.00 -31.00 1662.00 2408.67" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+<title>Metra</title>
+<rect id="backdrop" x="-31.00" y="-32.58" width="1796.86" height="2410.25" fill="var(--map-bg, #ffffff)"/>
+<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<g class="line" data-line="BNSF" stroke="#29c233" stroke-width="7.00">
+<path id="t12_BNSF" data-src="0xaaaaed976360" data-dst="0xaaaaed9765d0" d="M 1125.13 1440.00 L 1080.14 1440.00"/>
+<path id="t13_BNSF" data-src="0xaaaaed9765d0" data-dst="0xaaaaeda8d2e0" d="M 1080.14 1440.00 L 1035.16 1440.00"/>
+<path id="t46_BNSF" data-src="0xaaaaeda8d2e0" data-dst="0xaaaaee2b3630" d="M 1035.16 1440.00 L 990.18 1440.00"/>
+<path id="t76_BNSF" data-src="0xaaaaedc918e0" data-dst="0xaaaaedc91b10" d="M 1451.20 1386.67 L 1451.20 1440.00"/>
+<path id="t81_BNSF" data-src="0xaaaaedc91b10" data-dst="0xaaaaee2c4710" d="M 1440.00 1440.00 L 1395.02 1440.00"/>
+<path id="t151_BNSF" data-src="0xaaaaee2a0b20" data-dst="0xaaaaee2d3ac0" d="M 1215.09 1440.00 L 1170.11 1440.00"/>
+<path id="t156_BNSF" data-src="0xaaaaee2a4180" data-dst="0xaaaaee2c6140" d="M 522.09 1504.58 L 490.28 1536.39"/>
+<path id="t161_BNSF" data-src="0xaaaaee2a7910" data-dst="0xaaaaee2cce00" d="M 1350.04 1440.00 L 1305.05 1440.00"/>
+<path id="t170_BNSF" data-src="0xaaaaee2b1b00" data-dst="0xaaaaee2ce930" d="M 675.31 1440.00 L 630.32 1440.00"/>
+<path id="t172_BNSF" data-src="0xaaaaee2b3630" data-dst="0xaaaaee2bf480" d="M 990.18 1440.00 L 945.20 1440.00"/>
+<path id="t174_BNSF" data-src="0xaaaaee2b5160" data-dst="0xaaaaee2ceb00" d="M 585.70 1440.96 L 553.90 1472.77"/>
+<path id="t187_BNSF" data-src="0xaaaaee2bf480" data-dst="0xaaaaee2e1440" d="M 945.20 1440.00 L 900.22 1440.00"/>
+<path id="t188_BNSF" data-src="0xaaaaee2c0fb0" data-dst="0xaaaaee2b1b00" d="M 720.29 1440.00 L 675.31 1440.00"/>
+<path id="t192_BNSF" data-src="0xaaaaee2c4710" data-dst="0xaaaaee2a7910" d="M 1395.02 1440.00 L 1350.04 1440.00"/>
+<path id="t195_BNSF" data-src="0xaaaaee2c6140" data-dst="0xaaaaee2c6350" d="M 490.28 1536.39 L 480.60 1546.07 L 480.47 1546.20 L 480.36 1546.31 L 480.26 1546.41 L 480.10 1546.57 L 480.03 1546.64 L 479.95 1546.71 L 479.88 1546.78 L 479.80 1546.86 L 458.47 1568.19"/>
+<path id="t196_BNSF" data-src="0xaaaaee2c6350" data-dst="0xaaaaeda9b700" d="M 458.47 1568.19 L 426.67 1600.00"/>
+<path id="t203_BNSF" data-src="0xaaaaee2cce00" data-dst="0xaaaaee2d0460" d="M 1305.05 1440.00 L 1260.07 1440.00"/>
+<path id="t204_BNSF" data-src="0xaaaaee2ce930" data-dst="0xaaaaee2b5160" d="M 630.32 1440.00 L 587.27 1440.00 L 587.10 1440.00 L 586.97 1440.00 L 586.86 1440.02 L 586.76 1440.04 L 586.67 1440.07 L 586.58 1440.13 L 586.48 1440.20 L 586.37 1440.30 L 586.24 1440.43 L 586.08 1440.59 L 586.07 1440.60 L 585.70 1440.96"/>
+<path id="t205_BNSF" data-src="0xaaaaee2ceb00" data-dst="0xaaaaee2a4180" d="M 553.90 1472.77 L 533.93 1492.73 L 533.80 1492.87 L 533.69 1492.98 L 533.59 1493.07 L 533.43 1493.24 L 533.36 1493.31 L 533.29 1493.38 L 533.22 1493.45 L 533.14 1493.53 L 522.09 1504.58"/>
+<path id="t207_BNSF" data-src="0xaaaaee2d0460" data-dst="0xaaaaee2a0b20" d="M 1260.07 1440.00 L 1215.09 1440.00"/>
+<path id="t209_BNSF" data-src="0xaaaaee2d3ac0" data-dst="0xaaaaed976360" d="M 1170.11 1440.00 L 1125.13 1440.00"/>
+<path id="t212_BNSF" data-src="0xaaaaee2d7120" data-dst="0xaaaaee2d7300" d="M 855.23 1440.00 L 810.25 1440.00"/>
+<path id="t213_BNSF" data-src="0xaaaaee2d7300" data-dst="0xaaaaee2e2f70" d="M 810.25 1440.00 L 765.27 1440.00"/>
+<path id="t224_BNSF" data-src="0xaaaaee2e1440" data-dst="0xaaaaee2d7120" d="M 900.22 1440.00 L 855.23 1440.00"/>
+<path id="t226_BNSF" data-src="0xaaaaee2e2f70" data-dst="0xaaaaee2c0fb0" d="M 765.27 1440.00 L 720.29 1440.00"/>
+</g>
+<g class="line" data-line="HC" stroke="#550e0c" stroke-width="7.00">
+<path id="t9_HC" data-src="0xaaaaed95a620" data-dst="0xaaaaee2ac970" d="M 1013.33 1866.67 L 1013.29 1866.71 L 1013.22 1866.78 L 1013.14 1866.86 L 1013.05 1866.95 L 960.60 1919.40 L 960.47 1919.53 L 960.36 1919.64 L 960.26 1919.74 L 960.10 1919.90 L 960.03 1919.97 L 959.95 1920.05 L 959.88 1920.12 L 959.80 1920.20 L 959.72 1920.28 L 959.61 1920.39 L 907.27 1972.73 L 907.13 1972.87 L 907.02 1972.98 L 906.93 1973.07 L 906.76 1973.24 L 906.67 1973.33"/>
+<path id="t28_HC" data-src="0xaaaaeda27230" data-dst="0xaaaaeda27460" d="M 1333.33 1546.67 L 1333.29 1546.71 L 1333.22 1546.78 L 1333.14 1546.86 L 1333.05 1546.95 L 1280.60 1599.40 L 1280.47 1599.53 L 1280.36 1599.64 L 1280.26 1599.74 L 1280.10 1599.90 L 1280.03 1599.97 L 1279.95 1600.05 L 1279.88 1600.12 L 1279.80 1600.20 L 1279.72 1600.28 L 1279.61 1600.39 L 1227.27 1652.73 L 1227.13 1652.87 L 1227.02 1652.98 L 1226.93 1653.07 L 1226.76 1653.24 L 1226.67 1653.33"/>
+<path id="t29_HC" data-src="0xaaaaeda27460" data-dst="0xaaaaeda4cd00" d="M 1226.67 1653.33 L 1226.62 1653.38 L 1226.55 1653.45 L 1226.47 1653.53 L 1226.38 1653.62 L 1173.93 1706.07 L 1173.80 1706.20 L 1173.69 1706.31 L 1173.59 1706.41 L 1173.43 1706.57 L 1173.36 1706.64 L 1173.29 1706.71 L 1173.22 1706.78 L 1173.14 1706.86 L 1173.05 1706.95 L 1172.95 1707.05 L 1120.60 1759.40 L 1120.47 1759.53 L 1120.36 1759.64 L 1120.26 1759.74 L 1120.10 1759.90 L 1120.00 1760.00"/>
+<path id="t33_HC" data-src="0xaaaaeda4cd00" data-dst="0xaaaaed95a620" d="M 1120.00 1760.00 L 1119.95 1760.05 L 1119.88 1760.12 L 1119.80 1760.20 L 1119.72 1760.28 L 1067.27 1812.73 L 1067.13 1812.87 L 1067.02 1812.98 L 1066.93 1813.07 L 1066.76 1813.24 L 1066.69 1813.31 L 1066.62 1813.38 L 1066.55 1813.45 L 1066.47 1813.53 L 1066.38 1813.62 L 1066.28 1813.72 L 1013.93 1866.07 L 1013.80 1866.20 L 1013.69 1866.31 L 1013.59 1866.41 L 1013.43 1866.57 L 1013.33 1866.67"/>
+<path id="t76_HC" data-src="0xaaaaedc918e0" data-dst="0xaaaaedc91b10" d="M 1440.00 1386.67 L 1440.00 1440.00"/>
+<path id="t79_HC" data-src="0xaaaaedc91b10" data-dst="0xaaaaeda27230" d="M 1440.00 1440.00 L 1387.27 1492.73 L 1387.13 1492.87 L 1387.02 1492.98 L 1386.84 1493.16 L 1386.76 1493.24 L 1386.69 1493.31 L 1386.62 1493.38 L 1386.55 1493.45 L 1386.47 1493.53 L 1386.38 1493.62 L 1386.28 1493.72 L 1386.07 1493.93 L 1333.93 1546.07 L 1333.80 1546.20 L 1333.69 1546.31 L 1333.59 1546.41 L 1333.43 1546.57 L 1333.36 1546.64 L 1333.33 1546.67"/>
+<path id="t164_HC" data-src="0xaaaaee2ac970" data-dst="0xaaaaeda9b590" d="M 906.67 1973.33 L 906.62 1973.38 L 906.55 1973.45 L 906.47 1973.53 L 906.38 1973.62 L 853.93 2026.07 L 853.80 2026.20 L 853.69 2026.31 L 853.59 2026.41 L 853.43 2026.57 L 853.36 2026.64 L 853.29 2026.71 L 853.22 2026.78 L 853.14 2026.86 L 853.05 2026.95 L 800.00 2080.00"/>
+</g>
+<g class="line" data-line="MD-N" stroke="#cc5500" stroke-width="7.00">
+<path id="t5_MD_N" data-src="0xaaaaed90edb0" data-dst="0xaaaaedfdd5d0" d="M 956.63 583.30 L 959.40 586.07 L 959.53 586.20 L 959.64 586.31 L 959.74 586.41 L 959.90 586.57 L 959.97 586.64 L 960.05 586.71 L 960.12 586.78 L 960.20 586.86 L 960.28 586.95 L 1006.60 633.26"/>
+<path id="t10_MD_N" data-src="0xaaaaed95c790" data-dst="0xaaaaed95c9c0" d="M 1206.46 833.12 L 1226.07 852.73 L 1226.20 852.87 L 1226.31 852.98 L 1226.41 853.07 L 1226.57 853.24 L 1226.64 853.31 L 1226.71 853.38 L 1226.78 853.45 L 1226.86 853.53 L 1256.42 883.09"/>
+<path id="t11_MD_N" data-src="0xaaaaed95c9c0" data-dst="0xaaaaedb50fc0" d="M 1256.42 883.09 L 1279.40 906.07 L 1279.56 906.23 L 1279.69 906.36 L 1279.79 906.48 L 1279.87 906.57 L 1279.92 906.66 L 1279.96 906.75 L 1279.98 906.85 L 1279.99 906.96 L 1280.00 907.09 L 1280.00 907.25 L 1280.00 907.27 L 1280.00 944.02"/>
+<path id="t14_MD_N" data-src="0xaaaaed977fe0" data-dst="0xaaaaeda60020" d="M 1322.13 1333.33 L 1322.13 1386.67"/>
+<path id="t15_MD_N" data-src="0xaaaaed977fe0" data-dst="0xaaaaee384b60" d="M 1333.33 1333.33 L 1287.82 1287.82"/>
+<path id="t31_MD_N" data-src="0xaaaaeda45920" data-dst="0xaaaaee2e3e80" d="M 640.00 373.33 L 706.58 373.33"/>
+<path id="t49_MD_N" data-src="0xaaaaeda963e0" data-dst="0xaaaaeda96610" d="M 1106.53 733.19 L 1119.40 746.07 L 1119.53 746.20 L 1119.64 746.31 L 1119.74 746.41 L 1119.90 746.57 L 1119.97 746.64 L 1120.05 746.71 L 1120.12 746.78 L 1120.20 746.86 L 1156.49 783.16"/>
+<path id="t50_MD_N" data-src="0xaaaaeda96610" data-dst="0xaaaaed95c790" d="M 1156.49 783.16 L 1172.73 799.40 L 1172.87 799.53 L 1172.98 799.64 L 1173.07 799.74 L 1173.24 799.90 L 1173.31 799.97 L 1173.38 800.05 L 1173.45 800.12 L 1173.53 800.20 L 1206.46 833.12"/>
+<path id="t52_MD_N" data-src="0xaaaaeda99a60" data-dst="0xaaaaedabc600" d="M 1280.00 1085.34 L 1280.00 1156.01"/>
+<path id="t59_MD_N" data-src="0xaaaaedabc600" data-dst="0xaaaaeddc7bd0" d="M 1280.00 1156.01 L 1280.00 1226.67"/>
+<path id="t66_MD_N" data-src="0xaaaaedb50eb0" data-dst="0xaaaaeda99a60" d="M 1280.00 1014.68 L 1280.00 1085.34"/>
+<path id="t67_MD_N" data-src="0xaaaaedb50fc0" data-dst="0xaaaaedb50eb0" d="M 1280.00 944.02 L 1280.00 1014.68"/>
+<path id="t78_MD_N" data-src="0xaaaaedc918e0" data-dst="0xaaaaee2e4d00" d="M 1440.00 1403.47 L 1386.67 1403.47"/>
+<path id="t116_MD_N" data-src="0xaaaaedfdd5d0" data-dst="0xaaaaedfdd800" d="M 1006.60 633.26 L 1012.73 639.40 L 1012.87 639.53 L 1012.98 639.64 L 1013.07 639.74 L 1013.24 639.90 L 1013.31 639.97 L 1013.38 640.05 L 1013.45 640.12 L 1013.53 640.20 L 1056.56 683.23"/>
+<path id="t117_MD_N" data-src="0xaaaaedfdd800" data-dst="0xaaaaeda963e0" d="M 1056.56 683.23 L 1066.07 692.73 L 1066.20 692.87 L 1066.31 692.98 L 1066.41 693.07 L 1066.57 693.24 L 1066.64 693.31 L 1066.71 693.38 L 1066.78 693.45 L 1066.86 693.53 L 1106.53 733.19"/>
+<path id="t144_MD_N" data-src="0xaaaaee29a5e0" data-dst="0xaaaaed90edb0" d="M 906.67 533.33 L 956.63 583.30"/>
+<path id="t149_MD_N" data-src="0xaaaaee29e160" data-dst="0xaaaaee29a5e0" d="M 859.59 486.25 L 906.67 533.33"/>
+<path id="t162_MD_N" data-src="0xaaaaee2a8570" data-dst="0xaaaaee29e160" d="M 812.51 439.17 L 852.73 479.40 L 852.87 479.53 L 852.98 479.64 L 853.07 479.74 L 853.24 479.90 L 853.31 479.97 L 853.38 480.05 L 853.45 480.12 L 853.53 480.20 L 853.62 480.28 L 859.59 486.25"/>
+<path id="t163_MD_N" data-src="0xaaaaee2a86c0" data-dst="0xaaaaee2a8570" d="M 765.43 392.09 L 799.40 426.07 L 799.53 426.20 L 799.64 426.31 L 799.74 426.41 L 799.90 426.57 L 799.97 426.64 L 800.05 426.71 L 800.12 426.78 L 800.20 426.86 L 812.51 439.17"/>
+<path id="t227_MD_N" data-src="0xaaaaee2e3e80" data-dst="0xaaaaee2a86c0" d="M 706.58 373.33 L 746.07 373.33 L 746.23 373.33 L 746.36 373.34 L 746.48 373.35 L 746.57 373.37 L 746.66 373.41 L 746.75 373.46 L 746.85 373.53 L 746.96 373.63 L 747.09 373.76 L 747.25 373.92 L 747.27 373.93 L 765.43 392.09"/>
+<path id="t229_MD_N" data-src="0xaaaaee2e4d00" data-dst="0xaaaaeda60020" d="M 1386.67 1381.07 L 1333.33 1381.07"/>
+<path id="t237_MD_N" data-src="0xaaaaee384b60" data-dst="0xaaaaeddc7bd0" d="M 1287.82 1287.82 L 1280.60 1280.60 L 1280.44 1280.44 L 1280.31 1280.30 L 1280.21 1280.19 L 1280.13 1280.09 L 1280.08 1280.00 L 1280.04 1279.91 L 1280.02 1279.82 L 1280.01 1279.70 L 1280.00 1279.57 L 1280.00 1279.41 L 1280.00 1279.40 L 1280.00 1226.67"/>
+</g>
+<g class="line" data-line="MD-W" stroke="#f1ad0e" stroke-width="7.00">
+<path id="t2_MD_W" data-src="0xaaaaed8c0d50" data-dst="0xaaaaeda97fe0" d="M 686.28 1013.33 L 634.36 1013.33"/>
+<path id="t14_MD_W" data-src="0xaaaaed977fe0" data-dst="0xaaaaeda60020" d="M 1344.53 1333.33 L 1344.53 1386.67"/>
+<path id="t16_MD_W" data-src="0xaaaaed977fe0" data-dst="0xaaaaee385300" d="M 1333.33 1327.73 L 1287.82 1327.73"/>
+<path id="t27_MD_W" data-src="0xaaaaeda25700" data-dst="0xaaaaedeb4b40" d="M 530.51 1013.33 L 478.59 1013.33"/>
+<path id="t47_MD_W" data-src="0xaaaaeda8dee0" data-dst="0xaaaaee079b10" d="M 829.76 1043.09 L 800.60 1013.93 L 800.44 1013.77 L 800.30 1013.64 L 800.19 1013.54 L 800.09 1013.46 L 800.00 1013.41 L 799.91 1013.37 L 799.82 1013.35 L 799.70 1013.34 L 799.57 1013.33 L 799.41 1013.33 L 799.40 1013.33 L 790.12 1013.33"/>
+<path id="t48_MD_W" data-src="0xaaaaeda8e0e0" data-dst="0xaaaaed8c0d50" d="M 738.20 1013.33 L 686.28 1013.33"/>
+<path id="t51_MD_W" data-src="0xaaaaeda97fe0" data-dst="0xaaaaedd7c190" d="M 634.36 1013.33 L 582.43 1013.33"/>
+<path id="t55_MD_W" data-src="0xaaaaedab74a0" data-dst="0xaaaaeda8dee0" d="M 866.47 1079.81 L 853.93 1067.27 L 853.80 1067.13 L 853.69 1067.02 L 853.59 1066.93 L 853.43 1066.76 L 853.36 1066.69 L 853.29 1066.62 L 853.22 1066.55 L 853.14 1066.47 L 853.05 1066.38 L 852.95 1066.28 L 829.76 1043.09"/>
+<path id="t78_MD_W" data-src="0xaaaaedc918e0" data-dst="0xaaaaee2e4d00" d="M 1440.00 1381.07 L 1386.67 1381.07"/>
+<path id="t88_MD_W" data-src="0xaaaaedd2de20" data-dst="0xaaaaedd2e050" d="M 939.90 1153.24 L 907.27 1120.60 L 907.13 1120.47 L 907.02 1120.36 L 906.93 1120.26 L 906.76 1120.10 L 906.69 1120.03 L 906.62 1119.95 L 906.55 1119.88 L 906.47 1119.80 L 903.19 1116.52"/>
+<path id="t89_MD_W" data-src="0xaaaaedd2e050" data-dst="0xaaaaedab74a0" d="M 903.19 1116.52 L 866.47 1079.81"/>
+<path id="t92_MD_W" data-src="0xaaaaedd7c190" data-dst="0xaaaaeda25700" d="M 582.43 1013.33 L 530.51 1013.33"/>
+<path id="t102_MD_W" data-src="0xaaaaede66a90" data-dst="0xaaaaee02b870" d="M 1013.33 1226.67 L 976.62 1189.95"/>
+<path id="t105_MD_W" data-src="0xaaaaedeb4b40" data-dst="0xaaaaeda7ec70" d="M 478.59 1013.33 L 426.67 1013.33"/>
+<path id="t121_MD_W" data-src="0xaaaaee02b870" data-dst="0xaaaaedd2de20" d="M 976.62 1189.95 L 960.60 1173.93 L 960.47 1173.80 L 960.36 1173.69 L 960.26 1173.59 L 960.10 1173.43 L 960.03 1173.36 L 959.95 1173.29 L 959.88 1173.22 L 959.80 1173.14 L 939.90 1153.24"/>
+<path id="t125_MD_W" data-src="0xaaaaee079b10" data-dst="0xaaaaeda8e0e0" d="M 790.12 1013.33 L 738.20 1013.33"/>
+<path id="t229_MD_W" data-src="0xaaaaee2e4d00" data-dst="0xaaaaeda60020" d="M 1386.67 1403.47 L 1333.33 1403.47"/>
+<path id="t238_MD_W" data-src="0xaaaaee385300" data-dst="0xaaaaee385680" d="M 1287.82 1327.73 L 1242.30 1327.73"/>
+<path id="t239_MD_W" data-src="0xaaaaee385680" data-dst="0xaaaaee385950" d="M 1242.30 1327.73 L 1196.78 1327.73"/>
+<path id="t240_MD_W" data-src="0xaaaaee385950" data-dst="0xaaaaee385c50" d="M 1196.78 1327.73 L 1151.26 1327.73"/>
+<path id="t241_MD_W" data-src="0xaaaaee385c50" data-dst="0xaaaaee386030" d="M 1151.26 1327.73 L 1120.61 1327.73 L 1120.53 1327.73 L 1120.67 1327.74 L 1121.08 1327.78 L 1121.74 1327.93 L 1122.48 1328.22 L 1123.06 1328.56 L 1123.39 1328.82 L 1123.52 1328.93 L 1123.49 1328.91 L 1123.37 1328.78 L 1123.36 1328.77 L 1113.85 1319.27"/>
+<path id="t242_MD_W" data-src="0xaaaaee385eb0" data-dst="0xaaaaee386460" d="M 1081.67 1287.08 L 1071.23 1276.64 L 1071.09 1276.51 L 1070.98 1276.40 L 1070.89 1276.30 L 1070.72 1276.14 L 1070.65 1276.07 L 1070.58 1276.00 L 1070.51 1275.92 L 1070.43 1275.84 L 1049.48 1254.89"/>
+<path id="t243_MD_W" data-src="0xaaaaee386030" data-dst="0xaaaaee385eb0" d="M 1113.85 1319.27 L 1081.67 1287.08"/>
+<path id="t244_MD_W" data-src="0xaaaaee386460" data-dst="0xaaaaede66a90" d="M 1049.48 1254.89 L 1017.29 1222.71"/>
+</g>
+<g class="line" data-line="ME" stroke="#eb5c00" stroke-width="7.00">
+<path id="t0_ME" data-src="0xaaaaed8be370" data-dst="0xaaaaed8be640" d="M 1600.00 1689.60 L 1600.00 1648.35"/>
+<path id="t1_ME" data-src="0xaaaaed8be640" data-dst="0xaaaaede16240" d="M 1600.00 1648.35 L 1600.00 1607.10"/>
+<path id="t18_ME" data-src="0xaaaaed99cc90" data-dst="0xaaaaee077a10" d="M 1546.67 1578.67 L 1546.67 1610.67"/>
+<path id="t20_ME" data-src="0xaaaaed99ef00" data-dst="0xaaaaee2a2690" d="M 1386.67 2346.67 L 1416.38 2316.96"/>
+<path id="t53_ME" data-src="0xaaaaeda9d8f0" data-dst="0xaaaaee2b43a0" d="M 1440.00 1333.33 L 1466.24 1333.33"/>
+<path id="t54_ME" data-src="0xaaaaeda9daf0" data-dst="0xaaaaed99cc90" d="M 1546.67 1546.67 L 1546.67 1578.67"/>
+<path id="t73_ME" data-src="0xaaaaedbed390" data-dst="0xaaaaee2db5b0" d="M 1546.67 1866.67 L 1513.72 1899.61"/>
+<path id="t82_ME" data-src="0xaaaaedcdd670" data-dst="0xaaaaedcdd910" d="M 1546.67 1642.67 L 1546.67 1674.67"/>
+<path id="t83_ME" data-src="0xaaaaedcdd910" data-dst="0xaaaaedeb25d0" d="M 1546.67 1674.67 L 1546.67 1706.67"/>
+<path id="t94_ME" data-src="0xaaaaeddc7db0" data-dst="0xaaaaeda9daf0" d="M 1575.83 1575.83 L 1546.67 1546.67"/>
+<path id="t96_ME" data-src="0xaaaaede16240" data-dst="0xaaaaeddc7db0" d="M 1600.00 1607.10 L 1600.00 1600.60 L 1600.00 1600.44 L 1600.00 1600.30 L 1599.98 1600.19 L 1599.96 1600.09 L 1599.93 1600.00 L 1599.87 1599.91 L 1599.80 1599.82 L 1599.70 1599.70 L 1599.57 1599.57 L 1599.41 1599.41 L 1599.40 1599.40 L 1575.83 1575.83"/>
+<path id="t103_ME" data-src="0xaaaaedeb25d0" data-dst="0xaaaaedeb2870" d="M 1546.67 1706.67 L 1546.67 1738.67"/>
+<path id="t104_ME" data-src="0xaaaaedeb2870" data-dst="0xaaaaee380030" d="M 1546.67 1738.67 L 1546.67 1770.67"/>
+<path id="t124_ME" data-src="0xaaaaee077a10" data-dst="0xaaaaedcdd670" d="M 1546.67 1610.67 L 1546.67 1642.67"/>
+<path id="t139_ME" data-src="0xaaaaee1b2760" data-dst="0xaaaaee29aa20" d="M 1600.00 1813.33 L 1600.00 1772.09"/>
+<path id="t142_ME" data-src="0xaaaaee24c7b0" data-dst="0xaaaaed8be370" d="M 1600.00 1730.84 L 1600.00 1689.60"/>
+<path id="t147_ME" data-src="0xaaaaee29aa20" data-dst="0xaaaaee24c7b0" d="M 1600.00 1772.09 L 1600.00 1730.84"/>
+<path id="t150_ME" data-src="0xaaaaee29fc90" data-dst="0xaaaaee2a32f0" d="M 1546.67 2076.76 L 1546.67 2034.74"/>
+<path id="t153_ME" data-src="0xaaaaee2a2690" data-dst="0xaaaaee2a28c0" d="M 1416.38 2316.96 L 1439.40 2293.93 L 1439.53 2293.80 L 1439.64 2293.69 L 1439.74 2293.59 L 1439.90 2293.43 L 1439.97 2293.36 L 1440.05 2293.29 L 1440.12 2293.22 L 1440.20 2293.14 L 1446.09 2287.24"/>
+<path id="t154_ME" data-src="0xaaaaee2a28c0" data-dst="0xaaaaee2cb550" d="M 1446.09 2287.24 L 1475.80 2257.53"/>
+<path id="t155_ME" data-src="0xaaaaee2a32f0" data-dst="0xaaaaee2af140" d="M 1546.67 2034.74 L 1546.67 1992.72"/>
+<path id="t158_ME" data-src="0xaaaaee2a5e40" data-dst="0xaaaaee2e6740" d="M 1505.51 2227.82 L 1535.22 2198.11"/>
+<path id="t167_ME" data-src="0xaaaaee2af140" data-dst="0xaaaaee2af3b0" d="M 1546.67 1992.72 L 1546.67 1950.70"/>
+<path id="t168_ME" data-src="0xaaaaee2af3b0" data-dst="0xaaaaee2b0cb0" d="M 1546.67 1950.70 L 1546.67 1908.68"/>
+<path id="t169_ME" data-src="0xaaaaee2b0cb0" data-dst="0xaaaaedbed390" d="M 1546.67 1908.68 L 1546.67 1866.67"/>
+<path id="t173_ME" data-src="0xaaaaee2b43a0" data-dst="0xaaaaee2b7930" d="M 1466.24 1333.33 L 1492.49 1333.33"/>
+<path id="t177_ME" data-src="0xaaaaee2b7930" data-dst="0xaaaaee2b9460" d="M 1492.49 1333.33 L 1492.73 1333.33 L 1492.90 1333.33 L 1493.03 1333.34 L 1493.14 1333.35 L 1493.24 1333.37 L 1493.33 1333.41 L 1493.42 1333.46 L 1493.52 1333.53 L 1493.63 1333.63 L 1493.76 1333.76 L 1493.92 1333.92 L 1493.93 1333.93 L 1511.32 1351.32"/>
+<path id="t178_ME" data-src="0xaaaaee2b7b60" data-dst="0xaaaaee2bb0e0" d="M 1529.88 1369.88 L 1546.07 1386.07 L 1546.23 1386.23 L 1546.36 1386.36 L 1546.46 1386.48 L 1546.54 1386.57 L 1546.59 1386.66 L 1546.63 1386.75 L 1546.65 1386.85 L 1546.66 1386.96 L 1546.67 1387.09 L 1546.67 1387.25 L 1546.67 1387.27 L 1546.67 1389.20"/>
+<path id="t179_ME" data-src="0xaaaaee2b9460" data-dst="0xaaaaee2b7b60" d="M 1511.32 1351.32 L 1529.88 1369.88"/>
+<path id="t181_ME" data-src="0xaaaaee2baf90" data-dst="0xaaaaee2c38b0" d="M 1546.67 1415.45 L 1546.67 1441.69"/>
+<path id="t182_ME" data-src="0xaaaaee2bb0e0" data-dst="0xaaaaee2baf90" d="M 1546.67 1389.20 L 1546.67 1415.45"/>
+<path id="t185_ME" data-src="0xaaaaee2bd9e0" data-dst="0xaaaaee29fc90" d="M 1546.67 2118.78 L 1546.67 2076.76"/>
+<path id="t186_ME" data-src="0xaaaaee2bdb30" data-dst="0xaaaaee2bd9e0" d="M 1546.67 2160.79 L 1546.67 2118.78"/>
+<path id="t191_ME" data-src="0xaaaaee2c38b0" data-dst="0xaaaaee2c52b0" d="M 1546.67 1441.69 L 1546.67 1467.94"/>
+<path id="t193_ME" data-src="0xaaaaee2c52b0" data-dst="0xaaaaee2c5520" d="M 1546.67 1467.94 L 1546.67 1494.18"/>
+<path id="t194_ME" data-src="0xaaaaee2c5520" data-dst="0xaaaaee2cc130" d="M 1546.67 1494.18 L 1546.67 1520.42"/>
+<path id="t201_ME" data-src="0xaaaaee2cb550" data-dst="0xaaaaee2a5e40" d="M 1475.80 2257.53 L 1492.73 2240.60 L 1492.87 2240.47 L 1492.98 2240.36 L 1493.07 2240.26 L 1493.24 2240.10 L 1493.31 2240.03 L 1493.38 2239.95 L 1493.45 2239.88 L 1493.53 2239.80 L 1493.62 2239.72 L 1505.51 2227.82"/>
+<path id="t202_ME" data-src="0xaaaaee2cc130" data-dst="0xaaaaeda9daf0" d="M 1546.67 1520.42 L 1546.67 1546.67"/>
+<path id="t215_ME" data-src="0xaaaaee2d9a40" data-dst="0xaaaaeda601f0" d="M 1379.93 2026.67 L 1333.33 2026.67"/>
+<path id="t216_ME" data-src="0xaaaaee2db5b0" data-dst="0xaaaaee2dcfe0" d="M 1513.72 1899.61 L 1493.93 1919.40 L 1493.80 1919.53 L 1493.69 1919.64 L 1493.59 1919.74 L 1493.43 1919.90 L 1493.36 1919.97 L 1493.29 1920.05 L 1493.22 1920.12 L 1493.14 1920.20 L 1480.77 1932.56"/>
+<path id="t219_ME" data-src="0xaaaaee2dcfe0" data-dst="0xaaaaee2deac0" d="M 1480.77 1932.56 L 1447.82 1965.51"/>
+<path id="t222_ME" data-src="0xaaaaee2deac0" data-dst="0xaaaaee2e05b0" d="M 1447.82 1965.51 L 1440.60 1972.73 L 1440.47 1972.87 L 1440.36 1972.98 L 1440.26 1973.07 L 1440.10 1973.24 L 1440.03 1973.31 L 1439.95 1973.38 L 1439.88 1973.45 L 1439.80 1973.53 L 1414.88 1998.46"/>
+<path id="t223_ME" data-src="0xaaaaee2e05b0" data-dst="0xaaaaee2d9a40" d="M 1414.88 1998.46 L 1387.27 2026.07 L 1387.10 2026.23 L 1386.97 2026.36 L 1386.86 2026.46 L 1386.76 2026.54 L 1386.67 2026.59 L 1386.58 2026.63 L 1386.48 2026.65 L 1386.37 2026.66 L 1386.24 2026.67 L 1386.08 2026.67 L 1386.07 2026.67 L 1379.93 2026.67"/>
+<path id="t230_ME" data-src="0xaaaaee2e6740" data-dst="0xaaaaee2bdb30" d="M 1535.22 2198.11 L 1546.07 2187.27 L 1546.23 2187.10 L 1546.36 2186.97 L 1546.46 2186.86 L 1546.54 2186.76 L 1546.59 2186.67 L 1546.63 2186.58 L 1546.65 2186.48 L 1546.66 2186.37 L 1546.67 2186.24 L 1546.67 2186.08 L 1546.67 2186.07 L 1546.67 2160.79"/>
+<path id="t233_ME" data-src="0xaaaaee380030" data-dst="0xaaaaee3802a0" d="M 1546.67 1770.67 L 1546.67 1802.67"/>
+<path id="t234_ME" data-src="0xaaaaee3802a0" data-dst="0xaaaaee380510" d="M 1546.67 1802.67 L 1546.67 1834.67"/>
+<path id="t235_ME" data-src="0xaaaaee380510" data-dst="0xaaaaedbed390" d="M 1546.67 1834.67 L 1546.67 1866.67"/>
+</g>
+<g class="line" data-line="NCS" stroke="#9785bc" stroke-width="7.00">
+<path id="t8_NCS" data-src="0xaaaaed958bc0" data-dst="0xaaaaedd2b690" d="M 915.62 968.96 L 960.00 1013.33"/>
+<path id="t14_NCS" data-src="0xaaaaed977fe0" data-dst="0xaaaaeda60020" d="M 1333.33 1333.33 L 1333.33 1386.67"/>
+<path id="t16_NCS" data-src="0xaaaaed977fe0" data-dst="0xaaaaee385300" d="M 1333.33 1338.93 L 1287.82 1338.93"/>
+<path id="t24_NCS" data-src="0xaaaaed9f4780" data-dst="0xaaaaedf41090" d="M 906.67 847.12 L 906.67 909.87"/>
+<path id="t30_NCS" data-src="0xaaaaeda30720" data-dst="0xaaaaed9f4780" d="M 906.67 784.36 L 906.67 847.12"/>
+<path id="t38_NCS" data-src="0xaaaaeda63da0" data-dst="0xaaaaedace7d0" d="M 800.00 213.33 L 852.73 266.07 L 852.87 266.20 L 852.98 266.31 L 853.07 266.41 L 853.24 266.57 L 853.31 266.64 L 853.38 266.71 L 853.45 266.78 L 853.53 266.86 L 853.62 266.95 L 864.37 277.71"/>
+<path id="t60_NCS" data-src="0xaaaaedace7d0" data-dst="0xaaaaedad0740" d="M 864.37 277.71 L 906.07 319.40 L 906.23 319.56 L 906.36 319.70 L 906.46 319.81 L 906.54 319.91 L 906.59 320.00 L 906.63 320.09 L 906.65 320.18 L 906.66 320.30 L 906.67 320.43 L 906.67 320.59 L 906.67 320.60 L 906.67 351.26"/>
+<path id="t61_NCS" data-src="0xaaaaedacec10" data-dst="0xaaaaedacede0" d="M 906.67 596.09 L 906.67 658.85"/>
+<path id="t62_NCS" data-src="0xaaaaedacede0" data-dst="0xaaaaee3806a0" d="M 906.67 658.85 L 906.67 721.60"/>
+<path id="t63_NCS" data-src="0xaaaaedad0740" data-dst="0xaaaaedb9f2c0" d="M 906.67 351.26 L 906.67 442.30"/>
+<path id="t70_NCS" data-src="0xaaaaedb9f2c0" data-dst="0xaaaaee29a5e0" d="M 906.67 442.30 L 906.67 533.33"/>
+<path id="t78_NCS" data-src="0xaaaaedc918e0" data-dst="0xaaaaee2e4d00" d="M 1440.00 1392.27 L 1386.67 1392.27"/>
+<path id="t84_NCS" data-src="0xaaaaedcdfb80" data-dst="0xaaaaedcdfdb0" d="M 1013.33 1167.82 L 1013.33 1108.97"/>
+<path id="t85_NCS" data-src="0xaaaaedcdfdb0" data-dst="0xaaaaee02b980" d="M 1013.33 1108.97 L 1013.33 1067.27 L 1013.33 1067.10 L 1013.33 1066.97 L 1013.32 1066.86 L 1013.30 1066.76 L 1013.26 1066.67 L 1013.21 1066.58 L 1013.13 1066.48 L 1013.03 1066.37 L 1012.90 1066.24 L 1012.75 1066.08 L 1012.73 1066.07 L 1001.61 1054.94"/>
+<path id="t101_NCS" data-src="0xaaaaede66a90" data-dst="0xaaaaedcdfb80" d="M 1013.33 1226.67 L 1013.33 1167.82"/>
+<path id="t109_NCS" data-src="0xaaaaedf41090" data-dst="0xaaaaed958bc0" d="M 906.67 909.87 L 906.67 959.40 L 906.67 959.56 L 906.67 959.70 L 906.68 959.81 L 906.70 959.91 L 906.74 960.00 L 906.79 960.09 L 906.87 960.18 L 906.97 960.30 L 907.10 960.43 L 907.25 960.59 L 907.27 960.60 L 915.62 968.96"/>
+<path id="t122_NCS" data-src="0xaaaaee02b980" data-dst="0xaaaaedd2b690" d="M 1001.61 1054.94 L 960.00 1013.33"/>
+<path id="t145_NCS" data-src="0xaaaaee29a5e0" data-dst="0xaaaaedacec10" d="M 906.67 533.33 L 906.67 596.09"/>
+<path id="t229_NCS" data-src="0xaaaaee2e4d00" data-dst="0xaaaaeda60020" d="M 1386.67 1392.27 L 1333.33 1392.27"/>
+<path id="t236_NCS" data-src="0xaaaaee3806a0" data-dst="0xaaaaeda30720" d="M 906.67 721.60 L 906.67 784.36"/>
+<path id="t238_NCS" data-src="0xaaaaee385300" data-dst="0xaaaaee385680" d="M 1287.82 1338.93 L 1242.30 1338.93"/>
+<path id="t239_NCS" data-src="0xaaaaee385680" data-dst="0xaaaaee385950" d="M 1242.30 1338.93 L 1196.78 1338.93"/>
+<path id="t240_NCS" data-src="0xaaaaee385950" data-dst="0xaaaaee385c50" d="M 1196.78 1338.93 L 1151.26 1338.93"/>
+<path id="t241_NCS" data-src="0xaaaaee385c50" data-dst="0xaaaaee386030" d="M 1151.26 1338.93 L 1120.59 1338.93 L 1120.34 1338.93 L 1119.94 1338.92 L 1119.30 1338.86 L 1118.44 1338.67 L 1117.53 1338.30 L 1116.77 1337.85 L 1116.24 1337.45 L 1115.89 1337.13 L 1115.65 1336.90 L 1115.46 1336.71 L 1115.44 1336.69 L 1105.93 1327.18"/>
+<path id="t242_NCS" data-src="0xaaaaee385eb0" data-dst="0xaaaaee386460" d="M 1073.75 1295.00 L 1063.31 1284.56 L 1063.18 1284.43 L 1063.06 1284.32 L 1062.97 1284.22 L 1062.80 1284.06 L 1062.73 1283.99 L 1062.66 1283.91 L 1062.59 1283.84 L 1062.51 1283.76 L 1041.56 1262.81"/>
+<path id="t243_NCS" data-src="0xaaaaee386030" data-dst="0xaaaaee385eb0" d="M 1105.93 1327.18 L 1073.75 1295.00"/>
+<path id="t244_NCS" data-src="0xaaaaee386460" data-dst="0xaaaaede66a90" d="M 1041.56 1262.81 L 1009.37 1230.63"/>
+</g>
+<g class="line" data-line="RI" stroke="#e02400" stroke-width="7.00">
+<path id="t3_RI" data-src="0xaaaaed90c8d0" data-dst="0xaaaaed90cb40" d="M 1333.33 1836.64 L 1333.33 1798.63"/>
+<path id="t4_RI" data-src="0xaaaaed90cb40" data-dst="0xaaaaee29a7c0" d="M 1333.33 1798.63 L 1333.33 1760.63"/>
+<path id="t19_RI" data-src="0xaaaaed99cdd0" data-dst="0xaaaaee077560" d="M 1422.22 1706.67 L 1457.78 1706.67"/>
+<path id="t25_RI" data-src="0xaaaaeda23a20" data-dst="0xaaaaee164430" d="M 1493.33 1573.33 L 1493.33 1706.67"/>
+<path id="t36_RI" data-src="0xaaaaeda601f0" data-dst="0xaaaaee24ca10" d="M 1333.33 2026.67 L 1302.27 2057.73"/>
+<path id="t37_RI" data-src="0xaaaaeda601f0" data-dst="0xaaaaedc8f580" d="M 1333.33 2026.67 L 1333.33 1988.66"/>
+<path id="t42_RI" data-src="0xaaaaeda82d90" data-dst="0xaaaaeda9b590" d="M 960.00 2080.00 L 800.00 2080.00"/>
+<path id="t74_RI" data-src="0xaaaaedc8f580" data-dst="0xaaaaedc8f7e0" d="M 1333.33 1988.66 L 1333.33 1950.65"/>
+<path id="t75_RI" data-src="0xaaaaedc8f7e0" data-dst="0xaaaaedfdb0f0" d="M 1333.33 1950.65 L 1333.33 1912.65"/>
+<path id="t90_RI" data-src="0xaaaaedd79c70" data-dst="0xaaaaedd79f10" d="M 1047.86 2080.00 L 1003.93 2080.00"/>
+<path id="t91_RI" data-src="0xaaaaedd79f10" data-dst="0xaaaaeda82d90" d="M 1003.93 2080.00 L 960.00 2080.00"/>
+<path id="t98_RI" data-src="0xaaaaede642f0" data-dst="0xaaaaedf8cdc0" d="M 1223.59 2080.00 L 1179.66 2080.00"/>
+<path id="t99_RI" data-src="0xaaaaede64400" data-dst="0xaaaaede642f0" d="M 1267.52 2080.00 L 1223.59 2080.00"/>
+<path id="t110_RI" data-src="0xaaaaedf8cdc0" data-dst="0xaaaaedf8cff0" d="M 1179.66 2080.00 L 1135.73 2080.00"/>
+<path id="t111_RI" data-src="0xaaaaedf8cff0" data-dst="0xaaaaedf8d290" d="M 1135.73 2080.00 L 1091.80 2080.00"/>
+<path id="t112_RI" data-src="0xaaaaedf8d290" data-dst="0xaaaaedd79c70" d="M 1091.80 2080.00 L 1047.86 2080.00"/>
+<path id="t114_RI" data-src="0xaaaaedfdb0f0" data-dst="0xaaaaedfdb420" d="M 1333.33 1912.65 L 1333.33 1874.64"/>
+<path id="t115_RI" data-src="0xaaaaedfdb420" data-dst="0xaaaaed90c8d0" d="M 1333.33 1874.64 L 1333.33 1836.64"/>
+<path id="t123_RI" data-src="0xaaaaee077560" data-dst="0xaaaaee164430" d="M 1457.78 1706.67 L 1493.33 1706.67"/>
+<path id="t134_RI" data-src="0xaaaaee164430" data-dst="0xaaaaee2e4b30" d="M 1493.33 1706.67 L 1493.33 1835.41"/>
+<path id="t138_RI" data-src="0xaaaaee1b2590" data-dst="0xaaaaed99cdd0" d="M 1386.67 1706.67 L 1422.22 1706.67"/>
+<path id="t141_RI" data-src="0xaaaaee2009b0" data-dst="0xaaaaeda23a20" d="M 1493.33 1440.00 L 1493.33 1573.33"/>
+<path id="t143_RI" data-src="0xaaaaee24ca10" data-dst="0xaaaaede64400" d="M 1302.27 2057.73 L 1280.60 2079.40 L 1280.44 2079.56 L 1280.30 2079.69 L 1280.19 2079.79 L 1280.09 2079.87 L 1280.00 2079.92 L 1279.91 2079.96 L 1279.82 2079.98 L 1279.70 2079.99 L 1279.57 2080.00 L 1279.41 2080.00 L 1279.40 2080.00 L 1267.52 2080.00"/>
+<path id="t146_RI" data-src="0xaaaaee29a7c0" data-dst="0xaaaaee29ab30" d="M 1333.33 1760.63 L 1333.33 1760.60 L 1333.33 1760.44 L 1333.34 1760.30 L 1333.35 1760.19 L 1333.37 1760.09 L 1333.41 1760.00 L 1333.46 1759.91 L 1333.53 1759.82 L 1333.63 1759.70 L 1333.76 1759.57 L 1333.92 1759.41 L 1333.93 1759.40 L 1359.79 1733.54"/>
+<path id="t148_RI" data-src="0xaaaaee29ab30" data-dst="0xaaaaee1b2590" d="M 1359.79 1733.54 L 1386.67 1706.67"/>
+<path id="t180_RI" data-src="0xaaaaee2ba530" data-dst="0xaaaaeda601f0" d="M 1424.37 1935.63 L 1387.27 1972.73 L 1387.13 1972.87 L 1387.02 1972.98 L 1386.93 1973.07 L 1386.76 1973.24 L 1386.69 1973.31 L 1386.62 1973.38 L 1386.55 1973.45 L 1386.47 1973.53 L 1386.38 1973.62 L 1386.28 1973.72 L 1333.33 2026.67"/>
+<path id="t228_RI" data-src="0xaaaaee2e4b30" data-dst="0xaaaaee2ba530" d="M 1493.33 1835.41 L 1493.33 1866.07 L 1493.33 1866.23 L 1493.33 1866.36 L 1493.32 1866.48 L 1493.30 1866.57 L 1493.26 1866.66 L 1493.21 1866.75 L 1493.13 1866.85 L 1493.03 1866.96 L 1492.90 1867.09 L 1492.75 1867.25 L 1492.73 1867.27 L 1440.60 1919.40 L 1440.47 1919.53 L 1440.36 1919.64 L 1440.26 1919.74 L 1440.10 1919.90 L 1440.03 1919.97 L 1439.95 1920.05 L 1439.88 1920.12 L 1439.80 1920.20 L 1424.37 1935.63"/>
+</g>
+<g class="line" data-line="SWS" stroke="#0042a8" stroke-width="7.00">
+<path id="t7_SWS" data-src="0xaaaaed958ab0" data-dst="0xaaaaeda82d90" d="M 960.00 2186.67 L 960.00 2080.00"/>
+<path id="t76_SWS" data-src="0xaaaaedc918e0" data-dst="0xaaaaedc91b10" d="M 1428.80 1386.67 L 1428.80 1440.00"/>
+<path id="t80_SWS" data-src="0xaaaaedc91b10" data-dst="0xaaaaee2c97a0" d="M 1440.00 1440.00 L 1440.00 1516.25"/>
+<path id="t118_SWS" data-src="0xaaaaee0290e0" data-dst="0xaaaaed958ab0" d="M 960.00 2293.33 L 960.00 2186.67"/>
+<path id="t166_SWS" data-src="0xaaaaee2ae4e0" data-dst="0xaaaaee2c2ae0" d="M 1067.84 1972.16 L 1067.27 1972.73 L 1067.13 1972.87 L 1067.02 1972.98 L 1066.93 1973.07 L 1066.76 1973.24 L 1066.69 1973.31 L 1066.62 1973.38 L 1066.55 1973.45 L 1066.47 1973.53 L 1013.93 2026.07 L 1013.92 2026.08"/>
+<path id="t176_SWS" data-src="0xaaaaee2b6e20" data-dst="0xaaaaee2ae4e0" d="M 1121.76 1918.24 L 1120.60 1919.40 L 1120.47 1919.53 L 1120.36 1919.64 L 1120.26 1919.74 L 1120.10 1919.90 L 1120.03 1919.97 L 1119.95 1920.05 L 1119.88 1920.12 L 1119.80 1920.20 L 1119.72 1920.28 L 1067.84 1972.16"/>
+<path id="t190_SWS" data-src="0xaaaaee2c2ae0" data-dst="0xaaaaeda82d90" d="M 1013.92 2026.08 L 1013.80 2026.20 L 1013.69 2026.31 L 1013.59 2026.41 L 1013.43 2026.57 L 1013.36 2026.64 L 1013.29 2026.71 L 1013.22 2026.78 L 1013.14 2026.86 L 1013.05 2026.95 L 960.00 2080.00"/>
+<path id="t199_SWS" data-src="0xaaaaee2c97a0" data-dst="0xaaaaee2c99b0" d="M 1440.00 1516.25 L 1440.00 1592.51"/>
+<path id="t200_SWS" data-src="0xaaaaee2c99b0" data-dst="0xaaaaee2dc4c0" d="M 1440.00 1592.51 L 1440.00 1599.40 L 1440.00 1599.56 L 1440.00 1599.70 L 1439.98 1599.81 L 1439.96 1599.91 L 1439.93 1600.00 L 1439.87 1600.09 L 1439.80 1600.18 L 1439.70 1600.30 L 1439.57 1600.43 L 1439.41 1600.59 L 1439.40 1600.60 L 1391.35 1648.65"/>
+<path id="t210_SWS" data-src="0xaaaaee2d5780" data-dst="0xaaaaee2b6e20" d="M 1175.68 1864.32 L 1173.93 1866.07 L 1173.80 1866.20 L 1173.69 1866.31 L 1173.59 1866.41 L 1173.43 1866.57 L 1173.36 1866.64 L 1173.29 1866.71 L 1173.22 1866.78 L 1173.14 1866.86 L 1121.76 1918.24"/>
+<path id="t217_SWS" data-src="0xaaaaee2dc370" data-dst="0xaaaaee2ddde0" d="M 1337.43 1702.57 L 1333.93 1706.07 L 1333.80 1706.20 L 1333.69 1706.31 L 1333.59 1706.41 L 1333.43 1706.57 L 1333.36 1706.64 L 1333.29 1706.71 L 1333.22 1706.78 L 1333.14 1706.86 L 1333.05 1706.95 L 1283.51 1756.49"/>
+<path id="t218_SWS" data-src="0xaaaaee2dc4c0" data-dst="0xaaaaee2dc370" d="M 1391.35 1648.65 L 1387.27 1652.73 L 1387.13 1652.87 L 1387.02 1652.98 L 1386.93 1653.07 L 1386.76 1653.24 L 1386.69 1653.31 L 1386.62 1653.38 L 1386.55 1653.45 L 1386.47 1653.53 L 1337.43 1702.57"/>
+<path id="t220_SWS" data-src="0xaaaaee2ddde0" data-dst="0xaaaaee2de050" d="M 1283.51 1756.49 L 1280.60 1759.40 L 1280.47 1759.53 L 1280.36 1759.64 L 1280.26 1759.74 L 1280.10 1759.90 L 1280.03 1759.97 L 1279.95 1760.05 L 1279.88 1760.12 L 1279.80 1760.20 L 1229.60 1810.40"/>
+<path id="t221_SWS" data-src="0xaaaaee2de050" data-dst="0xaaaaee2d5780" d="M 1229.60 1810.40 L 1227.27 1812.73 L 1227.13 1812.87 L 1227.02 1812.98 L 1226.93 1813.07 L 1226.76 1813.24 L 1226.69 1813.31 L 1226.62 1813.38 L 1226.55 1813.45 L 1226.47 1813.53 L 1175.68 1864.32"/>
+</g>
+<g class="line" data-line="UP-N" stroke="#008000" stroke-width="7.00">
+<path id="t21_UP_N" data-src="0xaaaaed9f21d0" data-dst="0xaaaaed9f23e0" d="M 1386.67 895.90 L 1386.67 950.58"/>
+<path id="t22_UP_N" data-src="0xaaaaed9f23e0" data-dst="0xaaaaed9f2680" d="M 1386.67 950.58 L 1386.67 1005.26"/>
+<path id="t23_UP_N" data-src="0xaaaaed9f2680" data-dst="0xaaaaee113aa0" d="M 1386.67 1005.26 L 1386.67 1059.94"/>
+<path id="t32_UP_N" data-src="0xaaaaeda45a30" data-dst="0xaaaaee2a6950" d="M 1173.33 0.00 L 1212.00 38.66"/>
+<path id="t41_UP_N" data-src="0xaaaaeda7ede0" data-dst="0xaaaaedc918e0" d="M 1493.33 1397.87 L 1440.00 1397.87"/>
+<path id="t77_UP_N" data-src="0xaaaaedc918e0" data-dst="0xaaaaede66950" d="M 1436.04 1390.63 L 1382.71 1337.29"/>
+<path id="t106_UP_N" data-src="0xaaaaedf00830" data-dst="0xaaaaed9f21d0" d="M 1386.67 841.22 L 1386.67 895.90"/>
+<path id="t126_UP_N" data-src="0xaaaaee0c5800" data-dst="0xaaaaee0c5aa0" d="M 1386.67 1223.97 L 1386.67 1278.65"/>
+<path id="t127_UP_N" data-src="0xaaaaee0c5aa0" data-dst="0xaaaaede66950" d="M 1386.67 1278.65 L 1386.67 1333.33"/>
+<path id="t128_UP_N" data-src="0xaaaaee113aa0" data-dst="0xaaaaee113d10" d="M 1386.67 1059.94 L 1386.67 1114.62"/>
+<path id="t129_UP_N" data-src="0xaaaaee113d10" data-dst="0xaaaaee113fb0" d="M 1386.67 1114.62 L 1386.67 1169.30"/>
+<path id="t130_UP_N" data-src="0xaaaaee113fb0" data-dst="0xaaaaee0c5800" d="M 1386.67 1169.30 L 1386.67 1223.97"/>
+<path id="t152_UP_N" data-src="0xaaaaee2a17c0" data-dst="0xaaaaedf00830" d="M 1386.67 786.54 L 1386.67 841.22"/>
+<path id="t157_UP_N" data-src="0xaaaaee2a4e20" data-dst="0xaaaaee2b5e00" d="M 1386.67 567.82 L 1386.67 622.50"/>
+<path id="t159_UP_N" data-src="0xaaaaee2a6950" data-dst="0xaaaaee2a6af0" d="M 1212.00 38.66 L 1226.07 52.73 L 1226.20 52.87 L 1226.31 52.98 L 1226.49 53.16 L 1226.57 53.24 L 1226.64 53.31 L 1226.71 53.38 L 1226.78 53.45 L 1226.86 53.53 L 1250.66 77.33"/>
+<path id="t160_UP_N" data-src="0xaaaaee2a6af0" data-dst="0xaaaaee2ad7a0" d="M 1250.66 77.33 L 1279.40 106.07 L 1279.53 106.20 L 1279.64 106.31 L 1279.74 106.41 L 1279.90 106.57 L 1279.97 106.64 L 1280.05 106.71 L 1280.12 106.78 L 1280.20 106.86 L 1289.33 115.99"/>
+<path id="t165_UP_N" data-src="0xaaaaee2ad7a0" data-dst="0xaaaaee2d63f0" d="M 1289.33 115.99 L 1327.99 154.66"/>
+<path id="t171_UP_N" data-src="0xaaaaee2b2830" data-dst="0xaaaaee2a4e20" d="M 1386.67 513.14 L 1386.67 567.82"/>
+<path id="t175_UP_N" data-src="0xaaaaee2b5e00" data-dst="0xaaaaee2c1c50" d="M 1386.67 622.50 L 1386.67 677.18"/>
+<path id="t183_UP_N" data-src="0xaaaaee2bcac0" data-dst="0xaaaaee2bcd30" d="M 1386.67 349.11 L 1386.67 403.79"/>
+<path id="t184_UP_N" data-src="0xaaaaee2bcd30" data-dst="0xaaaaee2d1290" d="M 1386.67 403.79 L 1386.67 458.47"/>
+<path id="t189_UP_N" data-src="0xaaaaee2c1c50" data-dst="0xaaaaee2cf5d0" d="M 1386.67 677.18 L 1386.67 731.86"/>
+<path id="t197_UP_N" data-src="0xaaaaee2c8910" data-dst="0xaaaaee2bcac0" d="M 1386.67 294.43 L 1386.67 349.11"/>
+<path id="t198_UP_N" data-src="0xaaaaee2c8a60" data-dst="0xaaaaee2c8910" d="M 1386.67 239.75 L 1386.67 294.43"/>
+<path id="t206_UP_N" data-src="0xaaaaee2cf5d0" data-dst="0xaaaaee2a17c0" d="M 1386.67 731.86 L 1386.67 786.54"/>
+<path id="t208_UP_N" data-src="0xaaaaee2d1290" data-dst="0xaaaaee2b2830" d="M 1386.67 458.47 L 1386.67 513.14"/>
+<path id="t211_UP_N" data-src="0xaaaaee2d63f0" data-dst="0xaaaaee2e2120" d="M 1327.99 154.66 L 1332.73 159.40 L 1332.87 159.53 L 1332.98 159.64 L 1333.07 159.74 L 1333.24 159.90 L 1333.31 159.97 L 1333.38 160.05 L 1333.45 160.12 L 1333.53 160.20 L 1366.65 193.32"/>
+<path id="t225_UP_N" data-src="0xaaaaee2e2120" data-dst="0xaaaaee2c8a60" d="M 1366.65 193.32 L 1386.07 212.73 L 1386.23 212.90 L 1386.36 213.03 L 1386.46 213.14 L 1386.54 213.24 L 1386.59 213.33 L 1386.63 213.42 L 1386.65 213.52 L 1386.66 213.63 L 1386.67 213.76 L 1386.67 213.92 L 1386.67 213.93 L 1386.67 239.75"/>
+</g>
+<g class="line" data-line="UP-NW" stroke="#ffe600" stroke-width="7.00">
+<path id="t6_UP_NW" data-src="0xaaaaed90eec0" data-dst="0xaaaaedd2b690" d="M 896.54 1013.33 L 960.00 1013.33"/>
+<path id="t26_UP_NW" data-src="0xaaaaeda23bf0" data-dst="0xaaaaeddc7bd0" d="M 1333.33 1280.00 L 1333.29 1279.95 L 1333.22 1279.88 L 1333.14 1279.80 L 1333.05 1279.72 L 1280.00 1226.67"/>
+<path id="t34_UP_NW" data-src="0xaaaaeda55ab0" data-dst="0xaaaaedf02de0" d="M 524.87 684.87 L 532.73 692.73 L 532.87 692.87 L 532.98 692.98 L 533.07 693.07 L 533.24 693.24 L 533.31 693.31 L 533.38 693.38 L 533.45 693.45 L 533.53 693.53 L 533.62 693.62 L 533.72 693.72 L 569.75 729.75"/>
+<path id="t39_UP_NW" data-src="0xaaaaeda67f40" data-dst="0xaaaaeda68170" d="M 794.11 954.11 L 799.40 959.40 L 799.53 959.53 L 799.64 959.64 L 799.74 959.74 L 799.90 959.90 L 799.97 959.97 L 800.05 960.05 L 800.12 960.12 L 800.20 960.20 L 800.28 960.28 L 838.98 998.98"/>
+<path id="t40_UP_NW" data-src="0xaaaaeda68170" data-dst="0xaaaaed90eec0" d="M 838.98 998.98 L 852.73 1012.73 L 852.90 1012.90 L 853.03 1013.03 L 853.14 1013.13 L 853.24 1013.20 L 853.33 1013.26 L 853.42 1013.29 L 853.52 1013.32 L 853.63 1013.33 L 853.76 1013.33 L 853.92 1013.33 L 853.93 1013.33 L 896.54 1013.33"/>
+<path id="t41_UP_NW" data-src="0xaaaaeda7ede0" data-dst="0xaaaaedc918e0" d="M 1493.33 1386.67 L 1440.00 1386.67"/>
+<path id="t45_UP_NW" data-src="0xaaaaeda85bd0" data-dst="0xaaaaeda67f40" d="M 749.24 909.24 L 794.11 954.11"/>
+<path id="t56_UP_NW" data-src="0xaaaaedaba090" data-dst="0xaaaaedaba410" d="M 1073.76 1020.43 L 1067.27 1013.93 L 1067.10 1013.77 L 1066.97 1013.64 L 1066.86 1013.54 L 1066.76 1013.46 L 1066.67 1013.41 L 1066.58 1013.37 L 1066.48 1013.35 L 1066.37 1013.34 L 1066.24 1013.33 L 1066.08 1013.33 L 1066.07 1013.33 L 1018.33 1013.33"/>
+<path id="t58_UP_NW" data-src="0xaaaaedaba410" data-dst="0xaaaaedd2b690" d="M 1018.33 1013.33 L 960.00 1013.33"/>
+<path id="t77_UP_NW" data-src="0xaaaaedc918e0" data-dst="0xaaaaede66950" d="M 1443.96 1382.71 L 1390.63 1329.37"/>
+<path id="t93_UP_NW" data-src="0xaaaaeddc7bd0" data-dst="0xaaaaede16470" d="M 1280.00 1226.67 L 1238.75 1185.42"/>
+<path id="t95_UP_NW" data-src="0xaaaaeddc8080" data-dst="0xaaaaee161d40" d="M 1197.51 1144.17 L 1173.93 1120.60 L 1173.80 1120.47 L 1173.69 1120.36 L 1173.59 1120.26 L 1173.43 1120.10 L 1173.36 1120.03 L 1173.29 1119.95 L 1173.22 1119.88 L 1173.14 1119.80 L 1156.26 1102.92"/>
+<path id="t97_UP_NW" data-src="0xaaaaede16470" data-dst="0xaaaaeddc8080" d="M 1238.75 1185.42 L 1227.27 1173.93 L 1227.13 1173.80 L 1227.02 1173.69 L 1226.93 1173.59 L 1226.76 1173.43 L 1226.69 1173.36 L 1226.62 1173.29 L 1226.55 1173.22 L 1226.47 1173.14 L 1197.51 1144.17"/>
+<path id="t100_UP_NW" data-src="0xaaaaede66950" data-dst="0xaaaaeda23bf0" d="M 1386.67 1333.33 L 1333.93 1280.60 L 1333.80 1280.47 L 1333.69 1280.36 L 1333.59 1280.26 L 1333.43 1280.10 L 1333.33 1280.00"/>
+<path id="t107_UP_NW" data-src="0xaaaaedf02de0" data-dst="0xaaaaedf02f20" d="M 569.75 729.75 L 586.07 746.07 L 586.20 746.20 L 586.31 746.31 L 586.41 746.41 L 586.57 746.57 L 586.64 746.64 L 586.71 746.71 L 586.78 746.78 L 586.86 746.86 L 614.62 774.62"/>
+<path id="t108_UP_NW" data-src="0xaaaaedf02f20" data-dst="0xaaaaee373860" d="M 614.62 774.62 L 639.40 799.40 L 639.53 799.53 L 639.64 799.64 L 639.74 799.74 L 639.90 799.90 L 639.97 799.97 L 640.05 800.05 L 640.12 800.12 L 640.20 800.20 L 659.49 819.49"/>
+<path id="t113_UP_NW" data-src="0xaaaaedf8f540" data-dst="0xaaaaee2d98f0" d="M 0.00 320.00 L 159.40 320.00 L 159.56 320.00 L 159.70 320.00 L 159.81 320.02 L 159.91 320.04 L 160.00 320.07 L 160.09 320.13 L 160.18 320.20 L 160.30 320.30 L 160.43 320.43 L 160.59 320.59 L 160.60 320.60 L 212.73 372.73 L 212.87 372.87 L 212.98 372.98 L 213.07 373.07 L 213.24 373.24 L 213.31 373.31 L 213.38 373.38 L 213.45 373.45 L 213.53 373.53 L 263.45 423.45"/>
+<path id="t131_UP_NW" data-src="0xaaaaee161b60" data-dst="0xaaaaeda55ab0" d="M 480.00 640.00 L 524.87 684.87"/>
+<path id="t132_UP_NW" data-src="0xaaaaee161d40" data-dst="0xaaaaee1620a0" d="M 1156.26 1102.92 L 1120.60 1067.27 L 1120.47 1067.13 L 1120.36 1067.02 L 1120.26 1066.93 L 1120.10 1066.76 L 1120.03 1066.69 L 1119.95 1066.62 L 1119.88 1066.55 L 1119.80 1066.47 L 1115.01 1061.68"/>
+<path id="t133_UP_NW" data-src="0xaaaaee1620a0" data-dst="0xaaaaedaba090" d="M 1115.01 1061.68 L 1073.76 1020.43"/>
+<path id="t135_UP_NW" data-src="0xaaaaee1afe00" data-dst="0xaaaaee161b60" d="M 480.00 480.00 L 480.00 640.00"/>
+<path id="t214_UP_NW" data-src="0xaaaaee2d98f0" data-dst="0xaaaaee161b60" d="M 263.45 423.45 L 266.07 426.07 L 266.20 426.20 L 266.31 426.31 L 266.41 426.41 L 266.57 426.57 L 266.64 426.64 L 266.71 426.71 L 266.78 426.78 L 266.86 426.86 L 266.95 426.95 L 319.40 479.40 L 319.53 479.53 L 319.64 479.64 L 319.74 479.74 L 319.90 479.90 L 319.97 479.97 L 320.05 480.05 L 320.12 480.12 L 320.20 480.20 L 320.28 480.28 L 320.39 480.39 L 372.73 532.73 L 372.87 532.87 L 372.98 532.98 L 373.07 533.07 L 373.24 533.24 L 373.31 533.31 L 373.38 533.38 L 373.45 533.45 L 373.53 533.53 L 373.62 533.62 L 426.07 586.07 L 426.20 586.20 L 426.31 586.31 L 426.49 586.49 L 426.57 586.57 L 426.64 586.64 L 426.71 586.71 L 426.78 586.78 L 426.86 586.86 L 426.95 586.95 L 427.05 587.05 L 480.00 640.00"/>
+<path id="t231_UP_NW" data-src="0xaaaaee373860" data-dst="0xaaaaee373a00" d="M 659.49 819.49 L 692.73 852.73 L 692.87 852.87 L 692.98 852.98 L 693.07 853.07 L 693.24 853.24 L 693.31 853.31 L 693.38 853.38 L 693.45 853.45 L 693.53 853.53 L 704.37 864.37"/>
+<path id="t232_UP_NW" data-src="0xaaaaee373a00" data-dst="0xaaaaeda85bd0" d="M 704.37 864.37 L 746.07 906.07 L 746.20 906.20 L 746.31 906.31 L 746.41 906.41 L 746.57 906.57 L 746.64 906.64 L 746.71 906.71 L 746.78 906.78 L 746.86 906.86 L 749.24 909.24"/>
+</g>
+<g class="line" data-line="UP-W" stroke="#fe8d81" stroke-width="7.00">
+<path id="t17_UP_W" data-src="0xaaaaed99c920" data-dst="0xaaaaed977e40" d="M 325.93 1386.67 L 266.67 1386.67"/>
+<path id="t35_UP_W" data-src="0xaaaaeda60020" data-dst="0xaaaaedaba2c0" d="M 1333.33 1386.67 L 1274.07 1386.67"/>
+<path id="t41_UP_W" data-src="0xaaaaeda7ede0" data-dst="0xaaaaedc918e0" d="M 1493.33 1375.47 L 1440.00 1375.47"/>
+<path id="t43_UP_W" data-src="0xaaaaeda83620" data-dst="0xaaaaeda83950" d="M 800.00 1386.67 L 740.74 1386.67"/>
+<path id="t44_UP_W" data-src="0xaaaaeda83950" data-dst="0xaaaaedb4e900" d="M 740.74 1386.67 L 681.48 1386.67"/>
+<path id="t57_UP_W" data-src="0xaaaaedaba2c0" data-dst="0xaaaaee1fe690" d="M 1274.07 1386.67 L 1214.81 1386.67"/>
+<path id="t64_UP_W" data-src="0xaaaaedb4e900" data-dst="0xaaaaedb4eba0" d="M 681.48 1386.67 L 622.22 1386.67"/>
+<path id="t65_UP_W" data-src="0xaaaaedb4eba0" data-dst="0xaaaaee0292c0" d="M 622.22 1386.67 L 562.96 1386.67"/>
+<path id="t68_UP_W" data-src="0xaaaaedb9cbd0" data-dst="0xaaaaedb9cea0" d="M 1155.56 1386.67 L 1096.30 1386.67"/>
+<path id="t69_UP_W" data-src="0xaaaaedb9cea0" data-dst="0xaaaaedbeaf10" d="M 1096.30 1386.67 L 1037.04 1386.67"/>
+<path id="t71_UP_W" data-src="0xaaaaedbeaf10" data-dst="0xaaaaedbeb1b0" d="M 1037.04 1386.67 L 977.78 1386.67"/>
+<path id="t72_UP_W" data-src="0xaaaaedbeb1b0" data-dst="0xaaaaedd2b8b0" d="M 977.78 1386.67 L 918.52 1386.67"/>
+<path id="t78_UP_W" data-src="0xaaaaedc918e0" data-dst="0xaaaaee2e4d00" d="M 1440.00 1369.87 L 1386.67 1369.87"/>
+<path id="t86_UP_W" data-src="0xaaaaedd2b8b0" data-dst="0xaaaaedd2bb50" d="M 918.52 1386.67 L 859.26 1386.67"/>
+<path id="t87_UP_W" data-src="0xaaaaedd2bb50" data-dst="0xaaaaeda83620" d="M 859.26 1386.67 L 800.00 1386.67"/>
+<path id="t119_UP_W" data-src="0xaaaaee0292c0" data-dst="0xaaaaee029560" d="M 562.96 1386.67 L 503.70 1386.67"/>
+<path id="t120_UP_W" data-src="0xaaaaee029560" data-dst="0xaaaaee1affe0" d="M 503.70 1386.67 L 444.44 1386.67"/>
+<path id="t136_UP_W" data-src="0xaaaaee1affe0" data-dst="0xaaaaee1b0280" d="M 444.44 1386.67 L 385.19 1386.67"/>
+<path id="t137_UP_W" data-src="0xaaaaee1b0280" data-dst="0xaaaaed99c920" d="M 385.19 1386.67 L 325.93 1386.67"/>
+<path id="t140_UP_W" data-src="0xaaaaee1fe690" data-dst="0xaaaaedb9cbd0" d="M 1214.81 1386.67 L 1155.56 1386.67"/>
+<path id="t229_UP_W" data-src="0xaaaaee2e4d00" data-dst="0xaaaaeda60020" d="M 1386.67 1369.87 L 1333.33 1369.87"/>
+</g>
+</g>
+<g id="stations">
+<circle cx="1600.00" cy="1689.60" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed8be370" data-station-id="79TH-SC"/>
+<circle cx="1600.00" cy="1648.35" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed8be640" data-station-id="WINDSORPK"/>
+<circle cx="686.28" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed8c0d50" data-station-id="SCHAUM"/>
+<circle cx="1333.33" cy="1836.64" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed90c8d0" data-station-id="111TH-BEV"/>
+<circle cx="1333.33" cy="1798.63" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed90cb40" data-station-id="107TH-BEV"/>
+<circle cx="956.63" cy="583.30" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed90edb0" data-station-id="LIBERTYVIL"/>
+<circle cx="896.54" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed90eec0" data-station-id="CUMBERLAND"/>
+<circle cx="960.00" cy="2186.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed958ab0" data-station-id="LARAWAY"/>
+<circle cx="915.62" cy="968.96" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed958bc0" data-station-id="PROSPECTHG"/>
+<circle cx="1013.33" cy="1866.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed95a620" data-station-id="ROMEOVILLE"/>
+<circle cx="1206.46" cy="833.12" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed95c790" data-station-id="NGLENVIEW"/>
+<circle cx="1256.42" cy="883.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed95c9c0" data-station-id="GLENVIEW"/>
+<circle cx="1125.13" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed976360" data-station-id="HOLLYWOOD"/>
+<circle cx="1080.14" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed9765d0" data-station-id="BROOKFIELD"/>
+<circle cx="266.67" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed977e40" data-station-id="ELBURN"/>
+<circle cx="1333.33" cy="1333.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed977fe0" data-station-id="HEALY"/>
+<circle cx="325.93" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed99c920" data-station-id="LAFOX"/>
+<circle cx="1546.67" cy="1578.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed99cc90" data-station-id="75TH-UP"/>
+<circle cx="1422.22" cy="1706.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed99cdd0" data-station-id="91ST-BEV"/>
+<circle cx="1386.67" cy="2346.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed99ef00" data-station-id="UNIVERSITY"/>
+<circle cx="1386.67" cy="895.90" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed9f21d0" data-station-id="KENILWORTH"/>
+<circle cx="1386.67" cy="950.58" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed9f23e0" data-station-id="WILMETTE"/>
+<circle cx="1386.67" cy="1005.26" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed9f2680" data-station-id="CENTRALST"/>
+<circle cx="906.67" cy="847.12" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaed9f4780" data-station-id="BUFFGROVE"/>
+<circle cx="1493.33" cy="1573.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda23a20" data-station-id="35TH"/>
+<circle cx="1333.33" cy="1280.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda23bf0" data-station-id="IRVINGPK"/>
+<circle cx="530.51" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda25700" data-station-id="NATIONALS"/>
+<circle cx="1333.33" cy="1546.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda27230" data-station-id="SUMMIT"/>
+<circle cx="1226.67" cy="1653.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda27460" data-station-id="WILLOWSPRN"/>
+<circle cx="906.67" cy="784.36" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda30720" data-station-id="PRAIRIEVW"/>
+<circle cx="640.00" cy="373.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda45920" data-station-id="FOXLAKE"/>
+<circle cx="1173.33" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda45a30" data-station-id="KENOSHA"/>
+<circle cx="1120.00" cy="1760.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda4cd00" data-station-id="LEMONT"/>
+<circle cx="524.87" cy="684.87" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda55ab0" data-station-id="PINGREE"/>
+<circle cx="1333.33" cy="1386.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda60020" data-station-id="WESTERNAVE"/>
+<circle cx="1333.33" cy="2026.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda601f0" data-station-id="BLUEISLAND"/>
+<circle cx="800.00" cy="213.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda63da0" data-station-id="ANTIOCH"/>
+<circle cx="794.11" cy="954.11" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda67f40" data-station-id="ARLINGTNHT"/>
+<circle cx="838.98" cy="998.98" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda68170" data-station-id="MTPROSPECT"/>
+<circle cx="426.67" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda7ec70" data-station-id="BIGTIMBER"/>
+<circle cx="1493.33" cy="1386.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda7ede0" data-station-id="OTC"/>
+<circle cx="960.00" cy="2080.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda82d90" data-station-id="NEWLENOX"/>
+<circle cx="800.00" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda83620" data-station-id="VILLAPARK"/>
+<circle cx="740.74" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda83950" data-station-id="LOMBARD"/>
+<circle cx="749.24" cy="909.24" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda85bd0" data-station-id="ARLINGTNPK"/>
+<circle cx="1035.16" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda8d2e0" data-station-id="CONGRESSPK"/>
+<circle cx="829.76" cy="1043.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda8dee0" data-station-id="ITASCA"/>
+<circle cx="738.20" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda8e0e0" data-station-id="ROSELLE"/>
+<circle cx="1106.53" cy="733.19" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda963e0" data-station-id="LAKECOOKRD"/>
+<circle cx="1156.49" cy="783.16" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda96610" data-station-id="NBROOK"/>
+<circle cx="634.36" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda97fe0" data-station-id="HANOVERP"/>
+<circle cx="1280.00" cy="1085.34" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda99a60" data-station-id="EDGEBROOK"/>
+<circle cx="800.00" cy="2080.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda9b590" data-station-id="JOLIET"/>
+<circle cx="426.67" cy="1600.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda9b700" data-station-id="AURORA"/>
+<circle cx="1440.00" cy="1333.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda9d8f0" data-station-id="MILLENNIUM"/>
+<circle cx="1546.67" cy="1546.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeda9daf0" data-station-id="STONYISLND"/>
+<circle cx="866.47" cy="1079.81" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedab74a0" data-station-id="WOODDALE"/>
+<circle cx="1073.76" cy="1020.43" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedaba090" data-station-id="PARKRIDGE"/>
+<circle cx="1274.07" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedaba2c0" data-station-id="KEDZIE"/>
+<circle cx="1018.33" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedaba410" data-station-id="DEEROAD"/>
+<circle cx="1280.00" cy="1156.01" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedabc600" data-station-id="FORESTGLEN"/>
+<circle cx="864.37" cy="277.71" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedace7d0" data-station-id="LAKEVILLA"/>
+<circle cx="906.67" cy="596.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedacec10" data-station-id="PRAIRCROSS"/>
+<circle cx="906.67" cy="658.85" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedacede0" data-station-id="MUNDELEIN"/>
+<circle cx="906.67" cy="351.26" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedad0740" data-station-id="ROUNDLKBCH"/>
+<circle cx="681.48" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedb4e900" data-station-id="GLENELLYN"/>
+<circle cx="622.22" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedb4eba0" data-station-id="COLLEGEAVE"/>
+<circle cx="1280.00" cy="1014.68" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedb50eb0" data-station-id="MORTONGRV"/>
+<circle cx="1280.00" cy="944.02" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedb50fc0" data-station-id="GOLF"/>
+<circle cx="1155.56" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedb9cbd0" data-station-id="RIVRFOREST"/>
+<circle cx="1096.30" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedb9cea0" data-station-id="MAYWOOD"/>
+<circle cx="906.67" cy="442.30" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedb9f2c0" data-station-id="NCSGRAYSLK"/>
+<circle cx="1037.04" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedbeaf10" data-station-id="MELROSEPK"/>
+<circle cx="977.78" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedbeb1b0" data-station-id="BELLWOOD"/>
+<circle cx="1546.67" cy="1866.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedbed390" data-station-id="STATEST"/>
+<circle cx="1333.33" cy="1988.66" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedc8f580" data-station-id="PRAIRIEST"/>
+<circle cx="1333.33" cy="1950.65" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedc8f7e0" data-station-id="123RD-BEV"/>
+<circle cx="1440.00" cy="1386.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedc918e0" data-station-id="CUS"/>
+<circle cx="1440.00" cy="1440.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedc91b10" data-station-id="HALSTED"/>
+<circle cx="1546.67" cy="1642.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedcdd670" data-station-id="83RD-UP"/>
+<circle cx="1546.67" cy="1674.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedcdd910" data-station-id="87TH-UP"/>
+<circle cx="1013.33" cy="1167.82" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedcdfb80" data-station-id="SCHILLERPK"/>
+<circle cx="1013.33" cy="1108.97" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedcdfdb0" data-station-id="ROSEMONT"/>
+<circle cx="960.00" cy="1013.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedd2b690" data-station-id="DESPLAINES"/>
+<circle cx="918.52" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedd2b8b0" data-station-id="BERKELEY"/>
+<circle cx="859.26" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedd2bb50" data-station-id="ELMHURST"/>
+<circle cx="939.90" cy="1153.24" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedd2de20" data-station-id="MANNHEIM"/>
+<circle cx="903.19" cy="1116.52" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedd2e050" data-station-id="BENSENVIL"/>
+<circle cx="1047.86" cy="2080.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedd79c70" data-station-id="HICKORYCRK"/>
+<circle cx="1003.93" cy="2080.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedd79f10" data-station-id="MOKENA"/>
+<circle cx="582.43" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedd7c190" data-station-id="BARTLETT"/>
+<circle cx="1280.00" cy="1226.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeddc7bd0" data-station-id="MAYFAIR"/>
+<circle cx="1575.83" cy="1575.83" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeddc7db0" data-station-id="BRYNMAWR"/>
+<circle cx="1197.51" cy="1144.17" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaeddc8080" data-station-id="GLADSTONEP"/>
+<circle cx="1600.00" cy="1607.10" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaede16240" data-station-id="SOUTHSHORE"/>
+<circle cx="1238.75" cy="1185.42" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaede16470" data-station-id="JEFFERSONP"/>
+<circle cx="1223.59" cy="2080.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaede642f0" data-station-id="MIDLOTHIAN"/>
+<circle cx="1267.52" cy="2080.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaede64400" data-station-id="ROBBINS"/>
+<circle cx="1386.67" cy="1333.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaede66950" data-station-id="CLYBOURN"/>
+<circle cx="1013.33" cy="1226.67" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaede66a90" data-station-id="FRANKLINPK"/>
+<circle cx="1546.67" cy="1706.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedeb25d0" data-station-id="91ST-UP"/>
+<circle cx="1546.67" cy="1738.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedeb2870" data-station-id="103RD-UP"/>
+<circle cx="478.59" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedeb4b40" data-station-id="ELGIN"/>
+<circle cx="1386.67" cy="841.22" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedf00830" data-station-id="INDIANHILL"/>
+<circle cx="569.75" cy="729.75" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedf02de0" data-station-id="CARY"/>
+<circle cx="614.62" cy="774.62" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedf02f20" data-station-id="FOXRG"/>
+<circle cx="906.67" cy="909.87" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedf41090" data-station-id="WHEELING"/>
+<circle cx="1179.66" cy="2080.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedf8cdc0" data-station-id="OAKFOREST"/>
+<circle cx="1135.73" cy="2080.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedf8cff0" data-station-id="TINLEYPARK"/>
+<circle cx="1091.80" cy="2080.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedf8d290" data-station-id="TINLEY80TH"/>
+<circle cx="0.00" cy="320.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedf8f540" data-station-id="HARVARD"/>
+<circle cx="1333.33" cy="1912.65" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedfdb0f0" data-station-id="119TH-BEV"/>
+<circle cx="1333.33" cy="1874.64" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedfdb420" data-station-id="115TH-BEV"/>
+<circle cx="1006.60" cy="633.26" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedfdd5d0" data-station-id="LAKEFRST"/>
+<circle cx="1056.56" cy="683.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaedfdd800" data-station-id="DEERFIELD"/>
+<circle cx="960.00" cy="2293.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee0290e0" data-station-id="MANHATTAN"/>
+<circle cx="562.96" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee0292c0" data-station-id="WHEATON"/>
+<circle cx="503.70" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee029560" data-station-id="WINFIELD"/>
+<circle cx="976.62" cy="1189.95" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee02b870" data-station-id="FRANKLIN"/>
+<circle cx="1001.61" cy="1054.94" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee02b980" data-station-id="OHARE"/>
+<circle cx="1457.78" cy="1706.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee077560" data-station-id="BRAINERD"/>
+<circle cx="1546.67" cy="1610.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee077a10" data-station-id="79TH-UP"/>
+<circle cx="790.12" cy="1013.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee079b10" data-station-id="MEDINAH"/>
+<circle cx="1386.67" cy="1223.97" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee0c5800" data-station-id="PETERSON"/>
+<circle cx="1386.67" cy="1278.65" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee0c5aa0" data-station-id="RAVENSWOOD"/>
+<circle cx="1386.67" cy="1059.94" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee113aa0" data-station-id="EVANSTON"/>
+<circle cx="1386.67" cy="1114.62" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee113d10" data-station-id="MAINST"/>
+<circle cx="1386.67" cy="1169.30" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee113fb0" data-station-id="ROGERPK"/>
+<circle cx="480.00" cy="640.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee161b60" data-station-id="CRYSTAL"/>
+<circle cx="1156.26" cy="1102.92" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee161d40" data-station-id="NORWOODP"/>
+<circle cx="1115.01" cy="1061.68" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee1620a0" data-station-id="EDISONPK"/>
+<circle cx="1493.33" cy="1706.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee164430" data-station-id="GRESHAM"/>
+<circle cx="480.00" cy="480.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee1afe00" data-station-id="MCHENRY"/>
+<circle cx="444.44" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee1affe0" data-station-id="WCHICAGO"/>
+<circle cx="385.19" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee1b0280" data-station-id="GENEVA"/>
+<circle cx="1386.67" cy="1706.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee1b2590" data-station-id="95TH-BEV"/>
+<circle cx="1600.00" cy="1813.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee1b2760" data-station-id="93RD-SC"/>
+<circle cx="1214.81" cy="1386.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee1fe690" data-station-id="OAKPARK"/>
+<circle cx="1493.33" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2009b0" data-station-id="LSS"/>
+<circle cx="1600.00" cy="1730.84" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee24c7b0" data-station-id="83RD-SC"/>
+<circle cx="1302.27" cy="2057.73" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee24ca10" data-station-id="VERMONT"/>
+<circle cx="906.67" cy="533.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee29a5e0" data-station-id="PRAIRIEXNG"/>
+<circle cx="1333.33" cy="1760.63" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee29a7c0" data-station-id="103RD-BEV"/>
+<circle cx="1600.00" cy="1772.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee29aa20" data-station-id="87TH-SC"/>
+<circle cx="1359.79" cy="1733.54" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee29ab30" data-station-id="99TH-BEV"/>
+<circle cx="859.59" cy="486.25" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee29e160" data-station-id="GRAYSLAKE"/>
+<circle cx="1546.67" cy="2076.76" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee29fc90" data-station-id="HAZELCREST"/>
+<circle cx="1215.09" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a0b20" data-station-id="HARLEM"/>
+<circle cx="1386.67" cy="786.54" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a17c0" data-station-id="WINNETKA"/>
+<circle cx="1416.38" cy="2316.96" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a2690" data-station-id="RICHTON"/>
+<circle cx="1446.09" cy="2287.24" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a28c0" data-station-id="MATTESON"/>
+<circle cx="1546.67" cy="2034.74" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a32f0" data-station-id="HARVEY"/>
+<circle cx="522.09" cy="1504.58" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a4180" data-station-id="LISLE"/>
+<circle cx="1386.67" cy="567.82" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a4e20" data-station-id="RAVINIAPK"/>
+<circle cx="1505.51" cy="2227.82" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a5e40" data-station-id="OLYMPIA"/>
+<circle cx="1212.00" cy="38.66" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a6950" data-station-id="WINTHROP"/>
+<circle cx="1250.66" cy="77.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a6af0" data-station-id="ZION"/>
+<circle cx="1350.04" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a7910" data-station-id="CICERO"/>
+<circle cx="812.51" cy="439.17" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a8570" data-station-id="ROUNDLAKE"/>
+<circle cx="765.43" cy="392.09" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2a86c0" data-station-id="LONGLAKE"/>
+<circle cx="906.67" cy="1973.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2ac970" data-station-id="LOCKPORT"/>
+<circle cx="1289.33" cy="115.99" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2ad7a0" data-station-id="WAUKEGAN"/>
+<circle cx="1067.84" cy="1972.16" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2ae4e0" data-station-id="153RD-SWS"/>
+<circle cx="1546.67" cy="1992.72" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2af140" data-station-id="147TH-UP"/>
+<circle cx="1546.67" cy="1950.70" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2af3b0" data-station-id="IVANHOE"/>
+<circle cx="1546.67" cy="1908.68" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b0cb0" data-station-id="RIVERDALE"/>
+<circle cx="675.31" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b1b00" data-station-id="WESTMONT"/>
+<circle cx="1386.67" cy="513.14" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b2830" data-station-id="RAVINIA"/>
+<circle cx="990.18" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b3630" data-station-id="LAGRANGE"/>
+<circle cx="1466.24" cy="1333.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b43a0" data-station-id="VANBUREN"/>
+<circle cx="585.70" cy="1440.96" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b5160" data-station-id="MAINST-DG"/>
+<circle cx="1386.67" cy="622.50" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b5e00" data-station-id="BRAESIDE"/>
+<circle cx="1121.76" cy="1918.24" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b6e20" data-station-id="143RD-SWS"/>
+<circle cx="1492.49" cy="1333.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b7930" data-station-id="MUSEUM"/>
+<circle cx="1529.88" cy="1369.88" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b7b60" data-station-id="MCCORMICK"/>
+<circle cx="1511.32" cy="1351.32" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2b9460" data-station-id="18TH-UP"/>
+<circle cx="1424.37" cy="1935.63" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2ba530" data-station-id="WASHHGTS"/>
+<circle cx="1546.67" cy="1415.45" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2baf90" data-station-id="47TH-UP"/>
+<circle cx="1546.67" cy="1389.20" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2bb0e0" data-station-id="27TH-UP"/>
+<circle cx="1386.67" cy="349.11" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2bcac0" data-station-id="FTSHERIDAN"/>
+<circle cx="1386.67" cy="403.79" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2bcd30" data-station-id="HIGHWOOD"/>
+<circle cx="1546.67" cy="2118.78" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2bd9e0" data-station-id="CALUMET"/>
+<circle cx="1546.67" cy="2160.79" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2bdb30" data-station-id="HOMEWOOD"/>
+<circle cx="945.20" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2bf480" data-station-id="STONEAVE"/>
+<circle cx="720.29" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c0fb0" data-station-id="CLARNDNHIL"/>
+<circle cx="1386.67" cy="677.18" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c1c50" data-station-id="GLENCOE"/>
+<circle cx="1013.92" cy="2026.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c2ae0" data-station-id="179TH-SWS"/>
+<circle cx="1546.67" cy="1441.69" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c38b0" data-station-id="51ST-53RD"/>
+<circle cx="1395.02" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c4710" data-station-id="BNWESTERN"/>
+<circle cx="1546.67" cy="1467.94" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c52b0" data-station-id="55-56-57TH"/>
+<circle cx="1546.67" cy="1494.18" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c5520" data-station-id="59TH-UP"/>
+<circle cx="490.28" cy="1536.39" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c6140" data-station-id="NAPERVILLE"/>
+<circle cx="458.47" cy="1568.19" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c6350" data-station-id="ROUTE59"/>
+<circle cx="1386.67" cy="294.43" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c8910" data-station-id="LKFOREST"/>
+<circle cx="1386.67" cy="239.75" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c8a60" data-station-id="LAKEBLUFF"/>
+<circle cx="1440.00" cy="1516.25" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c97a0" data-station-id="WRIGHTWOOD"/>
+<circle cx="1440.00" cy="1592.51" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2c99b0" data-station-id="ASHBURN"/>
+<circle cx="1475.80" cy="2257.53" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2cb550" data-station-id="211TH-UP"/>
+<circle cx="1546.67" cy="1520.42" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2cc130" data-station-id="63RD-UP"/>
+<circle cx="1305.05" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2cce00" data-station-id="LAVERGNE"/>
+<circle cx="630.32" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2ce930" data-station-id="FAIRVIEWDG"/>
+<circle cx="553.90" cy="1472.77" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2ceb00" data-station-id="BELMONT"/>
+<circle cx="1386.67" cy="731.86" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2cf5d0" data-station-id="HUBARDWOOD"/>
+<circle cx="1260.07" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2d0460" data-station-id="BERWYN"/>
+<circle cx="1386.67" cy="458.47" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2d1290" data-station-id="HIGHLANDPK"/>
+<circle cx="1170.11" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2d3ac0" data-station-id="RIVERSIDE"/>
+<circle cx="1175.68" cy="1864.32" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2d5780" data-station-id="PALOSPARK"/>
+<circle cx="1327.99" cy="154.66" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2d63f0" data-station-id="NCHICAGO"/>
+<circle cx="855.23" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2d7120" data-station-id="HIGHLANDS"/>
+<circle cx="810.25" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2d7300" data-station-id="HINSDALE"/>
+<circle cx="263.45" cy="423.45" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2d98f0" data-station-id="WOODSTOCK"/>
+<circle cx="1379.93" cy="2026.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2d9a40" data-station-id="BURROAK"/>
+<circle cx="1513.72" cy="1899.61" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2db5b0" data-station-id="STEWARTRID"/>
+<circle cx="1337.43" cy="1702.57" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2dc370" data-station-id="CHICRIDGE"/>
+<circle cx="1391.35" cy="1648.65" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2dc4c0" data-station-id="OAKLAWN"/>
+<circle cx="1480.77" cy="1932.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2dcfe0" data-station-id="WPULLMAN"/>
+<circle cx="1283.51" cy="1756.49" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2ddde0" data-station-id="WORTH"/>
+<circle cx="1229.60" cy="1810.40" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2de050" data-station-id="PALOSHTS"/>
+<circle cx="1447.82" cy="1965.51" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2deac0" data-station-id="RACINE"/>
+<circle cx="1414.88" cy="1998.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2e05b0" data-station-id="ASHLAND"/>
+<circle cx="900.22" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2e1440" data-station-id="WESTSPRING"/>
+<circle cx="1366.65" cy="193.32" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2e2120" data-station-id="GRTLAKES"/>
+<circle cx="765.27" cy="1440.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2e2f70" data-station-id="WHINSDALE"/>
+<circle cx="706.58" cy="373.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2e3e80" data-station-id="INGLESIDE"/>
+<circle cx="1493.33" cy="1835.41" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2e4b30" data-station-id="LONGWOOD"/>
+<circle cx="1535.22" cy="2198.11" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee2e6740" data-station-id="FLOSSMOOR"/>
+<circle cx="659.49" cy="819.49" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee373860" data-station-id="BARRINGTON"/>
+<circle cx="704.37" cy="864.37" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee373a00" data-station-id="PALATINE"/>
+<circle cx="1546.67" cy="1770.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee380030" data-station-id="107TH-UP"/>
+<circle cx="1546.67" cy="1802.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee3802a0" data-station-id="111TH-UP"/>
+<circle cx="1546.67" cy="1834.67" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee380510" data-station-id="KENSINGTN"/>
+<circle cx="906.67" cy="721.60" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee3806a0" data-station-id="VERNON"/>
+<circle cx="1287.82" cy="1287.82" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee384b60" data-station-id="GRAYLAND"/>
+<circle cx="1287.82" cy="1333.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee385300" data-station-id="GRAND-CIC"/>
+<circle cx="1242.30" cy="1333.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee385680" data-station-id="HANSONPK"/>
+<circle cx="1196.78" cy="1333.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee385950" data-station-id="GALEWOOD"/>
+<circle cx="1151.26" cy="1333.33" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee385c50" data-station-id="MARS"/>
+<circle cx="1077.71" cy="1291.04" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee385eb0" data-station-id="ELMWOODPK"/>
+<circle cx="1109.89" cy="1323.23" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee386030" data-station-id="MONTCLARE"/>
+<circle cx="1045.52" cy="1258.85" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaee386460" data-station-id="RIVERGROVE"/>
+</g>
+<g id="labels" font-size="11.0" fill="var(--map-label, #111111)">
+<text x="1478.09" y="1320.69" text-anchor="start" data-node="0xaaaaedc918e0" transform="rotate(-60 1478.09 1320.69)">Chicago Union</text>
+<text x="1333.33" y="1470.17" text-anchor="middle" data-node="0xaaaaeda60020">Western Ave</text>
+<text x="1353.86" y="1345.18" text-anchor="start" data-node="0xaaaaed977fe0" transform="rotate(30 1353.86 1345.18)">Healy</text>
+<text x="1493.33" y="1422.22" text-anchor="middle" data-node="0xaaaaeda7ede0">Chicago OTC</text>
+<text x="1409.19" y="1493.36" text-anchor="end" data-node="0xaaaaedc91b10" transform="rotate(-60 1409.19 1493.36)">Halsted Street</text>
+<text x="1322.51" y="2020.42" text-anchor="end" data-node="0xaaaaeda601f0" transform="rotate(30 1322.51 2020.42)">Blue Island</text>
+<text x="951.16" y="2071.16" text-anchor="end" data-node="0xaaaaeda82d90" transform="rotate(45 951.16 2071.16)">New Lenox</text>
+<text x="791.16" y="2088.84" text-anchor="end" data-node="0xaaaaeda9b590" transform="rotate(-45 791.16 2088.84)">Joliet</text>
+<text x="968.84" y="1004.49" text-anchor="start" data-node="0xaaaaedd2b690" transform="rotate(-45 968.84 1004.49)">Des Plaines</text>
+<text x="1292.50" y="1226.67" text-anchor="start" data-node="0xaaaaeddc7bd0">Mayfair</text>
+<text x="1399.47" y="1320.53" text-anchor="start" data-node="0xaaaaede66950" transform="rotate(-45 1399.47 1320.53)">Clybourn</text>
+<text x="1031.43" y="1226.67" text-anchor="start" data-node="0xaaaaede66a90">Franklin Pk</text>
+<text x="919.17" y="533.33" text-anchor="start" data-node="0xaaaaee29a5e0">Prairie Crossing</text>
+<text x="1275.02" y="1320.53" text-anchor="end" data-node="0xaaaaee385300" transform="rotate(45 1275.02 1320.53)">Grand/Cicero</text>
+<text x="1229.50" y="1320.53" text-anchor="end" data-node="0xaaaaee385680" transform="rotate(45 1229.50 1320.53)">Hanson Park</text>
+<text x="1183.98" y="1320.53" text-anchor="end" data-node="0xaaaaee385950" transform="rotate(45 1183.98 1320.53)">Galewood</text>
+<text x="1138.46" y="1320.53" text-anchor="end" data-node="0xaaaaee385c50" transform="rotate(45 1138.46 1320.53)">Mars</text>
+<text x="1090.50" y="1278.24" text-anchor="start" data-node="0xaaaaee385eb0" transform="rotate(-45 1090.50 1278.24)">Elmwood Park</text>
+<text x="1097.09" y="1336.02" text-anchor="end" data-node="0xaaaaee386030" transform="rotate(-45 1097.09 1336.02)">Mont Clare</text>
+<text x="1032.72" y="1271.65" text-anchor="end" data-node="0xaaaaee386460" transform="rotate(-45 1032.72 1271.65)">River Grove</text>
+<text x="1612.50" y="1689.60" text-anchor="start" data-node="0xaaaaed8be370">Cheltenham (79th St.)</text>
+<text x="1612.50" y="1648.35" text-anchor="start" data-node="0xaaaaed8be640">Windsor Park</text>
+<text x="695.12" y="1004.49" text-anchor="start" data-node="0xaaaaed8c0d50" transform="rotate(-45 695.12 1004.49)">Schaumburg</text>
+<text x="1324.49" y="1845.48" text-anchor="end" data-node="0xaaaaed90c8d0" transform="rotate(-45 1324.49 1845.48)">111th St. - Morgan Park</text>
+<text x="1324.49" y="1807.47" text-anchor="end" data-node="0xaaaaed90cb40" transform="rotate(-45 1324.49 1807.47)">107th St. - Beverly Hills</text>
+<text x="969.13" y="583.30" text-anchor="start" data-node="0xaaaaed90edb0">Libertyville</text>
+<text x="887.70" y="1004.49" text-anchor="end" data-node="0xaaaaed90eec0" transform="rotate(45 887.70 1004.49)">Cumberland</text>
+<text x="972.50" y="2186.67" text-anchor="start" data-node="0xaaaaed958ab0">Laraway Road</text>
+<text x="924.46" y="960.12" text-anchor="start" data-node="0xaaaaed958bc0" transform="rotate(-45 924.46 960.12)">Prospect Hts</text>
+<text x="1000.83" y="1866.67" text-anchor="end" data-node="0xaaaaed95a620">Romeoville</text>
+<text x="1218.96" y="833.12" text-anchor="start" data-node="0xaaaaed95c790">Glen/N. Glenview</text>
+<text x="1268.92" y="883.09" text-anchor="start" data-node="0xaaaaed95c9c0">Glenview</text>
+<text x="1118.88" y="1450.83" text-anchor="end" data-node="0xaaaaed976360" transform="rotate(-60 1118.88 1450.83)">Hollywood</text>
+<text x="1073.89" y="1450.83" text-anchor="end" data-node="0xaaaaed9765d0" transform="rotate(-60 1073.89 1450.83)">Brookfield</text>
+<text x="275.51" y="1377.83" text-anchor="start" data-node="0xaaaaed977e40" transform="rotate(-45 275.51 1377.83)">Elburn</text>
+<text x="334.76" y="1377.83" text-anchor="start" data-node="0xaaaaed99c920" transform="rotate(-45 334.76 1377.83)">La Fox</text>
+<text x="1569.65" y="1555.69" text-anchor="start" data-node="0xaaaaed99cc90" transform="rotate(-45 1569.65 1555.69)">75th St. (Grand Crossing)</text>
+<text x="1374.17" y="2346.67" text-anchor="end" data-node="0xaaaaed99ef00">University Park</text>
+<text x="1399.17" y="895.90" text-anchor="start" data-node="0xaaaaed9f21d0">Kenilworth</text>
+<text x="1399.17" y="950.58" text-anchor="start" data-node="0xaaaaed9f23e0">Wilmette</text>
+<text x="1399.17" y="1005.26" text-anchor="start" data-node="0xaaaaed9f2680">Central St.</text>
+<text x="919.17" y="847.12" text-anchor="start" data-node="0xaaaaed9f4780">Buffalo Grove</text>
+<text x="1484.49" y="1582.17" text-anchor="end" data-node="0xaaaaeda23a20" transform="rotate(-45 1484.49 1582.17)">35th St. - Lou Jones</text>
+<text x="1339.58" y="1269.17" text-anchor="start" data-node="0xaaaaeda23bf0" transform="rotate(-60 1339.58 1269.17)">Irving Park</text>
+<text x="539.35" y="1004.49" text-anchor="start" data-node="0xaaaaeda25700" transform="rotate(-45 539.35 1004.49)">National St</text>
+<text x="1320.83" y="1546.67" text-anchor="end" data-node="0xaaaaeda27230">Summit</text>
+<text x="1214.17" y="1653.33" text-anchor="end" data-node="0xaaaaeda27460">Willow Springs</text>
+<text x="919.17" y="784.36" text-anchor="start" data-node="0xaaaaeda30720">Prairie View</text>
+<text x="648.84" y="364.49" text-anchor="start" data-node="0xaaaaeda45920" transform="rotate(-45 648.84 364.49)">Fox Lake</text>
+<text x="1185.83" y="0.00" text-anchor="start" data-node="0xaaaaeda45a30">Kenosha</text>
+<text x="1107.50" y="1760.00" text-anchor="end" data-node="0xaaaaeda4cd00">Lemont</text>
+<text x="537.37" y="684.87" text-anchor="start" data-node="0xaaaaeda55ab0">Pingree Road</text>
+<text x="812.50" y="213.33" text-anchor="start" data-node="0xaaaaeda63da0">Antioch</text>
+<text x="802.95" y="945.27" text-anchor="start" data-node="0xaaaaeda67f40" transform="rotate(-45 802.95 945.27)">Arlington Heights</text>
+<text x="821.48" y="998.98" text-anchor="end" data-node="0xaaaaeda68170">Mt. Prospect</text>
+<text x="435.51" y="1004.49" text-anchor="start" data-node="0xaaaaeda7ec70" transform="rotate(-45 435.51 1004.49)">Big Timber</text>
+<text x="808.84" y="1377.83" text-anchor="start" data-node="0xaaaaeda83620" transform="rotate(-45 808.84 1377.83)">Villa Park</text>
+<text x="749.58" y="1377.83" text-anchor="start" data-node="0xaaaaeda83950" transform="rotate(-45 749.58 1377.83)">Lombard</text>
+<text x="758.08" y="900.40" text-anchor="start" data-node="0xaaaaeda85bd0" transform="rotate(-45 758.08 900.40)">Arlington Park</text>
+<text x="1028.91" y="1450.83" text-anchor="end" data-node="0xaaaaeda8d2e0" transform="rotate(-60 1028.91 1450.83)">Congress Park</text>
+<text x="842.26" y="1043.09" text-anchor="start" data-node="0xaaaaeda8dee0">Itasca</text>
+<text x="731.95" y="1024.16" text-anchor="end" data-node="0xaaaaeda8e0e0" transform="rotate(-60 731.95 1024.16)">Roselle</text>
+<text x="1119.03" y="733.19" text-anchor="start" data-node="0xaaaaeda963e0">Lake-Cook</text>
+<text x="1168.99" y="783.16" text-anchor="start" data-node="0xaaaaeda96610">Northbrook</text>
+<text x="643.20" y="1004.49" text-anchor="start" data-node="0xaaaaeda97fe0" transform="rotate(-45 643.20 1004.49)">Hanover Park</text>
+<text x="1292.50" y="1085.34" text-anchor="start" data-node="0xaaaaeda99a60">Edgebrook</text>
+<text x="414.17" y="1600.00" text-anchor="end" data-node="0xaaaaeda9b700">Aurora</text>
+<text x="1446.25" y="1322.51" text-anchor="start" data-node="0xaaaaeda9d8f0" transform="rotate(-60 1446.25 1322.51)">Millennium Station</text>
+<text x="1563.46" y="1529.87" text-anchor="start" data-node="0xaaaaeda9daf0" transform="rotate(-45 1563.46 1529.87)">Stony Island</text>
+<text x="878.97" y="1079.81" text-anchor="start" data-node="0xaaaaedab74a0">Wood Dale</text>
+<text x="1082.60" y="1011.59" text-anchor="start" data-node="0xaaaaedaba090" transform="rotate(-45 1082.60 1011.59)">Park Ridge</text>
+<text x="1282.91" y="1377.83" text-anchor="start" data-node="0xaaaaedaba2c0" transform="rotate(-45 1282.91 1377.83)">Kedzie</text>
+<text x="1027.17" y="1004.49" text-anchor="start" data-node="0xaaaaedaba410" transform="rotate(-45 1027.17 1004.49)">Dee Road</text>
+<text x="1292.50" y="1156.01" text-anchor="start" data-node="0xaaaaedabc600">Forest Glen</text>
+<text x="876.87" y="277.71" text-anchor="start" data-node="0xaaaaedace7d0">Lake Villa</text>
+<text x="894.17" y="596.09" text-anchor="end" data-node="0xaaaaedacec10">Prairie Crossing.</text>
+<text x="919.17" y="658.85" text-anchor="start" data-node="0xaaaaedacede0">Mundelein</text>
+<text x="919.17" y="351.26" text-anchor="start" data-node="0xaaaaedad0740">Round Lake Beach</text>
+<text x="690.32" y="1377.83" text-anchor="start" data-node="0xaaaaedb4e900" transform="rotate(-45 690.32 1377.83)">Glen Ellyn</text>
+<text x="631.06" y="1377.83" text-anchor="start" data-node="0xaaaaedb4eba0" transform="rotate(-45 631.06 1377.83)">College Ave</text>
+<text x="1292.50" y="1014.68" text-anchor="start" data-node="0xaaaaedb50eb0">Morton Grove</text>
+<text x="1292.50" y="944.02" text-anchor="start" data-node="0xaaaaedb50fc0">Golf</text>
+<text x="1155.56" y="1374.17" text-anchor="middle" data-node="0xaaaaedb9cbd0">River Forest</text>
+<text x="1096.30" y="1405.42" text-anchor="middle" data-node="0xaaaaedb9cea0">Maywood</text>
+<text x="919.17" y="442.30" text-anchor="start" data-node="0xaaaaedb9f2c0">Washington St (Grayslake)</text>
+<text x="1028.20" y="1377.83" text-anchor="end" data-node="0xaaaaedbeaf10" transform="rotate(45 1028.20 1377.83)">Melrose Park</text>
+<text x="968.94" y="1377.83" text-anchor="end" data-node="0xaaaaedbeb1b0" transform="rotate(45 968.94 1377.83)">Bellwood</text>
+<text x="1559.17" y="1866.67" text-anchor="start" data-node="0xaaaaedbed390">State St.</text>
+<text x="1322.51" y="1982.41" text-anchor="end" data-node="0xaaaaedc8f580" transform="rotate(30 1322.51 1982.41)">Prairie St.</text>
+<text x="1344.16" y="1944.40" text-anchor="start" data-node="0xaaaaedc8f7e0" transform="rotate(-30 1344.16 1944.40)">123rd St.</text>
+<text x="1025.83" y="1167.82" text-anchor="start" data-node="0xaaaaedcdfb80">Schiller Park</text>
+<text x="1025.83" y="1108.97" text-anchor="start" data-node="0xaaaaedcdfdb0">Rosemont</text>
+<text x="909.68" y="1377.83" text-anchor="end" data-node="0xaaaaedd2b8b0" transform="rotate(45 909.68 1377.83)">Berkeley</text>
+<text x="859.26" y="1374.17" text-anchor="middle" data-node="0xaaaaedd2bb50">Elmhurst</text>
+<text x="952.40" y="1153.24" text-anchor="start" data-node="0xaaaaedd2de20">Mannheim</text>
+<text x="915.69" y="1116.52" text-anchor="start" data-node="0xaaaaedd2e050">Bensenville</text>
+<text x="1056.70" y="2071.16" text-anchor="start" data-node="0xaaaaedd79c70" transform="rotate(-45 1056.70 2071.16)">Hickory Creek</text>
+<text x="1012.77" y="2071.16" text-anchor="start" data-node="0xaaaaedd79f10" transform="rotate(-45 1012.77 2071.16)">Mokena</text>
+<text x="591.27" y="1004.49" text-anchor="start" data-node="0xaaaaedd7c190" transform="rotate(-45 591.27 1004.49)">Bartlett</text>
+<text x="1588.33" y="1575.83" text-anchor="start" data-node="0xaaaaeddc7db0">Bryn Mawr</text>
+<text x="1206.34" y="1135.33" text-anchor="start" data-node="0xaaaaeddc8080" transform="rotate(-45 1206.34 1135.33)">Gladstone Park</text>
+<text x="1612.50" y="1607.10" text-anchor="start" data-node="0xaaaaede16240">South Shore</text>
+<text x="1229.91" y="1194.26" text-anchor="end" data-node="0xaaaaede16470" transform="rotate(-45 1229.91 1194.26)">Jefferson Park</text>
+<text x="1232.43" y="2071.16" text-anchor="start" data-node="0xaaaaede642f0" transform="rotate(-45 1232.43 2071.16)">Midlothian</text>
+<text x="1273.77" y="2069.17" text-anchor="start" data-node="0xaaaaede64400" transform="rotate(-60 1273.77 2069.17)">Robbins</text>
+<text x="1537.92" y="1721.82" text-anchor="end" data-node="0xaaaaedeb25d0" transform="rotate(-60 1537.92 1721.82)">91st St.</text>
+<text x="487.43" y="1004.49" text-anchor="start" data-node="0xaaaaedeb4b40" transform="rotate(-45 487.43 1004.49)">Elgin</text>
+<text x="1399.17" y="841.22" text-anchor="start" data-node="0xaaaaedf00830">Indian Hill</text>
+<text x="582.25" y="729.75" text-anchor="start" data-node="0xaaaaedf02de0">Cary</text>
+<text x="627.12" y="774.62" text-anchor="start" data-node="0xaaaaedf02f20">Fox River Grove</text>
+<text x="897.83" y="918.71" text-anchor="end" data-node="0xaaaaedf41090" transform="rotate(-45 897.83 918.71)">Wheeling</text>
+<text x="1188.50" y="2071.16" text-anchor="start" data-node="0xaaaaedf8cdc0" transform="rotate(-45 1188.50 2071.16)">Oak Forest</text>
+<text x="1144.57" y="2071.16" text-anchor="start" data-node="0xaaaaedf8cff0" transform="rotate(-45 1144.57 2071.16)">Tinley Park</text>
+<text x="1100.63" y="2071.16" text-anchor="start" data-node="0xaaaaedf8d290" transform="rotate(-45 1100.63 2071.16)">Tinley-80th</text>
+<text x="8.84" y="311.16" text-anchor="start" data-node="0xaaaaedf8f540" transform="rotate(-45 8.84 311.16)">Harvard</text>
+<text x="1344.16" y="1906.40" text-anchor="start" data-node="0xaaaaedfdb0f0" transform="rotate(-30 1344.16 1906.40)">119th St.</text>
+<text x="1344.16" y="1868.39" text-anchor="start" data-node="0xaaaaedfdb420" transform="rotate(-30 1344.16 1868.39)">115th St. - Morgan Park</text>
+<text x="1019.10" y="633.26" text-anchor="start" data-node="0xaaaaedfdd5d0">Lake Forest</text>
+<text x="1069.06" y="683.23" text-anchor="start" data-node="0xaaaaedfdd800">Deerfield</text>
+<text x="972.50" y="2293.33" text-anchor="start" data-node="0xaaaaee0290e0">Manhattan</text>
+<text x="571.80" y="1377.83" text-anchor="start" data-node="0xaaaaee0292c0" transform="rotate(-45 571.80 1377.83)">Wheaton</text>
+<text x="512.54" y="1377.83" text-anchor="start" data-node="0xaaaaee029560" transform="rotate(-45 512.54 1377.83)">Winfield</text>
+<text x="967.78" y="1198.79" text-anchor="end" data-node="0xaaaaee02b870" transform="rotate(-45 967.78 1198.79)">Franklin Park</text>
+<text x="984.11" y="1054.94" text-anchor="end" data-node="0xaaaaee02b980">O&#x27;Hare Transfer</text>
+<text x="1448.94" y="1697.83" text-anchor="end" data-node="0xaaaaee077560" transform="rotate(45 1448.94 1697.83)">Brainerd</text>
+<text x="783.87" y="1024.16" text-anchor="end" data-node="0xaaaaee079b10" transform="rotate(-60 783.87 1024.16)">Medinah</text>
+<text x="1399.17" y="1223.97" text-anchor="start" data-node="0xaaaaee0c5800">Peterson/Ridge</text>
+<text x="1397.49" y="1272.40" text-anchor="start" data-node="0xaaaaee0c5aa0" transform="rotate(-30 1397.49 1272.40)">Ravenswood</text>
+<text x="1399.17" y="1059.94" text-anchor="start" data-node="0xaaaaee113aa0">Evanston (Davis St.)</text>
+<text x="1399.17" y="1114.62" text-anchor="start" data-node="0xaaaaee113d10">Main St.</text>
+<text x="1399.17" y="1169.30" text-anchor="start" data-node="0xaaaaee113fb0">Rogers Park</text>
+<text x="492.50" y="640.00" text-anchor="start" data-node="0xaaaaee161b60">Crystal Lake</text>
+<text x="1165.10" y="1094.09" text-anchor="start" data-node="0xaaaaee161d40" transform="rotate(-45 1165.10 1094.09)">Norwood Park</text>
+<text x="1123.85" y="1052.84" text-anchor="start" data-node="0xaaaaee1620a0" transform="rotate(-45 1123.85 1052.84)">Edison Park</text>
+<text x="1505.71" y="1694.29" text-anchor="start" data-node="0xaaaaee164430" transform="rotate(-45 1505.71 1694.29)">Gresham</text>
+<text x="492.50" y="480.00" text-anchor="start" data-node="0xaaaaee1afe00">McHenry</text>
+<text x="453.28" y="1377.83" text-anchor="start" data-node="0xaaaaee1affe0" transform="rotate(-45 453.28 1377.83)">West Chicago</text>
+<text x="394.02" y="1377.83" text-anchor="start" data-node="0xaaaaee1b0280" transform="rotate(-45 394.02 1377.83)">Geneva</text>
+<text x="1612.50" y="1813.33" text-anchor="start" data-node="0xaaaaee1b2760">South Chicago (93rd)</text>
+<text x="1214.81" y="1405.42" text-anchor="middle" data-node="0xaaaaee1fe690">Oak Park</text>
+<text x="1612.50" y="1730.84" text-anchor="start" data-node="0xaaaaee24c7b0">83rd St.</text>
+<text x="1311.11" y="2066.57" text-anchor="start" data-node="0xaaaaee24ca10" transform="rotate(45 1311.11 2066.57)">Blue Island-Vermont</text>
+<text x="1324.49" y="1769.46" text-anchor="end" data-node="0xaaaaee29a7c0" transform="rotate(-45 1324.49 1769.46)">103rd St. - Beverly Hills</text>
+<text x="1612.50" y="1772.09" text-anchor="start" data-node="0xaaaaee29aa20">87th St.</text>
+<text x="850.75" y="495.09" text-anchor="end" data-node="0xaaaaee29e160" transform="rotate(-45 850.75 495.09)">Grayslake</text>
+<text x="1559.17" y="2076.76" text-anchor="start" data-node="0xaaaaee29fc90">Hazel Crest</text>
+<text x="1208.84" y="1450.83" text-anchor="end" data-node="0xaaaaee2a0b20" transform="rotate(-60 1208.84 1450.83)">Harlem Ave.</text>
+<text x="1399.17" y="786.54" text-anchor="start" data-node="0xaaaaee2a17c0">Winnetka</text>
+<text x="1403.88" y="2316.96" text-anchor="end" data-node="0xaaaaee2a2690">Richton Park</text>
+<text x="1433.59" y="2287.24" text-anchor="end" data-node="0xaaaaee2a28c0">Matteson</text>
+<text x="1559.17" y="2034.74" text-anchor="start" data-node="0xaaaaee2a32f0">Harvey</text>
+<text x="509.59" y="1504.58" text-anchor="end" data-node="0xaaaaee2a4180">Lisle</text>
+<text x="1399.17" y="567.82" text-anchor="start" data-node="0xaaaaee2a4e20">Ravinia Park</text>
+<text x="1493.01" y="2227.82" text-anchor="end" data-node="0xaaaaee2a5e40">Olympia Fields</text>
+<text x="1224.50" y="38.66" text-anchor="start" data-node="0xaaaaee2a6950">Winthrop Harbor</text>
+<text x="1263.16" y="77.33" text-anchor="start" data-node="0xaaaaee2a6af0">Zion</text>
+<text x="1341.20" y="1431.16" text-anchor="end" data-node="0xaaaaee2a7910" transform="rotate(45 1341.20 1431.16)">Cicero</text>
+<text x="825.01" y="439.17" text-anchor="start" data-node="0xaaaaee2a8570">Round Lake</text>
+<text x="774.27" y="383.26" text-anchor="start" data-node="0xaaaaee2a86c0" transform="rotate(-45 774.27 383.26)">Long Lake</text>
+<text x="894.17" y="1973.33" text-anchor="end" data-node="0xaaaaee2ac970">Lockport</text>
+<text x="1301.83" y="115.99" text-anchor="start" data-node="0xaaaaee2ad7a0">Waukegan</text>
+<text x="1055.34" y="1972.16" text-anchor="end" data-node="0xaaaaee2ae4e0">Orland Park 153rd</text>
+<text x="1559.17" y="1992.72" text-anchor="start" data-node="0xaaaaee2af140">147th St.</text>
+<text x="1559.17" y="1950.70" text-anchor="start" data-node="0xaaaaee2af3b0">Ivanhoe</text>
+<text x="1559.17" y="1908.68" text-anchor="start" data-node="0xaaaaee2b0cb0">Riverdale</text>
+<text x="669.06" y="1450.83" text-anchor="end" data-node="0xaaaaee2b1b00" transform="rotate(-60 669.06 1450.83)">Westmont</text>
+<text x="1399.17" y="513.14" text-anchor="start" data-node="0xaaaaee2b2830">Ravinia</text>
+<text x="983.93" y="1450.83" text-anchor="end" data-node="0xaaaaee2b3630" transform="rotate(-60 983.93 1450.83)">LaGrange Road</text>
+<text x="1494.39" y="1317.08" text-anchor="start" data-node="0xaaaaee2b43a0" transform="rotate(-30 1494.39 1317.08)">Van Buren St.</text>
+<text x="591.95" y="1451.79" text-anchor="start" data-node="0xaaaaee2b5160" transform="rotate(60 591.95 1451.79)">Downers Grove</text>
+<text x="1399.17" y="622.50" text-anchor="start" data-node="0xaaaaee2b5e00">Braeside</text>
+<text x="1109.26" y="1918.24" text-anchor="end" data-node="0xaaaaee2b6e20">Orland Park 143rd</text>
+<text x="1503.31" y="1327.08" text-anchor="start" data-node="0xaaaaee2b7930" transform="rotate(-30 1503.31 1327.08)">Museum Campus/11th St.</text>
+<text x="1542.38" y="1369.88" text-anchor="start" data-node="0xaaaaee2b7b60">McCormick Place</text>
+<text x="1523.82" y="1351.32" text-anchor="start" data-node="0xaaaaee2b9460">18th St.</text>
+<text x="1451.87" y="1983.26" text-anchor="start" data-node="0xaaaaee2ba530" transform="rotate(60 1451.87 1983.26)">103rd St.-Washington Hts.</text>
+<text x="1559.17" y="1415.45" text-anchor="start" data-node="0xaaaaee2baf90">47th St. (Kenwood)</text>
+<text x="1559.17" y="1389.20" text-anchor="start" data-node="0xaaaaee2bb0e0">27th St.</text>
+<text x="1399.17" y="349.11" text-anchor="start" data-node="0xaaaaee2bcac0">Fort Sheridan</text>
+<text x="1399.17" y="403.79" text-anchor="start" data-node="0xaaaaee2bcd30">Highwood</text>
+<text x="1559.17" y="2118.78" text-anchor="start" data-node="0xaaaaee2bd9e0">Calumet</text>
+<text x="1559.17" y="2160.79" text-anchor="start" data-node="0xaaaaee2bdb30">Homewood</text>
+<text x="938.95" y="1450.83" text-anchor="end" data-node="0xaaaaee2bf480" transform="rotate(-60 938.95 1450.83)">Stone Ave.</text>
+<text x="714.04" y="1450.83" text-anchor="end" data-node="0xaaaaee2c0fb0" transform="rotate(-60 714.04 1450.83)">Clarendon Hills</text>
+<text x="1399.17" y="677.18" text-anchor="start" data-node="0xaaaaee2c1c50">Glencoe</text>
+<text x="1061.55" y="1998.58" text-anchor="start" data-node="0xaaaaee2c2ae0" transform="rotate(-30 1061.55 1998.58)">Orland Park 179th</text>
+<text x="477.78" y="1536.39" text-anchor="end" data-node="0xaaaaee2c6140">Naperville</text>
+<text x="445.97" y="1568.19" text-anchor="end" data-node="0xaaaaee2c6350">Route 59</text>
+<text x="1399.17" y="294.43" text-anchor="start" data-node="0xaaaaee2c8910">Lake Forest.</text>
+<text x="1399.17" y="239.75" text-anchor="start" data-node="0xaaaaee2c8a60">Lake Bluff</text>
+<text x="1431.16" y="1525.09" text-anchor="end" data-node="0xaaaaee2c97a0" transform="rotate(-45 1431.16 1525.09)">Wrightwood</text>
+<text x="1427.50" y="1592.51" text-anchor="end" data-node="0xaaaaee2c99b0">Ashburn</text>
+<text x="1463.30" y="2257.53" text-anchor="end" data-node="0xaaaaee2cb550">211th St.</text>
+<text x="1537.92" y="1535.58" text-anchor="end" data-node="0xaaaaee2cc130" transform="rotate(-60 1537.92 1535.58)">63rd St.</text>
+<text x="1298.80" y="1450.83" text-anchor="end" data-node="0xaaaaee2cce00" transform="rotate(-60 1298.80 1450.83)">Lavergne</text>
+<text x="630.32" y="1427.50" text-anchor="middle" data-node="0xaaaaee2ce930">Fairview Ave.</text>
+<text x="541.40" y="1472.77" text-anchor="end" data-node="0xaaaaee2ceb00">Belmont</text>
+<text x="1399.17" y="731.86" text-anchor="start" data-node="0xaaaaee2cf5d0">Hubbard Woods</text>
+<text x="1268.91" y="1431.16" text-anchor="start" data-node="0xaaaaee2d0460" transform="rotate(-45 1268.91 1431.16)">Berwyn</text>
+<text x="1399.17" y="458.47" text-anchor="start" data-node="0xaaaaee2d1290">Highland Park</text>
+<text x="1163.86" y="1450.83" text-anchor="end" data-node="0xaaaaee2d3ac0" transform="rotate(-60 1163.86 1450.83)">Riverside</text>
+<text x="1163.18" y="1864.32" text-anchor="end" data-node="0xaaaaee2d5780">Palos Park</text>
+<text x="1340.49" y="154.66" text-anchor="start" data-node="0xaaaaee2d63f0">North Chicago</text>
+<text x="848.98" y="1450.83" text-anchor="end" data-node="0xaaaaee2d7120" transform="rotate(-60 848.98 1450.83)">Highlands</text>
+<text x="804.00" y="1450.83" text-anchor="end" data-node="0xaaaaee2d7300" transform="rotate(-60 804.00 1450.83)">Hinsdale</text>
+<text x="272.28" y="414.61" text-anchor="start" data-node="0xaaaaee2d98f0" transform="rotate(-45 272.28 414.61)">Woodstock</text>
+<text x="1388.77" y="2035.51" text-anchor="start" data-node="0xaaaaee2d9a40" transform="rotate(45 1388.77 2035.51)">Burr Oak</text>
+<text x="1324.93" y="1702.57" text-anchor="end" data-node="0xaaaaee2dc370">Chicago Ridge</text>
+<text x="1378.85" y="1648.65" text-anchor="end" data-node="0xaaaaee2dc4c0">Oak Lawn Patriot</text>
+<text x="1487.02" y="1943.39" text-anchor="start" data-node="0xaaaaee2dcfe0" transform="rotate(60 1487.02 1943.39)">West Pullman</text>
+<text x="1271.01" y="1756.49" text-anchor="end" data-node="0xaaaaee2ddde0">Worth</text>
+<text x="1217.10" y="1810.40" text-anchor="end" data-node="0xaaaaee2de050">Palos Heights</text>
+<text x="1458.65" y="1971.76" text-anchor="start" data-node="0xaaaaee2deac0" transform="rotate(30 1458.65 1971.76)">Racine</text>
+<text x="1423.72" y="2007.30" text-anchor="start" data-node="0xaaaaee2e05b0" transform="rotate(45 1423.72 2007.30)">Ashland</text>
+<text x="893.97" y="1450.83" text-anchor="end" data-node="0xaaaaee2e1440" transform="rotate(-60 893.97 1450.83)">Western Springs</text>
+<text x="1379.15" y="193.32" text-anchor="start" data-node="0xaaaaee2e2120">Great Lakes</text>
+<text x="759.02" y="1450.83" text-anchor="end" data-node="0xaaaaee2e2f70" transform="rotate(-60 759.02 1450.83)">West Hinsdale</text>
+<text x="715.42" y="364.49" text-anchor="start" data-node="0xaaaaee2e3e80" transform="rotate(-45 715.42 364.49)">Ingleside</text>
+<text x="1484.49" y="1844.25" text-anchor="end" data-node="0xaaaaee2e4b30" transform="rotate(-45 1484.49 1844.25)">95th St.-Longwood</text>
+<text x="1522.72" y="2198.11" text-anchor="end" data-node="0xaaaaee2e6740">Flossmoor</text>
+<text x="671.99" y="819.49" text-anchor="start" data-node="0xaaaaee373860">Barrington</text>
+<text x="716.87" y="864.37" text-anchor="start" data-node="0xaaaaee373a00">Palatine</text>
+<text x="1537.92" y="1785.82" text-anchor="end" data-node="0xaaaaee380030" transform="rotate(-60 1537.92 1785.82)">107th St.</text>
+<text x="1537.92" y="1817.82" text-anchor="end" data-node="0xaaaaee3802a0" transform="rotate(-60 1537.92 1817.82)">111th St. (Pullman)</text>
+<text x="1559.17" y="1834.67" text-anchor="start" data-node="0xaaaaee380510">Kensington</text>
+<text x="919.17" y="721.60" text-anchor="start" data-node="0xaaaaee3806a0">Vernon Hills</text>
+<text x="1267.26" y="1275.95" text-anchor="end" data-node="0xaaaaee384b60" transform="rotate(30 1267.26 1275.95)">Grayland</text>
+<text x="1422.22" y="1755.42" text-anchor="middle" data-node="0xaaaaed99cdd0" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">91st St. - Beverly Hills</text>
+<text x="1546.67" y="1630.17" text-anchor="middle" data-node="0xaaaaedcdd670" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">83rd St. (Avalon Park)</text>
+<text x="1559.17" y="1674.67" text-anchor="start" data-node="0xaaaaedcdd910" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">87th St. (Woodruff)</text>
+<text x="1514.17" y="1738.67" text-anchor="end" data-node="0xaaaaedeb2870" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">103rd St. (Rosemoor)</text>
+<text x="1484.49" y="1448.84" text-anchor="end" data-node="0xaaaaee2009b0" transform="rotate(-45 1484.49 1448.84)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">LaSalle Street</text>
+<text x="1347.29" y="1733.54" text-anchor="end" data-node="0xaaaaee29ab30" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">99th St. - Beverly Hills</text>
+<text x="1537.83" y="1450.53" text-anchor="end" data-node="0xaaaaee2c38b0" transform="rotate(-45 1537.83 1450.53)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">51st/53rd St. (Hyde Park)</text>
+<text x="1405.84" y="1433.75" text-anchor="start" data-node="0xaaaaee2c4710" transform="rotate(-30 1405.84 1433.75)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Western Avenue</text>
+<text x="1537.83" y="1476.77" text-anchor="end" data-node="0xaaaaee2c52b0" transform="rotate(-45 1537.83 1476.77)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">55th - 56th - 57th St.</text>
+</g>
+<g id="trains"></g>
+</svg>

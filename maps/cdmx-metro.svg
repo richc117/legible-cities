@@ -1,0 +1,551 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1692" height="1787" viewBox="-31.00 -32.58 1691.68 1786.66" data-viewbox-nolabels="-31.00 -31.00 1662.00 1785.08" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+<title>Mexico City Metro</title>
+<rect id="backdrop" x="-31.00" y="-32.58" width="1691.68" height="1786.66" fill="var(--map-bg, #ffffff)"/>
+<g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<g class="line" data-line="1" stroke="#f94f8e" stroke-width="7.00">
+<path id="t5_1" data-src="0xaaaaef1b5d40" data-dst="0xaaaaef5ced80" d="M 492.31 800.00 L 523.08 769.23"/>
+<path id="t7_1" data-src="0xaaaaef1b8e80" data-dst="0xaaaaef7d81e0" d="M 615.38 738.46 L 652.26 738.46"/>
+<path id="t10_1" data-src="0xaaaaef222d40" data-dst="0xaaaaef222ec0" d="M 123.08 984.62 L 184.62 923.08"/>
+<path id="t11_1" data-src="0xaaaaef222ec0" data-dst="0xaaaaef52bca0" d="M 184.62 923.08 L 219.61 888.08"/>
+<path id="t24_1" data-src="0xaaaaef2cb8e0" data-dst="0xaaaaef2d3cc0" d="M 553.85 738.46 L 584.62 738.46"/>
+<path id="t28_1" data-src="0xaaaaef2d3cc0" data-dst="0xaaaaef1b8e80" d="M 584.62 738.46 L 615.38 738.46"/>
+<path id="t78_1" data-src="0xaaaaef4c59a0" data-dst="0xaaaaef4f8d20" d="M 331.78 800.00 L 381.27 800.00"/>
+<path id="t81_1" data-src="0xaaaaef4f8ac0" data-dst="0xaaaaef4c59a0" d="M 289.61 818.08 L 305.10 802.59 L 305.80 801.89 L 306.38 801.33 L 306.87 800.90 L 307.29 800.57 L 307.68 800.33 L 308.07 800.17 L 308.49 800.07 L 308.97 800.02 L 309.54 800.00 L 310.23 800.00 L 310.28 800.00 L 331.78 800.00"/>
+<path id="t82_1" data-src="0xaaaaef4f8d20" data-dst="0xaaaaef6cdba0" d="M 381.27 800.00 L 430.77 800.00"/>
+<path id="t85_1" data-src="0xaaaaef52bca0" data-dst="0xaaaaef566d20" d="M 219.61 888.08 L 243.56 864.13 L 244.13 863.56 L 244.61 863.08 L 245.03 862.66 L 245.40 862.29 L 245.73 861.96 L 246.04 861.65 L 246.35 861.34 L 246.66 861.03 L 247.00 860.69 L 254.61 853.08"/>
+<path id="t88_1" data-src="0xaaaaef566d20" data-dst="0xaaaaef4f8ac0" d="M 254.61 853.08 L 289.61 818.08"/>
+<path id="t91_1" data-src="0xaaaaef5ced80" data-dst="0xaaaaef2cb8e0" d="M 523.08 769.23 L 553.85 738.46"/>
+<path id="t106_1" data-src="0xaaaaef6cdba0" data-dst="0xaaaaef1b5d40" d="M 430.77 800.00 L 492.31 800.00"/>
+<path id="t131_1" data-src="0xaaaaef7d1630" data-dst="0xaaaaef7cfb10" d="M 836.61 738.46 L 858.95 738.46 L 859.99 738.45 L 860.70 738.38 L 861.16 738.19 L 861.41 737.82 L 861.51 737.21 L 861.54 736.29 L 861.54 735.87 L 861.54 726.00"/>
+<path id="t133_1" data-src="0xaaaaef7d3180" data-dst="0xaaaaef7d1630" d="M 799.74 738.46 L 836.61 738.46"/>
+<path id="t135_1" data-src="0xaaaaef7d4a70" data-dst="0xaaaaef7d4cd0" d="M 726.00 738.46 L 762.87 738.46"/>
+<path id="t136_1" data-src="0xaaaaef7d4cd0" data-dst="0xaaaaef7d3180" d="M 762.87 738.46 L 799.74 738.46"/>
+<path id="t137_1" data-src="0xaaaaef7d65c0" data-dst="0xaaaaef7d4a70" d="M 689.13 738.46 L 726.00 738.46"/>
+<path id="t138_1" data-src="0xaaaaef7d81e0" data-dst="0xaaaaef7d65c0" d="M 652.26 738.46 L 689.13 738.46"/>
+</g>
+<g class="line" data-line="2" stroke="#0071c1" stroke-width="7.00">
+<path id="t0_2" data-src="0xaaaaef1aba10" data-dst="0xaaaaef300730" d="M 492.31 861.54 L 544.78 809.07"/>
+<path id="t16_2" data-src="0xaaaaef279700" data-dst="0xaaaaef2e0010" d="M 492.31 738.46 L 430.77 738.46"/>
+<path id="t20_2" data-src="0xaaaaef2af160" data-dst="0xaaaaef2fcdf0" d="M 177.91 553.85 L 123.08 553.85"/>
+<path id="t25_2" data-src="0xaaaaef2cb8e0" data-dst="0xaaaaef6cab50" d="M 553.85 738.46 L 533.33 738.46"/>
+<path id="t32_2" data-src="0xaaaaef2e0010" data-dst="0xaaaaef763a30" d="M 430.77 738.46 L 375.94 738.46"/>
+<path id="t43_2" data-src="0xaaaaef2fcdf0" data-dst="0xaaaaef7e3f20" d="M 123.08 553.85 L 61.54 553.85"/>
+<path id="t48_2" data-src="0xaaaaef300730" data-dst="0xaaaaef2cb8e0" d="M 544.78 809.07 L 551.26 802.59 L 551.95 801.89 L 552.51 801.31 L 552.95 800.83 L 553.28 800.40 L 553.52 800.01 L 553.68 799.62 L 553.77 799.20 L 553.82 798.72 L 553.84 798.15 L 553.85 797.46 L 553.85 797.41 L 553.85 738.46"/>
+<path id="t52_2" data-src="0xaaaaef306690" data-dst="0xaaaaef632b20" d="M 492.31 1169.23 L 492.31 1107.69"/>
+<path id="t65_2" data-src="0xaaaaef3f9c10" data-dst="0xaaaaef3fb0c0" d="M 492.31 1292.31 L 492.31 1230.77"/>
+<path id="t67_2" data-src="0xaaaaef3fb0c0" data-dst="0xaaaaef306690" d="M 492.31 1230.77 L 492.31 1169.23"/>
+<path id="t71_2" data-src="0xaaaaef45efc0" data-dst="0xaaaaef7cca90" d="M 257.54 626.77 L 248.74 617.97 L 248.18 617.41 L 247.69 616.93 L 247.28 616.51 L 246.91 616.14 L 246.58 615.81 L 246.27 615.50 L 245.96 615.19 L 245.64 614.87 L 245.30 614.53 L 243.56 612.79 L 218.76 587.99"/>
+<path id="t75_2" data-src="0xaaaaef462010" data-dst="0xaaaaef3f9c10" d="M 492.31 1353.85 L 492.31 1292.31"/>
+<path id="t76_2" data-src="0xaaaaef491f60" data-dst="0xaaaaef59bde0" d="M 492.31 984.62 L 492.31 923.08"/>
+<path id="t90_2" data-src="0xaaaaef59bde0" data-dst="0xaaaaef1aba10" d="M 492.31 923.08 L 492.31 861.54"/>
+<path id="t92_2" data-src="0xaaaaef5ffb80" data-dst="0xaaaaef491f60" d="M 492.31 1046.15 L 492.31 984.62"/>
+<path id="t95_2" data-src="0xaaaaef632b20" data-dst="0xaaaaef5ffb80" d="M 492.31 1107.69 L 492.31 1046.15"/>
+<path id="t105_2" data-src="0xaaaaef6cab50" data-dst="0xaaaaef7cb9f0" d="M 533.33 738.46 L 512.82 738.46"/>
+<path id="t113_2" data-src="0xaaaaef730a90" data-dst="0xaaaaef45efc0" d="M 296.31 665.54 L 257.54 626.77"/>
+<path id="t114_2" data-src="0xaaaaef730ba0" data-dst="0xaaaaef730a90" d="M 335.08 704.31 L 310.28 679.51 L 309.72 678.95 L 309.23 678.46 L 308.81 678.05 L 308.45 677.68 L 308.11 677.35 L 307.80 677.03 L 307.50 676.73 L 307.18 676.41 L 306.84 676.07 L 296.31 665.54"/>
+<path id="t115_2" data-src="0xaaaaef763a30" data-dst="0xaaaaef730ba0" d="M 375.94 738.46 L 371.82 738.46 L 371.12 738.46 L 370.54 738.44 L 370.06 738.39 L 369.63 738.30 L 369.24 738.14 L 368.85 737.91 L 368.43 737.59 L 367.95 737.16 L 367.38 736.61 L 366.69 735.92 L 366.64 735.87 L 335.08 704.31"/>
+<path id="t124_2" data-src="0xaaaaef7cb9f0" data-dst="0xaaaaef279700" d="M 512.82 738.46 L 492.31 738.46"/>
+<path id="t125_2" data-src="0xaaaaef7cca90" data-dst="0xaaaaef2af160" d="M 218.76 587.99 L 187.21 556.44 L 186.50 555.74 L 185.93 555.18 L 185.44 554.74 L 185.02 554.41 L 184.63 554.18 L 184.24 554.02 L 183.82 553.92 L 183.34 553.87 L 182.77 553.85 L 182.07 553.85 L 182.03 553.85 L 177.91 553.85"/>
+<path id="t154_2" data-src="0xaaaaef7e3f20" data-dst="0xaaaaef4c8120" d="M 61.54 553.85 L 0.00 553.85"/>
+</g>
+<g class="line" data-line="3" stroke="#ad9b0c" stroke-width="7.00">
+<path id="t13_3" data-src="0xaaaaef223ea0" data-dst="0xaaaaef2e0010" d="M 430.77 769.23 L 430.77 738.46"/>
+<path id="t15_3" data-src="0xaaaaef2779b0" data-dst="0xaaaaef697be0" d="M 307.69 1101.36 L 307.69 1033.49"/>
+<path id="t26_3" data-src="0xaaaaef2cc060" data-dst="0xaaaaef2779b0" d="M 307.69 1169.23 L 307.69 1101.36"/>
+<path id="t29_3" data-src="0xaaaaef2ddda0" data-dst="0xaaaaef3c8130" d="M 425.72 874.51 L 408.21 892.02"/>
+<path id="t31_3" data-src="0xaaaaef2e0010" data-dst="0xaaaaef666b00" d="M 430.77 738.46 L 430.77 676.92"/>
+<path id="t35_3" data-src="0xaaaaef2ea600" data-dst="0xaaaaef7d3dd0" d="M 307.69 1476.92 L 307.69 1415.38"/>
+<path id="t41_3" data-src="0xaaaaef2f7a50" data-dst="0xaaaaef766c20" d="M 501.38 421.70 L 553.85 369.23"/>
+<path id="t60_3" data-src="0xaaaaef32d690" data-dst="0xaaaaef2ddda0" d="M 434.73 865.50 L 425.72 874.51"/>
+<path id="t61_3" data-src="0xaaaaef32d690" data-dst="0xaaaaef7f4260" d="M 430.77 861.54 L 430.77 849.52"/>
+<path id="t63_3" data-src="0xaaaaef3c8130" data-dst="0xaaaaef1b2e80" d="M 408.21 892.02 L 373.19 927.04"/>
+<path id="t74_3" data-src="0xaaaaef45ff70" data-dst="0xaaaaef766a80" d="M 492.31 597.28 L 492.31 492.31"/>
+<path id="t100_3" data-src="0xaaaaef666b00" data-dst="0xaaaaef45ff70" d="M 430.77 676.92 L 489.72 617.97 L 490.42 617.27 L 490.98 616.70 L 491.41 616.21 L 491.74 615.79 L 491.98 615.40 L 492.14 615.01 L 492.23 614.59 L 492.29 614.11 L 492.30 613.53 L 492.31 612.84 L 492.31 612.79 L 492.31 597.28"/>
+<path id="t104_3" data-src="0xaaaaef697be0" data-dst="0xaaaaef7648e0" d="M 307.69 1033.49 L 307.69 987.21 L 307.69 986.50 L 307.71 985.93 L 307.76 985.44 L 307.85 985.02 L 308.01 984.63 L 308.24 984.24 L 308.56 983.82 L 308.99 983.34 L 309.55 982.77 L 310.23 982.07 L 310.28 982.03 L 321.24 971.07"/>
+<path id="t107_3" data-src="0xaaaaef6cdba0" data-dst="0xaaaaef223ea0" d="M 430.77 800.00 L 430.77 769.23"/>
+<path id="t116_3" data-src="0xaaaaef7648e0" data-dst="0xaaaaef1b2e80" d="M 321.24 971.07 L 369.23 923.08"/>
+<path id="t117_3" data-src="0xaaaaef766a80" data-dst="0xaaaaef2f7a50" d="M 492.31 492.31 L 492.31 433.36 L 492.31 432.66 L 492.33 432.08 L 492.38 431.60 L 492.47 431.17 L 492.63 430.78 L 492.86 430.39 L 493.18 429.97 L 493.61 429.49 L 494.16 428.92 L 494.85 428.23 L 494.90 428.18 L 501.38 421.70"/>
+<path id="t119_3" data-src="0xaaaaef766c20" data-dst="0xaaaaef799b90" d="M 553.85 369.23 L 615.38 307.69"/>
+<path id="t128_3" data-src="0xaaaaef7cec40" data-dst="0xaaaaef2cc060" d="M 307.69 1230.77 L 307.69 1169.23"/>
+<path id="t130_3" data-src="0xaaaaef7d0890" data-dst="0xaaaaef7cec40" d="M 307.69 1292.31 L 307.69 1230.77"/>
+<path id="t132_3" data-src="0xaaaaef7d22e0" data-dst="0xaaaaef7d0890" d="M 307.69 1353.85 L 307.69 1292.31"/>
+<path id="t134_3" data-src="0xaaaaef7d3dd0" data-dst="0xaaaaef7d22e0" d="M 307.69 1415.38 L 307.69 1353.85"/>
+<path id="t174_3" data-src="0xaaaaef7f4260" data-dst="0xaaaaef6cdba0" d="M 430.77 849.52 L 430.77 800.00"/>
+</g>
+<g class="line" data-line="4" stroke="#7fbcaa" stroke-width="7.00">
+<path id="t6_4" data-src="0xaaaaef1b8e80" data-dst="0xaaaaef700b40" d="M 615.38 738.46 L 676.92 676.92"/>
+<path id="t9_4" data-src="0xaaaaef212570" data-dst="0xaaaaef3092f0" d="M 676.92 615.38 L 676.92 553.85"/>
+<path id="t39_4" data-src="0xaaaaef2f60f0" data-dst="0xaaaaef667dd0" d="M 615.38 923.08 L 615.38 861.54"/>
+<path id="t50_4" data-src="0xaaaaef301cb0" data-dst="0xaaaaef1b8e80" d="M 615.38 800.00 L 615.38 738.46"/>
+<path id="t54_4" data-src="0xaaaaef3092f0" data-dst="0xaaaaef7dd260" d="M 676.92 553.85 L 676.92 492.31"/>
+<path id="t103_4" data-src="0xaaaaef667dd0" data-dst="0xaaaaef301cb0" d="M 615.38 861.54 L 615.38 800.00"/>
+<path id="t109_4" data-src="0xaaaaef700b40" data-dst="0xaaaaef212570" d="M 676.92 676.92 L 676.92 615.38"/>
+<path id="t140_4" data-src="0xaaaaef7d9d30" data-dst="0xaaaaef733ae0" d="M 676.92 430.77 L 676.92 369.23"/>
+<path id="t143_4" data-src="0xaaaaef7dd260" data-dst="0xaaaaef7d9d30" d="M 676.92 492.31 L 676.92 430.77"/>
+</g>
+<g class="line" data-line="5" stroke="#f9d616" stroke-width="7.00">
+<path id="t53_5" data-src="0xaaaaef3092f0" data-dst="0xaaaaef7dee60" d="M 676.92 553.85 L 746.90 553.85"/>
+<path id="t69_5" data-src="0xaaaaef42f070" data-dst="0xaaaaef52de90" d="M 541.79 541.79 L 551.26 551.26 L 551.96 551.95 L 552.53 552.51 L 553.02 552.95 L 553.44 553.28 L 553.83 553.52 L 554.22 553.68 L 554.65 553.77 L 555.13 553.82 L 555.70 553.84 L 556.39 553.85 L 556.44 553.85 L 606.94 553.85"/>
+<path id="t86_5" data-src="0xaaaaef52de90" data-dst="0xaaaaef3092f0" d="M 606.94 553.85 L 676.92 553.85"/>
+<path id="t87_5" data-src="0xaaaaef5668d0" data-dst="0xaaaaef2fcf90" d="M 861.54 652.26 L 861.54 615.38"/>
+<path id="t111_5" data-src="0xaaaaef700d10" data-dst="0xaaaaef7988c0" d="M 430.77 369.23 L 430.77 428.18 L 430.77 428.88 L 430.79 429.46 L 430.84 429.94 L 430.93 430.37 L 431.09 430.76 L 431.32 431.15 L 431.64 431.57 L 432.07 432.05 L 432.62 432.62 L 433.31 433.31 L 433.36 433.36 L 439.84 439.84"/>
+<path id="t118_5" data-src="0xaaaaef766a80" data-dst="0xaaaaef42f070" d="M 492.31 492.31 L 541.79 541.79"/>
+<path id="t121_5" data-src="0xaaaaef7988c0" data-dst="0xaaaaef766a80" d="M 439.84 439.84 L 492.31 492.31"/>
+<path id="t123_5" data-src="0xaaaaef799a20" data-dst="0xaaaaef700d10" d="M 430.77 307.69 L 430.77 369.23"/>
+<path id="t127_5" data-src="0xaaaaef7cdf00" data-dst="0xaaaaef5668d0" d="M 861.54 689.13 L 861.54 652.26"/>
+<path id="t129_5" data-src="0xaaaaef7cfb10" data-dst="0xaaaaef7cdf00" d="M 861.54 726.00 L 861.54 689.13"/>
+<path id="t144_5" data-src="0xaaaaef7dd3b0" data-dst="0xaaaaef2fcf90" d="M 812.06 565.90 L 861.54 615.38"/>
+<path id="t146_5" data-src="0xaaaaef7dee60" data-dst="0xaaaaef7dd3b0" d="M 746.90 553.85 L 797.41 553.85 L 798.11 553.85 L 798.69 553.87 L 799.17 553.91 L 799.60 554.01 L 799.99 554.16 L 800.38 554.40 L 800.80 554.72 L 801.28 555.15 L 801.85 555.70 L 802.54 556.39 L 802.59 556.44 L 812.06 565.90"/>
+</g>
+<g class="line" data-line="6" stroke="#d81e05" stroke-width="7.00">
+<path id="t42_6" data-src="0xaaaaef2f7bf0" data-dst="0xaaaaef766c20" d="M 492.31 369.23 L 553.85 369.23"/>
+<path id="t55_6" data-src="0xaaaaef309490" data-dst="0xaaaaef30ae20" d="M 117.48 307.69 L 117.48 246.15"/>
+<path id="t56_6" data-src="0xaaaaef309490" data-dst="0xaaaaef42f240" d="M 123.08 307.69 L 170.17 354.79"/>
+<path id="t58_6" data-src="0xaaaaef3116e0" data-dst="0xaaaaef3c9130" d="M 297.56 369.23 L 364.17 369.23"/>
+<path id="t59_6" data-src="0xaaaaef3117f0" data-dst="0xaaaaef3116e0" d="M 230.96 369.23 L 297.56 369.23"/>
+<path id="t64_6" data-src="0xaaaaef3c9130" data-dst="0xaaaaef700d10" d="M 364.17 369.23 L 430.77 369.23"/>
+<path id="t70_6" data-src="0xaaaaef42f240" data-dst="0xaaaaef3117f0" d="M 170.17 354.79 L 182.03 366.64 L 182.73 367.34 L 183.30 367.90 L 183.79 368.34 L 184.21 368.66 L 184.60 368.90 L 184.99 369.06 L 185.41 369.16 L 185.89 369.21 L 186.47 369.23 L 187.16 369.23 L 187.21 369.23 L 230.96 369.23"/>
+<path id="t112_6" data-src="0xaaaaef700d10" data-dst="0xaaaaef2f7bf0" d="M 430.77 369.23 L 492.31 369.23"/>
+<path id="t120_6" data-src="0xaaaaef766c20" data-dst="0xaaaaef634cc0" d="M 553.85 369.23 L 615.38 369.23"/>
+</g>
+<g class="line" data-line="7" stroke="#e87511" stroke-width="7.00">
+<path id="t12_7" data-src="0xaaaaef222ec0" data-dst="0xaaaaef4c5eb0" d="M 184.62 923.08 L 184.62 844.20"/>
+<path id="t44_7" data-src="0xaaaaef2fcdf0" data-dst="0xaaaaef7e5c00" d="M 123.08 553.85 L 123.08 492.31"/>
+<path id="t55_7" data-src="0xaaaaef309490" data-dst="0xaaaaef30ae20" d="M 128.68 307.69 L 128.68 246.15"/>
+<path id="t68_7" data-src="0xaaaaef42cb00" data-dst="0xaaaaef2fcdf0" d="M 135.45 627.76 L 125.67 617.97 L 124.97 617.27 L 124.41 616.70 L 123.97 616.21 L 123.64 615.79 L 123.41 615.40 L 123.25 615.01 L 123.15 614.59 L 123.10 614.11 L 123.08 613.53 L 123.08 612.84 L 123.08 612.79 L 123.08 553.85"/>
+<path id="t72_7" data-src="0xaaaaef45fa60" data-dst="0xaaaaef45fce0" d="M 184.62 765.32 L 184.62 686.44"/>
+<path id="t73_7" data-src="0xaaaaef45fce0" data-dst="0xaaaaef42cb00" d="M 184.62 686.44 L 184.62 679.51 L 184.61 678.81 L 184.60 678.23 L 184.55 677.75 L 184.45 677.33 L 184.30 676.94 L 184.07 676.54 L 183.74 676.12 L 183.31 675.64 L 182.76 675.07 L 182.07 674.38 L 182.03 674.33 L 135.45 627.76"/>
+<path id="t79_7" data-src="0xaaaaef4c5eb0" data-dst="0xaaaaef45fa60" d="M 184.62 844.20 L 184.62 765.32"/>
+<path id="t80_7" data-src="0xaaaaef4c7f50" data-dst="0xaaaaef7eae50" d="M 184.62 1169.23 L 184.62 1107.69"/>
+<path id="t149_7" data-src="0xaaaaef7e09b0" data-dst="0xaaaaef309490" d="M 123.08 369.23 L 123.08 307.69"/>
+<path id="t151_7" data-src="0xaaaaef7e2540" data-dst="0xaaaaef7e09b0" d="M 123.08 430.77 L 123.08 369.23"/>
+<path id="t156_7" data-src="0xaaaaef7e5c00" data-dst="0xaaaaef7e2540" d="M 123.08 492.31 L 123.08 430.77"/>
+<path id="t157_7" data-src="0xaaaaef7e7770" data-dst="0xaaaaef222ec0" d="M 184.62 984.62 L 184.62 923.08"/>
+<path id="t159_7" data-src="0xaaaaef7e92f0" data-dst="0xaaaaef7e7770" d="M 184.62 1046.15 L 184.62 984.62"/>
+<path id="t161_7" data-src="0xaaaaef7eae50" data-dst="0xaaaaef7e92f0" d="M 184.62 1107.69 L 184.62 1046.15"/>
+</g>
+<g class="line" data-line="8" stroke="#118749" stroke-width="7.00">
+<path id="t1_8" data-src="0xaaaaef1aba10" data-dst="0xaaaaef2afd10" d="M 492.31 861.54 L 492.31 841.03"/>
+<path id="t4_8" data-src="0xaaaaef1b5d40" data-dst="0xaaaaef33d790" d="M 492.31 800.00 L 492.31 769.23"/>
+<path id="t14_8" data-src="0xaaaaef223ff0" data-dst="0xaaaaef2f60f0" d="M 661.88 969.58 L 615.38 923.08"/>
+<path id="t17_8" data-src="0xaaaaef279700" data-dst="0xaaaaef30af90" d="M 492.31 738.46 L 492.31 676.92"/>
+<path id="t18_8" data-src="0xaaaaef27d1d0" data-dst="0xaaaaef1b5d40" d="M 492.31 820.51 L 492.31 800.00"/>
+<path id="t21_8" data-src="0xaaaaef2afd10" data-dst="0xaaaaef27d1d0" d="M 492.31 841.03 L 492.31 820.51"/>
+<path id="t22_8" data-src="0xaaaaef2b0170" data-dst="0xaaaaef2b0340" d="M 676.92 1226.55 L 676.92 1160.79"/>
+<path id="t23_8" data-src="0xaaaaef2b0340" data-dst="0xaaaaef599c60" d="M 676.92 1160.79 L 676.92 1095.03"/>
+<path id="t30_8" data-src="0xaaaaef2ddee0" data-dst="0xaaaaef1aba10" d="M 553.85 867.14 L 492.31 867.14"/>
+<path id="t38_8" data-src="0xaaaaef2f5f20" data-dst="0xaaaaef2b0170" d="M 676.92 1292.31 L 676.92 1226.55"/>
+<path id="t40_8" data-src="0xaaaaef2f60f0" data-dst="0xaaaaef2ddee0" d="M 615.38 923.08 L 553.85 861.54"/>
+<path id="t51_8" data-src="0xaaaaef3044f0" data-dst="0xaaaaef223ff0" d="M 676.92 1029.27 L 676.92 987.21 L 676.92 986.50 L 676.90 985.93 L 676.85 985.44 L 676.76 985.02 L 676.61 984.63 L 676.37 984.24 L 676.05 983.82 L 675.62 983.34 L 675.07 982.77 L 674.38 982.07 L 674.33 982.03 L 661.88 969.58"/>
+<path id="t62_8" data-src="0xaaaaef33d790" data-dst="0xaaaaef279700" d="M 492.31 769.23 L 492.31 738.46"/>
+<path id="t83_8" data-src="0xaaaaef4faef0" data-dst="0xaaaaef7cd1a0" d="M 923.08 1292.31 L 861.54 1292.31"/>
+<path id="t89_8" data-src="0xaaaaef599c60" data-dst="0xaaaaef3044f0" d="M 676.92 1095.03 L 676.92 1029.27"/>
+<path id="t126_8" data-src="0xaaaaef7cd1a0" data-dst="0xaaaaef7fbbc0" d="M 861.54 1292.31 L 800.00 1292.31"/>
+<path id="t181_8" data-src="0xaaaaef7fa090" data-dst="0xaaaaef2f5f20" d="M 738.46 1292.31 L 676.92 1292.31"/>
+<path id="t182_8" data-src="0xaaaaef7fbbc0" data-dst="0xaaaaef7fa090" d="M 800.00 1292.31 L 738.46 1292.31"/>
+</g>
+<g class="line" data-line="9" stroke="#512826" stroke-width="7.00">
+<path id="t2_9" data-src="0xaaaaef1aba10" data-dst="0xaaaaef32d690" d="M 492.31 861.54 L 430.77 861.54"/>
+<path id="t3_9" data-src="0xaaaaef1b2e80" data-dst="0xaaaaef7f7950" d="M 369.23 923.08 L 307.69 923.08"/>
+<path id="t29_9" data-src="0xaaaaef2ddda0" data-dst="0xaaaaef3c8130" d="M 417.80 866.59 L 400.29 884.10"/>
+<path id="t30_9" data-src="0xaaaaef2ddee0" data-dst="0xaaaaef1aba10" d="M 553.85 855.94 L 492.31 855.94"/>
+<path id="t33_9" data-src="0xaaaaef2e1760" data-dst="0xaaaaef2eeae0" d="M 713.85 861.54 L 664.62 861.54"/>
+<path id="t36_9" data-src="0xaaaaef2eeae0" data-dst="0xaaaaef667dd0" d="M 664.62 861.54 L 615.38 861.54"/>
+<path id="t46_9" data-src="0xaaaaef2fec00" data-dst="0xaaaaef2e1760" d="M 763.08 861.54 L 713.85 861.54"/>
+<path id="t49_9" data-src="0xaaaaef301b10" data-dst="0xaaaaef2fec00" d="M 812.31 861.54 L 763.08 861.54"/>
+<path id="t60_9" data-src="0xaaaaef32d690" data-dst="0xaaaaef2ddda0" d="M 426.81 857.58 L 417.80 866.59"/>
+<path id="t63_9" data-src="0xaaaaef3c8130" data-dst="0xaaaaef1b2e80" d="M 400.29 884.10 L 365.27 919.12"/>
+<path id="t101_9" data-src="0xaaaaef667c60" data-dst="0xaaaaef301b10" d="M 861.54 861.54 L 812.31 861.54"/>
+<path id="t102_9" data-src="0xaaaaef667dd0" data-dst="0xaaaaef2ddee0" d="M 615.38 861.54 L 553.85 861.54"/>
+<path id="t108_9" data-src="0xaaaaef6cdd40" data-dst="0xaaaaef667c60" d="M 923.08 867.14 L 861.54 867.14"/>
+<path id="t177_9" data-src="0xaaaaef7f5d90" data-dst="0xaaaaef222ec0" d="M 246.15 923.08 L 184.62 923.08"/>
+<path id="t179_9" data-src="0xaaaaef7f7950" data-dst="0xaaaaef7f5d90" d="M 307.69 923.08 L 246.15 923.08"/>
+</g>
+<g class="line" data-line="A" stroke="#a02d96" stroke-width="7.00">
+<path id="t97_A" data-src="0xaaaaef634e90" data-dst="0xaaaaef7f27c0" d="M 1600.00 1292.31 L 1498.14 1292.31"/>
+<path id="t108_A" data-src="0xaaaaef6cdd40" data-dst="0xaaaaef667c60" d="M 923.08 855.94 L 861.54 855.94"/>
+<path id="t158_A" data-src="0xaaaaef7e84e0" data-dst="0xaaaaef667c60" d="M 933.56 933.56 L 925.67 925.67 L 925.10 925.10 L 924.62 924.62 L 924.20 924.20 L 923.83 923.83 L 923.50 923.50 L 923.19 923.19 L 922.88 922.88 L 922.57 922.57 L 922.23 922.23 L 861.54 861.54"/>
+<path id="t160_A" data-src="0xaaaaef7ea0d0" data-dst="0xaaaaef7e84e0" d="M 1005.59 1005.59 L 987.21 987.21 L 986.64 986.64 L 986.16 986.16 L 985.74 985.74 L 985.37 985.37 L 985.04 985.04 L 984.73 984.73 L 984.42 984.42 L 984.11 984.11 L 983.76 983.76 L 983.38 983.38 L 933.56 933.56"/>
+<path id="t162_A" data-src="0xaaaaef7eba70" data-dst="0xaaaaef7ebce0" d="M 1149.64 1149.64 L 1110.28 1110.28 L 1109.72 1109.72 L 1109.23 1109.23 L 1108.81 1108.81 L 1108.45 1108.45 L 1108.11 1108.11 L 1107.80 1107.80 L 1107.50 1107.50 L 1107.18 1107.18 L 1106.84 1106.84 L 1077.61 1077.61"/>
+<path id="t163_A" data-src="0xaaaaef7ebce0" data-dst="0xaaaaef7ea0d0" d="M 1077.61 1077.61 L 1048.74 1048.74 L 1048.18 1048.18 L 1047.69 1047.69 L 1047.28 1047.28 L 1046.91 1046.91 L 1046.58 1046.58 L 1046.27 1046.27 L 1045.96 1045.96 L 1045.64 1045.64 L 1045.30 1045.30 L 1005.59 1005.59"/>
+<path id="t165_A" data-src="0xaaaaef7ed5a0" data-dst="0xaaaaef7ef2f0" d="M 1294.42 1292.31 L 1294.20 1292.31 L 1293.62 1292.29 L 1293.13 1292.24 L 1292.71 1292.15 L 1292.32 1291.99 L 1291.93 1291.76 L 1291.51 1291.44 L 1291.03 1291.01 L 1290.46 1290.45 L 1289.77 1289.77 L 1289.72 1289.72 L 1233.36 1233.36 L 1232.79 1232.79 L 1232.31 1232.31 L 1231.89 1231.89 L 1231.52 1231.52 L 1231.19 1231.19 L 1230.88 1230.88 L 1230.57 1230.57 L 1230.26 1230.26 L 1229.92 1229.92 L 1221.66 1221.66"/>
+<path id="t167_A" data-src="0xaaaaef7ef0d0" data-dst="0xaaaaef7ed5a0" d="M 1396.28 1292.31 L 1294.90 1292.31 L 1294.42 1292.31"/>
+<path id="t168_A" data-src="0xaaaaef7ef2f0" data-dst="0xaaaaef7eba70" d="M 1221.66 1221.66 L 1171.82 1171.82 L 1171.26 1171.26 L 1170.77 1170.77 L 1170.35 1170.35 L 1169.99 1169.99 L 1169.65 1169.65 L 1169.34 1169.34 L 1169.04 1169.04 L 1168.72 1168.72 L 1168.38 1168.38 L 1168.00 1168.00 L 1167.57 1167.57 L 1149.64 1149.64"/>
+<path id="t172_A" data-src="0xaaaaef7f27c0" data-dst="0xaaaaef7ef0d0" d="M 1498.14 1292.31 L 1396.28 1292.31"/>
+</g>
+<g class="line" data-line="B" stroke="#118751" stroke-width="7.00">
+<path id="t8_B" data-src="0xaaaaef2123a0" data-dst="0xaaaaef601d20" d="M 615.38 676.92 L 553.85 676.92"/>
+<path id="t19_B" data-src="0xaaaaef2af050" data-dst="0xaaaaef7989d0" d="M 812.06 664.87 L 802.59 674.33 L 801.89 675.03 L 801.31 675.59 L 800.83 676.03 L 800.40 676.36 L 800.01 676.59 L 799.62 676.75 L 799.20 676.85 L 798.72 676.90 L 798.15 676.92 L 797.46 676.92 L 797.41 676.92 L 746.90 676.92"/>
+<path id="t34_B" data-src="0xaaaaef2ea400" data-dst="0xaaaaef7e4ee0" d="M 1169.23 0.00 L 1169.23 67.52"/>
+<path id="t45_B" data-src="0xaaaaef2fcf90" data-dst="0xaaaaef2af050" d="M 861.54 615.38 L 812.06 664.87"/>
+<path id="t57_B" data-src="0xaaaaef30af90" data-dst="0xaaaaef666b00" d="M 492.31 676.92 L 430.77 676.92"/>
+<path id="t93_B" data-src="0xaaaaef601d20" data-dst="0xaaaaef30af90" d="M 553.85 676.92 L 492.31 676.92"/>
+<path id="t99_B" data-src="0xaaaaef666b00" data-dst="0xaaaaef733c50" d="M 430.77 676.92 L 369.23 676.92"/>
+<path id="t110_B" data-src="0xaaaaef700b40" data-dst="0xaaaaef2123a0" d="M 676.92 676.92 L 615.38 676.92"/>
+<path id="t122_B" data-src="0xaaaaef7989d0" data-dst="0xaaaaef700b40" d="M 746.90 676.92 L 676.92 676.92"/>
+<path id="t139_B" data-src="0xaaaaef7d91a0" data-dst="0xaaaaef2fcf90" d="M 909.28 567.64 L 861.54 615.38"/>
+<path id="t141_B" data-src="0xaaaaef7dac20" data-dst="0xaaaaef7d91a0" d="M 957.02 519.90 L 925.67 551.26 L 925.10 551.82 L 924.62 552.31 L 924.20 552.72 L 923.83 553.09 L 923.50 553.42 L 923.19 553.73 L 922.88 554.04 L 922.57 554.36 L 922.23 554.70 L 909.28 567.64"/>
+<path id="t142_B" data-src="0xaaaaef7dc760" data-dst="0xaaaaef7dac20" d="M 1004.76 472.16 L 987.21 489.72 L 986.64 490.28 L 986.16 490.77 L 985.74 491.19 L 985.37 491.55 L 985.04 491.89 L 984.73 492.20 L 984.42 492.50 L 984.11 492.82 L 983.76 493.16 L 983.38 493.54 L 957.02 519.90"/>
+<path id="t145_B" data-src="0xaaaaef7de350" data-dst="0xaaaaef7dc760" d="M 1052.50 424.42 L 1048.74 428.18 L 1048.18 428.74 L 1047.69 429.23 L 1047.28 429.65 L 1046.91 430.01 L 1046.58 430.35 L 1046.27 430.66 L 1045.96 430.96 L 1045.64 431.28 L 1045.30 431.62 L 1044.92 432.00 L 1004.76 472.16"/>
+<path id="t147_B" data-src="0xaaaaef7dfc20" data-dst="0xaaaaef7de350" d="M 1100.24 376.68 L 1052.50 424.42"/>
+<path id="t148_B" data-src="0xaaaaef7dfd90" data-dst="0xaaaaef7dfc20" d="M 1147.98 328.94 L 1110.28 366.64 L 1109.72 367.21 L 1109.23 367.69 L 1108.81 368.11 L 1108.45 368.48 L 1108.11 368.81 L 1107.80 369.12 L 1107.50 369.43 L 1107.18 369.74 L 1106.84 370.08 L 1106.46 370.46 L 1100.24 376.68"/>
+<path id="t150_B" data-src="0xaaaaef7e1880" data-dst="0xaaaaef7dfd90" d="M 1169.23 270.06 L 1169.23 305.10 L 1169.23 305.80 L 1169.21 306.38 L 1169.16 306.87 L 1169.07 307.29 L 1168.91 307.68 L 1168.68 308.07 L 1168.36 308.49 L 1167.93 308.97 L 1167.38 309.54 L 1166.69 310.23 L 1166.64 310.28 L 1147.98 328.94"/>
+<path id="t152_B" data-src="0xaaaaef7e3280" data-dst="0xaaaaef7e3500" d="M 1169.23 135.03 L 1169.23 202.55"/>
+<path id="t153_B" data-src="0xaaaaef7e3500" data-dst="0xaaaaef7e1880" d="M 1169.23 202.55 L 1169.23 270.06"/>
+<path id="t155_B" data-src="0xaaaaef7e4ee0" data-dst="0xaaaaef7e3280" d="M 1169.23 67.52 L 1169.23 135.03"/>
+</g>
+<g class="line" data-line="L12" stroke="#b99e51" stroke-width="7.00">
+<path id="t27_L12" data-src="0xaaaaef2cc060" data-dst="0xaaaaef2ffe10" d="M 307.69 1169.23 L 272.71 1134.25"/>
+<path id="t37_L12" data-src="0xaaaaef2f5f20" data-dst="0xaaaaef494fb0" d="M 676.92 1292.31 L 617.97 1233.36 L 617.27 1232.66 L 616.70 1232.10 L 616.21 1231.66 L 615.79 1231.34 L 615.40 1231.10 L 615.01 1230.94 L 614.59 1230.84 L 614.11 1230.79 L 613.53 1230.77 L 612.84 1230.77 L 612.79 1230.77 L 597.28 1230.77"/>
+<path id="t47_L12" data-src="0xaaaaef2ffe10" data-dst="0xaaaaef633c60" d="M 272.71 1134.25 L 248.74 1110.28 L 248.05 1109.58 L 247.49 1109.00 L 247.05 1108.52 L 246.72 1108.10 L 246.48 1107.70 L 246.32 1107.31 L 246.23 1106.89 L 246.18 1106.41 L 246.16 1105.84 L 246.15 1105.15 L 246.15 1105.10 L 246.15 1095.62"/>
+<path id="t66_L12" data-src="0xaaaaef3fb0c0" data-dst="0xaaaaef631cf0" d="M 492.31 1230.77 L 422.33 1230.77"/>
+<path id="t77_L12" data-src="0xaaaaef494fb0" data-dst="0xaaaaef3fb0c0" d="M 597.28 1230.77 L 492.31 1230.77"/>
+<path id="t84_L12" data-src="0xaaaaef4fb030" data-dst="0xaaaaef7f8560" d="M 1292.31 1723.08 L 1220.16 1723.08"/>
+<path id="t94_L12" data-src="0xaaaaef631cf0" data-dst="0xaaaaef665ac0" d="M 422.33 1230.77 L 371.82 1230.77 L 371.12 1230.77 L 370.54 1230.75 L 370.06 1230.70 L 369.63 1230.61 L 369.24 1230.45 L 368.85 1230.22 L 368.43 1229.90 L 367.95 1229.47 L 367.38 1228.92 L 366.69 1228.23 L 366.64 1228.18 L 357.18 1218.71"/>
+<path id="t96_L12" data-src="0xaaaaef633c60" data-dst="0xaaaaef4c7b20" d="M 246.15 1095.62 L 246.15 1046.15"/>
+<path id="t98_L12" data-src="0xaaaaef665ac0" data-dst="0xaaaaef2cc060" d="M 357.18 1218.71 L 307.69 1169.23"/>
+<path id="t164_L12" data-src="0xaaaaef7ec940" data-dst="0xaaaaef2f5f20" d="M 727.94 1343.33 L 676.92 1292.31"/>
+<path id="t166_L12" data-src="0xaaaaef7ee420" data-dst="0xaaaaef7ec940" d="M 778.96 1394.34 L 741.05 1356.44 L 740.49 1355.87 L 740.00 1355.39 L 739.58 1354.97 L 739.22 1354.60 L 738.88 1354.27 L 738.57 1353.96 L 738.27 1353.65 L 737.95 1353.34 L 737.61 1353.00 L 737.23 1352.62 L 727.94 1343.33"/>
+<path id="t169_L12" data-src="0xaaaaef7efd70" data-dst="0xaaaaef7f0000" d="M 880.99 1496.38 L 864.13 1479.51 L 863.56 1478.95 L 863.08 1478.46 L 862.66 1478.05 L 862.29 1477.68 L 861.96 1477.35 L 861.65 1477.03 L 861.34 1476.73 L 861.03 1476.41 L 860.69 1476.07 L 829.98 1445.36"/>
+<path id="t170_L12" data-src="0xaaaaef7f0000" data-dst="0xaaaaef7ee420" d="M 829.98 1445.36 L 802.59 1417.97 L 802.02 1417.41 L 801.54 1416.93 L 801.12 1416.51 L 800.75 1416.14 L 800.42 1415.81 L 800.11 1415.50 L 799.81 1415.19 L 799.49 1414.87 L 799.15 1414.53 L 778.96 1394.34"/>
+<path id="t171_L12" data-src="0xaaaaef7f18a0" data-dst="0xaaaaef7efd70" d="M 932.01 1547.40 L 925.67 1541.05 L 925.10 1540.49 L 924.62 1540.00 L 924.20 1539.58 L 923.83 1539.22 L 923.50 1538.88 L 923.19 1538.57 L 922.88 1538.27 L 922.57 1537.95 L 922.23 1537.61 L 880.99 1496.38"/>
+<path id="t173_L12" data-src="0xaaaaef7f3500" data-dst="0xaaaaef7f18a0" d="M 983.03 1598.41 L 982.95 1598.33 L 932.01 1547.40"/>
+<path id="t175_L12" data-src="0xaaaaef7f4f00" data-dst="0xaaaaef7f3500" d="M 1034.05 1649.43 L 987.21 1602.59 L 986.64 1602.02 L 986.16 1601.54 L 985.74 1601.12 L 985.37 1600.75 L 985.04 1600.42 L 984.73 1600.11 L 984.42 1599.81 L 984.11 1599.49 L 983.76 1599.15 L 983.03 1598.41"/>
+<path id="t176_L12" data-src="0xaaaaef7f5050" data-dst="0xaaaaef7f4f00" d="M 1085.06 1700.45 L 1048.74 1664.13 L 1048.18 1663.56 L 1047.69 1663.08 L 1047.28 1662.66 L 1046.91 1662.29 L 1046.58 1661.96 L 1046.27 1661.65 L 1045.96 1661.34 L 1045.64 1661.03 L 1045.30 1660.69 L 1043.56 1658.95 L 1034.05 1649.43"/>
+<path id="t178_L12" data-src="0xaaaaef7f6a30" data-dst="0xaaaaef7f5050" d="M 1148.01 1723.08 L 1110.28 1723.08 L 1109.58 1723.07 L 1109.00 1723.06 L 1108.52 1723.01 L 1108.10 1722.91 L 1107.70 1722.76 L 1107.31 1722.53 L 1106.89 1722.21 L 1106.41 1721.78 L 1105.84 1721.22 L 1105.15 1720.53 L 1105.10 1720.49 L 1085.06 1700.45"/>
+<path id="t180_L12" data-src="0xaaaaef7f8560" data-dst="0xaaaaef7f6a30" d="M 1220.16 1723.08 L 1148.01 1723.08"/>
+</g>
+</g>
+<g id="stations">
+<circle cx="492.31" cy="861.54" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef1aba10" data-station-id="0200L8-CHABACANO"/>
+<circle cx="369.23" cy="923.08" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef1b2e80" data-station-id="0200L3-CENTROMEDICO"/>
+<circle cx="492.31" cy="800.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef1b5d40" data-station-id="0200L8-SALTOAGUA"/>
+<circle cx="615.38" cy="738.46" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef1b8e80" data-station-id="0200L1-CANDELARIA"/>
+<circle cx="615.38" cy="676.92" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2123a0" data-station-id="0200LB-TEPITO"/>
+<circle cx="676.92" cy="615.38" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef212570" data-station-id="0200L4-CANALNTE"/>
+<circle cx="123.08" cy="984.62" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef222d40" data-station-id="0200L1-OBSERVATORIO"/>
+<circle cx="184.62" cy="923.08" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef222ec0" data-station-id="0200L1-TACUBAYA"/>
+<circle cx="430.77" cy="769.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef223ea0" data-station-id="0200L3-JUAREZ"/>
+<circle cx="661.88" cy="969.58" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef223ff0" data-station-id="0200L8-COYUYA"/>
+<circle cx="307.69" cy="1101.36" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2779b0" data-station-id="0200L3-DIVISIONNTE"/>
+<circle cx="492.31" cy="738.46" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef279700" data-station-id="0200L8-BELLASARTES"/>
+<circle cx="492.31" cy="820.51" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef27d1d0" data-station-id="0200L8-DOCTORES"/>
+<circle cx="812.06" cy="664.87" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2af050" data-station-id="0200LB-ROMERORUBIO"/>
+<circle cx="177.91" cy="553.85" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2af160" data-station-id="0200L2-CUITLAHUAC"/>
+<circle cx="492.31" cy="841.03" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2afd10" data-station-id="0200L8-OBRERA"/>
+<circle cx="676.92" cy="1226.55" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2b0170" data-station-id="0200L8-ESCUADRON"/>
+<circle cx="676.92" cy="1160.79" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2b0340" data-station-id="0200L8-ACULCO"/>
+<circle cx="553.85" cy="738.46" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2cb8e0" data-station-id="0200L2-PINOSUAREZ"/>
+<circle cx="307.69" cy="1169.23" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2cc060" data-station-id="0200L3-ZAPATA"/>
+<circle cx="584.62" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2d3cc0" data-station-id="0200L1-MERCED"/>
+<circle cx="421.76" cy="870.55" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2ddda0" data-station-id="0200L9-LAZAROCAR"/>
+<circle cx="553.85" cy="861.54" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2ddee0" data-station-id="0200L8-LAVIGA"/>
+<circle cx="430.77" cy="738.46" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2e0010" data-station-id="0200L2-HIDALGO"/>
+<circle cx="713.85" cy="861.54" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2e1760" data-station-id="0200L9-VELODROMO"/>
+<circle cx="1169.23" cy="0.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2ea400" data-station-id="0200LB-CIUDADAZTECA"/>
+<circle cx="307.69" cy="1476.92" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2ea600" data-station-id="0200L3-UNIVERSIDAD"/>
+<circle cx="664.62" cy="861.54" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2eeae0" data-station-id="0200L9-MIXIUHCA"/>
+<circle cx="676.92" cy="1292.31" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2f5f20" data-station-id="020L12-ATLALILCO"/>
+<circle cx="615.38" cy="923.08" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2f60f0" data-station-id="0200L8-STAANITA"/>
+<circle cx="501.38" cy="421.70" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2f7a50" data-station-id="0200L3-POTRERO"/>
+<circle cx="492.31" cy="369.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2f7bf0" data-station-id="0200L6-LINDAVISTA"/>
+<circle cx="123.08" cy="553.85" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2fcdf0" data-station-id="0200L2-TACUBA"/>
+<circle cx="861.54" cy="615.38" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2fcf90" data-station-id="0200L5-OCEANIA"/>
+<circle cx="763.08" cy="861.54" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2fec00" data-station-id="0200L9-CIUDADDVA"/>
+<circle cx="272.71" cy="1134.25" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef2ffe10" data-station-id="020L12-HOSPITAL20"/>
+<circle cx="544.78" cy="809.07" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef300730" data-station-id="0200L2-SANANTONIO"/>
+<circle cx="812.31" cy="861.54" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef301b10" data-station-id="0200L9-PUEBLA"/>
+<circle cx="615.38" cy="800.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef301cb0" data-station-id="0200L4-FRAYSERVANDO"/>
+<circle cx="676.92" cy="1029.27" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef3044f0" data-station-id="0200L8-IZTACALCO"/>
+<circle cx="492.31" cy="1169.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef306690" data-station-id="0200L2-PORTALES"/>
+<circle cx="676.92" cy="553.85" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef3092f0" data-station-id="0200L4-CONSULADO"/>
+<circle cx="123.08" cy="307.69" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef309490" data-station-id="0200L6-TEZOZOMOC"/>
+<circle cx="123.08" cy="246.15" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef30ae20" data-station-id="0200L7-ELROSARIO"/>
+<circle cx="492.31" cy="676.92" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef30af90" data-station-id="0200LB-GARIBALDI"/>
+<circle cx="297.56" cy="369.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef3116e0" data-station-id="0200L6-NORTE45"/>
+<circle cx="230.96" cy="369.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef3117f0" data-station-id="0200L6-FERRERIA"/>
+<circle cx="492.31" cy="769.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef33d790" data-station-id="0200L8-SANJUANLETRAN"/>
+<circle cx="404.25" cy="888.06" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef3c8130" data-station-id="0200L3-HOSPITALGRAL"/>
+<circle cx="364.17" cy="369.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef3c9130" data-station-id="0200L6-VALLEJO"/>
+<circle cx="492.31" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef3f9c10" data-station-id="0200L2-GRALANAYA"/>
+<circle cx="492.31" cy="1230.77" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef3fb0c0" data-station-id="0200L2-ERMITA"/>
+<circle cx="135.45" cy="627.76" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef42cb00" data-station-id="0200L7-SANJOAQUIN"/>
+<circle cx="541.79" cy="541.79" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef42f070" data-station-id="0200L5-MISTERIOS"/>
+<circle cx="170.17" cy="354.79" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef42f240" data-station-id="0200L6-AZCAPOTZALCO"/>
+<circle cx="257.54" cy="626.77" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef45efc0" data-station-id="0200L2-COLMILITAR"/>
+<circle cx="184.62" cy="765.32" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef45fa60" data-station-id="0200L7-AUDITORIO"/>
+<circle cx="184.62" cy="686.44" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef45fce0" data-station-id="0200L7-POLANCO"/>
+<circle cx="492.31" cy="597.28" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef45ff70" data-station-id="0200L3-TLATELOLCO"/>
+<circle cx="492.31" cy="1353.85" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef462010" data-station-id="0200L2-TASQUENA"/>
+<circle cx="492.31" cy="984.62" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef491f60" data-station-id="0200L2-XOLA"/>
+<circle cx="597.28" cy="1230.77" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef494fb0" data-station-id="020L12-MEXICALTZINGO"/>
+<circle cx="331.78" cy="800.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef4c59a0" data-station-id="0200L1-INSURGENTES"/>
+<circle cx="184.62" cy="844.20" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef4c5eb0" data-station-id="0200L7-CONSTITUYENTES"/>
+<circle cx="246.15" cy="1046.15" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef4c7b20" data-station-id="020L12-MIXCOAC"/>
+<circle cx="184.62" cy="1169.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef4c7f50" data-station-id="0200L7-BARRANCA"/>
+<circle cx="0.00" cy="553.85" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef4c8120" data-station-id="0200L2-CUATROCAMIN"/>
+<circle cx="289.61" cy="818.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef4f8ac0" data-station-id="0200L1-SEVILLA"/>
+<circle cx="381.27" cy="800.00" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef4f8d20" data-station-id="0200L1-CUAUHTEMOC"/>
+<circle cx="923.08" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef4faef0" data-station-id="0200L8-CONST1917"/>
+<circle cx="1292.31" cy="1723.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef4fb030" data-station-id="020L12-TLAHUAC"/>
+<circle cx="219.61" cy="888.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef52bca0" data-station-id="0200L1-JUANACATLAN"/>
+<circle cx="606.94" cy="553.85" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef52de90" data-station-id="0200L5-VALLEGOMEZ"/>
+<circle cx="861.54" cy="652.26" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef5668d0" data-station-id="0200L5-TNALAEREA"/>
+<circle cx="254.61" cy="853.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef566d20" data-station-id="0200L1-CHAPULTEPEC"/>
+<circle cx="676.92" cy="1095.03" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef599c60" data-station-id="0200L8-APATLACO"/>
+<circle cx="492.31" cy="923.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef59bde0" data-station-id="0200L2-VIADUCTO"/>
+<circle cx="523.08" cy="769.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef5ced80" data-station-id="0200L1-ISABELLACA"/>
+<circle cx="492.31" cy="1046.15" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef5ffb80" data-station-id="0200L2-VILLADECORT"/>
+<circle cx="553.85" cy="676.92" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef601d20" data-station-id="0200LB-LAGUNILLA"/>
+<circle cx="422.33" cy="1230.77" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef631cf0" data-station-id="020L12-EJECENTRAL"/>
+<circle cx="492.31" cy="1107.69" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef632b20" data-station-id="0200L2-NATIVITAS"/>
+<circle cx="246.15" cy="1095.62" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef633c60" data-station-id="020L12-INSURGENTESSUR"/>
+<circle cx="615.38" cy="369.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef634cc0" data-station-id="0200L6-LAVILLA"/>
+<circle cx="1600.00" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef634e90" data-station-id="0200LA-LAPAZ"/>
+<circle cx="357.18" cy="1218.71" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef665ac0" data-station-id="020L12-PARQUEVENADOS"/>
+<circle cx="430.77" cy="676.92" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef666b00" data-station-id="0200LB-GUERRERO"/>
+<circle cx="615.38" cy="861.54" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef667dd0" data-station-id="0200L4-JAMAICA"/>
+<circle cx="307.69" cy="1033.49" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef697be0" data-station-id="0200L3-EUGENIA"/>
+<circle cx="533.33" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef6cab50" data-station-id="0200L2-ZOCALO"/>
+<circle cx="430.77" cy="800.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef6cdba0" data-station-id="0200L1-BALDERAS"/>
+<circle cx="923.08" cy="861.54" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef6cdd40" data-station-id="0200L5-PANTITLAN"/>
+<circle cx="676.92" cy="676.92" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef700b40" data-station-id="0200LB-MORELOS"/>
+<circle cx="430.77" cy="369.23" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef700d10" data-station-id="0200L5-ITOPETROLEO"/>
+<circle cx="296.31" cy="665.54" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef730a90" data-station-id="0200L2-NORMAL"/>
+<circle cx="335.08" cy="704.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef730ba0" data-station-id="0200L2-SANCOSME"/>
+<circle cx="676.92" cy="369.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef733ae0" data-station-id="0200L4-MARTINCARR"/>
+<circle cx="369.23" cy="676.92" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef733c50" data-station-id="0200LB-BUENAVISTA"/>
+<circle cx="375.94" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef763a30" data-station-id="0200L2-REVOLUCION"/>
+<circle cx="321.24" cy="971.07" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7648e0" data-station-id="0200L3-ETIOPIA"/>
+<circle cx="492.31" cy="492.31" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef766a80" data-station-id="0200L5-LARAZA"/>
+<circle cx="553.85" cy="369.23" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef766c20" data-station-id="0200L6-DTVO18MARZO"/>
+<circle cx="439.84" cy="439.84" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7988c0" data-station-id="0200L5-AUTOBUSESNTE"/>
+<circle cx="746.90" cy="676.92" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7989d0" data-station-id="0200LB-RFLORESMAGON"/>
+<circle cx="430.77" cy="307.69" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef799a20" data-station-id="0200L5-POLITECNICO"/>
+<circle cx="615.38" cy="307.69" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef799b90" data-station-id="0200L3-INDIOSVERD"/>
+<circle cx="512.82" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7cb9f0" data-station-id="0200L2-ALLENDE"/>
+<circle cx="218.76" cy="587.99" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7cca90" data-station-id="0200L2-POPOTLA"/>
+<circle cx="861.54" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7cd1a0" data-station-id="0200L8-UAM-I"/>
+<circle cx="861.54" cy="689.13" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7cdf00" data-station-id="0200L5-HANGARES"/>
+<circle cx="307.69" cy="1230.77" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7cec40" data-station-id="0200L3-COYOACAN"/>
+<circle cx="861.54" cy="726.00" r="6.00" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7cfb10" data-station-id="0200L5-PANTITLAN"/>
+<circle cx="307.69" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d0890" data-station-id="0200L3-VIVEROS"/>
+<circle cx="836.61" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d1630" data-station-id="0200L1-ZARAGOZA"/>
+<circle cx="307.69" cy="1353.85" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d22e0" data-station-id="0200L3-MAQ"/>
+<circle cx="799.74" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d3180" data-station-id="0200L1-GOMEZFARIAS"/>
+<circle cx="307.69" cy="1415.38" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d3dd0" data-station-id="0200L3-COPILCO"/>
+<circle cx="726.00" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d4a70" data-station-id="0200L1-BALBUENA"/>
+<circle cx="762.87" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d4cd0" data-station-id="0200L1-PTOAEREO"/>
+<circle cx="689.13" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d65c0" data-station-id="0200L1_MOCTEZUMA"/>
+<circle cx="652.26" cy="738.46" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d81e0" data-station-id="0200L1-SANLAZARO"/>
+<circle cx="909.28" cy="567.64" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d91a0" data-station-id="0200LB-DPVOOCEANIA"/>
+<circle cx="676.92" cy="430.77" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7d9d30" data-station-id="0200L4-TALISMAN"/>
+<circle cx="957.02" cy="519.90" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7dac20" data-station-id="0200LB-BOSQUEARAGON"/>
+<circle cx="1004.76" cy="472.16" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7dc760" data-station-id="0200LB-VILLAARAGON"/>
+<circle cx="676.92" cy="492.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7dd260" data-station-id="0200L4-BONDOJITO"/>
+<circle cx="812.06" cy="565.90" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7dd3b0" data-station-id="0200L5-ARAGON"/>
+<circle cx="1052.50" cy="424.42" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7de350" data-station-id="0200LB-NEZAHUALCO"/>
+<circle cx="746.90" cy="553.85" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7dee60" data-station-id="0200L5-EDUARDOMOLI"/>
+<circle cx="1100.24" cy="376.68" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7dfc20" data-station-id="0200LB-IMPULSORA"/>
+<circle cx="1147.98" cy="328.94" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7dfd90" data-station-id="0200LB-RIOREMEDIOS"/>
+<circle cx="123.08" cy="369.23" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e09b0" data-station-id="0200L7-AQUILESSERD"/>
+<circle cx="1169.23" cy="270.06" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e1880" data-station-id="0200LB-MUZQUIZ"/>
+<circle cx="123.08" cy="430.77" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e2540" data-station-id="0200L7-CAMARONES"/>
+<circle cx="1169.23" cy="135.03" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e3280" data-station-id="0200LB-OLIMPICA"/>
+<circle cx="1169.23" cy="202.55" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e3500" data-station-id="0200LB-ECATEPEC"/>
+<circle cx="61.54" cy="553.85" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e3f20" data-station-id="0200L2-PANTEONES"/>
+<circle cx="1169.23" cy="67.52" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e4ee0" data-station-id="0200LB-PLAZAARAGON"/>
+<circle cx="123.08" cy="492.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e5c00" data-station-id="0200L7-REFINERIA"/>
+<circle cx="184.62" cy="984.62" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e7770" data-station-id="0200L7-SANPEDROPINOS"/>
+<circle cx="933.56" cy="933.56" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e84e0" data-station-id="0200LA-AGRICOLA"/>
+<circle cx="184.62" cy="1046.15" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7e92f0" data-station-id="0200L7-SANANTONIO"/>
+<circle cx="1005.59" cy="1005.59" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7ea0d0" data-station-id="0200LA-CANALSANJUAN"/>
+<circle cx="184.62" cy="1107.69" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7eae50" data-station-id="020L12-MIXCOAC"/>
+<circle cx="1149.64" cy="1149.64" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7eba70" data-station-id="0200LA-GUELATAO"/>
+<circle cx="1077.61" cy="1077.61" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7ebce0" data-station-id="0200LA-TEPALCATES"/>
+<circle cx="727.94" cy="1343.33" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7ec940" data-station-id="020L12-CULHUACAN"/>
+<circle cx="1294.42" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7ed5a0" data-station-id="0200LA-ACATITLA"/>
+<circle cx="778.96" cy="1394.34" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7ee420" data-station-id="020L12-SANANDRESTO"/>
+<circle cx="1396.28" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7ef0d0" data-station-id="0200LA-STAMARTA"/>
+<circle cx="1221.66" cy="1221.66" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7ef2f0" data-station-id="0200LA-PENONVIEJO"/>
+<circle cx="880.99" cy="1496.38" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7efd70" data-station-id="020L12-CALLE11"/>
+<circle cx="829.98" cy="1445.36" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f0000" data-station-id="020L12-LOMASESTRELLA"/>
+<circle cx="932.01" cy="1547.40" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f18a0" data-station-id="020L12-PERIFERICOOTE"/>
+<circle cx="1498.14" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f27c0" data-station-id="0200LA-LOSREYES"/>
+<circle cx="983.03" cy="1598.41" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f3500" data-station-id="020L12-TEZONCO"/>
+<circle cx="430.77" cy="849.52" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f4260" data-station-id="0200L3-NINOSHEROES"/>
+<circle cx="1034.05" cy="1649.43" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f4f00" data-station-id="020L12-OLIVOS"/>
+<circle cx="1085.06" cy="1700.45" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f5050" data-station-id="020L12-NOPALERA"/>
+<circle cx="246.15" cy="923.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f5d90" data-station-id="0200L9-PATRIOTISMO"/>
+<circle cx="1148.01" cy="1723.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f6a30" data-station-id="020L12-ZAPOTITLAN"/>
+<circle cx="307.69" cy="923.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f7950" data-station-id="0200L9-CHILPANCINGO"/>
+<circle cx="1220.16" cy="1723.08" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7f8560" data-station-id="020L12-TLALTENCO"/>
+<circle cx="738.46" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7fa090" data-station-id="0200L8-IZTAPALAPA"/>
+<circle cx="800.00" cy="1292.31" r="4.20" fill="var(--map-station-fill, #ffffff)" stroke="var(--map-station-stroke, #111111)" stroke-width="2.20" data-node="0xaaaaef7fbbc0" data-station-id="0200L8-CERROESTRELLA"/>
+</g>
+<g id="labels" font-size="11.0" fill="var(--map-label, #111111)">
+<text x="479.51" y="874.34" text-anchor="end" data-node="0xaaaaef1aba10" transform="rotate(-45 479.51 874.34)">Chabacano</text>
+<text x="173.79" y="916.83" text-anchor="end" data-node="0xaaaaef222ec0" transform="rotate(30 173.79 916.83)">Tacubaya</text>
+<text x="382.03" y="935.88" text-anchor="start" data-node="0xaaaaef1b2e80" transform="rotate(45 382.03 935.88)">Centro Médico</text>
+<text x="627.76" y="750.84" text-anchor="start" data-node="0xaaaaef1b8e80" transform="rotate(45 627.76 750.84)">Candelaria</text>
+<text x="512.88" y="726.59" text-anchor="start" data-node="0xaaaaef279700" transform="rotate(-30 512.88 726.59)">Bellas Artes</text>
+<text x="569.00" y="729.71" text-anchor="start" data-node="0xaaaaef2cb8e0" transform="rotate(-30 569.00 729.71)">Pino Suárez</text>
+<text x="320.19" y="1169.23" text-anchor="start" data-node="0xaaaaef2cc060">Zapata</text>
+<text x="403.66" y="870.55" text-anchor="end" data-node="0xaaaaef2ddda0">Lázaro Cárdenas</text>
+<text x="566.64" y="848.74" text-anchor="start" data-node="0xaaaaef2ddee0" transform="rotate(-45 566.64 848.74)">La Viga</text>
+<text x="443.14" y="726.09" text-anchor="start" data-node="0xaaaaef2e0010" transform="rotate(-45 443.14 726.09)">Hidalgo</text>
+<text x="668.08" y="1301.15" text-anchor="end" data-node="0xaaaaef2f5f20" transform="rotate(-45 668.08 1301.15)">Atlalilco</text>
+<text x="627.88" y="923.08" text-anchor="start" data-node="0xaaaaef2f60f0">Santa Anita</text>
+<text x="135.45" y="541.47" text-anchor="start" data-node="0xaaaaef2fcdf0" transform="rotate(-45 135.45 541.47)">Tacuba</text>
+<text x="870.38" y="624.22" text-anchor="start" data-node="0xaaaaef2fcf90" transform="rotate(45 870.38 624.22)">Oceanía</text>
+<text x="689.30" y="541.47" text-anchor="start" data-node="0xaaaaef3092f0" transform="rotate(-45 689.30 541.47)">Consulado</text>
+<text x="141.18" y="307.69" text-anchor="start" data-node="0xaaaaef309490">Tezozómoc</text>
+<text x="141.18" y="246.15" text-anchor="start" data-node="0xaaaaef30ae20">El Rosario</text>
+<text x="501.15" y="668.08" text-anchor="start" data-node="0xaaaaef30af90" transform="rotate(-45 501.15 668.08)">Garibaldi y Lagunilla</text>
+<text x="386.15" y="888.06" text-anchor="end" data-node="0xaaaaef3c8130">Hospital General</text>
+<text x="504.68" y="1218.39" text-anchor="start" data-node="0xaaaaef3fb0c0" transform="rotate(-45 504.68 1218.39)">Ermita</text>
+<text x="421.93" y="668.08" text-anchor="end" data-node="0xaaaaef666b00" transform="rotate(45 421.93 668.08)">Guerrero</text>
+<text x="627.76" y="849.16" text-anchor="start" data-node="0xaaaaef667dd0" transform="rotate(-45 627.76 849.16)">Jamaica</text>
+<text x="443.14" y="787.63" text-anchor="start" data-node="0xaaaaef6cdba0" transform="rotate(-45 443.14 787.63)">Balderas</text>
+<text x="935.88" y="848.74" text-anchor="start" data-node="0xaaaaef6cdd40" transform="rotate(-45 935.88 848.74)">Pantitlán</text>
+<text x="683.17" y="687.75" text-anchor="start" data-node="0xaaaaef700b40" transform="rotate(60 683.17 687.75)">Morelos</text>
+<text x="443.14" y="356.86" text-anchor="start" data-node="0xaaaaef700d10" transform="rotate(-45 443.14 356.86)">Instituto del Petróleo</text>
+<text x="504.81" y="492.31" text-anchor="start" data-node="0xaaaaef766a80">La Raza</text>
+<text x="560.10" y="380.06" text-anchor="start" data-node="0xaaaaef766c20" transform="rotate(60 560.10 380.06)">Deportivo 18 de Marzo</text>
+<text x="870.38" y="734.83" text-anchor="start" data-node="0xaaaaef7cfb10" transform="rotate(45 870.38 734.83)">Pantitlán</text>
+<text x="624.22" y="668.08" text-anchor="start" data-node="0xaaaaef2123a0" transform="rotate(-45 624.22 668.08)">Tepito</text>
+<text x="689.42" y="615.38" text-anchor="start" data-node="0xaaaaef212570">Canal del Norte</text>
+<text x="110.58" y="984.62" text-anchor="end" data-node="0xaaaaef222d40">Observatorio</text>
+<text x="418.27" y="769.23" text-anchor="end" data-node="0xaaaaef223ea0">Juárez</text>
+<text x="674.38" y="969.58" text-anchor="start" data-node="0xaaaaef223ff0">Coyuya</text>
+<text x="320.19" y="1101.36" text-anchor="start" data-node="0xaaaaef2779b0">División del Norte</text>
+<text x="799.56" y="664.87" text-anchor="end" data-node="0xaaaaef2af050">Romero Rubio</text>
+<text x="186.75" y="545.01" text-anchor="start" data-node="0xaaaaef2af160" transform="rotate(-45 186.75 545.01)">Cuitláhuac</text>
+<text x="479.81" y="841.03" text-anchor="end" data-node="0xaaaaef2afd10">Obrera</text>
+<text x="689.42" y="1226.55" text-anchor="start" data-node="0xaaaaef2b0170">Escuadrón 201</text>
+<text x="689.42" y="1160.79" text-anchor="start" data-node="0xaaaaef2b0340">Aculco</text>
+<text x="584.62" y="757.21" text-anchor="middle" data-node="0xaaaaef2d3cc0">Merced</text>
+<text x="722.68" y="852.70" text-anchor="start" data-node="0xaaaaef2e1760" transform="rotate(-45 722.68 852.70)">Velódromo</text>
+<text x="1181.73" y="0.00" text-anchor="start" data-node="0xaaaaef2ea400">Ciudad Azteca</text>
+<text x="320.19" y="1476.92" text-anchor="start" data-node="0xaaaaef2ea600">Universidad</text>
+<text x="673.45" y="852.70" text-anchor="start" data-node="0xaaaaef2eeae0" transform="rotate(-45 673.45 852.70)">Mixiuhca</text>
+<text x="488.88" y="421.70" text-anchor="end" data-node="0xaaaaef2f7a50">Potrero</text>
+<text x="501.15" y="360.39" text-anchor="start" data-node="0xaaaaef2f7bf0" transform="rotate(-45 501.15 360.39)">Lindavista</text>
+<text x="771.92" y="852.70" text-anchor="start" data-node="0xaaaaef2fec00" transform="rotate(-45 771.92 852.70)">Ciudad Deportiva</text>
+<text x="263.87" y="1143.09" text-anchor="end" data-node="0xaaaaef2ffe10" transform="rotate(-45 263.87 1143.09)">Hospital 20 de Noviembre</text>
+<text x="821.15" y="852.70" text-anchor="start" data-node="0xaaaaef301b10" transform="rotate(-45 821.15 852.70)">Puebla</text>
+<text x="689.42" y="1029.27" text-anchor="start" data-node="0xaaaaef3044f0">Iztacalco</text>
+<text x="504.81" y="1169.23" text-anchor="start" data-node="0xaaaaef306690">Portales</text>
+<text x="306.40" y="360.39" text-anchor="start" data-node="0xaaaaef3116e0" transform="rotate(-45 306.40 360.39)">Norte 45</text>
+<text x="239.80" y="360.39" text-anchor="start" data-node="0xaaaaef3117f0" transform="rotate(-45 239.80 360.39)">Ferrería y Arena Ciudad de México</text>
+<text x="373.00" y="360.39" text-anchor="start" data-node="0xaaaaef3c9130" transform="rotate(-45 373.00 360.39)">Vallejo</text>
+<text x="504.81" y="1292.31" text-anchor="start" data-node="0xaaaaef3f9c10">General Anaya</text>
+<text x="147.95" y="627.76" text-anchor="start" data-node="0xaaaaef42cb00">San Joaquín</text>
+<text x="550.63" y="532.95" text-anchor="start" data-node="0xaaaaef42f070" transform="rotate(-45 550.63 532.95)">Misterios</text>
+<text x="179.01" y="345.95" text-anchor="start" data-node="0xaaaaef42f240" transform="rotate(-45 179.01 345.95)">UAM Azcapotzalco</text>
+<text x="270.04" y="626.77" text-anchor="start" data-node="0xaaaaef45efc0">Colegio Militar</text>
+<text x="197.12" y="765.32" text-anchor="start" data-node="0xaaaaef45fa60">Auditorio</text>
+<text x="197.12" y="686.44" text-anchor="start" data-node="0xaaaaef45fce0">Polanco</text>
+<text x="479.81" y="597.28" text-anchor="end" data-node="0xaaaaef45ff70">Tlatelolco</text>
+<text x="504.81" y="1353.85" text-anchor="start" data-node="0xaaaaef462010">Tasqueña</text>
+<text x="504.81" y="984.62" text-anchor="start" data-node="0xaaaaef491f60">Xola</text>
+<text x="606.12" y="1221.93" text-anchor="start" data-node="0xaaaaef494fb0" transform="rotate(-45 606.12 1221.93)">Mexicaltzingo</text>
+<text x="322.94" y="791.16" text-anchor="end" data-node="0xaaaaef4c59a0" transform="rotate(45 322.94 791.16)">Insurgentes</text>
+<text x="172.12" y="844.20" text-anchor="end" data-node="0xaaaaef4c5eb0">Constituyentes</text>
+<text x="254.99" y="1037.32" text-anchor="start" data-node="0xaaaaef4c7b20" transform="rotate(-45 254.99 1037.32)">Mixcoac</text>
+<text x="172.12" y="1169.23" text-anchor="end" data-node="0xaaaaef4c7f50">Barranca del Muerto</text>
+<text x="8.84" y="545.01" text-anchor="start" data-node="0xaaaaef4c8120" transform="rotate(-45 8.84 545.01)">Cuatro Caminos</text>
+<text x="298.45" y="826.92" text-anchor="start" data-node="0xaaaaef4f8ac0" transform="rotate(45 298.45 826.92)">Sevilla</text>
+<text x="372.44" y="791.16" text-anchor="end" data-node="0xaaaaef4f8d20" transform="rotate(45 372.44 791.16)">Cuauhtémoc</text>
+<text x="931.92" y="1283.47" text-anchor="start" data-node="0xaaaaef4faef0" transform="rotate(-45 931.92 1283.47)">Constitución de 1917</text>
+<text x="1301.15" y="1714.24" text-anchor="start" data-node="0xaaaaef4fb030" transform="rotate(-45 1301.15 1714.24)">Tláhuac</text>
+<text x="235.86" y="859.93" text-anchor="start" data-node="0xaaaaef52bca0" transform="rotate(-60 235.86 859.93)">Juanacatlán</text>
+<text x="615.78" y="545.01" text-anchor="start" data-node="0xaaaaef52de90" transform="rotate(-45 615.78 545.01)">Valle Gómez</text>
+<text x="852.70" y="661.09" text-anchor="end" data-node="0xaaaaef5668d0" transform="rotate(-45 852.70 661.09)">Terminal Aérea</text>
+<text x="689.42" y="1095.03" text-anchor="start" data-node="0xaaaaef599c60">Apatlaco</text>
+<text x="504.81" y="923.08" text-anchor="start" data-node="0xaaaaef59bde0">Viaducto</text>
+<text x="504.81" y="1046.15" text-anchor="start" data-node="0xaaaaef5ffb80">Villa de Cortés</text>
+<text x="562.68" y="668.08" text-anchor="start" data-node="0xaaaaef601d20" transform="rotate(-45 562.68 668.08)">Lagunilla</text>
+<text x="431.17" y="1221.93" text-anchor="start" data-node="0xaaaaef631cf0" transform="rotate(-45 431.17 1221.93)">Eje Central</text>
+<text x="504.81" y="1107.69" text-anchor="start" data-node="0xaaaaef632b20">Nativitas</text>
+<text x="624.22" y="360.39" text-anchor="start" data-node="0xaaaaef634cc0" transform="rotate(-45 624.22 360.39)">La Villa y Basílica</text>
+<text x="1608.84" y="1283.47" text-anchor="start" data-node="0xaaaaef634e90" transform="rotate(-45 1608.84 1283.47)">La Paz</text>
+<text x="366.01" y="1209.88" text-anchor="start" data-node="0xaaaaef665ac0" transform="rotate(-45 366.01 1209.88)">Parque de los Venados</text>
+<text x="320.19" y="1033.49" text-anchor="start" data-node="0xaaaaef697be0">Eugenia</text>
+<text x="563.39" y="768.51" text-anchor="start" data-node="0xaaaaef6cab50" transform="rotate(45 563.39 768.51)">Zócalo</text>
+<text x="308.81" y="665.54" text-anchor="start" data-node="0xaaaaef730a90">Normal</text>
+<text x="347.58" y="704.31" text-anchor="start" data-node="0xaaaaef730ba0">San Cosme</text>
+<text x="689.42" y="369.23" text-anchor="start" data-node="0xaaaaef733ae0">Martín Carrera</text>
+<text x="321.60" y="704.42" text-anchor="end" data-node="0xaaaaef733c50" transform="rotate(-30 321.60 704.42)">Buenavista</text>
+<text x="375.94" y="820.96" text-anchor="middle" data-node="0xaaaaef763a30">Revolución</text>
+<text x="431.00" y="448.68" text-anchor="end" data-node="0xaaaaef7988c0" transform="rotate(-45 431.00 448.68)">Autobuses del Norte</text>
+<text x="746.90" y="644.42" text-anchor="middle" data-node="0xaaaaef7989d0">Ricardo Flores Magón</text>
+<text x="418.27" y="307.69" text-anchor="end" data-node="0xaaaaef799a20">Politécnico</text>
+<text x="624.22" y="298.85" text-anchor="start" data-node="0xaaaaef799b90" transform="rotate(-45 624.22 298.85)">Indios Verdes</text>
+<text x="231.26" y="587.99" text-anchor="start" data-node="0xaaaaef7cca90">Popotla</text>
+<text x="870.38" y="1283.47" text-anchor="start" data-node="0xaaaaef7cd1a0" transform="rotate(-45 870.38 1283.47)">UAM-I</text>
+<text x="874.04" y="689.13" text-anchor="start" data-node="0xaaaaef7cdf00">Hangares</text>
+<text x="295.19" y="1230.77" text-anchor="end" data-node="0xaaaaef7cec40">Coyoacán</text>
+<text x="295.19" y="1292.31" text-anchor="end" data-node="0xaaaaef7d0890">Viveros y  Derechos Humanos</text>
+<text x="830.36" y="749.29" text-anchor="end" data-node="0xaaaaef7d1630" transform="rotate(-60 830.36 749.29)">Zaragoza</text>
+<text x="320.19" y="1353.85" text-anchor="start" data-node="0xaaaaef7d22e0">Miguel Ángel de Quevedo</text>
+<text x="787.36" y="750.84" text-anchor="end" data-node="0xaaaaef7d3180" transform="rotate(-45 787.36 750.84)">Gómez Farías</text>
+<text x="320.19" y="1415.38" text-anchor="start" data-node="0xaaaaef7d3dd0">Copilco</text>
+<text x="734.83" y="729.62" text-anchor="start" data-node="0xaaaaef7d4a70" transform="rotate(-45 734.83 729.62)">Balbuena</text>
+<text x="750.49" y="750.84" text-anchor="end" data-node="0xaaaaef7d4cd0" transform="rotate(-45 750.49 750.84)">Boulevard Puerto Aéreo</text>
+<text x="689.13" y="757.21" text-anchor="middle" data-node="0xaaaaef7d65c0">Moctezuma</text>
+<text x="918.12" y="576.48" text-anchor="start" data-node="0xaaaaef7d91a0" transform="rotate(45 918.12 576.48)">Deportivo Oceanía</text>
+<text x="689.42" y="430.77" text-anchor="start" data-node="0xaaaaef7d9d30">Talismán</text>
+<text x="944.52" y="519.90" text-anchor="end" data-node="0xaaaaef7dac20">Bosque de Aragón</text>
+<text x="992.26" y="472.16" text-anchor="end" data-node="0xaaaaef7dc760">Villa de Aragón</text>
+<text x="687.75" y="486.06" text-anchor="start" data-node="0xaaaaef7dd260" transform="rotate(-30 687.75 486.06)">Bondojito</text>
+<text x="820.89" y="557.06" text-anchor="start" data-node="0xaaaaef7dd3b0" transform="rotate(-45 820.89 557.06)">Aragón</text>
+<text x="1040.00" y="424.42" text-anchor="end" data-node="0xaaaaef7de350">Nezahualcóyotl</text>
+<text x="755.74" y="545.01" text-anchor="start" data-node="0xaaaaef7dee60" transform="rotate(-45 755.74 545.01)">Eduardo Molina</text>
+<text x="1087.74" y="376.68" text-anchor="end" data-node="0xaaaaef7dfc20">Impulsora</text>
+<text x="1135.48" y="328.94" text-anchor="end" data-node="0xaaaaef7dfd90">Río de los Remedios</text>
+<text x="110.58" y="369.23" text-anchor="end" data-node="0xaaaaef7e09b0">Aquiles Serdán</text>
+<text x="1181.73" y="270.06" text-anchor="start" data-node="0xaaaaef7e1880">Múzquiz</text>
+<text x="135.58" y="430.77" text-anchor="start" data-node="0xaaaaef7e2540">Camarones</text>
+<text x="1181.73" y="135.03" text-anchor="start" data-node="0xaaaaef7e3280">Olímpica</text>
+<text x="1181.73" y="202.55" text-anchor="start" data-node="0xaaaaef7e3500">Ecatepec</text>
+<text x="70.38" y="545.01" text-anchor="start" data-node="0xaaaaef7e3f20" transform="rotate(-45 70.38 545.01)">Panteones</text>
+<text x="1181.73" y="67.52" text-anchor="start" data-node="0xaaaaef7e4ee0">Plaza Aragón</text>
+<text x="135.58" y="492.31" text-anchor="start" data-node="0xaaaaef7e5c00">Refinería</text>
+<text x="175.78" y="993.45" text-anchor="end" data-node="0xaaaaef7e7770" transform="rotate(-45 175.78 993.45)">San Pedro de los Pinos</text>
+<text x="946.06" y="933.56" text-anchor="start" data-node="0xaaaaef7e84e0">Agrícola Oriental</text>
+<text x="175.78" y="1054.99" text-anchor="end" data-node="0xaaaaef7e92f0" transform="rotate(-45 175.78 1054.99)">San Antonio</text>
+<text x="1018.09" y="1005.59" text-anchor="start" data-node="0xaaaaef7ea0d0">Canal de San Juan</text>
+<text x="175.78" y="1116.53" text-anchor="end" data-node="0xaaaaef7eae50" transform="rotate(-45 175.78 1116.53)">Mixcoac</text>
+<text x="1162.14" y="1149.64" text-anchor="start" data-node="0xaaaaef7eba70">Guelatao</text>
+<text x="1090.11" y="1077.61" text-anchor="start" data-node="0xaaaaef7ebce0">Tepalcates</text>
+<text x="740.44" y="1343.33" text-anchor="start" data-node="0xaaaaef7ec940">Culhuacán</text>
+<text x="1303.26" y="1283.47" text-anchor="start" data-node="0xaaaaef7ed5a0" transform="rotate(-45 1303.26 1283.47)">Acatitla</text>
+<text x="791.46" y="1394.34" text-anchor="start" data-node="0xaaaaef7ee420">San Andrés Tomatlán</text>
+<text x="1405.12" y="1283.47" text-anchor="start" data-node="0xaaaaef7ef0d0" transform="rotate(-45 1405.12 1283.47)">Santa Marta</text>
+<text x="1234.16" y="1221.66" text-anchor="start" data-node="0xaaaaef7ef2f0">Penón Viejo</text>
+<text x="893.49" y="1496.38" text-anchor="start" data-node="0xaaaaef7efd70">Calle 11</text>
+<text x="842.48" y="1445.36" text-anchor="start" data-node="0xaaaaef7f0000">Lomas Estrella</text>
+<text x="944.51" y="1547.40" text-anchor="start" data-node="0xaaaaef7f18a0">Periférico Oriente</text>
+<text x="1506.98" y="1283.47" text-anchor="start" data-node="0xaaaaef7f27c0" transform="rotate(-45 1506.98 1283.47)">Los Reyes</text>
+<text x="995.53" y="1598.41" text-anchor="start" data-node="0xaaaaef7f3500">Tezonco</text>
+<text x="1046.55" y="1649.43" text-anchor="start" data-node="0xaaaaef7f4f00">Olivos</text>
+<text x="1093.90" y="1691.61" text-anchor="start" data-node="0xaaaaef7f5050" transform="rotate(-45 1093.90 1691.61)">Nopalera</text>
+<text x="252.40" y="912.25" text-anchor="start" data-node="0xaaaaef7f5d90" transform="rotate(-60 252.40 912.25)">Patriotismo</text>
+<text x="1156.85" y="1714.24" text-anchor="start" data-node="0xaaaaef7f6a30" transform="rotate(-45 1156.85 1714.24)">Zapotitlán</text>
+<text x="301.44" y="933.90" text-anchor="end" data-node="0xaaaaef7f7950" transform="rotate(-60 301.44 933.90)">Chilpancingo</text>
+<text x="1229.00" y="1714.24" text-anchor="start" data-node="0xaaaaef7f8560" transform="rotate(-45 1229.00 1714.24)">Tlaltenco</text>
+<text x="747.30" y="1283.47" text-anchor="start" data-node="0xaaaaef7fa090" transform="rotate(-45 747.30 1283.47)">Iztapalapa</text>
+<text x="808.84" y="1283.47" text-anchor="start" data-node="0xaaaaef7fbbc0" transform="rotate(-45 808.84 1283.47)">Cerro de la Estrella</text>
+<text x="504.18" y="820.57" text-anchor="start" data-node="0xaaaaef1b5d40" transform="rotate(60 504.18 820.57)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Salto del Agua</text>
+<text x="479.81" y="820.51" text-anchor="end" data-node="0xaaaaef27d1d0" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Doctores</text>
+<text x="615.38" y="882.50" text-anchor="middle" data-node="0xaaaaef301cb0" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Fray Servando</text>
+<text x="260.86" y="842.26" text-anchor="start" data-node="0xaaaaef566d20" transform="rotate(-60 260.86 842.26)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Chapultepec</text>
+<text x="495.58" y="721.60" text-anchor="end" data-node="0xaaaaef5ced80" transform="rotate(60 495.58 721.60)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Isabel la Católica</text>
+<text x="256.98" y="1101.87" text-anchor="start" data-node="0xaaaaef633c60" transform="rotate(30 256.98 1101.87)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Insurgentes Sur</text>
+<text x="330.08" y="979.91" text-anchor="start" data-node="0xaaaaef7648e0" transform="rotate(45 330.08 979.91)" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Etiopía y Plaza de la Transparencia</text>
+<text x="512.82" y="757.21" text-anchor="middle" data-node="0xaaaaef7cb9f0" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">Allende</text>
+<text x="652.26" y="725.96" text-anchor="middle" data-node="0xaaaaef7d81e0" stroke="var(--map-bg, #ffffff)" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">San Lázaro</text>
+</g>
+<g id="trains"></g>
+</svg>
