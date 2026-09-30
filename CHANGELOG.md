@@ -5,6 +5,26 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [Unreleased]
+
+### Changed
+
+- **The route lines glow.** Every map the engine draws, running or in the
+  essay, now finishes its lines as lit tubes in the dark theme (a bloom in
+  the line's own colour, a deeper rim, a white core, a gap where lines
+  cross) and as raised ribbons in sepia (a white edge and a soft shadow).
+  The lines draw themselves in when a page opens, and a light runs along
+  each now and then. `page/routes.css` and `page/routes.js` hold it; the
+  animation page inlines both and the site serves them. Nothing moves in an
+  export: a page opened with a `frame`, or put into capture, is still, and
+  so is one opened by a reader who asked for reduced motion. The atlas's
+  thumbnails keep the plain lines.
+- **The essay's maps are sized to the device.** A map breaks out of the
+  prose measure as far as the screen allows (up to 1100px, 1240px on a
+  large display), the animated maps sit in a 16:9 frame on a desktop, 3:2
+  on a tablet and 4:5 at the full width of a phone, and the side-by-side
+  comparisons stand taller. No map is taller than the screen.
+
 ## [0.10.1] - 2026-09-29
 
 ### Fixed

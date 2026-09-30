@@ -692,3 +692,102 @@ blockquote p:last-child {
     margin-bottom: 2.3rem;
   }
 }
+
+/* Maps sized to the device. The prose keeps its measure; a map breaks out of
+   it as far as the screen allows, because a network squeezed into a 600px
+   column is a strip on a laptop and a sliver on a phone. The photograph is
+   left on the measure: it is a picture of a sign, not a network. */
+.figure--embed,
+.figure:has(> svg),
+.figure:has(.compare) {
+  --w: min(var(--fig-max, 1100px), calc(100vw - var(--fig-gutter, 4rem)));
+  width: var(--w);
+  margin-inline: calc(50% - var(--w) / 2);
+}
+
+.figure--embed figcaption,
+.figure--embed .embed-bar,
+.figure:has(> svg) figcaption,
+.figure:has(.compare) figcaption {
+  width: min(var(--measure), 100%);
+  margin-inline: auto;
+}
+
+.figure--embed .embed {
+  aspect-ratio: 16 / 9;
+  max-height: 82vh;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--bg-soft);
+  box-shadow: 0 0 0 1px var(--border), 0 18px 40px -24px rgba(0, 0, 0, 0.6);
+}
+
+.figure:has(> svg) > svg {
+  max-height: 82vh;
+}
+
+/* Side by side, the comparisons can stand taller now they have the width. */
+.figure:has(.compare) .compare svg {
+  height: clamp(200px, 38vh, 400px);
+}
+
+@media (min-width: 1400px) {
+  :root {
+    --measure: 660px;
+    --fig-max: 1240px;
+  }
+}
+
+@media (max-width: 1100px) {
+  :root {
+    --fig-gutter: 2.5rem;
+  }
+
+  .figure--embed .embed {
+    aspect-ratio: 3 / 2;
+  }
+}
+
+/* Phones: maps run the full width and stand taller, so a wide network is not
+   squeezed into a strip; captions keep a gutter. */
+@media (max-width: 720px) {
+  :root {
+    --fig-gutter: 0px;
+  }
+
+  .figure--embed .embed {
+    aspect-ratio: 4 / 5;
+    max-height: 78vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .figure--embed figcaption,
+  .figure--embed .embed-bar,
+  .figure:has(> svg) figcaption,
+  .figure:has(.compare) figcaption {
+    width: auto;
+    padding-inline: 1rem;
+  }
+
+  .figure:has(> svg) > svg {
+    max-height: 70vh;
+  }
+
+  .figure:has(.compare) .compare {
+    padding-inline: 1rem;
+  }
+
+  .figure:has(.compare) .compare svg {
+    height: auto;
+    max-height: 42vh;
+  }
+}
+
+/* A phone on its side: fit the map to the short screen, not the width. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .figure--embed .embed {
+    aspect-ratio: auto;
+    height: 86vh;
+  }
+}

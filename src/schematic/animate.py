@@ -473,6 +473,9 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
     html_path = out_dir / f"{stem}.html"
     html_path.write_text(
         _HTML.replace("__PRESENT__", _PRESENT_JS)
+             # The route lines' finish, shared with the site (routes.css).
+             .replace("__ROUTES_CSS__", _ROUTES_CSS)
+             .replace("__ROUTES_JS__", _ROUTES_JS)
              # Named for the button, not the file: map-16 draws Geographic,
              # and the schematic view is code-branch turned 45 degrees by CSS.
              .replace("__ICON_GEO__", _VIEW_ICONS["map-16"])
@@ -524,6 +527,10 @@ def _json_for_script(data: object) -> str:
 
 _HTML = (_PAGE_DIR / "page.html").read_text(encoding="utf-8")
 _PRESENT_JS = (_PAGE_DIR / "present.js").read_text(encoding="utf-8")
+# The route lines' finish. Inlined for the same single-file reason as
+# present.js; the site serves the same two files for the maps in the essay.
+_ROUTES_CSS = (_PAGE_DIR / "routes.css").read_text(encoding="utf-8")
+_ROUTES_JS = (_PAGE_DIR / "routes.js").read_text(encoding="utf-8")
 
 # The toolbar's view icons, as data URIs for the same single-file reason.
 # Base64 of the file exactly as Esri published it: their licence permits

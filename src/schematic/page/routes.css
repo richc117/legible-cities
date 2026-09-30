@@ -1,0 +1,63 @@
+/* The route lines' finish: in the dark theme a glowing tube, in sepia a raised
+   ribbon. The engine still draws every line as it always has; routes.js joins
+   each line's segments into whole routes and lays these strokes under and over
+   them, so nothing here changes where a line runs.
+
+   Shared by the animation page, which inlines it, and the site, which serves
+   it beside style.css for the maps drawn inline in the essay. */
+:root { --rs-ease: cubic-bezier(0.2, 0, 0, 1); --rs-ground: var(--bg); }
+/* On the running map the network sits on the map's own ground; presented, the
+   map's ground is transparent and the page's shows through. */
+#stage { --rs-ground: var(--map-bg); }
+:root[data-present] #stage { --rs-ground: var(--bg); }
+
+.rs-under path, .rs-over path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Dark: a wide bloom in the line's colour, a gap in the ground so tubes part
+   where they cross, a deep rim, the colour, and a white-hot core. */
+:root:not([data-theme="sepia"]) .rs-under .ambient { stroke-width: 26px; opacity: .55; filter: url(#rs-bloom); }
+:root:not([data-theme="sepia"]) .rs-under .gap { stroke: var(--rs-ground); stroke-width: 13px; }
+:root:not([data-theme="sepia"]) .rs-under .rim { stroke-width: 10px; }
+:root:not([data-theme="sepia"]) [id="lines"] g.line { stroke-width: 6.5px; filter: saturate(1.35) brightness(1.15); }
+:root:not([data-theme="sepia"]) .rs-over .core { stroke-width: 2.2px; opacity: .95; }
+:root:not([data-theme="sepia"]) [id="stations"] circle { fill: #ffffff; stroke: var(--rs-ground); stroke-width: 2.4px; }
+:root:not([data-theme="sepia"]) [id="stations"] { filter: drop-shadow(0 0 3px rgba(255, 255, 255, .7)); }
+:root:not([data-theme="sepia"]) [id="trains"] { filter: drop-shadow(0 0 4px rgba(255, 255, 255, .9)) drop-shadow(0 0 10px rgba(255, 255, 255, .45)); }
+
+/* Sepia: a soft shadow cast below, a white edge, a deeper rim, a broad band of
+   colour and a sheen along it. */
+:root[data-theme="sepia"] .rs-under .ambient { stroke: rgba(60, 40, 20, .38); stroke-width: 15px; filter: url(#rs-shadow); transform: translate(0, 3px); }
+:root[data-theme="sepia"] .rs-under .gap { stroke: #ffffff; stroke-width: 16px; }
+:root[data-theme="sepia"] .rs-under .rim { stroke-width: 12px; }
+:root[data-theme="sepia"] [id="lines"] g.line { stroke-width: 9.5px; }
+:root[data-theme="sepia"] .rs-over .core { stroke-width: 3px; opacity: .4; }
+:root[data-theme="sepia"] [id="stations"] circle { stroke-width: 2.6px; }
+:root[data-theme="sepia"] [id="stations"] { filter: drop-shadow(0 1.5px 1.5px rgba(60, 40, 20, .35)); }
+
+/* A light that runs along each line now and then. */
+.rs-over .glint { stroke: #ffffff; stroke-width: 3px; opacity: .85; stroke-dasharray: 70 2600; stroke-dashoffset: 70; animation: rs-glint var(--rs-period, 8s) cubic-bezier(.45, 0, .2, 1) var(--rs-delay, 0s) infinite; }
+:root:not([data-theme="sepia"]) .rs-over .glint { filter: url(#rs-glow-sm); }
+@keyframes rs-glint { to { stroke-dashoffset: -2600; } }
+.rs-glints { opacity: 0; transition: opacity 1.5s var(--rs-ease); }
+.rs-glints.on { opacity: 1; }
+
+/* The bloom breathes, slowly. */
+:root:not([data-theme="sepia"]) .rs-under { animation: rs-breathe 7s ease-in-out infinite; }
+@keyframes rs-breathe { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
+
+/* The first look: the lines draw in, then the stations and names settle on. */
+[id="lines"].rs-hide { visibility: hidden; }
+.rs-fade { opacity: 0; animation: rs-appear .7s var(--rs-ease) var(--rs-after, 1.6s) forwards; }
+@keyframes rs-appear { to { opacity: 1; } }
+
+/* Still: a capture, or a reader who asked for less motion. The finish stays;
+   everything that moves on its own is gone, so a frame depends only on the
+   clock the exporter sets. */
+:root.rs-still .rs-glints { display: none; }
+:root.rs-still .rs-under { animation: none; }
+:root.rs-still .rs-fade { animation: none; opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .rs-glints { display: none; }
+  .rs-under { animation: none !important; }
+  .rs-fade { animation: none; opacity: 1; }
+}
