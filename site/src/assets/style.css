@@ -376,10 +376,9 @@ p {
    is one thing to reason about rather than two. The accessible name is the
    button's aria-label; the title is the sighted pointer user's tooltip.
 
-   The icons are Esri's Calcite UI icons, applied as CSS masks so the .svg files
-   ship exactly as published -- their licence permits redistribution without
-   modification -- and still take the theme through currentColor. Credited on
-   the Framework page. */
+   The icons are Phosphor's regular weight (MIT), applied as CSS masks so the
+   .svg files ship exactly as published and still take the theme through
+   currentColor. Credited on the Framework page. */
 .segmented button {
   font: inherit;
   line-height: 1;
@@ -398,8 +397,9 @@ p {
 
 .segmented button::before {
   content: "";
-  /* The set is drawn on a 16px grid; scaling it up softens the map icon into a
-     scribble. Rendered at its design size it stays a map. */
+  /* At 16px the regular weight's stroke is one device pixel at 1x, which is
+     why this weight and this size: the lighter one breaks up there, and the
+     animation page draws the same glyphs at the same size. */
   width: 16px;
   height: 16px;
   background: currentColor;
@@ -408,26 +408,19 @@ p {
 }
 
 .segmented button[data-view="geographic"] {
-  --icon: url("icons/map-16.svg");
+  --icon: url("icons/map-trifold.svg");
 }
 
 .segmented button[data-view="map"] {
-  --icon: url("icons/code-branch-16.svg");
-}
-
-/* code-branch stood on end reads as the octilinear grid the schematic map is
-   solved onto. The rotation is applied to the rendered mask, never to the file:
-   Esri's licence permits redistribution without modification. */
-.segmented button[data-view="map"]::before {
-  transform: rotate(90deg);
+  --icon: url("icons/graph.svg");
 }
 
 .segmented button[data-view="linear"] {
-  --icon: url("icons/connection-to-connection-16.svg");
+  --icon: url("icons/line-segments.svg");
 }
 
 .segmented button[data-view="time"] {
-  --icon: url("icons/clock-16.svg");
+  --icon: url("icons/clock.svg");
 }
 
 .segmented button + button {

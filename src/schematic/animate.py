@@ -473,12 +473,12 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
     html_path = out_dir / f"{stem}.html"
     html_path.write_text(
         _HTML.replace("__PRESENT__", _PRESENT_JS)
-             # Named for the button, not the file: map-16 draws Geographic,
-             # and the schematic view is code-branch turned 45 degrees by CSS.
-             .replace("__ICON_GEO__", _VIEW_ICONS["map-16"])
-             .replace("__ICON_SCHEMATIC__", _VIEW_ICONS["code-branch-16"])
-             .replace("__ICON_LINEAR__", _VIEW_ICONS["connection-to-connection-16"])
-             .replace("__ICON_TIME__", _VIEW_ICONS["clock-16"])
+             # Named for the button, not the file: map-trifold draws Geographic,
+             # graph the schematic view, line-segments the linear one.
+             .replace("__ICON_GEO__", _VIEW_ICONS["map-trifold"])
+             .replace("__ICON_SCHEMATIC__", _VIEW_ICONS["graph"])
+             .replace("__ICON_LINEAR__", _VIEW_ICONS["line-segments"])
+             .replace("__ICON_TIME__", _VIEW_ICONS["clock"])
              .replace("__ICONS__", _ICON_LINKS.format(base=icons) if icons else "")
              # Already escaped by the caller, which is the only thing that knows
              # the site's origin. Empty for a page written for standalone use.
@@ -526,14 +526,12 @@ _HTML = (_PAGE_DIR / "page.html").read_text(encoding="utf-8")
 _PRESENT_JS = (_PAGE_DIR / "present.js").read_text(encoding="utf-8")
 
 # The toolbar's view icons, as data URIs for the same single-file reason.
-# Base64 of the file exactly as Esri published it: their licence permits
-# redistribution without modification, so the bytes are never touched -- no
-# hand-lifted path data, no re-minified SVG, and the 45-degree turn on the
-# schematic one is a CSS transform over the mask. See page/icons/README.md.
+# Base64 of the files exactly as Phosphor published them (regular weight,
+# @phosphor-icons/core 2.1.1, MIT): the bytes are copied, not redrawn, so the
+# site's masks and this page draw the same glyphs. See page/icons/README.md.
 _ICON_DIR = _PAGE_DIR / "icons"
 _VIEW_ICONS = {
     name: "data:image/svg+xml;base64," + b64encode(
         (_ICON_DIR / f"{name}.svg").read_bytes()).decode("ascii")
-    for name in ("map-16", "code-branch-16", "connection-to-connection-16",
-                 "clock-16")
+    for name in ("map-trifold", "graph", "line-segments", "clock")
 }

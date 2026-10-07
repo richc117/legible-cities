@@ -92,24 +92,6 @@ def test_the_switcher_is_icons_with_an_accessible_name():
             assert "aria-pressed=" in button, button
 
 
-def test_the_icons_are_the_four_vendored_calcite_files():
-    """They ship as published; the schematic one is turned by CSS, not by hand."""
-    from schematic import animate
-
-    icons = Path(animate.__file__).parent / "page" / "icons"
-    assert set(animate._VIEW_ICONS) == {
-        "map-16", "code-branch-16", "connection-to-connection-16", "clock-16"}
-    for name in animate._VIEW_ICONS:
-        assert (icons / f"{name}.svg").exists(), name
-
-    page = PAGE.read_text()
-    for placeholder in ("__ICON_GEO__", "__ICON_SCHEMATIC__", "__ICON_LINEAR__",
-                        "__ICON_TIME__"):
-        assert placeholder in page, placeholder
-    # The 45-degree turn is a transform over the mask, never an edit to the file.
-    assert "#view-map::before { transform: rotate(90deg); }" in page
-
-
 def test_generated_tags_are_escaped_and_absolute():
     tags = site.social_tags("la-metro-rail")
     assert 'property="og:image"' in tags

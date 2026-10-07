@@ -1,8 +1,8 @@
 module.exports = function (eleventyConfig) {
   eleventyConfig.addPassthroughCopy({ "src/assets": "assets" });
-  // Vendored Calcite icons, copied rather than re-hosted from a second place:
-  // animate.py base64s the same files into the animation pages, and their
-  // licence allows redistribution only without modification. One source.
+  // Vendored Phosphor icons, copied rather than re-hosted from a second place:
+  // animate.py base64s the same files into the animation pages, so the site's
+  // masks and the pages draw the same glyphs. One source.
   eleventyConfig.addPassthroughCopy({ "../src/schematic/page/icons/*.svg": "assets/icons" });
   // Browsers request /favicon.ico regardless of what the head says.
   eleventyConfig.addPassthroughCopy({ "src/assets/favicon/favicon.ico": "favicon.ico" });

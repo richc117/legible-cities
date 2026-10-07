@@ -424,9 +424,10 @@ keep their own terms:
   rights reserved; quote with attribution.
 - **The station-icon photograph** `site/src/assets/cdmx-station-icons.jpg`
   is by Tbhotch via Wikimedia Commons, [CC BY-SA 4.0][ccbysa], resized.
-- **The four Esri Calcite icons** in `src/schematic/page/icons/` are
-  redistributed without modification under Esri's Master License Agreement;
-  the `README.md` beside them says what that permits.
+- **The four Phosphor icons** in `src/schematic/page/icons/`
+  (`map-trifold`, `graph`, `line-segments` and `clock`, regular weight, from
+  the 2.1.1 release of `@phosphor-icons/core`) are redistributed unmodified
+  under the MIT licence; its text is the `LICENSE` file beside them.
 
 Each agency's GTFS feed stays under that agency's terms; `data/` is not
 tracked and nothing from a feed is redistributed here.

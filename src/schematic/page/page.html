@@ -108,11 +108,10 @@ __SOCIAL__
   .segmented button[aria-pressed="true"] {
     background: var(--text); color: var(--bg); border-bottom-color: transparent;
   }
-  /* Esri's Calcite UI icons, base64'd from page/icons/ by animate.py rather
-     than redrawn as path data, because their licence allows redistribution
-     only without modification. This page has to stay one file, so they arrive
-     as data URIs rather than as a request. Masked over currentColor so they
-     take the theme and invert with the pressed state. */
+  /* Phosphor's icons (MIT), base64'd from page/icons/ by animate.py. This page
+     has to stay one file, so they arrive as data URIs rather than as a
+     request. Masked over currentColor so they take the theme and invert with
+     the pressed state. */
   .segmented button::before {
     content: ""; width: 16px; height: 16px; background: currentColor;
     mask: var(--icon) center / contain no-repeat;
@@ -122,11 +121,6 @@ __SOCIAL__
   #view-map { --icon: url("__ICON_SCHEMATIC__"); }
   #view-linear { --icon: url("__ICON_LINEAR__"); }
   #view-string { --icon: url("__ICON_TIME__"); }
-  /* code-branch stood on end reads as the octilinear grid the schematic map is
-     solved onto. The rotation is applied to the rendered mask here, never to
-     the file: Esri's licence permits redistribution without modification, so
-     the bytes shipped are the bytes they published. */
-  #view-map::before { transform: rotate(90deg); }
 
   input[type=range] {
     flex: 1 1 12rem; min-width: 8rem; max-width: 26rem; accent-color: var(--text);

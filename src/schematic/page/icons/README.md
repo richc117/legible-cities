@@ -1,35 +1,31 @@
-# Calcite UI icons
+# Phosphor icons
 
-Four icons from Esri's [Calcite Design System][calcite], vendored verbatim:
+Four icons from [Phosphor Icons][phosphor], regular weight, taken unmodified
+from the `@phosphor-icons/core` **2.1.1** release on npm (`assets/regular/`),
+under the MIT licence; its text is the `LICENSE` file beside them.
 
 | File | Used for |
 |---|---|
-| `map-16.svg` | the geographic view |
-| `code-branch-16.svg` | the schematic view, turned 90° |
-| `connection-to-connection-16.svg` | the linear view |
-| `clock-16.svg` | the time chart |
+| `map-trifold.svg` | the geographic view |
+| `graph.svg` | the schematic view |
+| `line-segments.svg` | the linear view |
+| `clock.svg` | the time chart |
 
-**Do not edit these files.** Their licence permits redistribution *without
-modification* only:
+The repository's git tags stop at 2.0.8, so the npm release is the source.
+Regular, not light: at 16px the regular weight's stroke is one device pixel
+at 1x, and light's breaks up there.
 
-> COPYRIGHT Esri. All rights reserved under the copyright laws of the United
-> States and applicable international laws, treaties, and conventions. This
-> material is licensed for use under the Esri Master License Agreement (MLA)…
-> You may redistribute and use this code without modification, provided you
-> adhere to the terms of the MLA and include this copyright notice.
+Copy a replacement over the file, never edit one by hand, so the next person
+can check it against the release. The site applies the files as CSS masks
+over the copies Eleventy passes through (`site/.eleventy.js`), and
+`animate.py` base64-encodes the file bytes into a `data:` URI, because an
+animation page has to stay one self-contained file. Both routes ship the same
+bytes. The page draws the glyphs at 16px over `currentColor`, so they take
+the theme and invert with the pressed state; none needs a turn.
 
-So they are never inlined as hand-edited path data. The site applies them as
-CSS masks over the copied files, and `animate.py` base64-encodes the file bytes
-into a `data:` URI, because an animation page has to stay one self-contained
-file. Both routes ship the same bytes that came from Esri.
+These replaced four icons from Esri's design system, whose Master License
+Agreement forbids combining them in a manner that would subject them to
+GPL-style terms, and this repository is GPL-3.0-or-later (issue 19). The
+desktop app draws its own chrome in Phosphor too.
 
-The schematic view's 90° turn is a CSS `transform` on the element the mask is
-painted into, for the same reason: `code-branch-16.svg` stood on end reads as
-the octilinear grid, but rotating it in the file would be a modification. The
-rotation lives beside the `--icon` rule in `page.html` and in the site's
-`style.css`.
-
-This is the only third-party asset here that is not open source, and it is
-credited on the site's Framework page.
-
-[calcite]: https://developers.arcgis.com/calcite-design-system/icons/
+[phosphor]: https://phosphoricons.com/
