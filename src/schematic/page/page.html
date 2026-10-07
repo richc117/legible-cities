@@ -1383,6 +1383,12 @@ __SOCIAL__
     draw();
   }
 
+  // The theme now showing, by the names the boot script at the top of the page
+  // and the site's theme.js use: sepia is the one attribute value there is, and
+  // warm-dark is the page with none.
+  const themeName = () =>
+    document.documentElement.getAttribute("data-theme") === "sepia" ? "sepia" : "warm-dark";
+
   window.__present = {
     advance(dt) { advance(dt); draw(); },
     seek(sec) { now = Math.max(t0, Math.min(t1, sec)); dirty = true; draw(); },
@@ -1420,6 +1426,22 @@ __SOCIAL__
       if (typeof margin === "number") frameMargin = margin;
       dirty = true; draw();
     },
+    // The page's theme, changed in place: the clock, the view, the scrub
+    // position and the line toggles stay where they are, because everything a
+    // theme touches is a CSS variable the stylesheet already swaps on
+    // data-theme. It sets that attribute the way the boot script and the
+    // site's theme.js do -- sepia sets it, warm-dark removes it -- and, like a
+    // no-op setGeo, reports false for a name the page does not know and
+    // changes nothing. It never writes the rc-theme key, which the site's
+    // script owns, and nothing calls it on load, so an address's ?theme= still
+    // wins at boot and a captured frame is the one it always was.
+    setTheme(name) {
+      if (name !== "warm-dark" && name !== "sepia") return false;
+      const root = document.documentElement;
+      if (name === "sepia") root.setAttribute("data-theme", "sepia");
+      else root.removeAttribute("data-theme");
+      return true;
+    },
     // Snap every tween to its target: a still should never catch a transition
     // halfway through.
     settle() {
@@ -1433,7 +1455,7 @@ __SOCIAL__
     state() {
       return { now: now, clock: fmt(now), shown: shown, mode: mode,
                view: view, str: str, geo: geo, box: lastBox.slice(),
-               viewName: viewName(), labels: labelsOn };
+               viewName: viewName(), labels: labelsOn, theme: themeName() };
     },
   };
   __PRESENT__
