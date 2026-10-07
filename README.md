@@ -252,11 +252,6 @@ rather than resemble it. `--no-title --no-clock` is the rest of the figure:
 it carries no furniture at all. `--tag` names the variant in the filename, so
 a dressed and an undressed cut of one preset can sit in the same folder.
 
-`bin/thumbnails <folder>` writes a small picture of every sample city in each of the
-interface's two palettes (`<key>-dark.svg`, `<key>-light.svg`) from the layouts already
-stored, for the desktop app to ship; it lays nothing out, so a preset that is not
-downloaded or not laid out at the pinned LOOM is named in its `README.md` and skipped.
-
 Each social shape has a GIF twin — `instagram-reel-gif`, `linkedin-gif`,
 `bluesky-gif` — for the places that will not take a video. They are smaller and
 slower than their mp4 siblings on purpose: a GIF stores a palette per frame, so
@@ -303,6 +298,12 @@ it.
 `bin/theme-thumbnails <folder>` writes the two pictures of the map's themes the
 desktop app chooses by (`theme-warm-dark.svg`, `theme-sepia.svg`), drawn from a
 made-up network, so it needs no feed, Docker or `data/`.
+
+
+`bin/thumbnails <folder>` writes a small picture of every sample city in each of the
+interface's two palettes (`<key>-dark.svg`, `<key>-light.svg`) from the layouts already
+stored, for the desktop app to ship; it lays nothing out, so a preset that is not
+downloaded or not laid out at the pinned LOOM is named in its `README.md` and skipped.
 
 ## What real transit data is like
 

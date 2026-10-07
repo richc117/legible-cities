@@ -10,7 +10,11 @@
 # and why. Prints the total size and the presets missing. <folder> is created
 # if it is missing. The layouts are read, never made: a preset whose feed is not
 # downloaded or not laid out at this LOOM is skipped, so run bin/run-all first
-# if a picture is wanted for it. See src/schematic/sample_thumbnails.py.
+# if a picture is wanted for it. The run must see the same SCHEMATIC_LOOM_COMMIT
+# the layouts were made under (a layout's id names the commit, not the backend),
+# or every preset reads "no layout at this LOOM". A picture an earlier run left
+# in <folder> for a preset that now has none is removed. See
+# src/schematic/sample_thumbnails.py.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
