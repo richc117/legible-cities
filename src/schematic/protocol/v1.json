@@ -328,7 +328,7 @@
       "additionalProperties": false
     },
     "MapBuildParams": {
-      "description": "Draw the map and the animation page for a registered feed on one service day, from a stored layout. Never lays the feed out: a layout that is not stored is refused, with a hint to lay it out first.",
+      "description": "Draw the map, the animation page and a thumbnail pair for a registered feed on one service day, from a stored layout. Never lays the feed out: a layout that is not stored is refused, with a hint to lay it out first.",
       "type": "object",
       "properties": {
         "key": {
@@ -452,7 +452,7 @@
             },
             "thumb_dark": {
               "type": "string",
-              "description": "A small picture of the map for the dark palette: the network alone, about 400 units wide, no ground, every colour a literal, in the project's colours and line order. Safe to show in an img."
+              "description": "A small picture of the map for the dark palette: the network alone, about 400 units wide, no ground, every colour a literal, in the request's colors, default_color and line_order. Safe to show in an img."
             },
             "thumb_light": {
               "type": "string",
