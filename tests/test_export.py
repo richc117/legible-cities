@@ -554,7 +554,10 @@ def test_a_dense_png_capture_for_the_jpeg_preset_is_transcoded_under_its_limit(t
     preset is, it is not."""
     preset = export.PRESETS["bluesky"]
     job = export.plan("la-metro-rail", "bluesky", quality="high")
-    source = _still(tmp_path / "capture.png", "png", (800, 600), noise=True)
+    # 740 by 560 of noise: the PNG is 28% over the limit and ffmpeg's JPEG of it
+    # at -q:v 3 is 30% under, so neither side of the test rests on one
+    # encoder's byte count (800 by 600 left the JPEG 19% under).
+    source = _still(tmp_path / "capture.png", "png", (740, 560), noise=True)
     assert source.stat().st_size > preset.max_bytes
     dest = tmp_path / "out" / job.filename
     export.encode(job, source, dest)
