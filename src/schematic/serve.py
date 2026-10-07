@@ -51,6 +51,7 @@ from .crs import to_mercator
 from .linegraph import LineGraph
 from .render import (HEX_COLOR_PATTERN, octilinearity, stage as render_stage,
                      summary as render_summary)
+from .render import STYLE_RANGES, Style
 
 log = logging.getLogger(__name__)
 
@@ -283,6 +284,64 @@ def _colors(left: dict[str, Any], name: str) -> dict[str, str] | None:
         raise invalid_params(f"{name} must be an object of line label to a colour "
                              f"written #rrggbb")
     return value
+
+
+# The four colours of a style the wire accepts. The app never sends them (the
+# page's theme owns the furniture); the command line and the site do.
+STYLE_COLORS = ("background", "station_fill", "station_stroke_color", "label_color")
+
+
+def _style(value: Any) -> Style | None:
+    """The style a client asked the map to be drawn with, or none.
+
+    None when the parameter is absent, so ``pipeline.run`` keeps its own
+    default, ``Style(themed=True)``, and every output is what it was.
+    Otherwise an object of optional fields: the eight numbers of
+    ``render.STYLE_RANGES``, each inside its closed range, and the four
+    colours of ``STYLE_COLORS``, each written ``#rrggbb``. Any other key is
+    refused, ``themed``, ``label_char_width`` and ``default_line_color``
+    among them: they are the engine's, not a client's (``default_color`` is
+    a parameter of ``map.build`` itself).
+
+    One rule the schema cannot hold: ``interchange_radius`` may not be below
+    ``station_radius``, judged on the values the map would be drawn with,
+    each field as given or else ``Style``'s default. So ``station_radius``
+    above 6 alone is refused too, because the default ``interchange_radius``
+    is 6, and a client that raises one sends the other.
+
+    The result is built ``themed=True`` and always, as ``pipeline.run``'s
+    default is: ``Style(**fields)`` alone would write literal colours where
+    the page expects ``var(--map-*)``."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise invalid_params("style must be an object")
+    left = dict(value)
+    fields: dict[str, Any] = {}
+    for name, (low, high, unit) in STYLE_RANGES.items():
+        if name not in left:
+            continue
+        number = left.pop(name)
+        if not _number(number) or not low <= number <= high:
+            raise invalid_params(
+                f"style.{name} must be from {low:g} to {high:g}, "
+                + (f"in {unit}" if unit else "as a multiple of line_width"))
+        fields[name] = number
+    for name in STYLE_COLORS:
+        if name not in left:
+            continue
+        color = left.pop(name)
+        if not isinstance(color, str) or not COLOR_PATTERN.match(color):
+            raise invalid_params(f"style.{name} must be a colour written #rrggbb")
+        fields[name] = color
+    _no_extra("style", left)
+    style = Style(themed=True, **fields)
+    if style.interchange_radius < style.station_radius:
+        raise invalid_params(
+            f"style.interchange_radius ({style.interchange_radius:g}) must not be below "
+            f"style.station_radius ({style.station_radius:g}); a field left out counts as its "
+            f"default, so send both")
+    return style
 
 
 # ---- the export methods' parameters: a preset, a page, the options, a plan
@@ -641,6 +700,7 @@ class EngineEndpoint(Endpoint):
         colors = _colors(left, "colors")
         default_color = _color(left, "default_color")
         line_order = _strings(left, "line_order")
+        style = _style(left.pop("style", None))
         _no_extra("map.build", left)
         folder = config.out_dir() / out if out else None
 
@@ -648,7 +708,7 @@ class EngineEndpoint(Endpoint):
             # From the stored layout, and never a layout of its own: a map
             # that re-laid a network unasked would be a different map.
             result = pipeline.run(key, layout=layout, date=date, width=width,
-                                  colors=colors, default_color=default_color,
+                                  colors=colors, default_color=default_color, style=style,
                                   line_order=line_order, out_dir=folder, progress=progress)
             where = folder or config.out_dir()
             diag = result.diagnostics()

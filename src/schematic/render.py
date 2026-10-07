@@ -59,6 +59,27 @@ class Style:
         return f"var(--map-{name}, {literal})" if self.themed else literal
 
 
+# What a client may ask of each numeric field of ``Style``: the closed range
+# and the unit it is in. The one table the server's sentences (``serve._style``)
+# and the protocol schema's bounds and descriptions agree with; a test holds
+# them to it. Every unit but one is SVG user units at the map's width, since
+# the map is fitted to ``width`` (1,800 by default), so ``line_width`` 7 is
+# seven of 1,800. ``line_gap`` is a multiple of ``line_width`` and has no unit
+# (None). ``Style`` itself enforces none of this: the thumbnail's scaled style
+# and the site's are the engine's own and sit outside these ranges.
+USER_UNITS = "SVG user units at the map's width"
+STYLE_RANGES: dict[str, tuple[float, float, str | None]] = {
+    "line_width": (1, 24, USER_UNITS),
+    "line_gap": (1, 3, None),
+    "station_radius": (1, 20, USER_UNITS),
+    "interchange_radius": (1, 30, USER_UNITS),
+    "station_stroke": (0, 8, USER_UNITS),
+    "label_size": (6, 32, USER_UNITS),
+    "label_offset": (0, 40, USER_UNITS),
+    "padding": (0, 200, USER_UNITS),
+}
+
+
 @dataclass
 class Projection:
     """Maps graph coordinates to SVG pixel coordinates (y flipped)."""

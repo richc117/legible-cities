@@ -582,7 +582,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     geo = None
     if feeds.get(key).geographic:
         geo_graph = LineGraph.from_geojson(paths["loom"]).reproject(to_mercator)
-        geo = animate.geographic_tracks(geo_graph, graph, r)
+        geo = animate.geographic_tracks(geo_graph, graph, r, style)
 
     anim = animate.build(r, graph, trips, date, geo, line_order=line_order)
     done("animate", f"{len(anim.paths)} distinct paths"

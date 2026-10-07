@@ -365,13 +365,85 @@
             "type": "string"
           },
           "description": "Line labels in the order they stack on shared track, the later over the earlier. A line the list leaves out follows the ones it names, and a label the layout does not carry is ignored, so a partial or stale order never drops a line."
-        }
+        },
+        "style": { "$ref": "#/$defs/MapStyle" }
       },
       "required": [
         "key",
         "layout",
         "date"
       ],
+      "additionalProperties": false
+    },
+    "MapStyle": {
+      "description": "How the map is drawn, in the engine's own numbers. Every field is optional; omitting the object, or any field, draws exactly what is drawn without it. The numbers are in SVG user units at the map's width (the map is fitted to MapBuildParams.width, 1800 by default, so a line width of 7 is seven of 1800), except line_gap, a multiple of line_width. interchange_radius may not be below station_radius, judged on the values the map would be drawn with (a field left out counts as its default): a rule the schema cannot hold and the server does. label_size and label_offset re-place the labels and move the drawing's viewBox, never the stored layout. The four colours are the literals a standalone SVG falls back to; the animation page's theme overrides them, which is why the desktop app does not send them.",
+      "type": "object",
+      "properties": {
+        "line_width": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 24,
+          "description": "Line stroke width, in SVG user units at the map's width; 7 when omitted."
+        },
+        "line_gap": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Pitch of parallel tracks as a multiple of line_width, so it has no unit; 1.6 when omitted."
+        },
+        "station_radius": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Radius of a station on one route, in SVG user units at the map's width; 4.2 when omitted."
+        },
+        "interchange_radius": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Radius of a station where routes meet, in SVG user units at the map's width; 6 when omitted. Not below station_radius."
+        },
+        "station_stroke": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8,
+          "description": "Width of a station's outline, in SVG user units at the map's width; 2.2 when omitted."
+        },
+        "label_size": {
+          "type": "number",
+          "minimum": 6,
+          "maximum": 32,
+          "description": "Font size of a station's name, in SVG user units at the map's width; 11 when omitted. The labels are placed again, so the viewBox moves."
+        },
+        "label_offset": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 40,
+          "description": "Distance of a name from its station, in SVG user units at the map's width; 9 when omitted. The labels are placed again, so the viewBox moves."
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200,
+          "description": "Margin round the drawing on every side, in SVG user units at the map's width; 24 when omitted."
+        },
+        "background": {
+          "$ref": "#/$defs/HexColor",
+          "description": "The ground, as the literal a standalone SVG falls back to; the page's theme overrides it. #ffffff when omitted."
+        },
+        "station_fill": {
+          "$ref": "#/$defs/HexColor",
+          "description": "A station's fill, as the literal a standalone SVG falls back to; the page's theme overrides it. #ffffff when omitted."
+        },
+        "station_stroke_color": {
+          "$ref": "#/$defs/HexColor",
+          "description": "A station's outline, as the literal a standalone SVG falls back to; the page's theme overrides it. #111111 when omitted."
+        },
+        "label_color": {
+          "$ref": "#/$defs/HexColor",
+          "description": "The station names, as the literal a standalone SVG falls back to; the page's theme overrides it. #111111 when omitted."
+        }
+      },
       "additionalProperties": false
     },
     "Diagnostics": {
