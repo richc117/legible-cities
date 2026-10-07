@@ -15,14 +15,30 @@ let chromium;
 try {
   ({ chromium } = require(path.join(__dirname, "..", "site", "node_modules", "playwright")));
 } catch (e) {
-  console.error("playwright missing. cd site && npm install --no-save playwright && npx playwright install chromium");
+  console.error("playwright missing. cd site && npm install --no-save playwright && " +
+                "npx playwright install chromium  (the full browser this recorder launches, " +
+                "not just the headless shell)");
   process.exit(1);
 }
 
 const job = JSON.parse(process.argv[2] || "{}");
 
 (async () => {
-  const browser = await chromium.launch();
+  // The channel is named on purpose; do not "simplify" it back to launch().
+  // Bare launch() starts Playwright's headless shell, a stripped build whose
+  // rasteriser is not the full browser's: at one version they disagree on
+  // every frame of one capture by up to 99 of 255 levels, on glyph and stroke
+  // edges (issue 21 measured it). A viewer's browser is the full one and so
+  // is the desktop app's capture, which runs Chromium through Electron, so
+  // `channel: "chromium"` records with the same rasteriser as both.
+  let browser;
+  try {
+    browser = await chromium.launch({ channel: "chromium" });
+  } catch (e) {
+    console.error("could not start the full Chromium (" + String(e.message).split("\n")[0] + ")\n" +
+                  "      cd site && npx playwright install chromium  (not --only-shell)");
+    process.exit(1);
+  }
   const ctx = await browser.newContext({
     viewport: { width: job.width, height: job.height },
     deviceScaleFactor: job.scale || 1,
