@@ -419,11 +419,14 @@ def user_feeds() -> dict[str, Feed]:
 def _write_user_feeds(records: dict[str, Feed]) -> None:
     """The whole file, written beside itself and moved into place: a write
     cut short, or a move refused, leaves the registry as it was and no
-    ``.part`` beside it, which nothing else would ever remove."""
+    ``.part`` beside it, which nothing else would ever remove. The scratch
+    name is the writer's own, process and thread, so that another process
+    writing this file (a notebook's may) never has its half-written bytes
+    moved into place by this one."""
     path = user_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps([f.to_dict() for f in records.values()], indent=2) + "\n"
-    tmp = path.with_name(path.name + ".part")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}-{threading.get_ident()}.part")
     try:
         tmp.write_text(text, encoding="utf-8", newline="\n")
         os.replace(tmp, path)
@@ -620,7 +623,8 @@ def _why(exc: Exception) -> str:
 
 
 class Interrupted(Exception):
-    """An add() or a download stopped because its caller asked; nothing was kept."""
+    """An add(), a remove() or a download stopped because its caller asked: an
+    add or a download kept nothing, and a remove left the feed as it was."""
 
 
 def add(source: Path | str, *, key: str | None = None, name: str | None = None,
@@ -695,7 +699,11 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
                 raise FeedError(f"{key!r} is already a feed; choose another key")
             feed = Feed(key=key, name=name, url=url, mode=mode, agency=agency,
                         headways=headways, source="user")
-            os.replace(staging, feed.zip_path)
+            # Under the feed's disk lock as well, as remove's deletions are: a
+            # removal of this key still deleting its files would otherwise
+            # delete the zip just kept, from the list it made before.
+            with _disk(key):
+                os.replace(staging, feed.zip_path)
             users[key] = feed
             _write_user_feeds(users)
         return feed
@@ -714,9 +722,12 @@ def remove(key: str, *, cancelled: "Callable[[], bool] | None" = None,
     feed is forgotten, ``forgotten()`` is told, and the zips and the layouts
     are removed to the end whatever ``cancelled()`` says, because stopping
     there would leave files no registry entry names and nothing would ever
-    remove. Only the feed's own zips under the feeds folder and its own
-    folder under the graphs folder are removed.
+    remove. Only the feed's own zips under the feeds folder, the folders the
+    native backend unpacked them into (``<key>.normalized`` and its scratch
+    ``.unpacking``), and its own folder under the graphs folder are removed.
     """
+    if not KEY_PATTERN.match(key):
+        raise FeedError("a feed key is lower-case letters, digits and hyphens, up to 64")
     if key in FEEDS:
         raise FeedError(f"{key!r} is a built-in feed and cannot be removed")
     with _user_lock:
@@ -730,8 +741,17 @@ def remove(key: str, *, cancelled: "Callable[[], bool] | None" = None,
         if forgotten is not None:
             forgotten()
     with _disk(key):
-        for path in config.feeds_dir().glob(f"{key}.*zip"):
+        # In an order the filesystem does not choose, so a stop partway, or a
+        # test that holds one removal, means the same thing everywhere.
+        for path in sorted(config.feeds_dir().glob(f"{key}.*zip")):
             path.unlink(missing_ok=True)
+        # What ``loom.unpacked`` made beside a zip for the native backend, and
+        # its scratch while it runs: folders, ending as it names them, and
+        # nothing else that begins with the key.
+        for path in sorted(config.feeds_dir().glob(f"{key}.*")):
+            if (path.is_dir() and not path.is_symlink()
+                    and path.name.endswith((".normalized", ".normalized.unpacking"))):
+                shutil.rmtree(path, ignore_errors=True)
         shutil.rmtree(config.graphs_dir() / key, ignore_errors=True)
 
 

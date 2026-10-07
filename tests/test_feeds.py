@@ -442,43 +442,92 @@ def test_the_registry_write_is_atomic_and_a_refused_move_leaves_the_registry_and
     assert "mine" not in feeds.all()
 
 
-def test_remove_touches_only_the_feeds_own_zips_and_layouts(home, tmp_path):
-    """Nothing but ``<key>.*zip`` under the feeds folder and ``<key>`` under the
-    graphs folder is removed: not a feed whose key begins with this one, not
-    another feed's layouts, not a project, an export or a file of the person's
-    own in the home."""
+def test_remove_touches_only_the_feeds_own_zips_unpacked_folders_and_layouts(home, tmp_path):
+    """Nothing but ``<key>.*zip`` and the folders the native backend unpacked
+    them into (``<key>.normalized``, its scratch ``.unpacking``, a variant's)
+    under the feeds folder, and ``<key>`` under the graphs folder, is removed:
+    not a feed whose key begins with this one, not another feed's layouts, not
+    a project, an export or a file of the person's own in the home."""
     _a_feed_with_files(tmp_path, "mine")
     _a_feed_with_files(tmp_path, "mine-2")
     _a_feed_with_files(tmp_path, "theirs")
+    feeds_dir = config.feeds_dir()
+    unpacked = {feeds_dir / "mine.normalized" / "stops.txt": "an unpacked feed",
+                feeds_dir / "mine.normalized.unpacking" / "stops.txt": "half of one",
+                feeds_dir / "mine.0123456789ab.normalized" / "stops.txt": "a variant's"}
     bystanders = {
         home / "notes.txt": "mine",
         home / "projects" / "p1" / "project.json": "{}",
         home / "out" / "mine.mp4": "a video",
-        home / "data" / "feeds" / "readme.txt": "mine",
-        home / "data" / "feeds" / "mine-2.zip.keep": "kept",
-        home / "data" / "graphs" / "mines" / "x.json": "{}",
+        feeds_dir / "readme.txt": "mine",
+        feeds_dir / "mine-2.zip.keep": "kept",
+        feeds_dir / "mine-2.normalized" / "stops.txt": "the neighbour's unpacked feed",
+        feeds_dir / "mines" / "stops.txt": "a folder of someone's",
+        feeds_dir / "mine.keep" / "stops.txt": "begins with the key, is not an unpacked feed",
+        config.graphs_dir() / "mines" / "x.json": "{}",
     }
-    for path, text in bystanders.items():
+    for path, text in {**unpacked, **bystanders}.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
+
     def its_own(path):
-        return ((path.parent == config.feeds_dir() and path.name.startswith("mine."))
-                or config.graphs_dir() / "mine" in path.parents)
+        if config.graphs_dir() / "mine" in path.parents:
+            return True
+        top = path.relative_to(feeds_dir).parts[0] if feeds_dir in path.parents else ""
+        return top.startswith("mine.") and top.endswith(("zip", ".normalized",
+                                                          ".normalized.unpacking"))
 
     survivors = {path: path.read_bytes() for path in home.rglob("*")
                  if path.is_file() and not its_own(path) and path != feeds.user_file()}
+    assert set(bystanders) <= set(survivors), "the bystanders are what is being kept"
 
     feeds.remove("mine")
 
-    assert not list(config.feeds_dir().glob("mine.*"))
+    assert [p.name for p in feeds_dir.glob("mine.*")] == ["mine.keep"]
+    assert not any(path.exists() for path in unpacked)
+    assert not any(path.parent.exists() for path in unpacked), "the folders go, not only a file"
     assert not (config.graphs_dir() / "mine").exists()
-    assert survivors, "there was something to keep"
     for path, text in survivors.items():
         assert path.is_file(), f"{path.relative_to(home)} was removed"
         assert path.read_bytes() == text, f"{path.relative_to(home)} was changed"
-    assert (config.feeds_dir() / "mine-2.zip").exists()
+    assert (feeds_dir / "mine-2.zip").exists()
     assert (config.graphs_dir() / "mine-2" / ("0" * 64) / "03_octi.json").exists()
     assert {f for f in feeds.user_feeds()} == {"mine-2", "theirs"}
+
+
+def test_remove_unlinks_the_zips_in_name_order(home, tmp_path, monkeypatch):
+    """Not in the order the filesystem lists them, which differs from disk to
+    disk: where a removal that stops partway, or a test that holds it, stands
+    is the same everywhere."""
+    _a_feed_with_files(tmp_path, "mine")
+    gone = []
+    real = Path.unlink
+
+    def unlinking(self, *args, **kwargs):
+        gone.append(self.name)
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", unlinking)
+    feeds.remove("mine")
+    assert [name for name in gone if name.startswith("mine.")] == [
+        "mine.normalized.zip", "mine.zip"]
+
+
+def test_remove_refuses_what_is_not_a_key_before_it_reads_the_registry(home):
+    """The server refuses a bad key before it gets here; a library caller gets
+    the same refusal. Without it a registry written by hand with the key ``..``
+    would have the removal delete the folder around the graphs."""
+    registry = feeds.user_file()
+    registry.parent.mkdir(parents=True)
+    registry.write_text(json.dumps([{"key": "..", "name": "Up", "url": ""}]))
+    graphs = config.graphs_dir()
+    graphs.mkdir(parents=True)
+    (graphs / "keep.json").write_text("{}")
+    before = registry.read_bytes()
+    with pytest.raises(feeds.FeedError, match="lower-case letters, digits and hyphens"):
+        feeds.remove("..")
+    assert registry.read_bytes() == before
+    assert (graphs / "keep.json").exists() and registry.exists()
 
 
 def test_a_file_feed_whose_zip_is_gone_says_so(home, tmp_path):

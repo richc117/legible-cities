@@ -1192,7 +1192,7 @@ def test_feeds_list_is_every_preset_and_what_was_added(client, home, tmp_path):
         other.endpoint.close()
 
     removed = client.call("feeds.remove", {"key": "metro-de-prueba"})["result"]
-    check(removed, "Ok")
+    check(removed, "FeedsRemoveResult")
     assert "metro-de-prueba" not in feeds.all()
     error = client.call("feeds.remove", {"key": KEY})["error"]
     assert error["code"] == -32000 and error["data"]["kind"] == "feed"
@@ -1389,15 +1389,17 @@ class Held:
         self.release = threading.Event()
 
 
-def hold(monkeypatch, owner, name: str, target: Path) -> Held:
-    """Stop the call of ``owner.name`` on ``target`` where it starts, and let
-    every other call through: a removal slowed as a network disk or a virus
-    scanner would slow it."""
+def hold(monkeypatch, owner, name: str, targets) -> Held:
+    """Stop the call of ``owner.name`` on any of ``targets`` (a path, or several)
+    where it starts, and let every other call through: a removal slowed as a
+    network disk or a virus scanner would slow it. Several, where the order
+    the calls come in is not the test's to say."""
     held = Held()
     real = getattr(owner, name)
+    targets = {targets} if isinstance(targets, Path) else set(targets)
 
     def slowed(*args, **kwargs):
-        if Path(args[0]) == target:
+        if Path(args[0]) in targets:
             held.entered.set()
             assert held.release.wait(30), "the test never let the call go"
         return real(*args, **kwargs)
@@ -1504,7 +1506,8 @@ def test_a_cancel_before_the_registry_write_keeps_the_feed_and_every_file(client
 
 def test_a_cancel_after_the_registry_write_is_too_late_and_the_files_go(client, reader, mine,
                                                                         monkeypatch):
-    held = hold(monkeypatch, Path, "unlink", mine.zips[0])
+    # Whichever zip goes first, both are still there when it is held.
+    held = hold(monkeypatch, Path, "unlink", set(mine.zips))
     try:
         removing = reader.send("feeds.remove", {"key": "mine"})
         assert held.entered.wait(10), "the removal never reached its files"
@@ -1527,6 +1530,43 @@ def test_a_cancel_after_the_registry_write_is_too_late_and_the_files_go(client, 
     # Only what was the feed's own went: a neighbour whose key begins with
     # this one, and files of the person's in the home, are where they were.
     assert all(path.exists() for path in mine.neighbours)
+    assert client.endpoint.jobs == {}
+
+
+def test_a_feed_added_again_while_its_removal_deletes_keeps_the_zip_it_was_given(
+        client, reader, mine, tmp_path, monkeypatch):
+    """The removal forgets the feed first, so its key is free while its files
+    are still going. An add of the same key in that window puts its zip where
+    the removal's list of files has the old one, and has to wait for the
+    removal to finish rather than lose the new zip to it."""
+    zip_path = config.feeds_dir() / "mine.zip"
+    again = gtfs_zip(tmp_path / "again.zip", {
+        **GOOD, "agency.txt": GOOD["agency.txt"].replace("Metro de Prueba", "Metro Otra Vez")})
+    replaced = threading.Event()
+    real = os.replace
+
+    def noticing(src, dst, *args, **kwargs):
+        if Path(dst) == zip_path:
+            replaced.set()
+        return real(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(feeds.os, "replace", noticing)
+    held = hold(monkeypatch, Path, "unlink", set(mine.zips))
+    try:
+        removing = reader.send("feeds.remove", {"key": "mine"})
+        assert held.entered.wait(10), "the removal never reached its files"
+        assert not _is_listed(client, "mine"), "the key is free while its files are going"
+        adding = reader.send("feeds.add", {"source": str(again), "key": "mine"})
+        assert not replaced.wait(0.5), "the add put its zip in place under the removal"
+    finally:
+        held.release.set()
+    assert client.wait(removing)["result"] == {"ok": True}
+    added = client.wait(adding)["result"]
+    check(added, "FeedRecord")
+    assert added["key"] == "mine" and added["name"] == "Metro Otra Vez"
+    assert _is_listed(client, "mine")
+    assert zip_path.read_bytes() == again.read_bytes(), "the new zip is the one on disk"
+    assert not (config.feeds_dir() / "mine.normalized.zip").exists(), "the old files went"
     assert client.endpoint.jobs == {}
 
 
