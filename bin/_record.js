@@ -53,7 +53,13 @@ const job = JSON.parse(process.argv[2] || "{}");
   const page = await ctx.newPage();
   const problems = [];
   page.on("pageerror", e => problems.push("pageerror: " + e.message));
-  page.on("console", m => { if (m.type() === "error") problems.push("console: " + m.text()); });
+  // The full Chromium fetches the page's icon links (the headless shell
+  // never did), and under file:// they are not there. An icon touches no
+  // frame, so that one failure is not the page's.
+  const icon = /\/assets\/favicon\//;
+  page.on("console", m => {
+    if (m.type() === "error" && !icon.test(m.location().url || "")) problems.push("console: " + m.text());
+  });
 
   await page.goto(job.url, { waitUntil: "load" });
   await page.waitForFunction(() => window.__present && window.__present.state, null,
