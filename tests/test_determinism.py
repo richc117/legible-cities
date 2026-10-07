@@ -64,6 +64,16 @@ def test_the_recorder_stops_the_clock_before_it_waits():
     assert stop < pin < wait, "the recorder waits with the page's clock running, or unpinned"
 
 
+def test_the_recorder_launches_the_full_chromium():
+    """`channel: "chromium"` is load-bearing (issue 21): bare `launch()` starts
+    the headless shell, whose rasteriser differs from the full browser's by up
+    to 99 of 255 levels on glyph and stroke edges. Two runs of the shell agree
+    with each other, so the pixel test cannot notice a change back."""
+    js = (config.REPO_ROOT / "bin" / "_record.js").read_text()
+    assert 'chromium.launch({ channel: "chromium" })' in js, \
+        "the recorder no longer names the full Chromium; captures will differ from the app's"
+
+
 @needs_browser
 def test_two_captures_of_the_same_beats_agree_pixel_for_pixel(tmp_path):
     """Two runs, a view morph between them, compared frame by frame.

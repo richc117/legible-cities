@@ -35,7 +35,11 @@ const job = JSON.parse(process.argv[2] || "{}");
   try {
     browser = await chromium.launch({ channel: "chromium" });
   } catch (e) {
-    console.error("could not start the full Chromium (" + String(e.message).split("\n")[0] + ")\n" +
+    // Playwright's first line names the missing executable by its absolute
+    // path under the person's home folder; the install line below says what
+    // to do, so the path is dropped before the message leaves the process.
+    const why = String(e.message).split("\n")[0].replace(/ at .*$/, "");
+    console.error("could not start the full Chromium (" + why + ")\n" +
                   "      cd site && npx playwright install chromium  (not --only-shell)");
     process.exit(1);
   }
