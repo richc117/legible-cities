@@ -16,7 +16,9 @@ wall-time put it. Since the export split (E10) the recorder stops the clock
 before that wait in both modes, and the guard below keeps it there.
 """
 
+import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -33,12 +35,14 @@ from schematic.export import Beat
 DRIFT = 8
 
 PAGE = Path(export.__file__).parent / "page" / "page.html"
+PRESENT_JS = PAGE.parent / "present.js"
 BUILT = config.REPO_ROOT / "site" / "src" / "maps" / "la-metro-rail.html"
 PLAYWRIGHT = config.REPO_ROOT / "site" / "node_modules" / "playwright"
 
 needs_browser = pytest.mark.skipif(
     not (BUILT.exists() and PLAYWRIGHT.exists() and shutil.which("node")),
     reason="needs a built map page and site/node_modules/playwright")
+needs_node = pytest.mark.skipif(not shutil.which("node"), reason="needs node")
 
 
 def test_capture_cancels_the_queued_frame():
@@ -72,6 +76,74 @@ def test_the_recorder_launches_the_full_chromium():
     js = (config.REPO_ROOT / "bin" / "_record.js").read_text()
     assert 'chromium.launch({ channel: "chromium" })' in js, \
         "the recorder no longer names the full Chromium; captures will differ from the app's"
+
+
+def _seam_method(page: str, name: str) -> str:
+    """The text of one method of the window.__present object, from its
+    signature to the `},` that closes it at the object's own indent."""
+    start = page.index(f"    {name}(")
+    return page[start:page.index("\n    },", start) + len("\n    },")]
+
+
+def test_the_seam_has_a_theme_method_and_state_reports_the_theme():
+    """`window.__present.setTheme` exists, and `state()` says which theme is
+    showing -- so a client can change the theme without navigating the page
+    again, which throws away the clock, the view, the scrub and the toggles."""
+    page = PAGE.read_text(encoding="utf-8")
+    seam = page[page.index("window.__present = {"):]
+    assert "\n    setTheme(name) {" in seam, "the seam lost its theme method"
+    state = seam[seam.index("    state() {"):]
+    assert "theme:" in state[:state.index("\n    },")], "state() no longer reports the theme"
+
+
+def test_nothing_calls_setTheme_on_load_and_nothing_writes_the_theme_key():
+    """The method does nothing until called: present.js, which runs the load
+    sequence from the address, never names it, and the page has no write to
+    storage at all -- rc-theme is the site's script's key, and an export's
+    ?theme= must still win at boot, so a captured frame is the one it was."""
+    page = PAGE.read_text(encoding="utf-8")
+    assert page.count("setTheme(") == 1, "setTheme is gone, or something besides the seam names it"
+    assert "setTheme" not in PRESENT_JS.read_text(encoding="utf-8")
+    assert "setItem" not in page, "the page writes storage; rc-theme belongs to the site's script"
+
+
+@needs_node
+def test_setTheme_sets_data_theme_as_the_boot_script_does_and_refuses_the_rest():
+    """The method itself, run over a stand-in document element: sepia sets
+    data-theme, warm-dark removes it (the page's default is the absence of the
+    attribute, as in the boot script and the site's theme.js), a name the page
+    does not know returns false and changes nothing, and nothing reads or
+    writes storage. No browser: the method touches only `document`."""
+    method = _seam_method(PAGE.read_text(encoding="utf-8"), "setTheme")
+    script = """
+      const attrs = new Map();
+      globalThis.document = { documentElement: {
+        setAttribute(k, v) { attrs.set(k, v); },
+        removeAttribute(k) { attrs.delete(k); },
+        getAttribute(k) { return attrs.has(k) ? attrs.get(k) : null; },
+      } };
+      const trap = () => { throw new Error("storage touched"); };
+      globalThis.localStorage = { getItem: trap, setItem: trap, removeItem: trap };
+      const seam = {""" + method + """};
+      const out = [];
+      const names = ["sepia", "bogus", undefined, "Sepia", "warm-dark", "warm-dark", "sepia"];
+      for (const name of names) {
+        const ret = seam.setTheme(name);
+        out.push([name === undefined ? "undefined" : name, ret, attrs.get("data-theme") ?? null]);
+      }
+      console.log(JSON.stringify(out));
+    """
+    done = subprocess.run(["node", "-e", script], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stderr
+    assert json.loads(done.stdout) == [
+        ["sepia", True, "sepia"],
+        ["bogus", False, "sepia"],        # refused: the theme did not move
+        ["undefined", False, "sepia"],
+        ["Sepia", False, "sepia"],        # names are the page's own, exactly
+        ["warm-dark", True, None],        # the default is no attribute at all
+        ["warm-dark", True, None],
+        ["sepia", True, "sepia"],
+    ]
 
 
 @needs_browser
