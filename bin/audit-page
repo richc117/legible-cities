@@ -56,9 +56,12 @@ if (!files.length) files.push(DEFAULT_PAGE);
     for (const file of files) {
       const name = path.basename(file);
       for (const theme of THEMES) {
-        const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-        const page = await ctx.newPage();
+        // Inside the try, so a context or page that cannot be made is a line
+        // about this page and theme, never a stack trace naming this script's path.
+        let ctx;
         try {
+          ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+          const page = await ctx.newPage();
           const url = pathToFileURL(path.resolve(file)).href + "?theme=" + theme;
           await page.goto(url, { waitUntil: "load" });
           // The clock reads --:-- until the first frame has been drawn.
@@ -88,7 +91,7 @@ if (!files.length) files.push(DEFAULT_PAGE);
             .replace(/\/[^\s"']+/g, p => path.basename(p))})`);
           failed++;
         } finally {
-          await ctx.close();
+          if (ctx) await ctx.close();
         }
       }
     }
