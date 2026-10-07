@@ -69,6 +69,9 @@ STEM_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 # included, since the page writes it into a chip, a row and a train's title.
 LINE_NAME_PATTERN = re.compile(r"^[^\r\n\u2028\u2029]*$")
 LINE_NAME_LENGTH = 40
+# No line break of any kind. Matched whole (fullmatch): `$` alone would let a
+# trailing newline through.
+CAPTION_PATTERN = re.compile(r"^[^\r\n\u2028\u2029]*$")
 
 # An exception's kind is the module that raised it, since that is where the
 # sentence for a person was written.
@@ -450,8 +453,21 @@ def _export_options(value: Any) -> dict[str, Any]:
                     "must be a short filename suffix: letters, digits, dot, underscore, hyphen")
     if tag is not None:
         out["tag"] = tag
+    caption = _optional(left, "caption", _caption,
+                        f"must be text of 1 to {export.CAPTION_MAX} characters on one line")
+    if caption is not None:
+        out["caption"] = caption
+    corner = _optional(left, "clock_corner", lambda v: v in export.CLOCK_CORNERS,
+                       "must be one of " + ", ".join(export.CLOCK_CORNERS))
+    if corner is not None:
+        out["clock_corner"] = corner
     _no_extra("export.plan options", left)
     return out
+
+
+def _caption(value: Any) -> bool:
+    return (isinstance(value, str) and 1 <= len(value) <= export.CAPTION_MAX
+            and bool(CAPTION_PATTERN.fullmatch(value)))
 
 
 def _beat_payload(value: Any, where: str) -> dict[str, Any]:
@@ -529,12 +545,21 @@ def _capture_job(value: Any) -> export.CaptureJob:
     notes = left.pop("notes", [])
     if not isinstance(notes, list) or not all(isinstance(n, str) for n in notes):
         raise invalid_params("plan.notes must be a list of strings")
+    caption = left.pop("caption", None)
+    if caption is not None and not _caption(caption):
+        raise invalid_params(f"plan.caption must be text of 1 to {export.CAPTION_MAX} "
+                             f"characters on one line, or null")
+    corner = left.pop("clock_corner", export.DEFAULT_CORNER)
+    if corner not in export.CLOCK_CORNERS:
+        raise invalid_params("plan.clock_corner must be one of "
+                             + ", ".join(export.CLOCK_CORNERS))
     _no_extra("plan", left)
     return export.CaptureJob(key=key, preset=preset, mode=mode, url=url, width=ints["width"],
                              height=ints["height"], scale=ints["scale"], fps=ints["fps"],
                              format=fmt, settle=ints["settle"], beats=beats, keep=keep,
                              crf=ints["crf"], fade=float(fade), stem=stem, theme=theme,
-                             view=view, storyboard=board, at=at, notes=tuple(notes))
+                             view=view, storyboard=board, at=at, notes=tuple(notes),
+                             caption=caption, clock_corner=corner)
 
 
 def _absolute(left: dict[str, Any], name: str) -> Path:

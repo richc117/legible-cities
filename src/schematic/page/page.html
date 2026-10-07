@@ -231,7 +231,9 @@ __SOCIAL__
      to write to -- the same reason the header is hidden and not removed.
 
      Top right is the one free corner: the overlay puts the name top left and
-     the clock bottom right, on this same inset, so the three line up. */
+     the clock bottom right, on this same inset, so the three line up. That
+     place assumes the clock's default corner; the atlas's Presentation link
+     never sets another. */
   :root[data-present][data-controls] header {
     display: block; position: fixed; top: 4.2vmin; right: 5vmin; left: auto;
     z-index: 12; background: none; border: 0; padding: 0;
@@ -270,6 +272,45 @@ __SOCIAL__
     font-size: 4.6vmin; font-variant-numeric: tabular-nums; color: var(--text);
   }
   #present-overlay [hidden] { display: none; }
+  /* Everything below acts only on an attribute present.js sets when the
+     address asks for it, so an address without a caption, a corner or a zone
+     lays the overlay out exactly as it always did. */
+  /* A person's caption, at the date line's size and in the network's colour.
+     No halo and no ground of its own: it sits on the frame's ground, as the
+     name does. The block stops short of the far edge, or of a top-right clock
+     (11.5vmin wide) by 2vmin, so 80 characters wrap to two lines at most. */
+  #present-overlay[data-caption] .name .caption { font-size: 0.72em; margin-top: 0.35em; }
+  #present-overlay[data-caption] .name { max-width: calc(100vw - 10vmin); }
+  #present-overlay[data-corner="top-right"] .name { max-width: calc(100vw - 23.5vmin); }
+  /* The clock's other three corners, on the same insets as its own. */
+  #present-overlay[data-corner^="top"] .time { top: 4.2vmin; bottom: auto; }
+  #present-overlay[data-corner$="left"] .time { left: 5vmin; right: auto; }
+  /* A platform's own interface over the frame (export.SAFE_ZONES, as
+     fractions on the address). The stage keeps the top zone as bare ground and
+     the map is laid out in the part below it; the name and a top clock sit on
+     their usual inset below the zone, and nothing sits nearer a side than its
+     side zone. In present mode --map-bg is transparent, so the reserved band
+     is the same ground as the rest of the frame. */
+  :root[data-present][data-zones] #stage { padding-top: calc(var(--zone-top, 0) * 100vh); }
+  :root[data-zones] #present-overlay {
+    --zone-inset: max(5vmin, round(up, calc(var(--zone-side, 0) * 100vw), 1px));
+  }
+  :root[data-zones] #present-overlay .name {
+    top: calc(var(--zone-top, 0) * 100vh + 4.2vmin); left: var(--zone-inset);
+  }
+  :root[data-zones] #present-overlay[data-caption] .name {
+    max-width: calc(100vw - 2 * var(--zone-inset));
+  }
+  :root[data-zones] #present-overlay[data-corner="top-right"] .name {
+    max-width: calc(100vw - 2 * var(--zone-inset) - 13.5vmin);
+  }
+  :root[data-zones] #present-overlay .time { right: var(--zone-inset); }
+  :root[data-zones] #present-overlay[data-corner$="left"] .time {
+    left: var(--zone-inset); right: auto;
+  }
+  :root[data-zones] #present-overlay[data-corner^="top"] .time {
+    top: calc(var(--zone-top, 0) * 100vh + 4.2vmin);
+  }
   /* Where the platform's own UI sits. A preview aid only -- the exporter draws
      this into a separate file and never into a deliverable. */
   #present-safe { position: fixed; inset: 0; pointer-events: none; z-index: 11; }
@@ -322,7 +363,7 @@ __SOCIAL__
 </header>
 <main id="stage">__SVG__</main>
 <div id="present-overlay" aria-hidden="true">
-  <div class="name" hidden><b></b><span></span><span class="when" hidden></span></div>
+  <div class="name" hidden><b></b><span></span><span class="when" hidden></span><span class="caption" hidden></span></div>
   <div class="time" hidden></div>
 </div>
 <script id="data" type="application/json">__DATA__</script>

@@ -670,6 +670,14 @@
       "type": "string",
       "pattern": "^[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?$"
     },
+    "Caption": {
+      "description": "A person's words for the frame, 1 to 80 characters with no line break. The page draws it as text, never markup, under the title at the size of the date line: at most two lines at 1,080 wide.",
+      "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[^\\r\\n\\u2028\\u2029]*$"
+    },
+    "ClockCorner": {
+      "description": "Where the page draws the clock. Left out, it is bottom-right, where the clock has always sat, except on a preset with safe zones (instagram-reel, instagram-story), where it is top-right: there bottom-right is refused, because the platform's own interface covers it, and bottom-left comes with a note.",
+      "enum": ["top-left", "top-right", "bottom-left", "bottom-right"]
+    },
     "PageUrl": {
       "description": "The page's own address, with its scheme. The desktop app serves a project's page on its own origin and passes that; the engine's default is the site's file.",
       "type": "string",
@@ -983,7 +991,9 @@
         "safe": {
           "type": "boolean",
           "description": "Draw the platform's safe zones; never for a deliverable."
-        }
+        },
+        "caption": { "$ref": "#/$defs/Caption" },
+        "clock_corner": { "$ref": "#/$defs/ClockCorner" }
       },
       "additionalProperties": false
     },
@@ -1199,6 +1209,8 @@
           },
           "description": "What a person should hear before the capture, such as a sweep too fast to read."
         },
+        "caption": { "oneOf": [{ "$ref": "#/$defs/Caption" }, { "type": "null" }], "description": "The caption as given; null for none." },
+        "clock_corner": { "$ref": "#/$defs/ClockCorner", "description": "The corner resolved, given even where the clock is off and the address names none." },
         "filename": {
           "type": "string",
           "description": "stem plus the format's extension; the plan's convenience."
@@ -1225,6 +1237,8 @@
         "storyboard",
         "at",
         "notes",
+        "caption",
+        "clock_corner",
         "filename"
       ],
       "additionalProperties": false

@@ -36,9 +36,32 @@
   // Slightly more of the added height goes above the network, because that is
   // where the name sits and a title wants air above it. The margin is wider
   // when there is an overlay, so the text has ground of its own.
-  var titled = q.get("title") === "1" || q.get("clock") === "1";
+  var titled = q.get("title") === "1" || q.get("clock") === "1" || !!q.get("caption");
   var top = num("frametop", 0.46);
   var margin = num("margin", titled ? 0.085 : 0.025);
+
+  // Where the platform draws its own interface over the frame, as fractions of
+  // it (export.SAFE_ZONES, which the plan writes onto the address; none of the
+  // numbers live here). The frame is laid out in the part under the top zone:
+  // the stylesheet reserves the zone on the stage and moves the name and the
+  // clock below it and off the sides, and the box is padded to the aspect of
+  // what is left. None of it happens on an address that carries no zone.
+  var fraction = function (key) {
+    var v = num(key, NaN);
+    return v >= 0 && v < 1 ? v : null;
+  };
+  var zones = { top: fraction("ztop"), bottom: fraction("zbottom"), side: fraction("zside"),
+                rail: fraction("zrail"), railTop: fraction("zrailtop") };
+  var below = 1;
+  if (zones.top !== null || zones.bottom !== null || zones.side !== null || zones.rail !== null) {
+    var root = document.documentElement;
+    root.setAttribute("data-zones", "");
+    if (zones.top !== null) {
+      root.style.setProperty("--zone-top", String(zones.top));
+      below = 1 - zones.top;
+    }
+    if (zones.side !== null) root.style.setProperty("--zone-side", String(zones.side));
+  }
 
   var frame = q.get("frame");
   var fixed = null;
@@ -51,7 +74,7 @@
   // rather than an export asking for a specific aspect -- fill the window, and
   // keep filling it when the window changes.
   function fit() {
-    P.setFrame(fixed || (innerWidth / innerHeight), top, margin);
+    P.setFrame((fixed || (innerWidth / innerHeight)) / below, top, margin);
   }
   fit();
   if (!fixed) addEventListener("resize", fit);
@@ -130,11 +153,27 @@
   var box = document.getElementById("present-overlay");
   var nameEl = box.querySelector(".name");
   var timeEl = box.querySelector(".time");
+  var captionEl = nameEl.querySelector(".caption");
 
   var showName = on("title", false);
   var showClock = on("clock", false);
-  nameEl.hidden = !showName;
+  // A person's own words for the frame, under the name: set as text, so a
+  // caption holding markup is drawn as the characters it is. With the title
+  // off it is the name block's only line.
+  var caption = q.get("caption") || "";
+  nameEl.hidden = !(showName || caption);
   timeEl.hidden = !showClock;
+  if (caption) {
+    captionEl.textContent = caption;
+    captionEl.hidden = false;
+    box.setAttribute("data-caption", "");
+  }
+  // The clock's corner. Bottom right is the stylesheet's own rule and needs no
+  // attribute, so an address that names no corner lays out as it always did.
+  var corner = q.get("corner");
+  if (["top-left", "top-right", "bottom-left"].indexOf(corner) >= 0) {
+    box.setAttribute("data-corner", corner);
+  }
 
   if (showName) {
     // Two lines, because a city and its network are two facts. The page's own
@@ -160,17 +199,30 @@
   }
 
   // --------------------------------------------------------------- safe area
-  // Where Instagram's own controls sit over a 9:16 frame. A preview aid only --
-  // the exporter writes this into a separate file and never into a deliverable.
-  if (q.get("safe") === "1") {
-    var zones = [
-      { top: "0", left: "0", width: "100%", height: "12%" },   // status bar, top actions
-      { bottom: "0", left: "0", width: "100%", height: "22%" },// caption, handle, audio
-      { top: "40%", right: "0", width: "18%", height: "38%" }, // the button rail
-    ];
+  // Where the platform's own controls sit over the frame: a box for each zone
+  // the address carries, and nothing when it carries none. A preview aid only
+  // -- the exporter writes this into a separate file and never into a
+  // deliverable, and the numbers are the plan's, never this file's.
+  if (on("safe", false)) {
+    var pct = function (v) { return v * 100 + "%"; };
+    var boxes = [];
+    if (zones.top !== null) {            // status bar, top actions
+      boxes.push({ top: "0", left: "0", width: "100%", height: pct(zones.top) });
+    }
+    if (zones.bottom !== null) {         // caption, handle, audio
+      boxes.push({ bottom: "0", left: "0", width: "100%", height: pct(zones.bottom) });
+    }
+    if (zones.side !== null) {           // the margins either side
+      boxes.push({ top: "0", left: "0", width: pct(zones.side), height: "100%" });
+      boxes.push({ top: "0", right: "0", width: pct(zones.side), height: "100%" });
+    }
+    if (zones.rail !== null) {           // the button rail, down to the bottom edge
+      boxes.push({ top: zones.railTop === null ? "0" : pct(zones.railTop), bottom: "0",
+                   right: "0", width: pct(zones.rail) });
+    }
     var layer = document.createElement("div");
     layer.id = "present-safe";
-    zones.forEach(function (z) {
+    boxes.forEach(function (z) {
       var d = document.createElement("div");
       // Only the sides the zone actually names, or an unset edge resolves to 0
       // and stretches the box across the frame.

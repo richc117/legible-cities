@@ -288,6 +288,8 @@ def test_patterns_agree_with_the_schema():
     assert serve.STEM_PATTERN.pattern == defs["CaptureJob"]["properties"]["stem"]["pattern"]
     assert serve.COLOR_PATTERN.pattern == defs["HexColor"]["pattern"]
     assert serve.LINE_NAME_PATTERN.pattern == defs["LineOptions"]["properties"]["name"]["pattern"]
+    assert serve.CAPTION_PATTERN.pattern == defs["Caption"]["pattern"]
+    assert defs["ClockCorner"]["enum"] == list(export.CLOCK_CORNERS)
     # The app's generated types know every preset and storyboard by name.
     assert defs["PresetName"]["enum"] == list(export.PRESETS)
     assert defs["StoryboardName"]["enum"] == list(export.STORYBOARDS)
@@ -633,6 +635,14 @@ BAD_PARAMS = [
      "ExportPlanParams"),
     ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"storyboard": 3}},
      "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"caption": ""}},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"caption": "x" * 81}},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel", "options": {"caption": "a\nb"}},
+     "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "instagram-reel",
+                     "options": {"clock_corner": "middle"}}, "ExportPlanParams"),
     ("export.encode", {}, "ExportEncodeParams"),
     ("export.encode", {"plan": {}, "source": "/a", "dest": "/b/x.mp4"}, "ExportEncodeParams"),
     ("export.encode", {"plan": "plan", "source": "/a", "dest": "/b/x.mp4"}, "ExportEncodeParams"),
@@ -653,7 +663,8 @@ BAD_PLANS = [
     {"beats": [{"secs": 1, "view": None, "labels": None, "at": "07:00", "speed": None,
                 "sweep": False, "hours": None, "lo": None, "hi": None, "tween": None}]},
     {"keep": "yes"}, {"fade": -1}, {"stem": "../x"}, {"theme": "sepia"}, {"view": "plan"},
-    {"storyboard": "unknown"}, {"at": "07:00"}, {"notes": "note"}, {"extra": 1},
+    {"storyboard": "unknown"}, {"at": "07:00"}, {"notes": "note"},
+    {"caption": "x" * 81}, {"clock_corner": "middle"}, {"extra": 1},
 ]
 
 
@@ -764,6 +775,8 @@ GOOD_PARAMS = [
                               {"secs": 6, "view": "linear", "at": "06:30", "speed": 240},
                               {"secs": 4, "view": "time"},
                               {"secs": 10, "sweep": True, "hours": 4}]}}),
+    ("ExportPlanParams", {"key": KEY, "preset": "instagram-reel",
+                          "options": {"caption": "x" * 80, "clock_corner": "bottom-left"}}),
     ("ExportEncodeParams", {"plan": _plan_dict(), "source": "/somewhere/frames",
                             "dest": "/elsewhere/out.mp4"}),
     ("ExportEncodeParams", {"plan": _plan_dict(), "source": "/somewhere/frames",
@@ -845,6 +858,25 @@ def test_export_plan_refuses_with_the_export_modules_sentences(client):
                                           "options": {"storyboard": "transform"}})["error"]
     assert geo["code"] == -32000 and geo["data"]["kind"] == "export"
     assert "geographic" in geo["data"]["hint"]
+
+
+def test_export_plan_answers_the_caption_and_the_corner_and_refuses_the_rail(client):
+    """Issue 40. The reel's clock goes top right by default and the plan says
+    so; bottom right there is the plan's own refusal, an export error. A plan
+    handed back without the two fields, as a client written before them
+    sends it, reads as no caption and today's corner."""
+    plan = client.call("export.plan", {"key": KEY, "preset": "instagram-reel"})["result"]
+    check(plan, "CaptureJob")
+    assert plan["clock_corner"] == "top-right" and plan["caption"] is None
+    rail = client.call("export.plan", {"key": KEY, "preset": "instagram-reel",
+                                       "options": {"clock_corner": "bottom-right"}})["error"]
+    assert rail["code"] == -32000 and rail["data"]["kind"] == "export"
+    assert "button rail" in rail["data"]["hint"]
+    job = serve._capture_job(plan)
+    assert (job.caption, job.clock_corner) == (None, "top-right")
+    older = {k: v for k, v in plan.items() if k not in ("caption", "clock_corner")}
+    job = serve._capture_job(older)
+    assert (job.caption, job.clock_corner) == (None, "bottom-right")
 
 
 def _frames(into: Path, n: int, size: int, *, noise: bool = False) -> Path:

@@ -163,16 +163,22 @@ class Preset:
     fps: int = 30
     max_bytes: int | None = None
     frame_top: float = 0.46
-    # Whether the platform draws its own interface over the image. Only true
-    # for Instagram's full-bleed portrait surfaces; a Bluesky or LinkedIn image
-    # sits in a card with nothing on top of it, so a "safe area" there is a
-    # meaningless overlay of somebody else's geometry.
-    safe_zones: bool = False
+    # The row of SAFE_ZONES for the interface the platform draws over the
+    # image, or "" for none. Only Instagram's full-bleed portrait surfaces have
+    # one; a Bluesky or LinkedIn image sits in a card with nothing on top of
+    # it, so a "safe area" there is a meaningless overlay of somebody else's
+    # geometry.
+    zones: str = ""
     note: str = ""
 
     @property
     def aspect(self) -> float:
         return self.width / self.height
+
+    @property
+    def safe_zones(self) -> bool:
+        """Whether the platform draws its own interface over the image."""
+        return bool(self.zones)
 
 
 PRESETS: dict[str, Preset] = {p.name: p for p in [
@@ -180,7 +186,7 @@ PRESETS: dict[str, Preset] = {p.name: p for p in [
     Preset("instagram-post", "Instagram", 1080, 1350, "still", "png"),
     Preset("instagram-square", "Instagram", 1080, 1080, "still", "png"),
     Preset("instagram-story", "Instagram", 1080, 1920, "still", "png",
-           safe_zones=True),
+           zones="instagram-stories"),
     Preset("linkedin", "LinkedIn", 1200, 1200, "still", "png"),
     Preset("linkedin-link", "LinkedIn", 1200, 627, "still", "png",
            note="link-preview shape; the map gets very little height"),
@@ -191,7 +197,7 @@ PRESETS: dict[str, Preset] = {p.name: p for p in [
 
     # --- video ---------------------------------------------------------------
     Preset("instagram-reel", "Instagram", 1080, 1920, "video", "mp4",
-           storyboard="tour", safe_zones=True),
+           storyboard="tour", zones="instagram-reels"),
     # Bluesky's own client allows 300 MB a video (read 6 Oct 2026). The 50 MB
     # this said before refused a long export at high quality, and only after
     # its capture had run.
@@ -226,6 +232,61 @@ PRESETS: dict[str, Preset] = {p.name: p for p in [
            storyboard="morph", fps=24,
            note="palette-based GIF; keep it short, they are heavy"),
 ]}
+
+
+@dataclass(frozen=True)
+class Zones:
+    """Where a platform draws its own interface over a full-bleed frame.
+
+    Fractions of the frame: ``top``, ``bottom`` and ``rail_top`` of its height,
+    ``side`` and ``rail_width`` of its width; None where the platform has no
+    such zone. The rail is the column of buttons in the lower right, from
+    ``rail_top`` down to the bottom edge. ``measured`` is the day the numbers
+    were read, because platforms move their interfaces: a row is a dated
+    reading, not a fact.
+    """
+
+    top: float | None
+    bottom: float | None
+    side: float | None
+    rail_width: float | None
+    rail_top: float | None
+    measured: dt.date
+    source: str
+
+
+# The platforms' interfaces, by the name a preset's ``zones`` gives. The plan
+# writes a row's fractions onto the page's address and the page draws and
+# avoids what it is given, so these are the only zone numbers there are
+# (app ADR-052). A platform without a preset has no row.
+SAFE_ZONES: dict[str, Zones] = {
+    "instagram-reels": Zones(
+        top=0.14, bottom=0.35, side=0.06, rail_width=0.21,
+        # Not read from Meta's file: a summariser's reading of the rail's top
+        # at about 1,150 px down, and unverified (ADR-052's Decision says so).
+        rail_top=0.60,
+        measured=dt.date(2026, 10, 2),
+        source="Meta's Reels template as traced by Cadenus (July 2026): 270 px "
+               "clear at the top, 672 at the bottom and 64 at each side, and the "
+               "button rail 227 px from the right edge, at 1080x1920."),
+    "instagram-stories": Zones(
+        top=0.14, bottom=0.20, side=None, rail_width=None, rail_top=None,
+        measured=dt.date(2026, 10, 2),
+        source="Meta's Stories template as traced by Cadenus (July 2026): "
+               "\"roughly the top 14 percent (about 270 pixels) and the bottom "
+               "20 percent (about 385 pixels)\"."),
+}
+
+# Where the page can put the clock. Bottom right is where it has always sat,
+# and it is the default everywhere but on a preset with a row in SAFE_ZONES.
+CLOCK_CORNERS = ("top-left", "top-right", "bottom-left", "bottom-right")
+DEFAULT_CORNER = "bottom-right"
+
+# A caption is a person's text, drawn by the page as text under the title.
+# Eighty is two lines at the overlay's size on every preset (ADR-052), and is
+# this project's bound, not a platform's.
+CAPTION_MAX = 80
+LINE_BREAKS = ("\r", "\n", "\u2028", "\u2029")
 
 
 # ----------------------------------------------------------------- storyboards
@@ -509,14 +570,25 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
             labels: bool | None = None, title: bool = True, clock: bool | None = None,
             theme: str = "dark", at: str | None = None, speed: float | None = None,
             lines: tuple[str, ...] = (), safe: bool = False,
-            page: str | None = None, date: str | None = None) -> str:
+            page: str | None = None, date: str | None = None,
+            caption: str | None = None, clock_corner: str = DEFAULT_CORNER,
+            zones: Zones | None = None) -> str:
     """The presentation-mode URL for a preset. Also what you paste into a browser.
 
     ``page`` is the page's own address when it is not the site's file: the
     desktop app serves a project's page on its own origin and passes it here.
     ``date`` (YYYY-MM-DD) is the service day the title names when the caller
     knows it; otherwise it is the atlas's.
+
+    ``caption``, ``clock_corner`` and ``zones`` are written after everything
+    else, and only where they say something, so an address that uses none of
+    them is the one it always was. The page lays its frame out below a top
+    zone and keeps the name and the clock off the side zones; it draws the
+    zones themselves only under ``safe``.
     """
+    if clock_corner not in CLOCK_CORNERS:
+        raise ValueError(f"clock_corner is one of {', '.join(CLOCK_CORNERS)}, "
+                         f"not {clock_corner!r}")
     feed = feeds.get(key)
     view = view or preset.view
     if clock is None:
@@ -549,6 +621,16 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
         q["lines"] = ",".join(lines)
     if safe:
         q["safe"] = "1"
+    if caption:
+        q["caption"] = caption
+    if clock and clock_corner != DEFAULT_CORNER:
+        q["corner"] = clock_corner
+    if zones is not None:
+        for name, value in (("ztop", zones.top), ("zbottom", zones.bottom),
+                            ("zside", zones.side), ("zrail", zones.rail_width),
+                            ("zrailtop", zones.rail_top)):
+            if value is not None:
+                q[name] = str(value)
     from urllib.parse import urlencode
     base = page or (MAPS_DIR / f"{key}.html").as_uri()
     return base + "?" + urlencode(q)
@@ -946,6 +1028,10 @@ class CaptureJob:
     storyboard: str                    # its name; CUSTOM for a list; "" for a still
     at: float | None = None            # the clock, in seconds, a still is taken at
     notes: tuple[str, ...] = ()        # what a person should hear before the capture
+    caption: str | None = None         # as given; the page draws it as text
+    # The corner resolved, carried even where the clock is off and the
+    # address names none.
+    clock_corner: str = DEFAULT_CORNER
 
     @property
     def filename(self) -> str:
@@ -976,7 +1062,8 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
          at: str | None = None, lines: tuple[str, ...] = (),
          storyboard: str | Sequence[Beat | dict] | None = None, quality: str = "standard",
          fade: float = 0.0, safe: bool = False, tag: str = "", page: str | None = None,
-         date: str | None = None) -> CaptureJob:
+         date: str | None = None, caption: str | None = None,
+         clock_corner: str | None = None) -> CaptureJob:
     """Describe an export without doing any of it.
 
     Pure: reads the registry and the atlas's data, touches no file, starts no
@@ -990,6 +1077,13 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
     ``at`` open a named storyboard: its first beat takes them with no
     transition, so the page's address and frame 0 agree (issue 31). Beside a
     list they are refused, since the list's first beat is where they go.
+
+    ``caption`` is drawn under the title as given (``check_caption``).
+    ``clock_corner`` left out is bottom right, where the clock has always
+    sat, except on a preset with safe zones, where it is top right: there
+    the platform's own interface covers the bottom right, so that corner is
+    refused and the bottom left comes with a note. A preset with safe zones
+    carries its row on every address (issue 40).
     """
     if key not in feeds.all():
         raise KeyError(f"unknown feed {key!r}")
@@ -1000,6 +1094,12 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
         raise ValueError(f"{preset_name} is a vector preset: nothing to capture")
     if quality not in QUALITY:
         raise ValueError(f"quality is draft, standard or high, not {quality!r}")
+    if caption is not None:
+        check_caption(caption)
+    zones = SAFE_ZONES[preset.zones] if preset.zones else None
+    corner, corner_note = _clock_corner(preset, zones, clock_corner,
+                                        clock=preset.kind == "video" if clock is None else clock,
+                                        title=title, caption=bool(caption))
     # The beats a video plays, settled before anything reads `view` or `at`:
     # where a video opens is its first beat, and the address says the same.
     board, planned = "", ()
@@ -1026,7 +1126,8 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
     stem = (f"{key}-{preset.name}" + (f"-{theme}" if theme != "dark" else "")
             + (f"-{tag}" if tag else ""))
     url = url_for(key, preset, view=view, labels=labels, title=title, clock=clock,
-                  theme=theme, at=at, lines=lines, safe=safe, page=page, date=date)
+                  theme=theme, at=at, lines=lines, safe=safe, page=page, date=date,
+                  caption=caption, clock_corner=corner, zones=zones)
     beats: tuple[dict, ...] = ()
     notes: list[str] = []
     if preset.kind == "video":
@@ -1043,6 +1144,8 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
         # The clock bounds are the feed's, so a sweep with no explicit span
         # covers whatever service day this network actually has.
         beats = tuple(beat_payload(planned))
+    if corner_note:
+        notes.append(corner_note)
     # A video's beats pin the clock themselves; a still is pinned here.
     pinned = _hms(at) if at else (_hms(PAGE_START) if preset.kind == "still" else None)
     return CaptureJob(key=key, preset=preset.name, mode=preset.kind, url=url,
@@ -1050,7 +1153,54 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
                       fps=preset.fps, format=preset.fmt, settle=SETTLE_MS, beats=beats,
                       keep=keep, crf=crf, fade=fade, stem=stem, theme=theme,
                       view=view or preset.view, storyboard=board, at=pinned,
-                      notes=tuple(notes))
+                      notes=tuple(notes), caption=caption, clock_corner=corner)
+
+
+def check_caption(caption: object) -> str:
+    """A caption as the page will draw it, or a ``ValueError`` naming the bound.
+
+    Counted in code points, as Python's ``len`` counts. Never trimmed and never
+    escaped here: the page sets it as text, so ``<b>`` is drawn as those three
+    characters.
+    """
+    bound = f"A caption is 1 to {CAPTION_MAX} characters on one line"
+    if not isinstance(caption, str):
+        raise ValueError(f"{bound}; this one is not text.")
+    if any(mark in caption for mark in LINE_BREAKS):
+        raise ValueError(f"{bound}; this one has a line break.")
+    if not 1 <= len(caption) <= CAPTION_MAX:
+        raise ValueError(f"{bound}; this one is {len(caption)}.")
+    return caption
+
+
+def _clock_corner(preset: Preset, zones: Zones | None, asked: str | None, *,
+                  clock: bool, title: bool, caption: bool) -> tuple[str, str]:
+    """The corner the clock takes, and a note for a person, or a refusal.
+
+    Judged only where the clock is drawn; a still without one still resolves
+    a corner, which its plan carries. The title and a caption are the name
+    block, which sits top left, so a clock there would be drawn over them.
+    """
+    corner = asked if asked is not None else ("top-right" if zones else DEFAULT_CORNER)
+    if corner not in CLOCK_CORNERS:
+        raise ValueError(f"Choose the clock's corner from {', '.join(CLOCK_CORNERS)}; "
+                         f"{corner!r} is not one of them.")
+    if not clock:
+        return corner, ""
+    if zones and corner == "bottom-right":
+        what = "button rail" if zones.rail_width is not None else "bottom zone"
+        raise ValueError(f"Choose another corner for the clock: on {preset.name}, "
+                         f"{preset.platform}'s {what} covers the bottom right.")
+    if corner == "top-left" and (title or caption):
+        named = ("title and the caption sit" if title and caption
+                 else "title sits" if title else "caption sits")
+        raise ValueError(f"Choose another corner for the clock: the {named} top left.")
+    if zones and corner == "bottom-left" and zones.bottom is not None:
+        return corner, (f"the clock sits bottom left, inside {preset.platform}'s bottom "
+                        f"zone (the lowest {zones.bottom:.0%} of the frame), where "
+                        f"{preset.platform}'s own interface can cover it; top right "
+                        f"keeps it clear.")
+    return corner, ""
 
 
 def capture(job: CaptureJob, *, frames: Path | None = None, out: Path | None = None) -> Path:
