@@ -1249,6 +1249,10 @@
             "type": "string"
           }
         },
+        "headways": {
+          "type": "boolean",
+          "description": "Whether the feed's service is run from frequencies.txt (trains at a scheduled interval) rather than a timetable of trip times. A preset says so in the registry; for a feed added through feeds.add it is decided when the zip is checked: frequencies.txt has rows and the trips they name are at least half of the feed's trips."
+        },
         "source": {
           "enum": [
             "preset",
@@ -1272,6 +1276,7 @@
         "agency",
         "geographic",
         "notes",
+        "headways",
         "source",
         "cached"
       ],

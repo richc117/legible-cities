@@ -763,3 +763,93 @@ def test_a_persons_feed_fetched_again_names_its_address_without_its_key(home, tm
         feeds.fetch("mine")
     assert "could not be fetched: the server answered 403 Forbidden" in str(refused.value)
     _says_nothing_secret(str(refused.value))
+
+
+# ------------------------------------------------------------- the headways
+#
+# Issue 46. A registry entry says whether its service is run from
+# frequencies.txt (trains at a scheduled interval) rather than a timetable of
+# trip times. A preset says so by hand; a feed a person adds is decided from
+# its zip where the zip is checked, and the answer is written to its record.
+
+# Every preset's zip was read in Oct 2026. Mexico City's frequencies.txt has
+# 1,583 rows covering all 1,204 of its trips. Three others carry the file and
+# are timetables all the same: Phoenix has 4 rows among 18,157 trips, and
+# Chicago and Pittsburgh ship it empty. None of those three may flip.
+PUBLISHES_HEADWAYS = {"cdmx-metro"}
+
+
+@pytest.mark.parametrize("key", sorted(feeds.FEEDS))
+def test_only_mexico_city_publishes_headways_among_the_presets(key):
+    assert feeds.FEEDS[key].headways is (key in PUBLISHES_HEADWAYS)
+    assert feeds.get(key).to_dict()["headways"] is (key in PUBLISHES_HEADWAYS)
+
+
+def test_a_feed_publishes_no_headways_unless_it_is_said_to():
+    assert feeds.Feed(key="k", name="K", url="https://example.test/k.zip").headways is False
+
+
+def _trips(count: int) -> str:
+    return "route_id,service_id,trip_id\n" + "".join(f"R1,s,T{i}\n" for i in range(1, count + 1))
+
+
+def _frequencies(*trip_ids: str, header: str = "trip_id,start_time,end_time,headway_secs") -> str:
+    return header + "\n" + "".join(f"{t},05:00:00,23:00:00,300\n" for t in trip_ids)
+
+
+def _added_headways(tmp_path, *, trips: int, frequencies: str | None) -> bool:
+    tables = {**GOOD, "trips.txt": _trips(trips)}
+    if frequencies is not None:
+        tables["frequencies.txt"] = frequencies
+    return feeds.add(gtfs_zip(tmp_path / "feed.zip", tables)).headways
+
+
+@pytest.mark.parametrize("trips,frequencies,expected", [
+    pytest.param(1, _frequencies("T1"), True, id="the one trip is named"),
+    pytest.param(1, None, False, id="no frequencies.txt"),
+    pytest.param(20, _frequencies("T1", "T2", "T3", "T4"), False,
+                 id="four rows among twenty trips"),
+    pytest.param(4, _frequencies("T1", "T2"), True, id="exactly half the trips"),
+    pytest.param(5, _frequencies("T1", "T2"), False, id="just under half"),
+    pytest.param(4, _frequencies("T1", "T1", "T1", "T1"), False,
+                 id="four rows for one trip are one trip"),
+    pytest.param(2, _frequencies("X1", "X2"), False, id="rows naming trips the feed lacks"),
+    pytest.param(1, _frequencies(), False, id="a header and no rows"),
+    pytest.param(1, "", False, id="an empty file"),
+    pytest.param(1, "start_time,end_time,headway_secs\n05:00:00,23:00:00,300\n", False,
+                 id="rows with no trip_id"),
+    pytest.param(1, _frequencies("T1", header=" trip_id ,start_time, end_time,headway_secs"),
+                 True, id="a padded header, as Metra's is"),
+])
+def test_a_feed_added_from_a_zip_publishes_headways_when_frequencies_name_half_its_trips(
+        home, tmp_path, trips, frequencies, expected):
+    assert _added_headways(tmp_path, trips=trips, frequencies=frequencies) is expected
+
+
+def test_a_user_feeds_headways_are_on_its_record_and_a_restart_does_not_open_the_zip(
+        home, tmp_path):
+    tables = {**GOOD, "frequencies.txt": _frequencies("T1")}
+    feed = feeds.add(gtfs_zip(tmp_path / "with.zip", tables), key="with")
+    plain = feeds.add(gtfs_zip(tmp_path / "plain.zip"), key="plain")
+    assert (feed.headways, plain.headways) == (True, False)
+    assert {r["key"]: r["headways"] for r in json.loads(feeds.user_file().read_text())} == {
+        "with": True, "plain": False}
+    # With its zip gone, the registry still says it: the record is the answer.
+    feed.zip_path.unlink()
+    assert feeds.get("with").headways is True
+    assert feeds.user_feeds()["with"].headways is True
+    assert feeds.get("plain").headways is False
+
+
+def test_a_record_written_before_the_field_existed_reads_as_no_headways(home, tmp_path):
+    old = {k: v for k, v in feeds.Feed(key="old", name="Old", url="", source="user")
+           .to_dict().items() if k != "headways"}
+    assert "headways" not in old
+    feeds.user_file().parent.mkdir(parents=True)
+    feeds.user_file().write_text(json.dumps([old]), encoding="utf-8")
+    assert feeds.get("old").headways is False
+    assert feeds.all()["old"].headways is False
+    # The next write states it, for the old record as for the new.
+    feeds.add(gtfs_zip(tmp_path / "new.zip"), key="new")
+    assert {r["key"]: r["headways"] for r in json.loads(feeds.user_file().read_text())} == {
+        "old": False, "new": False}

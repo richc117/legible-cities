@@ -1134,6 +1134,43 @@ def test_feeds_list_is_every_preset_and_what_was_added(client, home, tmp_path):
     assert "built-in" in error["data"]["hint"]
 
 
+def test_feeds_list_and_add_answer_headways_and_the_schema_requires_it(client, tmp_path,
+                                                                       monkeypatch):
+    """Issue 46: every feed answers whether it publishes headways, a preset by
+    the registry's word and a feed added from a zip by what its check found.
+    A home of its own: it needs no feed on disk and leaves the shared one as
+    it was."""
+    monkeypatch.setenv(config.ENV, str(tmp_path / "home"))
+    listed = client.call("feeds.list")["result"]
+    check(listed, "FeedsList")
+    assert {f["key"]: f["headways"] for f in listed["feeds"]} == {
+        key: key == "cdmx-metro" for key in feeds.FEEDS}
+
+    # The field is required and a boolean: a record without it, or with a word
+    # for it, is not a FeedRecord.
+    bart = next(f for f in listed["feeds"] if f["key"] == "bart")
+    assert not invalid(bart, "FeedRecord")
+    assert invalid({k: v for k, v in bart.items() if k != "headways"}, "FeedRecord")
+    assert invalid({**bart, "headways": "yes"}, "FeedRecord")
+
+    frequencies = ("trip_id,start_time,end_time,headway_secs\n"
+                   "T1,05:00:00,23:00:00,300\n")
+    runs = gtfs_zip(tmp_path / "runs.zip", {**GOOD, "frequencies.txt": frequencies})
+    plain = gtfs_zip(tmp_path / "plain.zip")
+    answers = {}
+    for key, src in (("runs-by-interval", runs), ("runs-by-timetable", plain)):
+        sent = client.send("feeds.add", {"source": str(src), "key": key})
+        answers[key] = client.wait(sent)["result"]
+        check(answers[key], "FeedRecord")
+    assert answers["runs-by-interval"]["headways"] is True
+    assert answers["runs-by-timetable"]["headways"] is False
+
+    after = client.call("feeds.list")["result"]
+    check(after, "FeedsList")
+    assert {f["key"]: f["headways"] for f in after["feeds"] if f["source"] == "user"} == {
+        "runs-by-interval": True, "runs-by-timetable": False}
+
+
 def test_feeds_add_refuses_a_zip_without_a_timetable_with_the_named_sentence(client, home,
                                                                               tmp_path):
     tables = {k: v for k, v in GOOD.items() if k != "stop_times.txt"}

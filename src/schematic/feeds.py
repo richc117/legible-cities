@@ -93,6 +93,13 @@ class Feed:
     # for.
     geographic: bool = True
     notes: tuple[str, ...] = ()
+    # Whether the operator publishes headways (``frequencies.txt``: trains at a
+    # scheduled interval for each period of the day) rather than a timetable
+    # of trip times. A fact about the feed that a client cannot read from the
+    # zip without opening it, so the registry states it: set by hand on a
+    # preset, decided from the zip for a feed a person adds
+    # (``_publishes_headways``) and kept on its record.
+    headways: bool = False
     # "preset" for an entry of FEEDS, "user" for one a person added, which is
     # the one kind ``remove`` will take away.
     source: str = "preset"
@@ -339,6 +346,11 @@ FEEDS: dict[str, Feed] = {
         # Eight operators share this feed, and Suburbano also has a route
         # numbered 1 at route_type 1.
         agency="METRO",
+        # 1,583 frequencies.txt rows cover all 1,204 of its trips (checked Oct
+        # 2026). The other presets that carry the file do not run from it:
+        # Valley Metro has 4 rows among 18,157 trips, and the Chicago 'L' and
+        # the Pittsburgh T ship it empty.
+        headways=True,
         notes=(
             "This is a 2025 snapshot: the published feed's service period ran "
             "to December 2025, so the date above is from its own calendar "
@@ -469,6 +481,40 @@ def _agency_name(path: Path, members: dict[str, str]) -> str | None:
         return None
     value = df["agency_name"].iloc[0]
     return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _trip_ids(zf: zipfile.ZipFile, member: str) -> set[str]:
+    """The distinct ``trip_id`` values of one table in the zip; none when the
+    table has no such column or no rows."""
+    df = pd.read_csv(io.BytesIO(zf.read(member)), dtype=str, skipinitialspace=True,
+                     keep_default_na=False,
+                     usecols=lambda column: column.strip().lstrip("\ufeff") == "trip_id")
+    df.columns = [c.strip().lstrip("\ufeff") for c in df.columns]
+    return set(df["trip_id"]) if "trip_id" in df.columns else set()
+
+
+def _publishes_headways(path: Path, members: dict[str, str]) -> bool:
+    """Whether the feed's service is run from ``frequencies.txt``: the file is
+    there, has rows, and the trips those rows name are at least half of the
+    trips ``trips.txt`` lists.
+
+    The file's presence alone says too little. Valley Metro's feed carries 4
+    rows among 18,157 trips, and the Chicago 'L' and the Pittsburgh T ship the
+    file with a header only: a timetable all the same. A table that cannot be
+    read is not a claim of headways, so it answers no.
+    """
+    member = members.get("frequencies")
+    if member is None:
+        return False
+    try:
+        with zipfile.ZipFile(path) as zf:
+            named = _trip_ids(zf, member)
+            if not named:
+                return False
+            trips = _trip_ids(zf, members["trips"])
+    except (ValueError, OSError, KeyError):
+        return False
+    return bool(trips) and 2 * len(named & trips) >= len(trips)
 
 
 def _is_url(source: str) -> bool:
@@ -610,6 +656,7 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
         if progress is not None:
             progress("check", 0, None)
         members = _check_gtfs(staging, what)
+        headways = _publishes_headways(staging, members)
         if progress is not None:
             progress("check", 1, None)
         if name is None:
@@ -632,7 +679,8 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
             users = user_feeds()
             if key in FEEDS or key in users:
                 raise FeedError(f"{key!r} is already a feed; choose another key")
-            feed = Feed(key=key, name=name, url=url, mode=mode, agency=agency, source="user")
+            feed = Feed(key=key, name=name, url=url, mode=mode, agency=agency,
+                        headways=headways, source="user")
             os.replace(staging, feed.zip_path)
             users[key] = feed
             _write_user_feeds(users)
