@@ -451,10 +451,16 @@ def test_a_stored_day_the_feed_no_longer_covers_is_refused(build):
     assert stored_days() == before
     assert not (site.DATA_DIR / "networks.json").exists(), "an atlas of a refused build"
 
+    # A day the pipeline chose itself is another case. It is the busiest day
+    # the calendar names, so a redate would choose it again; the feed has no
+    # timed trips, and the sentence must not send the person to a redate.
     # And a network built for the first time is not written down on the way.
     site.service_days_file().unlink()
-    with pytest.raises(ValueError, match=LA):
+    with pytest.raises(ValueError, match=rf"{LA}: the feed has no timed trips on "
+                                         rf"2026-10-07, the busiest day") as refusal:
         site.export([LA])
+    assert "--redate" not in str(refusal.value)
+    assert "not a stored service day" in str(refusal.value)
     assert not site.service_days_file().exists()
 
 
@@ -475,3 +481,5 @@ def test_a_write_cut_short_leaves_the_file_as_it_was(build, monkeypatch):
         site.write_service_days({LA: dt.date(2026, 10, 7), CDMX: dt.date(2026, 10, 7)})
 
     assert stored_days() == before
+    # Git does not ignore it and nothing else would remove it.
+    assert [f.name for f in site.DATA_DIR.iterdir()] == ["service-days.json"]

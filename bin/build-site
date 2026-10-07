@@ -41,13 +41,17 @@ echo "==> generating maps"
 "$python" -c "
 import sys
 from schematic import site
+# A ValueError is what the engine writes for a person: a feed that is not
+# registered, a file that cannot be read, a stored day the feed no longer
+# covers, a layout that is missing. One line and exit 1; anything else keeps its
+# traceback.
 try:
     for key, was in site.redate(sys.argv[1:]).items():
         print(f'{key}: ' + (f'service day {was} cleared; it is chosen again' if was
                             else 'had no stored service day'))
-except ValueError as exc:      # a FeedError is one, and so is an unreadable file
+    entries = site.export()
+except ValueError as exc:
     sys.exit(f'bin/build-site: {exc}')
-entries = site.export()
 print(f'{len(entries)} networks -> site/src/maps/')
 " ${redate[@]+"${redate[@]}"}
 

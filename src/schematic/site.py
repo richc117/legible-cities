@@ -346,8 +346,13 @@ def write_service_days(days: dict[str, dt.date]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     stored = {key: days[key].isoformat() for key in sorted(days)}
     tmp = path.with_name(path.name + ".part")
-    tmp.write_text(json.dumps(stored, indent=2) + "\n", encoding="utf-8", newline="\n")
-    os.replace(tmp, path)
+    try:
+        tmp.write_text(json.dumps(stored, indent=2) + "\n", encoding="utf-8", newline="\n")
+        os.replace(tmp, path)
+    except BaseException:
+        # Not ignored by git, and nothing else would ever remove it.
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def redate(keys: Iterable[str]) -> dict[str, dt.date | None]:
@@ -376,7 +381,7 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
     network with none is left to the pipeline, which chooses the busiest
     weekday from today, and what it chose is written down before the next
     network is built, so a build that stops part way keeps the days it chose.
-    A stored day with no trips in the feed any more is refused, naming the
+    A day with no trips in the feed, stored or chosen, is refused, naming the
     network, rather than built into an empty page.
     """
     keys = keys or list(feeds.all())
@@ -390,13 +395,23 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
                               out_dir=MAPS_DIR, back=atlas_url(),
                               icons=icons_url(), social=social_tags(key))
         if not result.trips:
-            # A day the pipeline chose always has trips, so this is a stored day
-            # the feed's calendar no longer covers. Built anyway it would be an
-            # empty page that the atlas ranks as the cleanest network.
+            # Built anyway this would be an empty page that the atlas ranks as
+            # the cleanest network. The cause depends on who chose the day: a
+            # stored one may be past the end of the feed's calendar, which a
+            # redate mends; one the pipeline chose is the busiest its calendar
+            # names, but it counts rows in trips.txt and the schedule needs
+            # timed calls too, so a feed without times has none even there, and
+            # choosing again would choose the same day.
+            day = result.date.isoformat()
+            if key in days:
+                raise ValueError(
+                    f"{key}: no trips run on {day}, so the feed's calendar no "
+                    f"longer covers its stored service day; "
+                    f"bin/build-site --redate {key} chooses another")
             raise ValueError(
-                f"{key}: no trips run on {result.date.isoformat()}, so the feed's "
-                f"calendar no longer covers its stored service day; "
-                f"bin/build-site --redate {key} chooses another")
+                f"{key}: the feed has no timed trips on {day}, the busiest day its "
+                f"own calendar names, so the feed is the problem and not a stored "
+                f"service day")
         if key not in days:
             days[key] = result.date
             write_service_days(days)
