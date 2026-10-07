@@ -1144,6 +1144,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "alt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "The sidecar's alt text in the caller's own words, written trimmed, in place of the description the engine generates; omitted, the generated one stands. At most 1,000 characters, counted as Unicode code points (a JavaScript string's length counts UTF-16 units, so one emoji is one here and two there). Text of only whitespace is refused by the server."
         }
       },
       "additionalProperties": false

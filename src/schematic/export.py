@@ -929,7 +929,8 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
             _resample(source, dest, preset)
         check_size(dest, preset)
         _write_sidecar(job.key, preset, [dest], theme=job.theme, view=job.view,
-                       storyboard=job.storyboard, provenance=provenance)
+                       storyboard=job.storyboard, provenance=provenance,
+                       alt=(provenance or {}).get("alt"))
     except BaseException:
         for path in (dest, sidecar_path(dest)):
             path.unlink(missing_ok=True)
@@ -1006,10 +1007,13 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
 
 def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
                    theme: str, view: str, storyboard: str = "",
-                   provenance: dict | None = None) -> None:
+                   provenance: dict | None = None,
+                   alt: str | None = None) -> None:
     """What this file is, beside the file. Includes the caveats the atlas shows:
     an image travels further than the page it came from. ``provenance`` from
-    the caller wins over the atlas's, field by field."""
+    the caller wins over the atlas's, field by field. ``alt`` is the caller's own
+    description, written as given in place of the generated one; it is not
+    checked here, the server checks it."""
     feed = feeds.get(key)
     prov = {**_provenance(key),
             **{k: v for k, v in (provenance or {}).items() if v is not None}}
@@ -1029,8 +1033,9 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
             "view": storyboard_views(storyboard) or view,
             "storyboard": storyboard or None,
             "theme": theme,
-            "alt": (storyboard_alt(key, storyboard, **stats) if storyboard
-                    else alt_text(key, view, **stats)),
+            "alt": alt if alt is not None else (
+                storyboard_alt(key, storyboard, **stats) if storyboard
+                else alt_text(key, view, **stats)),
             "service_date": prov.get("service_date"),
             "trips": prov.get("trips"),
             # What the atlas says about this network, carried with the picture.

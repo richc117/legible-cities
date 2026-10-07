@@ -548,6 +548,10 @@ def test_a_plan_handed_back_is_checked_field_by_field(client, wrong):
     {"source": "/somewhere/frames", "dest": str(config.REPO_ROOT / "out" / "x.mp4")},
     {"source": "/somewhere/frames", "dest": "/elsewhere/out.mp4", "provenance": {"trips": -1}},
     {"source": "/somewhere/frames", "dest": "/elsewhere/out.mp4", "provenance": {"x": 1}},
+    {"source": "/somewhere/frames", "dest": "/elsewhere/out.mp4", "provenance": {"alt": ""}},
+    {"source": "/somewhere/frames", "dest": "/elsewhere/out.mp4",
+     "provenance": {"alt": "x" * 1001}},
+    {"source": "/somewhere/frames", "dest": "/elsewhere/out.mp4", "provenance": {"alt": 7}},
 ])
 def test_encode_refuses_a_path_it_must_not_write_to(client, params):
     error = client.call("export.encode", {"plan": _plan_dict(), **params})["error"]
@@ -620,6 +624,11 @@ GOOD_PARAMS = [
                             "dest": "/elsewhere/out.mp4",
                             "provenance": {"service_date": DATE, "trips": 100,
                                            "stations": 10, "lines": 2, "caveats": ["a"]}}),
+    ("ExportEncodeParams", {"plan": _plan_dict(), "source": "/somewhere/frames",
+                            "dest": "/elsewhere/out.mp4",
+                            "provenance": {"service_date": DATE, "trips": 100,
+                                           "stations": 10, "lines": 2, "caveats": ["a"],
+                                           "alt": "A map of the network."}}),
 ]
 
 

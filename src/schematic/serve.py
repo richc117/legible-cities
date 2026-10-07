@@ -464,6 +464,19 @@ def _provenance(value: Any) -> dict[str, Any] | None:
     caveats = _strings(left, "caveats")
     if caveats is not None:
         out["caveats"] = caveats
+    alt = left.pop("alt", None)
+    if alt is not None:
+        longest = 1000  # code points, which is what the schema's maxLength counts
+        if not isinstance(alt, str):
+            raise invalid_params("provenance.alt must be text")
+        if len(alt) > longest:
+            raise invalid_params(f"provenance.alt is {len(alt):,} characters; "
+                                 f"it may be at most {longest:,}")
+        alt = alt.strip()
+        if not alt:
+            raise invalid_params("provenance.alt is empty; omit it instead, and the "
+                                 "sidecar keeps the description the engine writes")
+        out["alt"] = alt
     _no_extra("provenance", left)
     return out
 
