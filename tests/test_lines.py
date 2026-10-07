@@ -26,7 +26,7 @@ from test_colors import _graph
 
 from schematic import animate, feeds, pipeline, render as render_module, serve, thumbnail
 from schematic.animate import _HTML
-from schematic.linegraph import LineGraph, Node
+from schematic.linegraph import Edge, LineGraph, Node
 from schematic.render import Style, render
 from schematic.schedule import Call, StopMatch, Trip
 
@@ -62,9 +62,13 @@ def _collection(points: list[tuple[float, float]]) -> dict:
 
 
 def chain() -> LineGraph:
-    """The chain, and a station off it that never had an edge."""
+    """The chain, a station off it that never had an edge, and two more
+    joined by an edge that never carried a line."""
     graph = LineGraph.from_geojson(_collection(SCHEMATIC))
     graph.nodes["n9"] = Node(id="n9", coord=(50.0, 0.0), station_id="S9", station_label="Stop 9")
+    graph.nodes["n7"] = Node(id="n7", coord=(50.0, 10.0), station_id="S7", station_label="Stop 7")
+    graph.nodes["n8"] = Node(id="n8", coord=(60.0, 10.0), station_id="S8", station_label="Stop 8")
+    graph.edges.append(Edge(src="n7", dst="n8", geometry=[(50.0, 10.0), (60.0, 10.0)], lines=[]))
     return graph
 
 
@@ -83,15 +87,20 @@ def test_without_nothing_it_carries_is_the_graph_itself(labels):
     graph = chain()
     copy = graph.without(labels)
     assert copy is not graph and copy.edges is not graph.edges
+    # The edge that never carried a line, and the two stations only it
+    # holds, are not the hiding's to take.
+    assert edge(copy, "n7", "n8").lines == [] and {"n7", "n8"} <= set(copy.nodes)
     assert dumped(copy) == dumped(graph)
 
 
 def test_a_station_only_the_hidden_line_served_goes_and_the_rest_stay():
     graph = chain()
     seen = graph.without({"B"})
-    # n4 had an edge and lost it; n9 never had one, so it is not B's to take.
-    assert list(seen.nodes) == ["n0", "n1", "n2", "n3", "n9"]
-    assert [(e.src, e.dst) for e in seen.edges] == [("n2", "n3"), ("n1", "n2"), ("n0", "n1")]
+    # n4 had an edge and lost it; n9 never had one, and n7 and n8 have one
+    # that never carried a line, so none of them is B's to take.
+    assert list(seen.nodes) == ["n0", "n1", "n2", "n3", "n9", "n7", "n8"]
+    assert [(e.src, e.dst) for e in seen.edges] == \
+        [("n2", "n3"), ("n1", "n2"), ("n0", "n1"), ("n7", "n8")]
 
 
 def test_an_edge_the_lines_shared_carries_the_one_left_in_its_place():
@@ -189,8 +198,16 @@ def circle(node: str) -> str:
     return rf'<circle [^>]*data-node="{node}"'
 
 
+def radius(svg: str, node: str) -> float:
+    """The radius a station is drawn with."""
+    found = re.search(rf'<circle [^>]*\sr="([0-9.]+)"[^>]*data-node="{node}"', svg)
+    assert found, node
+    return float(found.group(1))
+
+
 def test_a_hidden_line_is_taken_off_before_anything_reads_the_graph(stand, tmp_path):
     before = stand.hashes()
+    whole = stand.run(tmp_path / "whole")[1]
     result, svg, data, page = stand.run(tmp_path / "out", lines={"B": {"hidden": True}})
 
     # The map: no group for B, no station only B served, and every station A
@@ -200,6 +217,12 @@ def test_a_hidden_line_is_taken_off_before_anything_reads_the_graph(stand, tmp_p
     assert not re.search(circle("n4"), svg) and 'data-node="n4"' not in svg
     for node in ("n0", "n1", "n2", "n3"):
         assert re.search(circle(node), svg), node
+    # A station that was an interchange only because of B is a plain one now.
+    style = Style()
+    for node in ("n1", "n2", "n3"):
+        assert radius(whole, node) == pytest.approx(style.interchange_radius), node
+        assert radius(svg, node) == pytest.approx(style.station_radius), node
+    assert radius(whole, "n0") == radius(svg, "n0") == pytest.approx(style.station_radius)
 
     # The page: no colour, no row (so no band) and no trip, so no chip, since
     # the page makes its chips from the trips.
