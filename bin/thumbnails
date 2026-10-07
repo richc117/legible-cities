@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Draw the thumbnail pair of every sample city the desktop app shows on its
+# front door.
+#
+#   bin/thumbnails <folder>
+#
+# For each preset with a stored layout at the pinned LOOM, writes
+# <key>-dark.svg and <key>-light.svg and, beside them, a README.md naming the
+# engine, the LOOM commit and the date, and each preset left without a picture
+# and why. Prints the total size and the presets missing. <folder> is created
+# if it is missing. The layouts are read, never made: a preset whose feed is not
+# downloaded or not laid out at this LOOM is skipped, so run bin/run-all first
+# if a picture is wanted for it. See src/schematic/sample_thumbnails.py.
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+
+python="$root/.venv/bin/python"
+[ -x "$python" ] || python="python3"
+
+# Not cd'ing into the checkout: <folder> is read from where the caller stands,
+# so a relative one lands where they meant. PYTHONPATH covers the fallback
+# python3, which has not had the engine installed into it.
+PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" exec "$python" -m schematic.sample_thumbnails "$@"
