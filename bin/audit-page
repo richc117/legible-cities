@@ -1,0 +1,99 @@
+#!/usr/bin/env node
+// Run axe over an animation page, in both themes, and fail on any violation.
+//
+//   node bin/audit-page [page.html ...]
+//
+// Each page is opened over file:// at 1280x800, once under ?theme=warm-dark
+// and once under ?theme=sepia (the boot script at the top of the page reads
+// `theme`), given its first frame, and checked with axe's default rules. What
+// is printed is the count per page and theme and, for each violation, its rule,
+// its impact and its first few targets. A page is named by its file name only:
+// this output is pasted into public issues, and a path names a person's home.
+// Exits 1 on any violation, and on a page it could not open. What axe could not
+// decide ("incomplete") is printed as "to review" and does not fail the run.
+//
+// No rule is turned off. If one ever has to be, name it here with the reason,
+// where the next person reads it, and list the defect it hides.
+//
+// @axe-core/playwright and axe-core are MPL-2.0 and are used only here, to
+// test. They are devDependencies of the site and never reach a page, the
+// site or the Python package.
+const path = require("path");
+const { pathToFileURL } = require("url");
+
+const MODULES = path.join(__dirname, "..", "site", "node_modules");
+let chromium, AxeBuilder;
+try {
+  ({ chromium } = require(path.join(MODULES, "playwright")));
+  AxeBuilder = require(path.join(MODULES, "@axe-core", "playwright")).default
+    || require(path.join(MODULES, "@axe-core", "playwright")).AxeBuilder;
+  if (typeof AxeBuilder !== "function") throw new Error("no AxeBuilder");
+} catch (e) {
+  console.error("playwright or @axe-core/playwright missing. cd site && npm install");
+  process.exit(1);
+}
+
+const DEFAULT_PAGE = path.join(__dirname, "..", "site", "src", "maps", "la-metro-rail.html");
+const THEMES = ["warm-dark", "sepia"];
+const SHOWN = 3;     // targets printed per violation
+
+const files = process.argv.slice(2);
+if (!files.length) files.push(DEFAULT_PAGE);
+
+(async () => {
+  // The full Chromium, as bin/_record.js launches it: the browser a viewer has.
+  let browser;
+  try {
+    browser = await chromium.launch({ channel: "chromium" });
+  } catch (e) {
+    const why = String(e.message).split("\n")[0].replace(/ (at|spawn) .*$/, "");
+    console.error("could not start the full Chromium (" + why + ")\n" +
+                  "      cd site && npx playwright install chromium  (not --only-shell)");
+    process.exit(1);
+  }
+  let failed = 0;
+  try {
+    for (const file of files) {
+      const name = path.basename(file);
+      for (const theme of THEMES) {
+        const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+        const page = await ctx.newPage();
+        try {
+          const url = pathToFileURL(path.resolve(file)).href + "?theme=" + theme;
+          await page.goto(url, { waitUntil: "load" });
+          // The clock reads --:-- until the first frame has been drawn.
+          await page.waitForFunction(
+            () => window.__present && window.__present.state().clock !== "--:--",
+            null, { timeout: 30000 });
+          const results = await new AxeBuilder({ page }).analyze();
+          const found = results.violations;
+          console.log(`${name} ${theme}: ${found.length} violation${found.length === 1 ? "" : "s"}`);
+          for (const v of found) {
+            const targets = v.nodes.map(n => n.target.join(" "));
+            const more = targets.length > SHOWN ? ` (+${targets.length - SHOWN} more)` : "";
+            console.log(`  ${v.id} (${v.impact}), ${v.nodes.length} node${v.nodes.length === 1 ? "" : "s"}: ` +
+                        targets.slice(0, SHOWN).join(" | ") + more);
+          }
+          // Not failures: axe could not decide, and says so. Printed so a
+          // person reads them, one line a rule.
+          for (const v of results.incomplete) {
+            const targets = v.nodes.map(n => n.target.join(" "));
+            const more = targets.length > SHOWN ? ` (+${targets.length - SHOWN} more)` : "";
+            console.log(`  to review: ${v.id} (${v.impact}), ${v.nodes.length} node${v.nodes.length === 1 ? "" : "s"}: ` +
+                        targets.slice(0, SHOWN).join(" | ") + more);
+          }
+          if (found.length) failed++;
+        } catch (e) {
+          console.log(`${name} ${theme}: could not be checked (${String(e.message).split("\n")[0]
+            .replace(/\/[^\s"']+/g, p => path.basename(p))})`);
+          failed++;
+        } finally {
+          await ctx.close();
+        }
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+  process.exit(failed ? 1 : 0);
+})();
