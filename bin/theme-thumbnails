@@ -15,6 +15,6 @@ python="$root/.venv/bin/python"
 [ -x "$python" ] || python="python3"
 
 # Not cd'ing into the checkout: <folder> is read from where the caller stands,
-# so a relative one lands where they meant. PYTHONPATH covers the fallback
-# python3, which has not had the engine installed into it.
+# so a relative one lands where they meant. PYTHONPATH puts the engine's source
+# on the fallback python3's path; it still needs the engine's dependencies.
 PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" exec "$python" -m schematic.theme_thumbnails "$@"

@@ -92,8 +92,12 @@ LINES: dict[str, tuple[str, list[tuple[int, int]]]] = {
     "D": ("#c2690f", [(11, 9), (11, 5), (11, 3), (11, 1)]),
 }
 
+# What the reframing reads in the renderer's markup. ``site._reframe`` does the
+# same surgery for the share card and is the other copy of it: change one and
+# read the other. The size is anchored to the root, so that a root without
+# width and height is refused rather than the backdrop's own pair taken for it.
 _VIEWBOX = re.compile(r'viewBox="([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+)"')
-_SIZED = re.compile(r'width="[\d.]+" height="[\d.]+"')
+_SIZED = re.compile(r'(<svg\b[^>]*?\s)width="[\d.]+" height="[\d.]+"')
 _BACKDROP = re.compile(r'<rect id="backdrop"[^>]*?/>')
 
 
@@ -148,7 +152,7 @@ def frame(svg: str, theme: str) -> str:
     x, y, w, h = (round(v, 2) for v in padded_box(drawn, ASPECT, frame_top=0.5))
 
     svg, n = _VIEWBOX.subn(f'viewBox="{x:.2f} {y:.2f} {w:.2f} {h:.2f}"', svg, count=1)
-    svg, m = _SIZED.subn(f'width="{SIZE[0]}" height="{SIZE[1]}"', svg, count=1)
+    svg, m = _SIZED.subn(rf'\g<1>width="{SIZE[0]}" height="{SIZE[1]}"', svg, count=1)
     svg, k = _BACKDROP.subn(
         f'<rect id="backdrop" x="{x:.2f}" y="{y:.2f}" width="{w:.2f}" '
         f'height="{h:.2f}" fill="{palette["bg"]}"/>', svg, count=1)

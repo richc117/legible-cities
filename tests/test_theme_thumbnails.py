@@ -82,6 +82,40 @@ def test_the_first_drawn_element_is_the_palettes_ground_over_the_whole_view(made
     assert first.get("fill") == ground
 
 
+# ---------------------------------------------------------------------- shape
+
+# The network the research chose, written out again here on purpose: the
+# fixture's own table is what a change to it would edit.
+STATIONS = {(1, 5), (5, 5), (8, 5), (11, 5), (15, 5),     # A
+            (5, 9), (5, 1),                                # B, besides (5, 5)
+            (8, 8), (14, 2),                               # C, besides (11, 5)
+            (11, 9), (11, 3), (11, 1)}                     # D, besides (11, 5)
+INTERCHANGES = {(5, 5), (11, 5)}
+
+
+def drawn_at(x: int, y: int) -> tuple[str, str]:
+    """Where grid point (x, y) is drawn: 32 units a step, x from 1, y down from 9."""
+    return f"{(x - 1) * 32:.2f}", f"{(9 - y) * 32:.2f}"
+
+
+def test_the_fixture_is_twelve_stations_on_eleven_runs():
+    graph = theme_thumbnails.fixture()
+    assert len(graph.stations) == 12 and len(graph.edges) == 11
+    assert {(int(n.coord[0]), int(n.coord[1])) for n in graph.stations} == STATIONS
+
+
+@pytest.mark.parametrize("name", GROUNDS)
+def test_each_file_draws_two_interchanges_and_ten_stations_where_the_grid_puts_them(made, name):
+    circles = [(c.get("cx"), c.get("cy"), c.get("r"))
+               for c in ET.fromstring(made[name]).iter(f"{SVG}circle")]
+    interchanges = [(cx, cy) for cx, cy, r in circles if r == "6.00"]
+    stations = [(cx, cy) for cx, cy, r in circles if r == "4.20"]
+    assert sorted(interchanges) == sorted(drawn_at(*p) for p in INTERCHANGES)
+    assert ("128.00", "128.00") in interchanges and ("320.00", "128.00") in interchanges
+    assert sorted(stations) == sorted(drawn_at(*p) for p in STATIONS - INTERCHANGES)
+    assert len(stations) == 10 and len(circles) == 12
+
+
 # -------------------------------------------------------------------- framing
 
 @pytest.mark.parametrize("name", GROUNDS)
@@ -119,6 +153,15 @@ def test_a_drawing_of_either_shape_is_padded_out_never_cropped():
         ground = next(iter(root))
         assert [float(ground.get(a)) for a in ("x", "y", "width", "height")] == \
             pytest.approx(new, abs=0.005)
+
+
+def test_a_drawing_whose_root_has_no_size_is_refused_not_given_the_backdrops():
+    drawing = theme_thumbnails.draw()
+    root = re.compile(r'(<svg\b[^>]*?\s)width="[\d.]+" height="[\d.]+"')
+    bare = root.sub(r"\g<1>", drawing, count=1)
+    assert bare != drawing and 'width="' in bare       # the backdrop's own stays
+    with pytest.raises(ValueError, match="no longer has the size"):
+        theme_thumbnails.frame(bare, "dark")
 
 
 # ------------------------------------------------------------ one drawing, twice
@@ -164,10 +207,18 @@ def contrast(a: str, b: str) -> float:
 @pytest.mark.parametrize("label", ROUTES)
 def test_each_route_colour_reads_on_both_grounds(label):
     for theme in ("dark", "light"):
-        # D on Sepia is 3.4556, which the research rounded to 3.46: held to
-        # its figure as it was written, and well over WCAG's 3 for a graphic.
+        # The research wrote "at least 3.46:1", a figure rounded to two places:
+        # D on Sepia is 3.4556. Held to what is true, and well over WCAG's 3
+        # for a graphic.
         ratio = contrast(theme_thumbnails.LINES[label][0], PALETTES[theme]["bg"])
-        assert round(ratio, 2) >= 3.46
+        assert ratio >= 3.45
+
+
+def test_the_marginal_pair_is_on_the_record():
+    """D on Sepia is the thinnest margin of the eight; a change to either
+    colour that moves it is a decision, not a drift."""
+    assert contrast(theme_thumbnails.LINES["D"][0], PALETTES["light"]["bg"]) == \
+        pytest.approx(3.456, abs=0.001)
 
 
 # ------------------------------------------------------------------------ size
@@ -206,3 +257,22 @@ def test_the_script_writes_the_two_files_and_a_readme_and_the_same_bytes_again(t
     assert f"engine {__version__} on {dt.date.today().isoformat()}" in readme
     assert "bin/theme-thumbnails <folder>" in readme
     assert str(tmp_path) not in readme and str(ROOT) not in readme
+
+
+def test_main_writes_the_files_and_says_where(tmp_path, capsys):
+    """The path the script takes, called in-process, so it is held on Windows too."""
+    assert theme_thumbnails.main([str(tmp_path / "a")]) == 0
+    assert sorted(p.name for p in (tmp_path / "a").iterdir()) == \
+        ["README.md", "theme-sepia.svg", "theme-warm-dark.svg"]
+    said = capsys.readouterr().out.split()
+    assert sorted(Path(p).name for p in said) == \
+        ["README.md", "theme-sepia.svg", "theme-warm-dark.svg"]
+
+
+def test_main_answers_a_folder_it_cannot_make_with_one_line_and_exit_1(tmp_path, capsys):
+    (tmp_path / "file").write_text("not a folder", encoding="utf-8")
+    assert theme_thumbnails.main([str(tmp_path / "file")]) == 1
+    seen = capsys.readouterr()
+    assert seen.out == ""
+    assert seen.err.startswith("bin/theme-thumbnails: ")
+    assert seen.err.count("\n") == 1
