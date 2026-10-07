@@ -466,6 +466,14 @@ def _check_gtfs(path: Path, what: str) -> dict[str, str]:
     return members
 
 
+# What reading one member of a zip can raise besides a bad table. The check
+# lists the zip's central directory alone, so a member whose bytes fail their
+# CRC (BadZipFile), that is encrypted (RuntimeError) or that uses a
+# compression the library lacks (NotImplementedError) passes it and fails here.
+UNREADABLE = (ValueError, OSError, KeyError,
+              zipfile.BadZipFile, RuntimeError, NotImplementedError)
+
+
 def _agency_name(path: Path, members: dict[str, str]) -> str | None:
     """The first agency's name, when the feed says one."""
     member = members.get("agency")
@@ -474,7 +482,7 @@ def _agency_name(path: Path, members: dict[str, str]) -> str | None:
     try:
         with zipfile.ZipFile(path) as zf:
             df = pd.read_csv(io.BytesIO(zf.read(member)), dtype=str, skipinitialspace=True)
-    except (ValueError, OSError, KeyError):
+    except UNREADABLE:
         return None
     df.columns = [c.strip().lstrip("\ufeff") for c in df.columns]
     if "agency_name" not in df.columns or df.empty:
@@ -512,7 +520,7 @@ def _publishes_headways(path: Path, members: dict[str, str]) -> bool:
             if not named:
                 return False
             trips = _trip_ids(zf, members["trips"])
-    except (ValueError, OSError, KeyError):
+    except UNREADABLE:
         return False
     return bool(trips) and 2 * len(named & trips) >= len(trips)
 

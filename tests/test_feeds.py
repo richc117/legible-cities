@@ -853,3 +853,56 @@ def test_a_record_written_before_the_field_existed_reads_as_no_headways(home, tm
     feeds.add(gtfs_zip(tmp_path / "new.zip"), key="new")
     assert {r["key"]: r["headways"] for r in json.loads(feeds.user_file().read_text())} == {
         "old": False, "new": False}
+
+
+# A zip is checked from its central directory alone, so a member that cannot
+# be read (a bad CRC, an encryption or a compression the library lacks) still
+# passes the check. Reading it for the headways must answer no, not stop the add.
+import struct
+import zipfile
+
+
+def _flip_a_byte_in(path, member: str) -> None:
+    """Break one stored member's CRC while the central directory still lists it."""
+    with zipfile.ZipFile(path) as zf:
+        info = zf.getinfo(member)
+    raw = bytearray(path.read_bytes())
+    name_length, extra_length = struct.unpack(
+        "<HH", raw[info.header_offset + 26:info.header_offset + 30])
+    raw[info.header_offset + 30 + name_length + extra_length + info.file_size // 2] ^= 0x01
+    path.write_bytes(bytes(raw))
+
+
+@pytest.mark.parametrize("member,name,headways", [
+    pytest.param("frequencies.txt", "Metro de Prueba", False, id="the frequencies"),
+    pytest.param("trips.txt", "Metro de Prueba", False, id="the trips"),
+    pytest.param("agency.txt", "Springfield", True, id="the agency, named from the file"),
+])
+def test_a_member_with_a_bad_crc_does_not_stop_a_feed_being_added(home, tmp_path,
+                                                                 member, name, headways):
+    src = gtfs_zip(tmp_path / "Springfield.zip", {**GOOD, "frequencies.txt": _frequencies("T1")})
+    _flip_a_byte_in(src, member)
+    with pytest.raises(zipfile.BadZipFile, match="Bad CRC-32"):
+        with zipfile.ZipFile(src) as zf:
+            zf.read(member)  # the fixture is broken the way the test says
+    feed = feeds.add(src)
+    assert (feed.name, feed.headways) == (name, headways)
+    assert feeds.get(feed.key) == feed
+
+
+@pytest.mark.parametrize("raised", [
+    pytest.param(zipfile.BadZipFile("bad"), id="a bad zip"),
+    pytest.param(RuntimeError("is encrypted, password required"), id="an encrypted member"),
+    pytest.param(NotImplementedError("compression type 9 (deflate64)"), id="deflate64"),
+])
+def test_a_member_the_library_will_not_read_answers_no_headways_and_the_feed_is_kept(
+        home, tmp_path, monkeypatch, raised):
+    src = gtfs_zip(tmp_path / "Springfield.zip", {**GOOD, "frequencies.txt": _frequencies("T1")})
+
+    def unreadable(self, name, pwd=None):
+        raise raised
+
+    monkeypatch.setattr(zipfile.ZipFile, "read", unreadable)
+    feed = feeds.add(src)
+    assert (feed.name, feed.headways) == ("Springfield", False)
+    assert feeds.get(feed.key) == feed
