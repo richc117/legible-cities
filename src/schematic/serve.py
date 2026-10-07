@@ -848,7 +848,10 @@ class EngineEndpoint(Endpoint):
         return self._job(work)
 
     def render_stage(self, params: Any) -> Callable[[], Any]:
-        """One stored stage graph of a layout, drawn, with its counts (E15)."""
+        """One stored stage graph of a layout, drawn, with its counts (E15) and
+        its description (issue 54). ``date``, the project's service day, gives
+        the description its minutes; left out, they are null and no timetable
+        is read. A null date is refused rather than taken for one left out."""
         left = _object("render.stage", params)
         key = _feed_key(left.pop("key", None))
         layout = _layout(left.pop("layout", None))
@@ -857,13 +860,22 @@ class EngineEndpoint(Endpoint):
             raise invalid_params("stage must be one of " + ", ".join(pipeline.STAGE_FILES))
         width = _positive(left, "width", 1200.0)
         labels = _flag(left, "labels")
+        date = None
+        if "date" in left:
+            value = left.pop("date")
+            if value is None:
+                raise invalid_params("date must be the service day as YYYY-MM-DD, or left out "
+                                     "for a description without minutes")
+            date = _date(value)
         _no_extra("render.stage", left)
 
         def work(_job: loom.Job, _progress: Progress) -> dict[str, Any]:
-            svg, counts = render_stage(key, stage, layout=layout, width=width, labels=labels)
+            svg, counts, description = render_stage(key, stage, layout=layout, width=width,
+                                                    labels=labels, date=date)
             width_px, height_px = counts.pop("width"), counts.pop("height")
             return {"layout": layout, "stage": stage, "svg": svg,
-                    "width": width_px, "height": height_px, "counts": counts}
+                    "width": width_px, "height": height_px, "counts": counts,
+                    "description": description}
 
         return self._job(work)
 

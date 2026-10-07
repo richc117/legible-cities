@@ -16,6 +16,8 @@ GTFS quirks handled here:
 from __future__ import annotations
 
 import datetime as dt
+import math
+import statistics
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -505,3 +507,55 @@ def trips_on(tables: dict[str, pd.DataFrame], date: dt.date, match: StopMatch,
 def concurrent_trips(trips: list[Trip], at_second: int) -> list[Trip]:
     """Trips in motion at a given time -- used to sanity-check the animation."""
     return [t for t in trips if t.start <= at_second <= t.end]
+
+
+# --------------------------------------------------------------------------
+# How long a line takes
+# --------------------------------------------------------------------------
+
+def line_runs(trips: Sequence[Trip], labels: Sequence[str],
+              names: dict[str, str]) -> dict[str, dict | None]:
+    """Each line timed by its commonest trip on the day of ``trips``.
+
+    Never between two ends chosen from the map: timing each of the
+    registry's 184 lines between its spine's two ends times 100 of them from
+    half their trips or more and 32 from none (Chicago's Loop lines, New
+    York's 2 to 5), where the commonest trip times 178. A trip runs from its
+    first to its last call at a mapped stop, and a line's trips are grouped
+    by that ordered pair of nodes. The largest group wins; on a tie the one
+    whose median is shorter, then the pair whose names sort first, then the
+    pair of node ids. Its median duration, the last mapped call's arrival
+    less the first's departure, is given in whole minutes rounded half up:
+    64.5 is 65, where ``round`` says 64.
+
+    ``names`` maps a node id to its station's name. The answer has every
+    label in ``labels``: ``{"minutes", "from", "to"}``, the names in the
+    trip's own direction and equal for a trip that ends where it began, or
+    None for a line with no trip that day. A trip with fewer than two
+    mapped calls goes nowhere on the map and is not counted.
+    """
+    wanted = set(labels)
+    groups: dict[str, dict[tuple[str, str], list[int]]] = defaultdict(lambda: defaultdict(list))
+    for trip in trips:
+        if trip.route_label not in wanted:
+            continue
+        mapped = [c for c in trip.calls if c.node_id is not None]
+        if len(mapped) < 2:
+            continue
+        first, last = mapped[0], mapped[-1]
+        groups[trip.route_label][(first.node_id, last.node_id)].append(
+            last.arrival - first.departure)
+
+    out: dict[str, dict | None] = {}
+    for label in labels:
+        by_pair = groups.get(label)
+        if not by_pair:
+            out[label] = None
+            continue
+        medians = {pair: statistics.median(durations) for pair, durations in by_pair.items()}
+        a, b = min(by_pair, key=lambda pair: (-len(by_pair[pair]), medians[pair],
+                                              names.get(pair[0], ""), names.get(pair[1], ""),
+                                              pair))
+        out[label] = {"minutes": max(0, math.floor(medians[(a, b)] / 60 + 0.5)),
+                      "from": names.get(a, ""), "to": names.get(b, "")}
+    return out

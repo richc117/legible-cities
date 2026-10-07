@@ -88,7 +88,7 @@ class LinearLayout:
         }
 
 
-def _adjacency(graph: LineGraph, label: str) -> tuple[dict[str, set[str]], set[str]]:
+def adjacency_for(graph: LineGraph, label: str) -> tuple[dict[str, set[str]], set[str]]:
     adj: dict[str, set[str]] = defaultdict(set)
     nodes: set[str] = set()
     for e in graph.edges_for(label):
@@ -195,7 +195,7 @@ def build(graph: LineGraph, order: list[str] | None = None) -> LinearLayout:
     labels = ordered_labels(order, graph.labels)
     lines: list[Line] = []
     for label in labels:
-        adj, nodes = _adjacency(graph, label)
+        adj, nodes = adjacency_for(graph, label)
         if not nodes:
             continue
         main = spine(adj, nodes)

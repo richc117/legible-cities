@@ -453,8 +453,9 @@ def summary(graph: LineGraph) -> dict:
 
 
 def stage(key: str, stage: str, *, layout: str | None = None, width: float = 1200.0,
-          labels: bool = False, **overrides) -> tuple[str, dict]:
-    """One stored stage graph of a feed, as SVG, with its counts.
+          labels: bool = False, date=None, **overrides) -> tuple[str, dict, dict]:
+    """One stored stage graph of a feed, as SVG, with its counts and its
+    description.
 
     ``stage`` is one of the pipeline's four (``gtfs2graph``, ``topo``, ``loom``,
     ``octi``). ``layout`` names the stored set by its id; without it, the set
@@ -463,9 +464,17 @@ def stage(key: str, stage: str, *, layout: str | None = None, width: float = 120
     every drawing here must be: LOOM emits lon/lat and computes in metres.
     A stage that is not stored raises ``pipeline.LayoutMissing`` with a hint
     naming it and what builds it.
+
+    The description is the protocol's StageDescription of the graph drawn
+    (``describe.describe``), made after the drawing, which it leaves as it
+    was. ``date``, the project's service day, times each line by its
+    commonest trip that day (``pipeline.line_minutes``, read once per layout
+    and day); without it the minutes are null and no timetable is read, and
+    nothing here picks a day.
     """
     from . import pipeline  # here, not at the top: pipeline imports this module
     from .crs import to_mercator
+    from .describe import describe
 
     if stage not in pipeline.STAGE_FILES:
         raise ValueError(f"{stage!r} is not a stage; the stages are "
@@ -491,5 +500,6 @@ def stage(key: str, stage: str, *, layout: str | None = None, width: float = 120
     r = render(graph, width=width, labels=labels, style=Style(themed=True))
     counts["width"] = r.width
     counts["height"] = r.height
-    return r.svg, counts
+    minutes = pipeline.line_minutes(found, date) if date is not None else None
+    return r.svg, counts, describe(graph, minutes)
 

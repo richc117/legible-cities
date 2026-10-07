@@ -558,13 +558,11 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     require_edges(found.feed, graph_ll)
     graph = graph_ll.reproject(to_mercator)
 
-    # The schedule reads the feed as the layout was built from it, so an
-    # agency filter or a label rule the layout used applies here too.
-    tables = feeds.tables(found.feed)
-    lines = set(graph_ll.labels)
-    match = match_stops(graph_ll, tables)
-    date = date or busiest_weekday(tables, lines, anchor=anchor or dt.date.today())
-    trips = trips_on(tables, date, match, lines)
+    # The day is read as render.stage's description reads it (schedule_for).
+    day = schedule_for(found, date, anchor=anchor, graph=graph_ll)
+    date, match, trips = day.date, day.match, day.trips
+    # Every line the layout carries is timed: hiding lines (E42a) must not narrow this fill.
+    _remember_minutes(found.id, day)
     done("schedule", f"{len(trips)} trips on {service_day_text(date)}; {match.report()}")
 
     name = feeds.get(key).name
@@ -601,3 +599,68 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
 
     return Result(key=key, date=date, layout=found.id, graph=graph, render=r, trips=trips,
                   match=match, animation=anim, paths=paths)
+
+
+# -------------------------------------------------------- a layout's service day
+
+@dataclass(frozen=True)
+class Day:
+    """A layout's service day as the schedule reads it: the octi stage its
+    stops were matched on, unprojected, the match, the day and its trips."""
+
+    date: dt.date
+    graph: LineGraph
+    match: StopMatch
+    trips: list[Trip]
+
+
+def schedule_for(found: Layout, date: dt.date | None, *, anchor: dt.date | None = None,
+                 graph: LineGraph | None = None) -> Day:
+    """The trips of a stored layout's lines on a day, read one way for
+    ``run`` and for the minutes ``render.stage`` describes, so the two
+    cannot drift. The feed is read as the layout was built from it, so an
+    agency filter or a label rule the layout used applies here too, and its
+    stops are matched against the octi stage unprojected. Without ``date``
+    the busiest weekday is chosen scanning from ``anchor``, which is today
+    unless the caller says otherwise; only ``run`` leaves it out. ``graph``
+    is the octi stage when the caller has read it already. The tables are
+    not kept."""
+    graph = graph if graph is not None else LineGraph.from_geojson(found.paths["octi"])
+    tables = feeds.tables(found.feed)
+    lines = set(graph.labels)
+    match = match_stops(graph, tables)
+    date = date or busiest_weekday(tables, lines, anchor=anchor or dt.date.today())
+    return Day(date=date, graph=graph, match=match, trips=trips_on(tables, date, match, lines))
+
+
+# Each line's commonest trip on a day, timed (``schedule.line_runs``), per
+# (layout id, day): the minutes render.stage's description gives. Plain values
+# and nothing else, never the tables or the trips -- reading a day holds a
+# feed's stop_times, 6.0 million rows and 2.5 GB on Chicago -- so a second
+# description of the same layout and day reads no timetable, and map.build,
+# which holds the day's trips already, fills it. Requests run on several
+# workers: two misses at once may both read the day, which is harmless.
+_MINUTES: dict[tuple[str, dt.date], dict[str, dict[str, Any] | None]] = {}
+_minutes_lock = threading.Lock()
+
+
+def line_minutes(found: Layout, date: dt.date) -> dict[str, dict[str, Any] | None]:
+    """Every line of a stored layout timed by its commonest trip on ``date``:
+    ``{label: {"minutes", "from", "to"} | None}``, the names the octi
+    stage's. The day is read once per layout and day in a process."""
+    with _minutes_lock:
+        known = _MINUTES.get((found.id, date))
+    if known is not None:
+        return known
+    return _remember_minutes(found.id, schedule_for(found, date))
+
+
+def _remember_minutes(layout: str, day: Day) -> dict[str, dict[str, Any] | None]:
+    from .describe import station_name
+    from .schedule import line_runs
+
+    names = {node.id: station_name(node) for node in day.graph.stations}
+    minutes = line_runs(day.trips, day.graph.labels, names)
+    with _minutes_lock:
+        _MINUTES[(layout, day.date)] = minutes
+    return minutes

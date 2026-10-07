@@ -33,7 +33,7 @@ def test_every_station_is_placed_exactly_once():
     for key, graph in built_graphs():
         layout = linear.build(graph)
         for line in layout.lines:
-            _, nodes = linear._adjacency(graph, line.label)
+            _, nodes = linear.adjacency_for(graph, line.label)
             placed = [n for row in line.rows for n, _ in row.nodes]
             assert sorted(placed) == sorted(nodes), f"{key} {line.label}"
             assert len(placed) == len(set(placed)), f"{key} {line.label} duplicated"
@@ -52,7 +52,7 @@ def test_a_simple_line_is_one_row_in_timetable_order(la):
     whose order matches the line's own chain of stations."""
     line = next(l for l in linear.build(la).lines if l.label == "E")
     assert len(line.rows) == 1
-    adj, nodes = linear._adjacency(la, "E")
+    adj, nodes = linear.adjacency_for(la, "E")
     order = [n for n, _ in line.rows[0].nodes]
     assert len(order) == len(nodes)
     # Consecutive entries must actually be connected on the line.

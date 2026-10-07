@@ -19,7 +19,7 @@ needs_la = pytest.mark.skipif(pipeline.stage_path(KEY, "octi") is None,
 @needs_la
 @pytest.mark.parametrize("stage", ["gtfs2graph", "loom", "octi"])
 def test_a_stage_renders_with_the_counts_its_graph_has(stage):
-    svg, counts = render.stage(KEY, stage)
+    svg, counts, _ = render.stage(KEY, stage)
     assert svg.startswith(("<svg", "<?xml"))
     graph = LineGraph.from_geojson(pipeline.stage_path(KEY, stage)).reproject(to_mercator)
     assert counts["nodes"] == len(graph.nodes)
@@ -36,8 +36,8 @@ def test_a_stage_renders_with_the_counts_its_graph_has(stage):
 @needs_la
 def test_by_layout_id_and_by_registry_entry_agree():
     stored = pipeline.stored(KEY)
-    svg_a, counts_a = render.stage(KEY, "gtfs2graph", layout=stored.id, width=600)
-    svg_b, counts_b = render.stage(KEY, "gtfs2graph", width=600)
+    svg_a, counts_a, _ = render.stage(KEY, "gtfs2graph", layout=stored.id, width=600)
+    svg_b, counts_b, _ = render.stage(KEY, "gtfs2graph", width=600)
     assert counts_a == counts_b
     assert svg_a == svg_b
 

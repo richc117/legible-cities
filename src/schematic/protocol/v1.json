@@ -1723,7 +1723,7 @@
       ]
     },
     "RenderStageParams": {
-      "description": "One stored stage graph of a layout, drawn as SVG, with its counts (E15): what a geographic view shows beside the schematic map. Never lays out; a stage that is not stored is refused with kind layout.",
+      "description": "One stored stage graph of a layout, drawn as SVG, with its counts (E15) and its description (StageDescription): what a geographic view shows beside the schematic map, and what its text alternative is written from. Never lays out; a stage that is not stored is refused with kind layout.",
       "type": "object",
       "properties": {
         "key": {
@@ -1745,7 +1745,8 @@
           "type": "boolean",
           "default": false,
           "description": "Draw station names."
-        }
+        },
+        "date": { "$ref": "#/$defs/ServiceDate", "description": "The project's service day, which times each line of the description by its commonest trip that day. Left out, every trip and the extent are null and no timetable is read: the engine never picks a day for it. Null is refused; leave it out instead." }
       },
       "required": [
         "key",
@@ -1775,7 +1776,8 @@
         },
         "counts": {
           "$ref": "#/$defs/StageSummary"
-        }
+        },
+        "description": { "$ref": "#/$defs/StageDescription" }
       },
       "required": [
         "layout",
@@ -1783,8 +1785,90 @@
         "svg",
         "width",
         "height",
-        "counts"
+        "counts",
+        "description"
       ],
+      "additionalProperties": false
+    },
+    "StageDescription": {
+      "description": "The stage graph drawn, in fields a text alternative is written from; the engine writes no sentence. A station is named as the map draws it, the empty string where the feed gives no name, never its id; a junction LOOM inserted (no station) is never named, listed or met at. The minutes are of the layout and the request's date, not of the stage, so every stage answers the same ones; only the order of their two names follows the stage.",
+      "type": "object",
+      "properties": {
+        "extent": {
+          "description": "The line whose trip takes the most minutes, with that trip; the first in label order on a tie. Null without a date, or when no line has a trip that day.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "minutes": { "type": "integer", "minimum": 0 },
+                "line": { "type": "string", "description": "The line's label." },
+                "from": { "type": "string" },
+                "to": { "type": "string" }
+              },
+              "required": ["minutes", "line", "from", "to"],
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        },
+        "lines": {
+          "description": "One entry per line label, in label order (sorted). For every line, its stations and every branch's together are the line's stations, each once.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "termini": { "type": "array", "items": { "type": "string" }, "maxItems": 2, "description": "The first and last station of the line's spine, its longest run (linear.spine), never a headsign; one for a loop, or for a spine of one station." },
+              "stations": { "type": "array", "items": { "type": "string" }, "description": "The spine's stations in order, termini first and last. A loop, a line whose graph is one cycle, lists its cycle once, from the station with the smallest node id toward that station's neighbour with the smaller id." },
+              "meets": {
+                "description": "Every station of the line whose node carries another line on any edge, in the order of stations and then of each branch's stations.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "station": { "type": "string" },
+                    "lines": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "The other lines there, in label order." }
+                  },
+                  "required": ["station", "lines"],
+                  "additionalProperties": false
+                }
+              },
+              "branches": {
+                "description": "The stations off the spine, as simple paths in travel order: from each spine station in order, each way off it in node id order, a branch and then the branches that fork from it. A branch ends where it forks again, and each way on from the fork is a branch of its own. Empty for a loop.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "at": { "type": ["string", "null"], "description": "The station the branch leaves. Where it leaves the run at a junction that is not a station, the station next to the junction along that run on the side with more stations to the run's end, toward its start on a tie; where it leaves a junction ending a branch, the nearest station back along that branch, else that branch's own at. Null for a further piece of the line that touches the rest nowhere, whose stations are that piece's own spine and whose branches follow it." },
+                    "stations": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "In travel order away from at. A branch that would pass no station is left out; the branches beyond it are kept." }
+                  },
+                  "required": ["at", "stations"],
+                  "additionalProperties": false
+                }
+              },
+              "trip": {
+                "description": "The line's commonest trip on the date: its trips that day grouped by their first and last calls at a mapped station, the largest group winning (on a tie the shorter median, then the names that sort first), its median duration in whole minutes rounded half up. from and to are in the order the line's stations and then its branches list them, a name the stage does not list keeping the trip's own order; equal for a trip that ends where it began. Null without a date, or when the line has no trip that day.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "minutes": { "type": "integer", "minimum": 0 },
+                      "from": { "type": "string" },
+                      "to": { "type": "string" }
+                    },
+                    "required": ["minutes", "from", "to"],
+                    "additionalProperties": false
+                  },
+                  { "type": "null" }
+                ]
+              }
+            },
+            "required": ["label", "termini", "stations", "meets", "branches", "trip"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["extent", "lines"],
       "additionalProperties": false
     },
     "ErrorData": {
