@@ -158,6 +158,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 GOOD = {
     "agency.txt": "agency_id,agency_name,agency_url,agency_timezone\n"
@@ -358,6 +359,126 @@ def test_remove_forgets_a_user_feed_with_its_files_and_refuses_a_preset(home, tm
     with pytest.raises(feeds.FeedError, match="not a registered feed"):
         feeds.remove("mine")
     assert len(feeds.FEEDS) == 22
+
+
+def _a_feed_with_files(tmp_path, key):
+    """A user feed with its zip, its normalised zip and a stored layout."""
+    feed = feeds.add(gtfs_zip(tmp_path / f"{key}.zip"), key=key)
+    normalized = feeds.normalize(key)
+    layout = config.graphs_dir() / key / ("0" * 64)
+    layout.mkdir(parents=True)
+    (layout / "03_octi.json").write_text("{}")
+    return feed, normalized, layout
+
+
+def test_remove_asked_to_stop_before_the_registry_write_keeps_the_feed_and_every_file(
+        home, tmp_path):
+    feed, normalized, layout = _a_feed_with_files(tmp_path, "mine")
+    before = feeds.user_file().read_bytes()
+    told = []
+    with pytest.raises(feeds.Interrupted):
+        feeds.remove("mine", cancelled=lambda: True, forgotten=lambda: told.append(1))
+    assert told == [], "nothing was forgotten"
+    assert feeds.get("mine") == feed
+    assert feeds.user_file().read_bytes() == before
+    assert feed.zip_path.exists() and normalized.exists()
+    assert (layout / "03_octi.json").exists()
+    # And once no one asks, the same call removes it.
+    feeds.remove("mine", cancelled=lambda: False)
+    assert "mine" not in feeds.all() and not feed.zip_path.exists()
+
+
+def test_remove_past_the_registry_write_removes_every_file_whatever_is_asked_after(
+        home, tmp_path):
+    """The point of no return: ``cancelled()`` is asked once, before the write.
+    A yes after it is not asked for and not honoured, so no file is left that
+    no registry entry names."""
+    feed, normalized, layout = _a_feed_with_files(tmp_path, "mine")
+    asked = []
+    told = []
+
+    def forgotten():
+        # Told once the registry is written, and before a file is touched.
+        assert "mine" not in feeds.user_feeds()
+        assert feed.zip_path.exists() and layout.exists()
+        told.append(1)
+
+    def cancelled():
+        asked.append(1)
+        return len(asked) > 1      # no on the first asking, yes ever after
+
+    feeds.remove("mine", cancelled=cancelled, forgotten=forgotten)
+    assert told == [1]
+    assert asked == [1], "asked once, before the write, and never again"
+    assert not feed.zip_path.exists() and not normalized.exists()
+    assert not (config.graphs_dir() / "mine").exists()
+
+
+def test_the_registry_write_is_atomic_and_a_refused_move_leaves_the_registry_and_no_part(
+        home, tmp_path, monkeypatch):
+    feed, normalized, layout = _a_feed_with_files(tmp_path, "mine")
+    feeds.add(gtfs_zip(tmp_path / "theirs.zip"), key="theirs")
+    registry = feeds.user_file()
+    before = registry.read_bytes()
+    real_replace = os.replace
+
+    def refused(src, dst, *a, **kw):
+        if Path(dst) == registry:
+            raise OSError(28, "No space left on device")
+        return real_replace(src, dst, *a, **kw)
+
+    told = []
+    with monkeypatch.context() as stub:
+        stub.setattr(feeds.os, "replace", refused)
+        with pytest.raises(OSError, match="No space"):
+            feeds.remove("mine", forgotten=lambda: told.append(1))
+    assert told == [], "a feed whose forgetting failed is not forgotten"
+    assert registry.read_bytes() == before
+    assert not list(registry.parent.glob("*.part"))
+    assert feeds.get("mine") == feed
+    assert feed.zip_path.exists() and normalized.exists()
+    assert (layout / "03_octi.json").exists()
+    feeds.remove("mine")
+    assert "mine" not in feeds.all()
+
+
+def test_remove_touches_only_the_feeds_own_zips_and_layouts(home, tmp_path):
+    """Nothing but ``<key>.*zip`` under the feeds folder and ``<key>`` under the
+    graphs folder is removed: not a feed whose key begins with this one, not
+    another feed's layouts, not a project, an export or a file of the person's
+    own in the home."""
+    _a_feed_with_files(tmp_path, "mine")
+    _a_feed_with_files(tmp_path, "mine-2")
+    _a_feed_with_files(tmp_path, "theirs")
+    bystanders = {
+        home / "notes.txt": "mine",
+        home / "projects" / "p1" / "project.json": "{}",
+        home / "out" / "mine.mp4": "a video",
+        home / "data" / "feeds" / "readme.txt": "mine",
+        home / "data" / "feeds" / "mine-2.zip.keep": "kept",
+        home / "data" / "graphs" / "mines" / "x.json": "{}",
+    }
+    for path, text in bystanders.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    def its_own(path):
+        return ((path.parent == config.feeds_dir() and path.name.startswith("mine."))
+                or config.graphs_dir() / "mine" in path.parents)
+
+    survivors = {path: path.read_bytes() for path in home.rglob("*")
+                 if path.is_file() and not its_own(path) and path != feeds.user_file()}
+
+    feeds.remove("mine")
+
+    assert not list(config.feeds_dir().glob("mine.*"))
+    assert not (config.graphs_dir() / "mine").exists()
+    assert survivors, "there was something to keep"
+    for path, text in survivors.items():
+        assert path.is_file(), f"{path.relative_to(home)} was removed"
+        assert path.read_bytes() == text, f"{path.relative_to(home)} was changed"
+    assert (config.feeds_dir() / "mine-2.zip").exists()
+    assert (config.graphs_dir() / "mine-2" / ("0" * 64) / "03_octi.json").exists()
+    assert {f for f in feeds.user_feeds()} == {"mine-2", "theirs"}
 
 
 def test_a_file_feed_whose_zip_is_gone_says_so(home, tmp_path):

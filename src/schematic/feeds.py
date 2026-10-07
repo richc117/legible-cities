@@ -417,13 +417,19 @@ def user_feeds() -> dict[str, Feed]:
 
 
 def _write_user_feeds(records: dict[str, Feed]) -> None:
-    """The whole file, written beside itself and moved into place."""
+    """The whole file, written beside itself and moved into place: a write
+    cut short, or a move refused, leaves the registry as it was and no
+    ``.part`` beside it, which nothing else would ever remove."""
     path = user_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps([f.to_dict() for f in records.values()], indent=2) + "\n"
     tmp = path.with_name(path.name + ".part")
-    tmp.write_text(text, encoding="utf-8", newline="\n")
-    os.replace(tmp, path)
+    try:
+        tmp.write_text(text, encoding="utf-8", newline="\n")
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def all() -> dict[str, Feed]:  # noqa: A001 - the registry's own name for both halves
@@ -697,17 +703,32 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
         staging.unlink(missing_ok=True)
 
 
-def remove(key: str) -> None:
+def remove(key: str, *, cancelled: "Callable[[], bool] | None" = None,
+           forgotten: "Callable[[], None] | None" = None) -> None:
     """Forget a feed a person added, with its zips and its stored layouts.
-    A preset cannot be removed."""
+    A preset cannot be removed.
+
+    The registry's write is the point of no return, and it is atomic. Until
+    it, ``cancelled()`` has the last word: a yes raises Interrupted and the
+    feed stays registered with every file in place. Once it is written the
+    feed is forgotten, ``forgotten()`` is told, and the zips and the layouts
+    are removed to the end whatever ``cancelled()`` says, because stopping
+    there would leave files no registry entry names and nothing would ever
+    remove. Only the feed's own zips under the feeds folder and its own
+    folder under the graphs folder are removed.
+    """
     if key in FEEDS:
         raise FeedError(f"{key!r} is a built-in feed and cannot be removed")
     with _user_lock:
         users = user_feeds()
         if key not in users:
             raise FeedError(f"{key!r} is not a registered feed")
+        if cancelled is not None and cancelled():
+            raise Interrupted()
         del users[key]
         _write_user_feeds(users)
+        if forgotten is not None:
+            forgotten()
     with _disk(key):
         for path in config.feeds_dir().glob(f"{key}.*zip"):
             path.unlink(missing_ok=True)

@@ -10,7 +10,11 @@ carry the request's id, and ``$/cancelRequest`` ends the process the request
 is waiting on (a LOOM tool, or ffmpeg), or stops a feed it is downloading
 between chunks and caches nothing, and answers it with the cancelled error.
 Work that waits on neither (``feeds.service`` reading a calendar) runs to its
-end and is answered with the same error.
+end and is answered with the same error. ``feeds.remove`` has a point of no
+return, the registry's write: a cancel before it leaves the feed registered
+with every file in place and is answered with the cancelled error; a cancel
+after it is not honoured, since the feed is already forgotten and its files
+are removed to the end, and the answer says the cancel came too late.
 
 Errors a person can act on are code -32000 with ``data: {kind, detail,
 hint}``: ``hint`` is the sentence the engine already raises, ``detail`` says
@@ -69,8 +73,23 @@ KIND_BY_MODULE = {"feeds": "feed", "pipeline": "feed", "schedule": "schedule",
 # for a layout named that is not stored (nothing ran, nothing failed).
 KINDS = sorted(set(KIND_BY_MODULE.values()) | {"engine", "io", "params", "layout"})
 
+
+class _Job(loom.Job):
+    """A job that can pass its point of no return: work that has done what a
+    cancel could no longer undo says so with ``commit()``, and from then on a
+    cancel is not honoured and does not turn the work's own answer, or its own
+    failure, into the cancelled error. Only the worker reads or sets it."""
+
+    def __init__(self, log: Callable[[str], None] | None = None) -> None:
+        super().__init__(log=log)
+        self.committed = False
+
+    def commit(self) -> None:
+        self.committed = True
+
+
 Progress = pipeline.Progress
-Work = Callable[[loom.Job, Progress], Any]
+Work = Callable[[_Job, Progress], Any]
 
 
 def schema() -> dict[str, Any]:
@@ -514,7 +533,7 @@ class EngineEndpoint(Endpoint):
         request with what it returns or raises.
         """
         msg_id = self._request_id
-        job = loom.Job(log=lambda line: self.notify(
+        job = _Job(log=lambda line: self.notify(
             "job/log", {"id": msg_id, "level": "info", "line": line}))
         self.jobs[msg_id] = job
 
@@ -536,8 +555,10 @@ class EngineEndpoint(Endpoint):
                 # Work that starts no process cannot be interrupted, so a
                 # cancel that arrived while it ran is honoured here: the
                 # answer to a cancelled request is the cancelled error, never
-                # a result the client has stopped waiting for.
-                if job.cancelled:
+                # a result the client has stopped waiting for. Unless the work
+                # passed its point of no return, when what it did stands and
+                # the answer says so.
+                if job.cancelled and not job.committed:
                     raise JsonRpcRequestCancelled()
                 return result
             except (loom.Cancelled, feeds.Interrupted):
@@ -547,7 +568,7 @@ class EngineEndpoint(Endpoint):
             except JsonRpcException:
                 raise
             except Exception as exc:
-                if job.cancelled:
+                if job.cancelled and not job.committed:
                     raise JsonRpcRequestCancelled() from None
                 log.exception("request %s failed", msg_id)
                 raise classify(exc) from exc
@@ -706,15 +727,30 @@ class EngineEndpoint(Endpoint):
 
         return self._job(work)
 
-    def feeds_remove(self, params: Any) -> dict[str, Any]:
+    def feeds_remove(self, params: Any) -> Callable[[], Any]:
+        """Forget a feed a person added, with its zips and its layouts. A job,
+        so the reader answers other requests meanwhile and reads a cancel. The
+        registry's write is the point of no return: a cancel before it leaves
+        the feed registered and is answered with the cancelled error; one after
+        it is not honoured, the files are removed to the end, and the answer
+        carries ``cancel_too_late``."""
         left = _object("feeds.remove", params)
         key = _feed_key(left.pop("key", None))
         _no_extra("feeds.remove", left)
-        try:
-            feeds.remove(key)
-        except feeds.FeedError as exc:
-            raise EngineError("feed", str(exc)) from exc
-        return {"ok": True}
+        msg_id = self._request_id
+
+        def work(job: _Job, _progress: Progress) -> dict[str, Any]:
+            try:
+                feeds.remove(key, cancelled=lambda: job.cancelled, forgotten=job.commit)
+            except feeds.FeedError as exc:
+                raise EngineError("feed", str(exc)) from exc
+            if job.cancelled:
+                log.info("cancel for request %s came after the feed was forgotten; "
+                         "its files were removed", msg_id)
+                return {"ok": True, "cancel_too_late": True}
+            return {"ok": True}
+
+        return self._job(work)
 
     def feeds_inspect(self, params: Any) -> Callable[[], Any]:
         """What is in a feed, as data, from the raw zip: a long request when

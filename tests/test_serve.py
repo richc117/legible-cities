@@ -18,12 +18,14 @@ import datetime as dt
 import json
 import logging
 import os
+import queue
 import re
 import shutil
 import subprocess
 import sys
 import threading
 import time
+import types
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -1337,6 +1339,247 @@ def test_a_failed_add_from_a_keyed_address_tells_nobody_the_key(client, home, mo
         for secret in ("S3CRET", "someone", "pw@", "tok", "Client Error"):
             assert secret not in text, f"{secret!r} is in {text!r}"
     assert sorted(feeds.all()) == before, "nothing was kept"
+
+
+# ---------------------------------------------- feeds.remove as a job (issue 35)
+
+class Reader:
+    """The server's one reader thread, as ``main`` has it: messages reach the
+    endpoint one at a time, in order, from this thread alone, so a handler that
+    has not returned holds up every message behind it, a cancel included."""
+
+    def __init__(self, client: Client) -> None:
+        self.client = client
+        self.queue: queue.Queue = queue.Queue()
+        self.thread = threading.Thread(target=self._read, daemon=True)
+        self.thread.start()
+
+    def _read(self) -> None:
+        while (message := self.queue.get()) is not None:
+            self.client.endpoint.consume(message)
+
+    def send(self, method: str, params=None) -> int:
+        self.client.n += 1
+        message = {"jsonrpc": "2.0", "id": self.client.n, "method": method}
+        if params is not None:
+            message["params"] = params
+        self.queue.put(message)
+        return self.client.n
+
+    def notify(self, method: str, params) -> None:
+        self.queue.put({"jsonrpc": "2.0", "method": method, "params": params})
+
+    def stop(self) -> None:
+        self.queue.put(None)
+        self.thread.join(10)
+
+
+@pytest.fixture
+def reader(client):
+    r = Reader(client)
+    yield r
+    r.stop()
+
+
+class Held:
+    """A filesystem call held until the test lets it go."""
+
+    def __init__(self) -> None:
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+
+def hold(monkeypatch, owner, name: str, target: Path) -> Held:
+    """Stop the call of ``owner.name`` on ``target`` where it starts, and let
+    every other call through: a removal slowed as a network disk or a virus
+    scanner would slow it."""
+    held = Held()
+    real = getattr(owner, name)
+
+    def slowed(*args, **kwargs):
+        if Path(args[0]) == target:
+            held.entered.set()
+            assert held.release.wait(30), "the test never let the call go"
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(owner, name, slowed)
+    return held
+
+
+@pytest.fixture
+def mine(tmp_path, monkeypatch):
+    """A home of its own holding the user feed ``mine`` with its zips and a
+    stored layout, a neighbour that shares its first letters, and files the
+    engine never made."""
+    home = tmp_path / "home"
+    monkeypatch.setenv(config.ENV, str(home))
+    feeds.add(gtfs_zip(tmp_path / "mine.zip"), key="mine")
+    feeds.normalize("mine")
+    layouts = config.graphs_dir() / "mine"
+    (layouts / ("0" * 64)).mkdir(parents=True)
+    (layouts / ("0" * 64) / "03_octi.json").write_text("{}")
+    feeds.add(gtfs_zip(tmp_path / "mine-2.zip"), key="mine-2")
+    (config.graphs_dir() / "mine-2").mkdir()
+    (config.graphs_dir() / "mine-2" / "03_octi.json").write_text("{}")
+    bystanders = {home / "notes.txt": "mine, not the engine's",
+                  home / "projects" / "p1" / "project.json": "{}",
+                  home / "out" / "mine.mp4": "a video"}
+    for path, text in bystanders.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    zips = sorted(config.feeds_dir().glob("mine.*zip"))
+    assert len(zips) == 2
+    neighbours = [*config.feeds_dir().glob("mine-2.*zip"),
+                  config.graphs_dir() / "mine-2" / "03_octi.json", *bystanders]
+    return types.SimpleNamespace(home=home, zips=zips, layouts=layouts, neighbours=neighbours)
+
+
+def _is_listed(client: Client, key: str) -> bool:
+    return key in [f["key"] for f in client.call("feeds.list")["result"]["feeds"]]
+
+
+def test_a_removal_that_is_running_does_not_hold_up_the_reader(client, reader, mine, monkeypatch):
+    """The removal is a job: while it works through its files, the one reader
+    thread still answers other requests, which is what the app's own deadline
+    on this method was standing in for."""
+    held = hold(monkeypatch, shutil, "rmtree", mine.layouts)
+    try:
+        removing = reader.send("feeds.remove", {"key": "mine"})
+        assert held.entered.wait(10), "the removal never reached its layouts"
+        listed = client.wait(reader.send("feeds.list"), timeout=5)["result"]
+        info = client.wait(reader.send("engine.info"), timeout=5)["result"]
+        check(listed, "FeedsList")
+        check(info, "EngineInfo")
+        keys = [f["key"] for f in listed["feeds"]]
+        assert "mine" not in keys and "mine-2" in keys, "the registry is written first"
+        assert info["home"] == str(mine.home)
+        assert removing in client.endpoint.jobs, "the removal is a job, still running"
+        assert not any(m.get("id") == removing and "method" not in m for m in client.out)
+    finally:
+        held.release.set()
+    result = client.wait(removing)["result"]
+    assert result == {"ok": True}, "the normal answer, as it always was"
+    check(result, "Ok")
+    check(result, "FeedsRemoveResult")
+    assert not any(path.exists() for path in mine.zips) and not mine.layouts.exists()
+    assert all(path.exists() for path in mine.neighbours)
+    assert client.endpoint.jobs == {}
+
+
+def test_a_cancel_before_the_registry_write_keeps_the_feed_and_every_file(client, reader, mine,
+                                                                          monkeypatch):
+    # Stopped where the work first reads the registry: the cancel is read by
+    # the reader meanwhile and has to be honoured by the removal itself, which
+    # is already running and so past the job's own look at the start.
+    entered, release = threading.Event(), threading.Event()
+    real = feeds.user_feeds
+
+    def user_feeds():
+        if loom.current_job() is not None:       # the removal's worker, not the reader
+            entered.set()
+            assert release.wait(30), "the test never let the read go"
+        return real()
+
+    monkeypatch.setattr(feeds, "user_feeds", user_feeds)
+    try:
+        removing = reader.send("feeds.remove", {"key": "mine"})
+        assert entered.wait(10), "the removal never started"
+        reader.notify("$/cancelRequest", {"id": removing})
+        wait_for(lambda: client.endpoint.jobs[removing].cancelled, 10, "the cancel to be read")
+    finally:
+        release.set()
+    answer = client.wait(removing)
+    assert "error" in answer, f"the cancel was not honoured: {answer}"
+    error = answer["error"]
+    assert error["code"] == JsonRpcRequestCancelled.CODE
+    assert _is_listed(client, "mine")
+    assert all(path.exists() for path in mine.zips)
+    assert (mine.layouts / ("0" * 64) / "03_octi.json").exists()
+    assert all(path.exists() for path in mine.neighbours)
+    assert client.endpoint.jobs == {}
+    # Nothing was held against it: the same request, uncancelled, removes it.
+    assert client.call("feeds.remove", {"key": "mine"})["result"] == {"ok": True}
+    assert not _is_listed(client, "mine")
+
+
+def test_a_cancel_after_the_registry_write_is_too_late_and_the_files_go(client, reader, mine,
+                                                                        monkeypatch):
+    held = hold(monkeypatch, Path, "unlink", mine.zips[0])
+    try:
+        removing = reader.send("feeds.remove", {"key": "mine"})
+        assert held.entered.wait(10), "the removal never reached its files"
+        # The point of no return is behind it: forgotten, and the files not yet gone.
+        assert not _is_listed(client, "mine")
+        assert all(path.exists() for path in mine.zips)
+        reader.notify("$/cancelRequest", {"id": removing})
+        wait_for(lambda: client.endpoint.jobs[removing].cancelled, 10, "the cancel to be read")
+    finally:
+        held.release.set()
+    answer = client.wait(removing)
+    assert "error" not in answer, answer
+    result = answer["result"]
+    assert result == {"ok": True, "cancel_too_late": True}
+    check(result, "FeedsRemoveResult")
+    assert invalid(result, "Ok"), "the plain answer's shape is its own, unchanged"
+    assert not any(path.exists() for path in mine.zips)
+    assert not mine.layouts.exists()
+    assert not _is_listed(client, "mine")
+    # Only what was the feed's own went: a neighbour whose key begins with
+    # this one, and files of the person's in the home, are where they were.
+    assert all(path.exists() for path in mine.neighbours)
+    assert client.endpoint.jobs == {}
+
+
+def test_a_registry_write_that_fails_answers_the_error_and_leaves_everything(client, mine,
+                                                                            monkeypatch):
+    registry = feeds.user_file()
+    before = registry.read_bytes()
+    real = os.replace
+
+    def refused(src, dst, *args, **kwargs):
+        if Path(dst) == registry:
+            raise OSError(28, "No space left on device")
+        return real(src, dst, *args, **kwargs)
+
+    with monkeypatch.context() as stub:
+        stub.setattr(feeds.os, "replace", refused)
+        error = client.call("feeds.remove", {"key": "mine"})["error"]
+    assert error["code"] == -32000 and error["data"]["kind"] == "io"
+    assert "No space left" in error["data"]["hint"]
+    assert registry.read_bytes() == before
+    assert not list(registry.parent.glob("*.part"))
+    assert _is_listed(client, "mine")
+    assert all(path.exists() for path in mine.zips)
+    assert (mine.layouts / ("0" * 64) / "03_octi.json").exists()
+    assert client.endpoint.jobs == {}
+
+
+def test_work_past_its_point_of_no_return_answers_for_itself_whatever_was_cancelled(client):
+    """The job's own rule, apart from any method: once the work says it has done
+    what a cancel cannot undo, a cancel changes neither its result nor its
+    failure into the cancelled error."""
+    endpoint = client.endpoint
+    for fails in (False, True):
+        endpoint._request_id = 51
+        failure = ValueError("the files would not go")
+
+        def work(job, _progress, fails=fails, failure=failure):
+            job.commit()
+            client.notify("$/cancelRequest", {"id": 51})
+            assert job.cancelled
+            if fails:
+                raise failure
+            return {"done": True}
+
+        run = endpoint._job(work)
+        endpoint._request_id = None
+        if fails:
+            with pytest.raises(serve.EngineError) as caught:
+                run()
+            assert caught.value.data["hint"] == "the files would not go"
+        else:
+            assert run() == {"done": True}
+        assert endpoint.jobs == {}
 
 
 def test_feeds_inspect_for_la_is_the_librarys_answer(client, home):
