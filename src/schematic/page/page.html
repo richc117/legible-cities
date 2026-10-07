@@ -1413,7 +1413,12 @@ __SOCIAL__
     };
     chip.onclick = toggle;
     chip.onkeydown = e => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        // A held key is one press. A toggle that repeated with it would end up
+        // wherever the key happened to be let go.
+        if (!e.repeat) toggle();
+      }
     };
     chips.set(r, chip);
     lines.appendChild(chip);

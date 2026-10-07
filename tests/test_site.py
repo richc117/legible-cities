@@ -723,6 +723,13 @@ main(async browser => {
       info.props = props;
       seen.stops.push(info);
     }
+    // A key held on a chip is one press: two keydowns, the second its repeat, flip it once.
+    await page.focus(".chip");
+    seen.held = [await page.getAttribute(".chip", "aria-pressed")];
+    await page.keyboard.down("Space");
+    await page.keyboard.down("Space");
+    await page.keyboard.up("Space");
+    seen.held.push(await page.getAttribute(".chip", "aria-pressed"));
     // A name follows what a control now does: Play after Pause, the rate after a
     // press of the speed, More after Less. Each is a press and a read-back.
     const nameOf = async selector => {
@@ -816,6 +823,7 @@ def test_every_control_has_a_role_a_name_a_ring_and_a_state_in_both_themes(tmp_p
         after = run["after"]
         assert after["#play"]["name"] == "Play" and "pressed" not in after["#play"]["props"]
         assert run["said"] == "Paused"
+        assert run["held"] == ["true", "false"], "a held key flipped a chip more than once"
         assert after["#speed"]["text"] == "240\u00d7"
         assert after["#speed"]["name"] == "Playback speed 240\u00d7"
         assert after["#more"]["name"] == "More" and after["#more"]["text"].startswith("More")
