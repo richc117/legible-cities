@@ -1,1 +1,24 @@
-{}
+{
+  "bart": "2026-09-08",
+  "boston-t": "2026-09-11",
+  "cdmx-metro": "2025-06-16",
+  "chicago-l": "2026-09-09",
+  "cleveland-rta": "2026-10-01",
+  "dallas-dart": "2026-09-08",
+  "denver-rtd": "2026-09-11",
+  "la-metro-rail": "2026-09-08",
+  "lirr": "2026-09-09",
+  "marta": "2026-09-08",
+  "metra": "2026-09-08",
+  "miami-metrorail": "2026-09-08",
+  "minneapolis-metro": "2026-09-08",
+  "nj-transit-rail": "2026-09-11",
+  "nyc-subway": "2026-09-08",
+  "phoenix-valley-metro": "2026-09-08",
+  "pittsburgh-t": "2026-09-08",
+  "salt-lake-uta": "2026-09-11",
+  "seattle-link": "2026-09-15",
+  "septa-regional-rail": "2026-09-08",
+  "sf-muni-metro": "2026-08-10",
+  "trimet-max": "2026-09-08"
+}

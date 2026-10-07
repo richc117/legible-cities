@@ -261,10 +261,13 @@ class FakeBuild:
     def __init__(self, today: dt.date):
         self.today = today
         self.calls: list[tuple[str, dt.date | None]] = []
+        # One trip on any day, so a page is not empty. A test that wants the
+        # feed to have stopped covering a day empties it.
+        self.trips: list = [SimpleNamespace()]
 
     def run(self, key, *, date=None, **_):
         self.calls.append((key, date))
-        return SimpleNamespace(date=date or self.today, trips=[],
+        return SimpleNamespace(date=date or self.today, trips=list(self.trips),
                                graph=SimpleNamespace(stations=[], labels=[]))
 
     def dates_asked(self) -> dict[str, dt.date | None]:
@@ -391,19 +394,21 @@ def test_redate_refuses_a_key_it_cannot_find_and_changes_nothing(build):
 
 
 def test_a_service_days_file_that_cannot_be_read_is_refused_by_name(build):
-    """Read as empty it would have every network chosen again, silently."""
-    for text in ("{", "[]", '{"la-metro-rail": "last tuesday"}', '{"la-metro-rail": 3}'):
+    """Read as empty it would have every network chosen again, silently.
+
+    An empty file is what a write cut short leaves behind, so it is refused
+    like the rest; only a file that is not there is a site never built.
+    """
+    for text in ("", "\n", "{", "[]", '{"la-metro-rail": "last tuesday"}',
+                 '{"la-metro-rail": 3}'):
         site.DATA_DIR.mkdir(parents=True, exist_ok=True)
         site.service_days_file().write_text(text, encoding="utf-8")
         with pytest.raises(ValueError, match="service-days.json"):
             site.export([LA])
     assert build.calls == [], "nothing was built from a file that could not be read"
 
-    # An empty file, or none, is a site that has not been built yet.
-    site.service_days_file().write_text("", encoding="utf-8")
-    assert site.read_service_days() == {}
     site.service_days_file().unlink()
-    assert site.read_service_days() == {}
+    assert site.read_service_days() == {}, "no file is a site that has not been built yet"
 
 
 def test_the_committed_file_is_one_the_build_can_read():
@@ -418,3 +423,55 @@ def test_the_committed_file_is_one_the_build_can_read():
     days = site.read_service_days()
     stored = {key: days[key].isoformat() for key in sorted(days)}
     assert path.read_text(encoding="utf-8") == json.dumps(stored, indent=2) + "\n"
+
+
+def test_the_stored_days_are_exactly_the_registrys_networks():
+    """No network without a day, no day for a network that is not there.
+
+    Read from the registry's presets and not from the disk, so a person's own
+    feeds and whatever was last built cannot change the answer. A preset
+    added without its day would be chosen from the clock at the next build and
+    published on a day nobody looked at; a day left behind for a preset that
+    was removed is a record of a page that no longer exists.
+    """
+    stored = set(site.read_service_days())
+    assert not set(feeds.FEEDS) - stored, "no stored service day for these networks"
+    assert not stored - set(feeds.FEEDS), "a stored service day for a network that is gone"
+
+
+def test_a_stored_day_the_feed_no_longer_covers_is_refused(build):
+    """An empty page would be built, and the atlas would rank it the cleanest."""
+    store_days({LA: "2026-09-09"})
+    before = stored_days()
+    build.trips = []
+
+    with pytest.raises(ValueError, match=rf"{LA}: no trips run on 2026-09-09.*--redate {LA}"):
+        site.export([LA])
+
+    assert stored_days() == before
+    assert not (site.DATA_DIR / "networks.json").exists(), "an atlas of a refused build"
+
+    # And a network built for the first time is not written down on the way.
+    site.service_days_file().unlink()
+    with pytest.raises(ValueError, match=LA):
+        site.export([LA])
+    assert not site.service_days_file().exists()
+
+
+def test_a_write_cut_short_leaves_the_file_as_it_was(build, monkeypatch):
+    """The file is written beside itself and moved into place.
+
+    A write that truncated the file first would leave it empty if the build
+    were killed between the two, and the days it holds would be gone.
+    """
+    store_days({LA: "2026-09-09"})
+    before = stored_days()
+
+    def cut_short(src, dst):
+        raise OSError("stopped before the move")
+
+    monkeypatch.setattr(site.os, "replace", cut_short)
+    with pytest.raises(OSError, match="stopped"):
+        site.write_service_days({LA: dt.date(2026, 10, 7), CDMX: dt.date(2026, 10, 7)})
+
+    assert stored_days() == before

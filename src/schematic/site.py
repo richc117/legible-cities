@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import html
 import json
+import os
 import re
 import subprocess
 from collections.abc import Iterable
@@ -307,14 +308,18 @@ def service_days_file() -> Path:
 def read_service_days() -> dict[str, dt.date]:
     """The stored service day per network. Empty when there is no file yet.
 
-    A file that is not an object of ISO dates is refused by name rather than
-    read as empty, because an empty answer would have every network chosen
-    afresh and quietly move the days this file exists to hold still.
+    Only a missing file is empty. A file that is empty, or is not an object of
+    ISO dates, is refused by name, because reading it as "never built" would
+    have every network chosen afresh and quietly move the days this file
+    exists to hold still.
     """
     path = service_days_file()
-    text = path.read_text(encoding="utf-8") if path.exists() else ""
-    if not text.strip():
+    if not path.exists():
         return {}
+    text = path.read_text(encoding="utf-8")
+    if not text.strip():
+        raise ValueError(f"{path.name} is empty; restore it from git, or delete it "
+                         f"to have every service day chosen afresh")
     try:
         stored = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -332,11 +337,17 @@ def read_service_days() -> dict[str, dt.date]:
 
 
 def write_service_days(days: dict[str, dt.date]) -> None:
-    """Sorted by key, one entry to a line, so a diff shows one network per line."""
+    """Sorted by key, one entry to a line, so a diff shows one network per line.
+
+    Written beside itself and moved into place, as the user feeds are: a write
+    cut short leaves the file as it was, never an empty one.
+    """
     path = service_days_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     stored = {key: days[key].isoformat() for key in sorted(days)}
-    path.write_text(json.dumps(stored, indent=2) + "\n", encoding="utf-8", newline="\n")
+    tmp = path.with_name(path.name + ".part")
+    tmp.write_text(json.dumps(stored, indent=2) + "\n", encoding="utf-8", newline="\n")
+    os.replace(tmp, path)
 
 
 def redate(keys: Iterable[str]) -> dict[str, dt.date | None]:
@@ -365,6 +376,8 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
     network with none is left to the pipeline, which chooses the busiest
     weekday from today, and what it chose is written down before the next
     network is built, so a build that stops part way keeps the days it chose.
+    A stored day with no trips in the feed any more is refused, naming the
+    network, rather than built into an empty page.
     """
     keys = keys or list(feeds.all())
     MAPS_DIR.mkdir(parents=True, exist_ok=True)
@@ -376,6 +389,14 @@ def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[Netw
         result = pipeline.run(key, date=days.get(key), width=width,
                               out_dir=MAPS_DIR, back=atlas_url(),
                               icons=icons_url(), social=social_tags(key))
+        if not result.trips:
+            # A day the pipeline chose always has trips, so this is a stored day
+            # the feed's calendar no longer covers. Built anyway it would be an
+            # empty page that the atlas ranks as the cleanest network.
+            raise ValueError(
+                f"{key}: no trips run on {result.date.isoformat()}, so the feed's "
+                f"calendar no longer covers its stored service day; "
+                f"bin/build-site --redate {key} chooses another")
         if key not in days:
             days[key] = result.date
             write_service_days(days)

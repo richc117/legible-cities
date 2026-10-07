@@ -40,12 +40,12 @@ echo "==> generating maps"
 # is the bash a Mac has.
 "$python" -c "
 import sys
-from schematic import feeds, site
+from schematic import site
 try:
     for key, was in site.redate(sys.argv[1:]).items():
         print(f'{key}: ' + (f'service day {was} cleared; it is chosen again' if was
                             else 'had no stored service day'))
-except feeds.FeedError as exc:
+except ValueError as exc:      # a FeedError is one, and so is an unreadable file
     sys.exit(f'bin/build-site: {exc}')
 entries = site.export()
 print(f'{len(entries)} networks -> site/src/maps/')
