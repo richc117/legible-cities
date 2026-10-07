@@ -449,12 +449,22 @@
             },
             "positions": {
               "type": "string"
+            },
+            "thumb_dark": {
+              "type": "string",
+              "description": "A small picture of the map for the dark palette: the network alone, about 400 units wide, no ground, every colour a literal, in the project's colours and line order. Safe to show in an img."
+            },
+            "thumb_light": {
+              "type": "string",
+              "description": "The same picture for the light palette."
             }
           },
           "required": [
             "svg",
             "html",
-            "positions"
+            "positions",
+            "thumb_dark",
+            "thumb_light"
           ],
           "additionalProperties": false
         },

@@ -26,6 +26,7 @@ import threading
 import time
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import jsonschema
 import pandas as pd
@@ -34,8 +35,10 @@ from unittest import mock
 from jsonschema import Draft202012Validator
 
 from pylsp_jsonrpc.exceptions import JsonRpcRequestCancelled
+from test_colors import _graph
 
-from schematic import __version__, config, export, feeds, loom, pipeline, schedule, serve
+from schematic import (__version__, config, diagnostics, export, feeds, loom, pipeline, schedule,
+                       serve, thumbnail)
 
 SCHEMA = serve.schema()
 KEY = "la-metro-rail"
@@ -256,6 +259,15 @@ def test_schema_is_a_valid_schema_and_names_every_method():
     assert sorted(SCHEMA["notifications"]) == ["$/cancelRequest", "job/log", "job/progress"]
 
 
+def test_the_schema_names_both_thumbnails_as_files_every_map_build_answers():
+    """Issue 51: ``files`` grew by two required keys, the ones the engine
+    answers (``thumbnail.files_for``), beside the three it always had."""
+    files = SCHEMA["$defs"]["MapBuildResult"]["properties"]["files"]
+    assert set(files["properties"]) == {"svg", "html", "positions", *thumbnail.files_for("k")}
+    assert set(files["required"]) == set(files["properties"])
+    assert files["additionalProperties"] is False
+
+
 def test_schema_flag_prints_the_same_schema(capsys):
     assert serve.main(["--schema"]) == 0
     assert json.loads(capsys.readouterr().out) == SCHEMA
@@ -364,6 +376,47 @@ def test_map_build_refuses_a_layout_that_is_not_stored(client, home):
     check(error["data"], "ErrorData")
     assert error["data"]["kind"] == "layout"
     assert "lay the feed out first" in error["data"]["hint"]
+
+
+def test_map_build_answers_a_thumbnail_pair_beside_the_page(client, tmp_path, monkeypatch):
+    """Issue 51: two more files in the answer's ``files``, written into the
+    folder of the page, drawn from the graph the build drew with the colours,
+    default and order the request carried. In-process, with the pipeline stood
+    in for by a hand-made graph, so it runs without a feed or LOOM; the same
+    through the real pipeline is the LOOM-gated test below."""
+    monkeypatch.setenv(config.ENV, str(tmp_path))
+    graph = _graph([[("A", "0072bc"), ("B", None)], [("B", None), ("C", "ff0000")]])
+    diag = diagnostics.Diagnostics(
+        key="p9", name="Nine", date=dt.date.fromisoformat(DATE), stations=3, junctions=0,
+        edges=2, lines=("A", "B", "C"), octilinear=1.0,
+        stops=diagnostics.StopMatching(3, 3, 3, 0, 0, ()), trips_total=0, paths=0, unrouted=0,
+        skipped_calls=0, borrowed_track=0, labels_dropped=0, peak_concurrent=0)
+    asked: dict = {}
+
+    def stood_in(key, **kwargs):
+        asked.update(kwargs)
+        kwargs["out_dir"].mkdir(parents=True)
+        return SimpleNamespace(layout=NO_LAYOUT, date=dt.date.fromisoformat(DATE), graph=graph,
+                               diagnostics=lambda: diag)
+
+    monkeypatch.setattr(pipeline, "run", stood_in)
+    response = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                         "out": "p9", "colors": {"A": "#123456"},
+                                         "default_color": "#abcdef", "line_order": ["C", "A"]})
+    assert "result" in response, response
+    files = response["result"]["files"]
+    check(response["result"], "MapBuildResult")
+    folder = tmp_path / "out" / "p9"
+    assert files == {"svg": str(folder / f"{KEY}.svg"), "html": str(folder / f"{KEY}.html"),
+                     "positions": str(folder / f"{KEY}.positions.json"),
+                     "thumb_dark": str(folder / f"{KEY}-thumb-dark.svg"),
+                     "thumb_light": str(folder / f"{KEY}-thumb-light.svg")}
+    assert asked["colors"] == {"A": "#123456"} and asked["line_order"] == ["C", "A"]
+    for answer in ("thumb_dark", "thumb_light"):
+        svg = Path(files[answer]).read_text(encoding="utf-8")
+        assert "var(" not in svg and "<text" not in svg
+        # The request's colours, default and order, as the page has them.
+        assert re.findall(r'<g stroke="(#[0-9a-f]{6})"', svg) == ["#ff0000", "#123456", "#abcdef"]
 
 
 BAD_PARAMS = [
@@ -973,9 +1026,14 @@ def test_map_build_writes_under_out_and_reports_diagnostics(client, home):
 
     assert result["layout"] == layout
     assert result["date"] == DATE
+    assert set(result["files"]) == {"svg", "html", "positions", "thumb_dark", "thumb_light"}
     for kind, path in result["files"].items():
         assert Path(path).is_file(), kind
         assert Path(path).parent == home / "out" / "p1"
+    for kind in ("thumb_dark", "thumb_light"):
+        thumb = Path(result["files"][kind]).read_text(encoding="utf-8")
+        assert "var(" not in thumb and "<text" not in thumb and "<rect" not in thumb, kind
+        assert len(thumb.encode()) < 100_000, kind
     assert f"Friday 11 September 2026" in result["summary"]
 
     d = result["diagnostics"]
@@ -1008,6 +1066,11 @@ def test_map_build_takes_a_colour_per_line_and_a_default(client, home):
     assert '<g class="line" data-line="B" stroke="#eb131b"' in svg
     lines = json.loads(Path(result["files"]["positions"]).read_text())["lines"]
     assert lines["A"] == "#123456" and lines["B"] == "#eb131b" and "ZZ" not in lines
+    # The thumbnails carry the same colours, as literals, in both palettes.
+    for kind in ("thumb_dark", "thumb_light"):
+        thumb = Path(result["files"][kind]).read_text(encoding="utf-8")
+        drawn = re.findall(r'<g stroke="(#[0-9a-f]{6})"', thumb)
+        assert "#123456" in drawn and "#eb131b" in drawn and "#0072bc" not in drawn, kind
     assert set(lines) == set(result["diagnostics"]["lines"])
 
 

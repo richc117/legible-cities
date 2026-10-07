@@ -41,7 +41,8 @@ from pylsp_jsonrpc.exceptions import (JsonRpcException, JsonRpcInvalidParams,
                                       JsonRpcRequestCancelled)
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 
-from . import __version__, config, diagnostics, export, feeds, loom, pipeline, schedule
+from . import (__version__, config, diagnostics, export, feeds, loom, pipeline, schedule,
+               thumbnail)
 from .crs import to_mercator
 from .linegraph import LineGraph
 from .render import (HEX_COLOR_PATTERN, octilinearity, stage as render_stage,
@@ -617,12 +618,17 @@ class EngineEndpoint(Endpoint):
                                   line_order=line_order, out_dir=folder, progress=progress)
             where = folder or config.out_dir()
             diag = result.diagnostics()
+            # The picture the app's front door shows, beside the page, drawn
+            # from the graph just drawn in the project's colours and order.
+            thumbs = thumbnail.write(result.graph, where, key, colors=colors,
+                                     default_color=default_color, line_order=line_order)
             return {
                 "layout": result.layout,
                 "date": result.date.isoformat(),
                 "files": {"svg": str(where / f"{key}.svg"),
                           "html": str(where / f"{key}.html"),
-                          "positions": str(where / f"{key}.positions.json")},
+                          "positions": str(where / f"{key}.positions.json"),
+                          **{name: str(path) for name, path in thumbs.items()}},
                 "summary": diag.summary(),
                 "diagnostics": diag.to_dict(),
                 "caveats": diagnostics.caveats(diag),
