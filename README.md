@@ -295,6 +295,10 @@ before a still is captured, so its clock, and the trains with it, land somewhere
 slightly different each run. `notebooks/06_export_assets.ipynb` walks through
 it.
 
+`bin/theme-thumbnails <folder>` writes the two pictures of the map's themes the
+desktop app chooses by (`theme-warm-dark.svg`, `theme-sepia.svg`), drawn from a
+made-up network, so it needs no feed, Docker or `data/`.
+
 ## What real transit data is like
 
 The pipeline was the straightforward part. Almost every difficult hour went into

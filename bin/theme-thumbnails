@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Draw the two pictures of the map's themes the desktop app chooses by.
+#
+#   bin/theme-thumbnails <folder>
+#
+# Writes theme-warm-dark.svg, theme-sepia.svg and a README.md saying how they
+# were made into <folder>, which is created if it is missing. The network is a
+# fixture built in code and drawn directly, so this needs no Docker and no
+# data/ folder. See src/schematic/theme_thumbnails.py.
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+
+python="$root/.venv/bin/python"
+[ -x "$python" ] || python="python3"
+
+# Not cd'ing into the checkout: <folder> is read from where the caller stands,
+# so a relative one lands where they meant. PYTHONPATH covers the fallback
+# python3, which has not had the engine installed into it.
+PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" exec "$python" -m schematic.theme_thumbnails "$@"
