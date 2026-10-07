@@ -18,7 +18,7 @@ import json
 import re
 from dataclasses import replace
 from unittest import mock
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit
 
 import pytest
 from pylsp_jsonrpc.exceptions import JsonRpcInvalidParams
@@ -100,12 +100,32 @@ def test_the_pins_cover_every_name_and_every_video_preset():
         k for k, p in export.PRESETS.items() if p.kind == "video"}
 
 
+# What issue 40 (lane E40) added to every plan, and to the address of a preset
+# with safe zones. The pins compare the beats, the view, the clock and the
+# address to v0.11.0; the caption, the corner and the zones are E40's
+# additions, judged by tests/test_overlay.py, so they are left out of the hash.
+E40_FIELDS = ("caption", "clock_corner")
+E40_QUERY = ("corner", "ztop", "zbottom", "zside", "zrail", "zrailtop")
+
+
+def _as_before_e40(plan: dict) -> dict:
+    """The plan without E40's two fields, and its address without E40's
+    keys: the query parsed and re-encoded as url_for writes it, so the order
+    and the encoding of every other key are untouched."""
+    plan = {k: v for k, v in plan.items() if k not in E40_FIELDS}
+    base, query = plan["url"].split("?", 1)
+    kept = [(k, v) for k, v in parse_qsl(query, keep_blank_values=True) if k not in E40_QUERY]
+    plan["url"] = base + "?" + urlencode(kept)
+    return plan
+
+
 @pytest.mark.parametrize("preset,storyboard", list(BEFORE))
 def test_the_eight_names_plan_as_the_release_before(preset, storyboard):
     """A name asked for without ``view`` or ``at`` plans byte for byte what
     v0.11.0 planned: the same beats, address and job."""
     job = export.plan(KEY, preset, storyboard=storyboard, page=PAGE, date=DATE)
-    digest = hashlib.sha256(json.dumps(job.to_dict(), sort_keys=True).encode()).hexdigest()
+    plan = _as_before_e40(job.to_dict())
+    digest = hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()
     assert digest == BEFORE[(preset, storyboard)]
 
 
