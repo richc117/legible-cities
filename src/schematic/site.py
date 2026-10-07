@@ -12,6 +12,7 @@ import html
 import json
 import re
 import subprocess
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -289,17 +290,95 @@ def export_comparison(key: str, width: float = 1100.0) -> tuple[Path, Path]:
             export_unlabelled(key, "octi", f"{key}-plain.svg", width))
 
 
+# ------------------------------------------------------------- service days
+
+# One date per network, key to ISO date, committed. Without it every build
+# chose each network's busiest weekday from the day it ran, so a rebuild that
+# changed nothing else moved most of the published service days and the trip
+# counts with them (issue 25). The file is the record of which day each page
+# shows: written the first time a network is built, read on every build after,
+# and cleared on purpose with ``redate``.
+
+
+def service_days_file() -> Path:
+    return DATA_DIR / "service-days.json"
+
+
+def read_service_days() -> dict[str, dt.date]:
+    """The stored service day per network. Empty when there is no file yet.
+
+    A file that is not an object of ISO dates is refused by name rather than
+    read as empty, because an empty answer would have every network chosen
+    afresh and quietly move the days this file exists to hold still.
+    """
+    path = service_days_file()
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    if not text.strip():
+        return {}
+    try:
+        stored = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path.name} is not valid JSON: {exc}") from exc
+    if not isinstance(stored, dict):
+        raise ValueError(f"{path.name} must be an object of network key to date")
+    days: dict[str, dt.date] = {}
+    for key, value in stored.items():
+        try:
+            days[key] = dt.date.fromisoformat(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{path.name}: {key!r} is {value!r}, "
+                             f"which is not a date written YYYY-MM-DD") from None
+    return days
+
+
+def write_service_days(days: dict[str, dt.date]) -> None:
+    """Sorted by key, one entry to a line, so a diff shows one network per line."""
+    path = service_days_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stored = {key: days[key].isoformat() for key in sorted(days)}
+    path.write_text(json.dumps(stored, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+
+def redate(keys: Iterable[str]) -> dict[str, dt.date | None]:
+    """Forget the stored service day of each network, so the next build chooses it again.
+
+    Answers what each one had, or ``None`` where it had nothing. A key that is
+    neither a registered feed nor in the file is refused before anything is
+    removed: a mistyped key that cleared nothing would look like a redate that
+    had worked.
+    """
+    keys = list(dict.fromkeys(keys))
+    days = read_service_days()
+    for key in keys:
+        if key not in days:
+            feeds.get(key)          # raises FeedError naming the key
+    had = {key: days.pop(key, None) for key in keys}
+    if any(had.values()):
+        write_service_days(days)
+    return had
+
+
 def export(keys: list[str] | None = None, *, width: float = 1600.0) -> list[NetworkEntry]:
-    """Build every city and copy its artifacts into the site."""
+    """Build every city and copy its artifacts into the site.
+
+    A network's service day is the one stored in ``service-days.json``. A
+    network with none is left to the pipeline, which chooses the busiest
+    weekday from today, and what it chose is written down before the next
+    network is built, so a build that stops part way keeps the days it chose.
+    """
     keys = keys or list(feeds.all())
     MAPS_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    days = read_service_days()
 
     entries: list[NetworkEntry] = []
     for key in keys:
-        result = pipeline.run(key, width=width, out_dir=MAPS_DIR,
-                              back=atlas_url(), icons=icons_url(),
-                              social=social_tags(key))
+        result = pipeline.run(key, date=days.get(key), width=width,
+                              out_dir=MAPS_DIR, back=atlas_url(),
+                              icons=icons_url(), social=social_tags(key))
+        if key not in days:
+            days[key] = result.date
+            write_service_days(days)
         entries.append(NetworkEntry(
             key=key,
             name=feeds.get(key).name,

@@ -7,14 +7,16 @@ seen by opening the site -- that an origin exists, that both consumers of it
 emit whole URLs, and that the card is the size it claims to be.
 """
 
+import datetime as dt
 import json
 import re
 import struct
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from schematic import feeds, site
+from schematic import feeds, pipeline, site
 
 SITE_JSON = site.SRC_DIR / "_data" / "site.json"
 BASE_NJK = site.SRC_DIR / "_includes" / "layouts" / "base.njk"
@@ -239,3 +241,180 @@ def test_the_page_only_shows_the_switcher_when_asked():
     js = (Path(site.__file__).parent / "page" / "present.js").read_text()
     assert 'on("controls", false)' in js, "the flag must default off"
 
+
+
+# ---------------------------------------------------------------- service days
+
+# Two presets, so no test reads the person's own feeds: site.export() is given
+# its keys, never feeds.all().
+LA, CDMX = "la-metro-rail", "cdmx-metro"
+
+
+class FakeBuild:
+    """``pipeline.run`` stood in for, with the day the real one would choose.
+
+    ``today`` is what the pipeline's busiest weekday would be if asked now: it
+    answers it when no date is passed, as ``pipeline.run`` does, and moves
+    when a test says a month has gone by.
+    """
+
+    def __init__(self, today: dt.date):
+        self.today = today
+        self.calls: list[tuple[str, dt.date | None]] = []
+
+    def run(self, key, *, date=None, **_):
+        self.calls.append((key, date))
+        return SimpleNamespace(date=date or self.today, trips=[],
+                               graph=SimpleNamespace(stations=[], labels=[]))
+
+    def dates_asked(self) -> dict[str, dt.date | None]:
+        return dict(self.calls)
+
+
+@pytest.fixture
+def build(monkeypatch, tmp_path):
+    """site.export() with the pipeline stood in for and its folders in tmp_path.
+
+    The service-days file is read from DATA_DIR at the moment it is asked, so
+    pointing DATA_DIR at tmp_path moves it too and the committed file is never
+    touched.
+    """
+    fake = FakeBuild(dt.date(2026, 10, 7))
+    monkeypatch.setattr(site, "MAPS_DIR", tmp_path / "maps")
+    monkeypatch.setattr(site, "DATA_DIR", tmp_path / "_data")
+    monkeypatch.setattr(pipeline, "run", fake.run)
+    monkeypatch.setattr(pipeline, "stored", lambda key: None)
+    monkeypatch.setattr(site, "export_comparison", lambda key: None)
+    monkeypatch.setattr(site, "og_card", lambda: None)
+    monkeypatch.setattr(site, "_caveats", lambda result: [])
+    monkeypatch.setattr(site, "_issue_score", lambda result: 0.0)
+    return fake
+
+
+def stored_days() -> str:
+    return site.service_days_file().read_text(encoding="utf-8")
+
+
+def store_days(days: dict[str, str]) -> None:
+    site.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    site.service_days_file().write_text(json.dumps(days, indent=2) + "\n", encoding="utf-8")
+
+
+def test_a_stored_service_day_is_the_one_the_pipeline_is_given(build):
+    """The day a page shows is what the file says, not what today would choose."""
+    store_days({LA: "2026-09-09"})
+    before = stored_days()
+
+    entries = site.export([LA])
+
+    assert build.dates_asked() == {LA: dt.date(2026, 9, 9)}
+    assert entries[0].date == "2026-09-09"
+    assert stored_days() == before, "reading a day must not rewrite the file"
+
+
+def test_a_network_with_no_stored_day_is_written_once_it_is_built(build):
+    """The first build chooses from today and writes the choice down."""
+    entries = site.export([LA])
+
+    assert build.dates_asked() == {LA: None}, "no stored day: the pipeline chooses"
+    assert entries[0].date == "2026-10-07"
+    assert site.service_days_file().exists(), "the day the pipeline chose was not written"
+    assert json.loads(stored_days()) == {LA: "2026-10-07"}
+
+
+def test_a_day_is_written_as_soon_as_its_network_is_built(build, monkeypatch):
+    """A build that stops part way keeps the days it had already chosen."""
+    def stops_at_the_second(key, *, date=None, **_):
+        if key == CDMX:
+            raise RuntimeError("the second network failed")
+        return build.run(key, date=date)
+
+    monkeypatch.setattr(pipeline, "run", stops_at_the_second)
+    with pytest.raises(RuntimeError):
+        site.export([LA, CDMX])
+
+    assert json.loads(stored_days()) == {LA: "2026-10-07"}
+
+
+def test_two_builds_a_month_apart_publish_the_same_days(build):
+    """The point of the file: what the clock says no longer reaches a page."""
+    first = site.export([LA, CDMX])
+    build.today = dt.date(2026, 11, 7)
+    second = site.export([LA, CDMX])
+
+    assert {e.key: e.date for e in first} == {e.key: e.date for e in second}
+    assert {e.date for e in second} == {"2026-10-07"}
+    assert build.calls[-2:] == [(LA, dt.date(2026, 10, 7)), (CDMX, dt.date(2026, 10, 7))]
+
+
+def test_the_file_is_sorted_by_key_with_one_entry_to_a_line(build):
+    """So a diff of it is one network a line, whatever order they were built in."""
+    store_days({"zz-added": "2026-08-12"})
+    site.export([LA, CDMX])
+
+    assert stored_days() == (
+        "{\n"
+        f'  "{CDMX}": "2026-10-07",\n'
+        f'  "{LA}": "2026-10-07",\n'
+        '  "zz-added": "2026-08-12"\n'
+        "}\n"), "a network the build was not asked for keeps its day"
+
+
+def test_redate_clears_one_network_and_no_other(build):
+    """The next build chooses that one again and leaves the rest where they were."""
+    store_days({LA: "2026-09-09", CDMX: "2026-09-10", "zz-added": "2026-08-12"})
+
+    assert site.redate([CDMX]) == {CDMX: dt.date(2026, 9, 10)}
+    assert json.loads(stored_days()) == {LA: "2026-09-09", "zz-added": "2026-08-12"}
+
+    entries = {e.key: e.date for e in site.export([LA, CDMX])}
+
+    assert build.dates_asked() == {LA: dt.date(2026, 9, 9), CDMX: None}
+    assert entries == {LA: "2026-09-09", CDMX: "2026-10-07"}
+    assert json.loads(stored_days()) == {
+        LA: "2026-09-09", CDMX: "2026-10-07", "zz-added": "2026-08-12"}
+
+
+def test_redate_refuses_a_key_it_cannot_find_and_changes_nothing(build):
+    """A mistyped key that cleared nothing would look like a redate that worked."""
+    store_days({LA: "2026-09-09"})
+    before = stored_days()
+
+    with pytest.raises(feeds.FeedError, match="no-such-network"):
+        site.redate([CDMX, "no-such-network"])
+    assert stored_days() == before
+
+    # A registered network that has no day yet is not an error; there is just
+    # nothing to forget, and the file is left as it was.
+    assert site.redate([CDMX]) == {CDMX: None}
+    assert stored_days() == before
+
+
+def test_a_service_days_file_that_cannot_be_read_is_refused_by_name(build):
+    """Read as empty it would have every network chosen again, silently."""
+    for text in ("{", "[]", '{"la-metro-rail": "last tuesday"}', '{"la-metro-rail": 3}'):
+        site.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        site.service_days_file().write_text(text, encoding="utf-8")
+        with pytest.raises(ValueError, match="service-days.json"):
+            site.export([LA])
+    assert build.calls == [], "nothing was built from a file that could not be read"
+
+    # An empty file, or none, is a site that has not been built yet.
+    site.service_days_file().write_text("", encoding="utf-8")
+    assert site.read_service_days() == {}
+    site.service_days_file().unlink()
+    assert site.read_service_days() == {}
+
+
+def test_the_committed_file_is_one_the_build_can_read():
+    """The file the repository carries parses, and is in the shape a build writes it.
+
+    So the first build after a clone changes it only by adding a network, and
+    a hand edit that broke the order or the layout is seen here and not as a
+    diff nobody can read.
+    """
+    path = site.SRC_DIR / "_data" / "service-days.json"
+    assert path.exists(), "service-days.json is committed with the site's data"
+    days = site.read_service_days()
+    stored = {key: days[key].isoformat() for key in sorted(days)}
+    assert path.read_text(encoding="utf-8") == json.dumps(stored, indent=2) + "\n"

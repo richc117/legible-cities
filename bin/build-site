@@ -2,25 +2,59 @@
 # Build the standalone site: regenerate every map, export it plus its
 # provenance into the Eleventy source tree, then build the site.
 #
-#   bin/build-site            all networks
-#   bin/build-site --serve    ...and watch
+#   bin/build-site                   all networks
+#   bin/build-site --serve           ...and watch
+#   bin/build-site --redate <key>    choose that network's service day again
+#
+# Each network's service day is kept in site/src/_data/service-days.json,
+# written the first time the network is built and read on every build after,
+# so a rebuild never moves a published day. --redate forgets one network's day
+# before the build, which then chooses the busiest weekday from today; it may
+# be given more than once. The file is committed: read its diff before pushing.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 python=".venv/bin/python"
 [ -x "$python" ] || python="python3"
 
+serve=0
+redate=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --serve) serve=1 ;;
+    --redate)
+      [ $# -ge 2 ] || { echo "bin/build-site: --redate needs a network key" >&2; exit 2; }
+      redate+=("$2")
+      shift
+      ;;
+    *)
+      echo "bin/build-site: unknown argument '$1' (--serve, --redate <key>)" >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
 echo "==> generating maps"
+# ${redate[@]+...}: an empty array is an unbound variable to bash 3.2, which
+# is the bash a Mac has.
 "$python" -c "
-from schematic import site
+import sys
+from schematic import feeds, site
+try:
+    for key, was in site.redate(sys.argv[1:]).items():
+        print(f'{key}: ' + (f'service day {was} cleared; it is chosen again' if was
+                            else 'had no stored service day'))
+except feeds.FeedError as exc:
+    sys.exit(f'bin/build-site: {exc}')
 entries = site.export()
 print(f'{len(entries)} networks -> site/src/maps/')
-"
+" ${redate[@]+"${redate[@]}"}
 
 echo "==> building site"
 cd site
 [ -d node_modules ] || npm install --silent
-if [ "${1:-}" = "--serve" ]; then
+if [ "$serve" = 1 ]; then
   npx @11ty/eleventy --serve --input=src --output=dist
 else
   npx @11ty/eleventy --input=src --output=dist
