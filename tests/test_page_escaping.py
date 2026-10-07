@@ -79,4 +79,4 @@ def test_the_line_chips_are_built_as_nodes_and_not_as_markup():
     start = _HTML.index('chip.className = "chip"')
     block = _HTML[start:_HTML.index("lines.appendChild(chip)", start)]
     assert "innerHTML" not in block, "a chip is built from feed text; keep it off markup sinks"
-    assert "chip.append(dot, r)" in block
+    assert "chip.append(dot, display(r))" in block

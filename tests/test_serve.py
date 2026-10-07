@@ -287,6 +287,7 @@ def test_patterns_agree_with_the_schema():
     assert serve.URL_PATTERN.pattern == defs["PageUrl"]["pattern"]
     assert serve.STEM_PATTERN.pattern == defs["CaptureJob"]["properties"]["stem"]["pattern"]
     assert serve.COLOR_PATTERN.pattern == defs["HexColor"]["pattern"]
+    assert serve.LINE_NAME_PATTERN.pattern == defs["LineOptions"]["properties"]["name"]["pattern"]
     # The app's generated types know every preset and storyboard by name.
     assert defs["PresetName"]["enum"] == list(export.PRESETS)
     assert defs["StoryboardName"]["enum"] == list(export.STORYBOARDS)
@@ -421,6 +422,37 @@ def test_map_build_answers_a_thumbnail_pair_beside_the_page(client, tmp_path, mo
         assert re.findall(r'<g stroke="(#[0-9a-f]{6})"', svg) == ["#ff0000", "#123456", "#abcdef"]
 
 
+def test_map_build_hands_the_lines_chosen_to_the_pipeline(client, tmp_path, monkeypatch):
+    """Issue 42: ``lines`` reaches ``pipeline.run`` as the client sent it,
+    a label the layout may not carry included, since only the pipeline has
+    the layout to judge it by. Stood in as the thumbnail test above is."""
+    monkeypatch.setenv(config.ENV, str(tmp_path))
+    graph = _graph([[("A", "0072bc"), ("B", None)]])
+    diag = diagnostics.Diagnostics(
+        key="p9", name="Nine", date=dt.date.fromisoformat(DATE), stations=2, junctions=0,
+        edges=1, lines=("A", "B"), octilinear=1.0,
+        stops=diagnostics.StopMatching(2, 2, 2, 0, 0, ()), trips_total=0, paths=0, unrouted=0,
+        skipped_calls=0, borrowed_track=0, labels_dropped=0, peak_concurrent=0)
+    asked: dict = {}
+
+    def stood_in(key, **kwargs):
+        asked.update(kwargs)
+        kwargs["out_dir"].mkdir(parents=True)
+        return SimpleNamespace(layout=NO_LAYOUT, date=dt.date.fromisoformat(DATE), graph=graph,
+                               diagnostics=lambda: diag)
+
+    monkeypatch.setattr(pipeline, "run", stood_in)
+    chosen = {"A": {"name": "Airport Line"}, "B": {"hidden": True}, "Z": {}}
+    response = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                         "out": "p9", "lines": chosen})
+    assert "result" in response, response
+    check(response["result"], "MapBuildResult")
+    assert asked["lines"] == chosen
+    assert client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                     "out": "p8"})["result"]
+    assert asked["lines"] is None
+
+
 BAD_PARAMS = [
     ("feeds.service", None, "FeedsServiceParams"),
     ("feeds.service", {}, "FeedsServiceParams"),
@@ -531,6 +563,20 @@ BAD_PARAMS = [
                    "style": {"line_width": "7"}}, "MapBuildParams"),
     ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
                    "style": {"background": "black"}}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "lines": ["A"]},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "lines": {"A": "Airport"}},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                   "lines": {"A": {"name": ""}}}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                   "lines": {"A": {"name": "x" * 41}}}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                   "lines": {"A": {"name": "a\nb"}}}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                   "lines": {"A": {"hidden": "yes"}}}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                   "lines": {"A": {"colour": "#123456"}}}, "MapBuildParams"),
     ("export.plan", None, "ExportPlanParams"),
     ("export.plan", {}, "ExportPlanParams"),
     ("export.plan", {"key": KEY}, "ExportPlanParams"),
@@ -702,6 +748,9 @@ GOOD_PARAMS = [
     ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
                         "style": {"background": "#000000", "station_fill": "#FFFFFF",
                                   "station_stroke_color": "#111111", "label_color": "#abcdef"}}),
+    ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                        "lines": {"A": {"name": "Airport Line"}, "B": {"hidden": True},
+                                  "Z": {}}}),
     ("ExportPlanParams", {"key": KEY, "preset": "instagram-reel"}),
     ("ExportPlanParams", {"key": KEY, "preset": "instagram-post",
                           "page": "app://local/projects/p1/la-metro-rail.html", "date": DATE,

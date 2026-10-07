@@ -500,8 +500,8 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         anchor: dt.date | None = None,
         width: float = 1800.0, style: Style | None = None,
         colors: dict[str, str] | None = None, default_color: str | None = None,
-        line_order: list[str] | None = None, force: bool = False,
-        out_dir: Path | None = None, back: str = "index.html",
+        line_order: list[str] | None = None, lines: dict[str, dict] | None = None,
+        force: bool = False, out_dir: Path | None = None, back: str = "index.html",
         icons: str | None = None, social: str = "",
         progress: Progress | None = None) -> Result:
     """Everything: the layout, then draw, schedule, animate, write.
@@ -516,7 +516,13 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     leaves uncoloured, both written ``#rrggbb`` and both reaching the map
     and the page alike (``render.line_colors``); ``line_order`` is the
     stacking on shared track, the later over the earlier; the lines it
-    leaves out follow the ones it names rather than going undrawn. ``back`` is the href the animation page's
+    leaves out follow the ones it names rather than going undrawn. ``lines``
+    is what a client chose per line, by label, as ``serve._lines`` checked it:
+    a ``name`` the page writes where it writes the label, and ``hidden``, which
+    takes the line off the graph before anything reads it (app ADR-053), so
+    it has no track, trips, chip, row or band and a station only it served is
+    not drawn; nothing stored changes, and a label the layout does not carry
+    is ignored. ``back`` is the href the animation page's
     back-link points at. The default is the sibling gallery in ``out/``;
     the site passes its own atlas URL, because a relative "index.html"
     resolves to /maps/index.html there.
@@ -556,13 +562,35 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     # there, and reprojecting is only needed for geometry.
     graph_ll = LineGraph.from_geojson(paths["octi"])
     require_edges(found.feed, graph_ll)
+    # A hidden line comes off the graph here, once, so the stop matching, the
+    # schedule, the drawing, the thumbnails and the page see only the lines
+    # that remain (app ADR-053). The stored layout is read, never changed.
+    every = set(graph_ll.labels)
+    hidden = {label for label, chosen in (lines or {}).items()
+              if chosen.get("hidden") and label in every}
+    if hidden and hidden == every:
+        raise ValueError(f"{key}: every line on this map is hidden; show at least one line "
+                         f"to draw it")
+    graph_all = graph_ll
+    if hidden:
+        graph_ll = graph_ll.without(hidden)
     graph = graph_ll.reproject(to_mercator)
 
-    # The day is read as render.stage's description reads it (schedule_for).
-    day = schedule_for(found, date, anchor=anchor, graph=graph_ll)
-    date, match, trips = day.date, day.match, day.trips
-    # Every line the layout carries is timed: hiding lines (E42a) must not narrow this fill.
+    # The day is read as render.stage's description reads it (schedule_for),
+    # over every line the layout carries: the minutes cache it fills describes
+    # the whole layout, and the service day is counted over every line, so
+    # hiding one never moves it (app ADR-053). The drawn map then keeps the
+    # drawn lines' trips alone, and the match it reports is cut to the
+    # stations that remain.
+    day = schedule_for(found, date, anchor=anchor, graph=graph_all)
     _remember_minutes(found.id, day)
+    date, match, trips = day.date, day.match, day.trips
+    labels = set(graph_ll.labels)
+    if hidden:
+        kept = set(graph_ll.nodes)
+        match = replace(match, stop_to_node={stop: node for stop, node in match.stop_to_node.items()
+                                             if node in kept})
+        trips = [trip for trip in trips if trip.route_label in labels]
     done("schedule", f"{len(trips)} trips on {service_day_text(date)}; {match.report()}")
 
     name = feeds.get(key).name
@@ -576,13 +604,17 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
                colors=colors)
     done("render", f"{len(r.dropped_labels)} labels dropped")
     # The loom stage, not gtfs2graph: same stations and the same solved line
-    # ordering, so only the shape differs. See animate.geographic_tracks.
+    # ordering, so only the shape differs. See animate.geographic_tracks. It
+    # keeps a hidden line: the morph pairs the drawn tracks, which lack it.
     geo = None
     if feeds.get(key).geographic:
         geo_graph = LineGraph.from_geojson(paths["loom"]).reproject(to_mercator)
         geo = animate.geographic_tracks(geo_graph, graph, r, style)
 
-    anim = animate.build(r, graph, trips, date, geo, line_order=line_order)
+    # A name for a line the map does not draw, hidden or unknown, is dropped.
+    names = {label: chosen["name"] for label, chosen in (lines or {}).items()
+             if "name" in chosen and label in labels}
+    anim = animate.build(r, graph, trips, date, geo, line_order=line_order, names=names)
     done("animate", f"{len(anim.paths)} distinct paths"
          + (f", {len(anim.unrouted)} unrouted" if anim.unrouted else ""))
 

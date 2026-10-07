@@ -18,7 +18,7 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 Coord = tuple[float, float]
 
@@ -152,6 +152,33 @@ class LineGraph:
             edges=[Edge(src=e.src, dst=e.dst, geometry=[fn(c) for c in e.geometry],
                         lines=list(e.lines), props=dict(e.props))
                    for e in self.edges],
+        )
+
+    def without(self, labels: Iterable[str]) -> LineGraph:
+        """Return a copy with the lines labelled ``labels`` taken off.
+
+        A line comes off every edge, and the lines left keep their order,
+        which is the solved stacking ``offsets.py`` reads, so the lines it
+        shared track with close up over its place. An edge left with no line
+        goes, then a node left with no edge: a station only those lines
+        served is not drawn. A node that never had an edge stays, and nodes
+        and edges keep their order, so a drawing of the copy is as
+        deterministic as one of the graph. A label the graph does not carry
+        changes nothing, so ``without(())`` is a copy that writes the same
+        GeoJSON. The graph itself is never changed.
+        """
+        gone = set(labels)
+        edges = [Edge(src=e.src, dst=e.dst, geometry=list(e.geometry),
+                      lines=[ln for ln in e.lines if ln.label not in gone], props=dict(e.props))
+                 for e in self.edges]
+        edges = [e for e in edges if e.lines]
+        had = {end for e in self.edges for end in (e.src, e.dst)}
+        has = {end for e in edges for end in (e.src, e.dst)}
+        return LineGraph(
+            nodes={nid: Node(id=n.id, coord=n.coord, station_id=n.station_id,
+                             station_label=n.station_label, props=dict(n.props))
+                   for nid, n in self.nodes.items() if nid in has or nid not in had},
+            edges=edges,
         )
 
     def bounds(self) -> tuple[float, float, float, float]:

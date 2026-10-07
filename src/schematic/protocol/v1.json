@@ -366,6 +366,11 @@
           },
           "description": "Line labels in the order they stack on shared track, the later over the earlier. A line the list leaves out follows the ones it names, and a label the layout does not carry is ignored, so a partial or stale order never drops a line."
         },
+        "lines": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/LineOptions" },
+          "description": "A display name and a hidden flag per line, keyed by line label. A label the layout does not carry is ignored, so a client can keep its choices for lines a narrower mode dropped. Hiding is a drawing choice: a hidden line comes off the map, its trips, the page and the thumbnails, a station only it served is not drawn, and no stored layout changes; render.stage still shows every line."
+        },
         "style": { "$ref": "#/$defs/MapStyle" }
       },
       "required": [
@@ -442,6 +447,24 @@
         "label_color": {
           "$ref": "#/$defs/HexColor",
           "description": "The station names, as the literal a standalone SVG falls back to; the page's theme overrides it. #111111 when omitted."
+        }
+      },
+      "additionalProperties": false
+    },
+    "LineOptions": {
+      "description": "What a client chose for one line of the map. Every field is optional; an empty object changes nothing.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\r\\n\\u2028\\u2029]*$",
+          "description": "The line's display name, written where the page writes the line's label: its chip, its row and the time chart's band, and the trains' titles. The label stays the line's key everywhere else (the SVG's data-line, ExportOptions.lines). From 1 to 40 characters, with no line break."
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "True leaves the line off the map: no track, no trips, no chip, row or band, and no colour in the thumbnails; the lines it shared track with close up over its place."
         }
       },
       "additionalProperties": false

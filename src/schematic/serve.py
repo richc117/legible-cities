@@ -65,6 +65,10 @@ DATE_PATTERN = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 CLOCK_PATTERN = re.compile(export.CLOCK)
 URL_PATTERN = re.compile(r"^[a-z][a-z0-9+.-]*://[^\s]+$")
 STEM_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+# A line's display name: no line break of any kind, the two Unicode ones
+# included, since the page writes it into a chip, a row and a train's title.
+LINE_NAME_PATTERN = re.compile(r"^[^\r\n\u2028\u2029]*$")
+LINE_NAME_LENGTH = 40
 
 # An exception's kind is the module that raised it, since that is where the
 # sentence for a person was written.
@@ -283,6 +287,39 @@ def _colors(left: dict[str, Any], name: str) -> dict[str, str] | None:
             for k, v in value.items()):
         raise invalid_params(f"{name} must be an object of line label to a colour "
                              f"written #rrggbb")
+    return value
+
+
+def _lines(left: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
+    """Line label to what a client chose for that line, or none.
+
+    Each value is an object of two optional fields and nothing else: ``name``,
+    from 1 to ``LINE_NAME_LENGTH`` characters with no line break, and
+    ``hidden``, true or false. A label the layout does not carry is not
+    refused, as ``colors`` does not refuse one: it cannot be checked without
+    reading the layout, and a project's choices must survive a narrower
+    mode. ``pipeline.run`` ignores it."""
+    value = left.pop("lines", None)
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise invalid_params("lines must be an object of line label to the line's name "
+                             "and hidden")
+    for label, chosen in value.items():
+        if not isinstance(chosen, dict):
+            raise invalid_params(f"lines[{label!r}] must be an object of name and hidden")
+        rest = dict(chosen)
+        if "name" in rest:
+            name = rest.pop("name")
+            if (not isinstance(name, str) or not 1 <= len(name) <= LINE_NAME_LENGTH
+                    or not LINE_NAME_PATTERN.fullmatch(name)):
+                raise invalid_params(f"lines[{label!r}].name must be from 1 to "
+                                     f"{LINE_NAME_LENGTH} characters with no line break")
+        if "hidden" in rest:
+            if not isinstance(rest.pop("hidden"), bool):
+                raise invalid_params(f"lines[{label!r}].hidden must be true or false")
+        if rest:
+            raise invalid_params(f"lines[{label!r}] does not take {', '.join(sorted(rest))}")
     return value
 
 
@@ -710,6 +747,7 @@ class EngineEndpoint(Endpoint):
         default_color = _color(left, "default_color")
         line_order = _strings(left, "line_order")
         style = _style(left.pop("style", None))
+        lines = _lines(left)
         _no_extra("map.build", left)
         folder = config.out_dir() / out if out else None
 
@@ -718,7 +756,8 @@ class EngineEndpoint(Endpoint):
             # that re-laid a network unasked would be a different map.
             result = pipeline.run(key, layout=layout, date=date, width=width,
                                   colors=colors, default_color=default_color, style=style,
-                                  line_order=line_order, out_dir=folder, progress=progress)
+                                  line_order=line_order, lines=lines, out_dir=folder,
+                                  progress=progress)
             where = folder or config.out_dir()
             diag = result.diagnostics()
             # The picture the app's front door shows, beside the page, drawn

@@ -329,6 +329,10 @@ __SOCIAL__
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("data").textContent);
+  // What the page writes for a line: its name where the map gave it one,
+  // else its label. The label stays the key everywhere it is matched on.
+  const display = r =>
+    (data.names && Object.prototype.hasOwnProperty.call(data.names, r) && data.names[r]) || r;
   // Declared here rather than beside the view state below: the track and dot
   // builders read it, and they run first.
   const geoData = data.geo || null;
@@ -631,7 +635,7 @@ __SOCIAL__
     name.setAttribute("class", "rowname");
     name.setAttribute("text-anchor", "end");
     name.setAttribute("fill", data.lines[line.label] || "currentColor");
-    name.textContent = line.label;
+    name.textContent = display(line.label);
     nameLayer.appendChild(name);
     names.push({ el: name, label: line.label });
   }
@@ -1006,7 +1010,7 @@ __SOCIAL__
         dot.setAttribute("class", "train");
         dot.setAttribute("fill", data.lines[trip.r] || "#333");
         const title = document.createElementNS(NS, "title");
-        title.textContent = trip.r + (trip.h ? " to " + trip.h : "");
+        title.textContent = display(trip.r) + (trip.h ? " to " + trip.h : "");
         dot.appendChild(title);
         layer.appendChild(dot);
         nodes.set(i, dot);
@@ -1251,8 +1255,8 @@ __SOCIAL__
   const sized = new Map(layout.lines.map(l => [l.label, l.stations]));
   const applySort = how => {
     const sorted = order.slice().sort((a, b) =>
-      how === "size" ? (sized.get(b) - sized.get(a)) || a.localeCompare(b)
-                     : a.localeCompare(b, undefined, { numeric: true }));
+      how === "size" ? (sized.get(b) - sized.get(a)) || display(a).localeCompare(display(b))
+                     : display(a).localeCompare(display(b), undefined, { numeric: true }));
     sorted.forEach((label, i) => rowTarget.set(label, i));
     Object.keys(sortBtns).forEach(k =>
       sortBtns[k].setAttribute("aria-pressed", String(k === how)));
@@ -1294,7 +1298,7 @@ __SOCIAL__
     const dot = document.createElement("span");
     dot.className = "dot";
     dot.style.background = data.lines[r] || "#333";
-    chip.append(dot, r);
+    chip.append(dot, display(r));
     const toggle = () => {
       setRoute(r, chip.getAttribute("aria-pressed") !== "true");
       draw();

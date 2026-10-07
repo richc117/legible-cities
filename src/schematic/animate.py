@@ -313,6 +313,9 @@ class Animation:
     trips: list[dict]
     lines: dict[str, str]
     unrouted: list[str]
+    # A display name per drawn line, by label, where the client gave one. The
+    # page writes it where it writes the label; the label stays the key.
+    names: dict[str, str] = field(default_factory=dict)
     # Column assignments for the linear view; rows are placed in the browser,
     # since their order depends on the sort the reader picks.
     linear: dict = field(default_factory=dict)
@@ -329,6 +332,9 @@ class Animation:
         return {
             "date": self.date.isoformat(),
             "lines": self.lines,
+            # Only when there is a name, so a page without one carries the
+            # data it always did.
+            **({"names": self.names} if self.names else {}),
             "linear": self.linear,
             "paths": self.paths,
             "trips": self.trips,
@@ -343,8 +349,11 @@ class Animation:
 
 def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
           date: dt.date, geo: GeoLayer | None = None,
-          line_order: list[str] | None = None) -> Animation:
-    """Route every trip and collect the deduplicated paths."""
+          line_order: list[str] | None = None,
+          names: dict[str, str] | None = None) -> Animation:
+    """Route every trip and collect the deduplicated paths. ``names`` is a
+    display name per line label, which the page writes in the line's chip,
+    row, band and train titles; the caller gives names for drawn lines only."""
     net = RouteNetwork.build(render)
     layout = linear.build(graph, order=line_order)
     layout_json = layout.to_json()
@@ -435,7 +444,7 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
 
     out_trips.sort(key=lambda t: t["k"][0][0])
     return Animation(date=date, paths=paths, trips=out_trips, lines=colors,
-                     geo=geo or GeoLayer(),
+                     names=dict(names or {}), geo=geo or GeoLayer(),
                      unrouted=unrouted, trips_with_skipped_calls=skipped_calls,
                      trips_with_borrowed_track=borrowed,
                      linear=layout_json)
