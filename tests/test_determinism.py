@@ -105,6 +105,8 @@ def test_nothing_calls_setTheme_on_load_and_nothing_writes_the_theme_key():
     assert page.count("setTheme(") == 1, "setTheme is gone, or something besides the seam names it"
     assert "setTheme" not in PRESENT_JS.read_text(encoding="utf-8")
     assert "setItem" not in page, "the page writes storage; rc-theme belongs to the site's script"
+    assert "setItem" not in PRESENT_JS.read_text(encoding="utf-8"), \
+        "present.js writes storage; it is inlined into every generated page"
 
 
 @needs_node
