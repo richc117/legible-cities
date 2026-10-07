@@ -444,6 +444,22 @@ p {
   outline-offset: -2px;
 }
 
+/* As on the animation page's own switcher: the two end buttons take the
+   group's curve so the clip does not cut the ring, and on a pressed button
+   (--text) a band of --bg between the ring and the fill puts --focus on a
+   ground it clears. */
+.segmented button:first-child:focus-visible {
+  border-radius: 999px 0 0 999px;
+}
+
+.segmented button:last-child:focus-visible {
+  border-radius: 0 999px 999px 0;
+}
+
+.segmented button[aria-pressed="true"]:focus-visible {
+  box-shadow: inset 0 0 0 4px var(--bg);
+}
+
 .compare > div > p {
   color: var(--muted);
   font-size: 0.86rem;

@@ -53,8 +53,15 @@ __SOCIAL__
   }
   a { color: var(--text); text-decoration-thickness: 1px; text-underline-offset: 2px; }
   a:hover { color: var(--link-hover); }
-  a:focus-visible, button:focus-visible, input:focus-visible {
+  a:focus-visible, button:focus-visible, input:focus-visible, .chip:focus-visible {
     outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px;
+  }
+  /* Said to a screen reader and drawn nowhere: the one live region, below. Out of
+     the flow, so it adds no gap to the bar it sits in and no height to the
+     header. */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
   }
   header {
     background: var(--bg); border-bottom: 1px solid var(--border);
@@ -84,9 +91,6 @@ __SOCIAL__
   }
   button:hover { color: var(--text); }
   button[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text); }
-  /* Play/pause says which it is in its own label; the pressed underline just
-     reads as a stray rule under the word. */
-  #play[aria-pressed="true"] { border-bottom-color: transparent; }
 
   /* An exclusive choice should not look like the toggles beside it. Sharing a
      ground and a border makes "one of these" read at a glance, which the bare
@@ -108,6 +112,15 @@ __SOCIAL__
   .segmented button[aria-pressed="true"] {
     background: var(--text); color: var(--bg); border-bottom-color: transparent;
   }
+  /* The group clips what falls outside it, so the ring is drawn inside the
+     button, and the two end buttons take the group's curve so the clip does not
+     cut it. On a pressed one the ring sits on --text, which --focus is under 3:1
+     against in both themes; a band of --bg between the two puts it on a ground
+     it clears. */
+  .segmented button:focus-visible { outline-offset: -2px; }
+  .segmented button:first-child:focus-visible { border-radius: 999px 0 0 999px; }
+  .segmented button:last-child:focus-visible { border-radius: 0 999px 999px 0; }
+  .segmented button[aria-pressed="true"]:focus-visible { box-shadow: inset 0 0 0 4px var(--bg); }
   /* Phosphor's icons (MIT), base64'd from page/icons/ by animate.py. This page
      has to stay one file, so they arrive as data URIs rather than as a
      request. Masked over currentColor so they take the theme and invert with
@@ -147,6 +160,14 @@ __SOCIAL__
   }
   .chip:hover { color: var(--text); }
   .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+  /* A line's colour is the agency's and is drawn as published. Where it is under
+     3:1 against the header's ground the dot gets a 1px ring in the label
+     colour, in that theme only: data-weak lists the themes it fails in, and the
+     theme can change in place (setTheme), so each theme has its own rule. */
+  :root:not([data-theme="sepia"]) .chip .dot[data-weak~="warm-dark"],
+  :root[data-theme="sepia"] .chip .dot[data-weak~="sepia"] {
+    box-shadow: 0 0 0 1px var(--text);
+  }
   .chip[aria-pressed="true"] { color: var(--text); }
   .chip[aria-pressed="false"] .dot { opacity: 0.3; }
   .sort { color: var(--muted); font-size: 0.86rem; display: inline-flex;
@@ -192,7 +213,11 @@ __SOCIAL__
     /* The service date is on the atlas entry that got you here. */
     .sub:not(#count) { display: none; }
     #count { font-size: 0.78rem; }
-    #count::after { content: none; }
+    /* Out of sight, not out of the page: "12 trains", not "12", to a reader. */
+    #count::after {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      clip-path: inset(50%); white-space: nowrap;
+    }
     input[type=range] { min-width: 3.5rem; flex: 1 1 3.5rem; }
     .spacer { display: none; }
     .back { font-size: 0; }              /* keeps the arrow, drops the word */
@@ -319,7 +344,7 @@ __SOCIAL__
 </style>
 <header>
   <div class="bar">
-    <a class="back" href="__BACK__">&larr; Atlas</a>
+    <a class="back" href="__BACK__" aria-label="Back to the atlas">&larr; Atlas</a>
     <h1>__NAME__</h1>
     <span class="sub">__SUBTITLE__</span>
     <span class="spacer"></span>
@@ -334,25 +359,29 @@ __SOCIAL__
     </span>
   </div>
   <div class="bar">
-    <button id="play" aria-pressed="true">Pause</button>
+    <button id="play">Pause</button>
+    <!-- The one live region. Written when Play or Pause is pressed and at no
+         other time: the clock and the count change every frame and are never in
+         it. -->
+    <span id="announce" class="sr-only" aria-live="polite" aria-atomic="true"></span>
     <div class="clock" id="clock">--:--</div>
     <input type="range" id="scrub" min="0" max="1" step="1" value="0"
            aria-label="Time of day">
     <span class="sub" id="count">0 trains</span>
-    <button id="speed" aria-label="Playback speed">60&times;</button>
-    <button id="more" aria-expanded="false" aria-controls="more-panel">More &#9662;</button>
+    <button id="speed" aria-label="Playback speed 60&times;">60&times;</button>
+    <button id="more" aria-expanded="false" aria-controls="more-panel">More <span aria-hidden="true">&#9662;</span></button>
   </div>
   <div id="more-panel" hidden>
     <div class="panel-row">
-      <span class="panel-group">
+      <span class="panel-group" role="group" aria-label="Lines">
         <span class="panel-label">Lines <span id="line-count"></span></span>
         <button id="lines-all">All</button>
         <button id="lines-none">None</button>
       </span>
-      <span class="lines" id="line-toggles"></span>
+      <span class="lines" id="line-toggles" role="group" aria-label="Lines shown"></span>
       <span class="panel-group">
         <button id="labels-toggle" aria-pressed="true">Labels</button>
-        <span class="sort" id="sort-group" hidden>
+        <span class="sort" id="sort-group" role="group" aria-label="Sort" hidden>
           <span class="panel-label">Sort</span>
           <button id="sort-line" aria-pressed="true">A&ndash;Z</button>
           <button id="sort-size" aria-pressed="false">Stations</button>
@@ -772,7 +801,9 @@ __SOCIAL__
   const hidden = new Set();
   const nodes = new Map();
 
-  let now = 7 * 3600, speed = 60, playing = true, last = performance.now();
+  // Under reduced motion the trains start paused, and a reader can still press
+  // Play. `reduced` is false in present mode, so a capture starts as it always did.
+  let now = 7 * 3600, speed = 60, playing = !reduced, last = performance.now();
   // Two tweens rather than one three-way switch: m unfolds the map into rows,
   // s stands those rows up into a time chart. A jump from map to stringline
   // simply runs both at once.
@@ -1064,10 +1095,13 @@ __SOCIAL__
     for (const entry of nodes) {
       if (!alive.has(entry[0])) { entry[1].remove(); nodes.delete(entry[0]); }
     }
-    clock.textContent = fmt(now);
-    // The word is appended in CSS so a phone can drop it and keep the number.
+    const when = fmt(now);
+    clock.textContent = when;
+    // A range speaks its value; the scrub's is a time, not a count of seconds.
+    // Written when it changes, which is once a sim-minute, not every frame.
+    if (scrub.getAttribute("aria-valuetext") !== when) scrub.setAttribute("aria-valuetext", when);
+    // The word is appended in CSS so a phone can hide it and keep the number.
     count.textContent = shown;
-    count.setAttribute("aria-label", shown + (shown === 1 ? " train" : " trains") + " running");
     // Present mode's overlay redraws here rather than on its own rAF loop: a
     // capture steps the clock by hand, and a separate loop would not be
     // guaranteed to run between a step and its screenshot.
@@ -1141,10 +1175,15 @@ __SOCIAL__
 
   // ---------------------------------------------------------------- controls
   const playBtn = document.getElementById("play");
+  const announce = document.getElementById("announce");
+  // The button names what pressing it does, so it carries no pressed state.
+  const showPlay = () => { playBtn.textContent = playing ? "Pause" : "Play"; };
+  showPlay();     // read at boot: under reduced motion the page starts paused
   playBtn.onclick = () => {
     playing = !playing;
-    playBtn.textContent = playing ? "Pause" : "Play";
-    playBtn.setAttribute("aria-pressed", String(playing));
+    showPlay();
+    // The one thing said without focus moving, and only when a person asked.
+    announce.textContent = playing ? "Playing" : "Paused";
   };
   scrub.oninput = () => { now = +scrub.value; draw(); };
 
@@ -1157,6 +1196,7 @@ __SOCIAL__
   const showSpeed = () => {
     speed = SPEEDS[speedIdx];
     speedBtn.textContent = speed + "\u00d7";
+    speedBtn.setAttribute("aria-label", "Playback speed " + speed + "\u00d7");
     speedBtn.title = "Playback speed \u2014 tap to cycle";
   };
   speedBtn.onclick = () => { speedIdx = (speedIdx + 1) % SPEEDS.length; showSpeed(); };
@@ -1169,7 +1209,8 @@ __SOCIAL__
   const setMore = open => {
     morePanel.hidden = !open;
     moreBtn.setAttribute("aria-expanded", String(open));
-    moreBtn.innerHTML = open ? "Less &#9652;" : "More &#9662;";
+    moreBtn.innerHTML = open ? 'Less <span aria-hidden="true">&#9652;</span>'
+                             : 'More <span aria-hidden="true">&#9662;</span>';
     dirty = true;
   };
   moreBtn.onclick = () => setMore(morePanel.hidden);
@@ -1261,16 +1302,20 @@ __SOCIAL__
   // for something, and waiting on an answer you already asked for feels slower
   // than watching the same motion unprompted. Same S-curve, less of it.
   const CLICK_MORPH = 1.2;
+  // A click is a reader asking, and a reader who asked for no motion gets the
+  // view at once: neither the morph nor the fade into the time chart runs. Zero
+  // is a snap, as present.js uses it; `reduced` is false in present mode.
+  const CLICK_DUR = reduced ? 0 : CLICK_MORPH;
 
   // Every button sets both axes: naming a view says where the network is as
   // well as how it is laid out. Both tweens run over the same window, so
   // Geographic -> Linear morphs the two together, which the interpolation in
   // trackD(t, m, g) already handles.
   Object.keys(viewBtns).forEach(k => {
-    viewBtns[k].onclick = () => { setGeo(false, CLICK_MORPH); setMode(k, CLICK_MORPH); };
+    viewBtns[k].onclick = () => { setGeo(false, CLICK_DUR); setMode(k, CLICK_DUR); };
   });
   if (geoData) {
-    geoBtn.onclick = () => { setGeo(true, CLICK_MORPH); setMode("map", CLICK_MORPH); };
+    geoBtn.onclick = () => { setGeo(true, CLICK_DUR); setMode("map", CLICK_DUR); };
   }
 
   // The four public view names, as the URL, the site's switcher and the
@@ -1328,6 +1373,26 @@ __SOCIAL__
     lineCount.textContent = (routes.length - hidden.size) + " of " + routes.length;
   };
 
+  // The two grounds a chip's dot sits on: the --bg of each theme above, written
+  // out because the script cannot read a theme that is not showing (a test holds
+  // the two to the stylesheet). A dot is marked with every theme it is under 3:1
+  // in, since the theme can change in place.
+  const GROUNDS = { "warm-dark": "#15120f", "sepia": "#f7efe1" };
+  const luminance = hex => {
+    const [r, g, b] = [1, 3, 5].map(i => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a, b) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  // A colour that is not #rrggbb cannot be measured, and is ringed in both.
+  const weakIn = colour => Object.keys(GROUNDS).filter(theme =>
+    !/^#[0-9a-f]{6}$/i.test(colour) || contrast(colour, GROUNDS[theme]) < 3).join(" ");
+
   for (const r of routes) {
     const chip = document.createElement("span");
     chip.className = "chip";
@@ -1338,6 +1403,8 @@ __SOCIAL__
     // the label and the colour -- and a line named with a tag would run here.
     const dot = document.createElement("span");
     dot.className = "dot";
+    const weak = weakIn(data.lines[r] || "#333");
+    if (weak) dot.setAttribute("data-weak", weak);
     dot.style.background = data.lines[r] || "#333";
     chip.append(dot, display(r));
     const toggle = () => {
