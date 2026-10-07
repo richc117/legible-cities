@@ -35,6 +35,37 @@ def test_no_duplicate_urls():
     assert len(urls) == len(set(urls))
 
 
+def _plain_http_without_a_note(registry):
+    """The keys whose address is plain http and whose notes do not say that is
+    on purpose. A note says it by naming "plain http" (the agency serves no
+    TLS, and when that was checked); nothing else lets http through."""
+    return sorted(
+        key for key, feed in registry.items()
+        if not feed.url.startswith("https://")
+        and not any("plain http" in note.lower() for note in feed.notes))
+
+
+def test_every_preset_is_fetched_over_https_unless_its_entry_says_otherwise():
+    """A preset's zip is downloaded on a person's machine, and plain http
+    invites tampering and proxies. A new preset cannot slip back to it
+    silently: an agency that serves no TLS keeps http, with a note saying so."""
+    assert _plain_http_without_a_note(feeds.FEEDS) == []
+
+
+def test_a_note_naming_plain_http_is_what_lets_an_http_address_stand():
+    bare = feeds.Feed(key="a", name="A", url="http://example.invalid/a.zip")
+    noted = feeds.Feed(
+        key="b", name="B", url="http://example.invalid/b.zip",
+        notes=("The agency serves this feed over plain http only "
+               "(checked Oct 2026).",))
+    unrelated = feeds.Feed(
+        key="c", name="C", url="http://example.invalid/c.zip",
+        notes=("A 2025 snapshot.",))
+    secure = feeds.Feed(key="d", name="D", url="https://example.invalid/d.zip")
+    registry = {f.key: f for f in (bare, noted, unrelated, secure)}
+    assert _plain_http_without_a_note(registry) == ["a", "c"]
+
+
 def test_label_derivation():
     """route_short_name wins; otherwise derive from the long name, then strip."""
     routes = pd.DataFrame([

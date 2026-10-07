@@ -169,7 +169,11 @@ FEEDS: dict[str, Feed] = {
         name="New York City Subway",
         city="New York",
         network="Subway",
-        url="http://web.mta.info/developers/data/nyct/subway/google_transit.zip",
+        # web.mta.info answers with a redirect to the MTA's own S3 bucket, and
+        # on https it redirects back down to http first, so the bucket's https
+        # address is the one that is encrypted end to end. Same bytes as the
+        # old address's (checked Oct 2026).
+        url="https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip",
         mode="all",
     ),
     "chicago-l": Feed(
@@ -202,7 +206,7 @@ FEEDS: dict[str, Feed] = {
         name="Miami Metrorail & Metromover",
         city="Miami",
         network="Metrorail & Metromover",
-        url="http://www.miamidade.gov/transit/googletransit/current/google_transit.zip",
+        url="https://www.miamidade.gov/transit/googletransit/current/google_transit.zip",
         # Metrorail is published as route_type 2 (rail), not subway; Metromover
         # and the airport people mover are light rail.
         mode="tram,rail",
@@ -246,7 +250,7 @@ FEEDS: dict[str, Feed] = {
         name="DART Light Rail",
         city="Dallas",
         network="DART Light Rail",
-        url="http://www.dart.org/transitdata/latest/google_transit.zip",
+        url="https://www.dart.org/transitdata/latest/google_transit.zip",
         mode="tram",
     ),
     "minneapolis-metro": Feed(
@@ -315,7 +319,9 @@ FEEDS: dict[str, Feed] = {
         name="Long Island Rail Road",
         city="New York",
         network="Long Island Rail Road",
-        url="http://web.mta.info/developers/data/lirr/google_transit.zip",
+        # The MTA's own S3 bucket, where web.mta.info redirects (checked Oct
+        # 2026); the same bytes over https as over the old http address.
+        url="https://rrgtfsfeeds.s3.amazonaws.com/gtfslirr.zip",
         mode="all",
     ),
 
