@@ -5,7 +5,7 @@ import re
 import pandas as pd
 import pytest
 
-from schematic import feeds
+from schematic import config, feeds
 
 # LOOM's -m accepts these names or raw GTFS route-type codes, comma separated.
 VALID_MOTS = feeds.MOTS
@@ -35,35 +35,49 @@ def test_no_duplicate_urls():
     assert len(urls) == len(set(urls))
 
 
-def _plain_http_without_a_note(registry):
-    """The keys whose address is plain http and whose notes do not say that is
-    on purpose. A note says it by naming "plain http" (the agency serves no
-    TLS, and when that was checked); nothing else lets http through."""
-    return sorted(
-        key for key, feed in registry.items()
-        if not feed.url.startswith("https://")
-        and not any("plain http" in note.lower() for note in feed.notes))
+# The presets whose agency serves no TLS for the feed, so that its address
+# stays plain http: key -> why, naming the month and year it was checked. The
+# entry's comment in feeds.py says the same. It is empty while every agency
+# serves https, and it belongs here rather than in a feed's `notes`, which a
+# reader of the atlas, an export's sidecar and the app all see.
+PLAIN_HTTP: dict[str, str] = {}
 
 
-def test_every_preset_is_fetched_over_https_unless_its_entry_says_otherwise():
+def _http_but_not_listed(registry, listed):
+    """The keys whose address is plain http and which ``listed`` does not name."""
+    return sorted(key for key, feed in registry.items()
+                  if not feed.url.startswith("https://") and key not in listed)
+
+
+def _listed_but_not_http(registry, listed):
+    """The keys ``listed`` names that are no longer plain http, or no longer
+    registered: a list that outlives the move to https says something false."""
+    return sorted(key for key in listed
+                  if key not in registry or registry[key].url.startswith("https://"))
+
+
+def test_every_preset_is_fetched_over_https_unless_it_is_listed_as_plain_http():
     """A preset's zip is downloaded on a person's machine, and plain http
     invites tampering and proxies. A new preset cannot slip back to it
-    silently: an agency that serves no TLS keeps http, with a note saying so."""
-    assert _plain_http_without_a_note(feeds.FEEDS) == []
+    silently: an agency that serves no TLS goes in ``PLAIN_HTTP`` with a reason."""
+    assert _http_but_not_listed(feeds.FEEDS, PLAIN_HTTP) == []
 
 
-def test_a_note_naming_plain_http_is_what_lets_an_http_address_stand():
-    bare = feeds.Feed(key="a", name="A", url="http://example.invalid/a.zip")
-    noted = feeds.Feed(
-        key="b", name="B", url="http://example.invalid/b.zip",
-        notes=("The agency serves this feed over plain http only "
-               "(checked Oct 2026).",))
-    unrelated = feeds.Feed(
-        key="c", name="C", url="http://example.invalid/c.zip",
-        notes=("A 2025 snapshot.",))
-    secure = feeds.Feed(key="d", name="D", url="https://example.invalid/d.zip")
-    registry = {f.key: f for f in (bare, noted, unrelated, secure)}
-    assert _plain_http_without_a_note(registry) == ["a", "c"]
+def test_the_plain_http_list_holds_only_presets_that_are_still_plain_http():
+    assert _listed_but_not_http(feeds.FEEDS, PLAIN_HTTP) == []
+
+
+def test_the_plain_http_check_reads_both_directions():
+    registry = {f.key: f for f in (
+        feeds.Feed(key="bare", name="A", url="http://example.invalid/a.zip"),
+        feeds.Feed(key="listed", name="B", url="http://example.invalid/b.zip"),
+        feeds.Feed(key="moved", name="C", url="https://example.invalid/c.zip"),
+        feeds.Feed(key="secure", name="D", url="https://example.invalid/d.zip"))}
+    listed = {"listed": "serves no TLS (checked Oct 2026)",
+              "moved": "serves no TLS (checked Oct 2026)",
+              "gone": "serves no TLS (checked Oct 2026)"}
+    assert _http_but_not_listed(registry, listed) == ["bare"]
+    assert _listed_but_not_http(registry, listed) == ["gone", "moved"]
 
 
 def test_label_derivation():
@@ -90,7 +104,7 @@ def test_label_strip_merges_directional_variants():
     assert list(feeds.route_labels("bart", routes)) == ["Yellow", "Yellow", "BridgeA"]
 
 
-def test_agency_filter_cascades_through_references(tmp_path):
+def test_agency_filter_cascades_through_references(home, tmp_path):
     """Dropping routes without their trips and stop_times leaves orphans, which
     LOOM rejects -- and Mexico City needs the filter because Suburbano also has
     a line numbered 1 at route_type 1."""
@@ -112,6 +126,9 @@ def test_agency_filter_cascades_through_references(tmp_path):
         for name, body in tables.items():
             z.writestr(name, body)
 
+    # ``normalize`` writes beside the zips and leaves making that folder to
+    # ``fetch``, which this test replaces.
+    config.feeds_dir().mkdir(parents=True)
     feed = feeds.Feed(key="t", name="T", url="http://x", agency="METRO")
     feeds.FEEDS["t"] = feed
     try:
@@ -141,8 +158,6 @@ import json
 import os
 import subprocess
 import sys
-
-from schematic import config
 
 GOOD = {
     "agency.txt": "agency_id,agency_name,agency_url,agency_timezone\n"
