@@ -760,7 +760,7 @@
       "additionalProperties": false
     },
     "StoryboardBeat": {
-      "description": "A stretch of video with one set of state, as the storyboard is written; export.storyboards answers every field, and a client writing a list gives only secs and what changes. A field left out or null carries over from the beat before. The server also checks what this cannot say: the beats last 90 seconds in all at most, a span's first clock is before its second, and the first beat names a view and has tween 0 or none, since frame 0 must already be in a view.",
+      "description": "A stretch of video with one set of state, as the storyboard is written; export.storyboards answers every field, and a client writing a list gives only secs and what changes. A field left out or null carries over from the beat before. The server also checks what this cannot say: the beats last 90 seconds in all at most, a span's first clock is before its second, the first beat names a view and has tween 0 or none, since frame 0 must already be in a view, and the first beat names at unless it sweeps without hours, since frame 0 is not reproducible without a clock.",
       "type": "object",
       "properties": {
         "secs": {
@@ -926,7 +926,7 @@
           "description": "Line labels to keep; the rest are hidden."
         },
         "storyboard": {
-          "description": "What a video plays: a storyboard's name, or a list of beats written as export.storyboards writes them, played in order. A list's first beat names the view frame 0 is in. A still ignores either.",
+          "description": "What a video plays: a storyboard's name, or a list of beats written as export.storyboards writes them, played in order. A list's first beat names the view frame 0 is in, and its clock unless it sweeps without hours. A still ignores either.",
           "oneOf": [
             {
               "$ref": "#/$defs/StoryboardName"

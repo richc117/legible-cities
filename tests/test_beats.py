@@ -146,12 +146,13 @@ def test_the_rewritten_beat_and_a_list_are_judged_for_geography():
             export.plan(plain, "instagram-reel", view=export.GEO_VIEW)
         with pytest.raises(ValueError, match="no geographic geometry"):
             export.plan(plain, "instagram-reel",
-                        storyboard=[{"secs": 2, "view": "map"},
+                        storyboard=[{"secs": 2, "view": "map", "at": "08:00"},
                                     {"secs": 2, "view": export.GEO_VIEW}])
         # Neither asks for it here, and both plan.
         export.plan(plain, "instagram-reel", view="linear")
         export.plan(plain, "instagram-reel",
-                    storyboard=[{"secs": 2, "view": "map"}, {"secs": 2, "view": "time"}])
+                    storyboard=[{"secs": 2, "view": "map", "at": "08:00"},
+                                {"secs": 2, "view": "time"}])
 
 
 # ------------------------------------------------------------------ a list
@@ -168,9 +169,6 @@ def test_a_list_plans_like_a_name():
     query = _query(job)
     assert (query["view"], query["at"]) == ("linear", "06:30")
     assert job.view == "linear" and job.at == 23400.0
-    # A list with no clock on its first beat leaves the page's own.
-    clockless = export.plan(KEY, "instagram-reel", storyboard=[{"secs": 3, "view": "time"}])
-    assert "at" not in _query(clockless) and clockless.at is None
 
 
 def test_day_written_as_a_list_plans_days_beats_and_its_sweep_note():
@@ -190,13 +188,15 @@ def test_day_written_as_a_list_plans_days_beats_and_its_sweep_note():
 
 def test_a_list_of_beats_is_taken_as_a_list_of_objects():
     """``plan`` may be handed ``Beat``s in Python; it checks them all the same."""
-    beats = (export.Beat(3, view="map", tween=0), export.Beat(3, view="linear"))
+    beats = (export.Beat(3, view="map", at="08:00", tween=0), export.Beat(3, view="linear"))
     assert export.authored_beats(beats) == beats
     job = export.plan(KEY, "instagram-reel", storyboard=beats)
     assert job.beats == tuple(export.beat_payload(beats))
     with pytest.raises(ValueError, match=r"storyboard\[0\]\.tween"):
         export.plan(KEY, "instagram-reel",
-                    storyboard=(export.Beat(3, view="map", tween=1),))
+                    storyboard=(export.Beat(3, view="map", at="08:00", tween=1),))
+    with pytest.raises(ValueError, match=r"storyboard\[0\]\.at"):
+        export.plan(KEY, "instagram-reel", storyboard=(export.Beat(3, view="map"),))
 
 
 # --------------------------------------------------------------- the first beat
@@ -216,58 +216,95 @@ def test_the_first_beat_names_a_view():
 
 
 def test_the_first_beat_does_not_transition_into_it():
-    hint = _refused([{"secs": 3, "view": "map", "tween": 0.5}])
-    assert "storyboard[0]" in hint and "tween" in hint and "frame 0" in hint
+    hint = _refused([{"secs": 3, "view": "map", "at": "08:00", "tween": 0.5}])
+    assert "storyboard[0].tween" in hint and "frame 0" in hint
+
+
+@pytest.mark.parametrize("first", [
+    pytest.param({"secs": 3, "view": "time"}, id="no-clock"),
+    pytest.param({"secs": 3, "view": "map", "sweep": True, "hours": 4}, id="sweeps-hours"),
+    pytest.param({"secs": 3, "view": "map", "span": ["06:00", "09:00"]}, id="span-no-sweep"),
+])
+def test_the_first_beat_sets_the_clock(first):
+    """Two captures of one plan have to agree, and a first beat that names no
+    time starts wherever the page's clock happened to be: the desktop app's
+    capture refuses that plan, so the engine does not make it."""
+    hint = _refused([first, {"secs": 3, "view": "linear"}])
+    assert "storyboard[0].at" in hint and "reproducible" in hint
+    with pytest.raises(ValueError, match=re.escape("storyboard[0].at")):
+        export.plan(KEY, "instagram-reel", storyboard=[first])
+
+
+@pytest.mark.parametrize("first", [
+    pytest.param({"secs": 10, "view": "map", "sweep": True}, id="sweeps-the-day"),
+    pytest.param({"secs": 10, "view": "map", "sweep": True, "span": ["06:00", "09:00"]},
+                 id="sweeps-a-span"),
+])
+def test_a_first_beat_that_sweeps_a_span_sets_the_clock_itself(first):
+    """The app's one exception: a sweep given its span, not a number of hours,
+    carries ``lo`` and ``hi`` to the recorder, which seeks to ``lo``."""
+    job = export.plan(KEY, "instagram-reel", storyboard=[first, {"secs": 3, "view": "linear"}])
+    opening = job.beats[0]
+    assert opening["at"] is None and opening["sweep"] is True
+    assert opening["lo"] is not None and opening["hi"] is not None
+    assert opening["hi"] >= opening["lo"] >= 0
+    assert job.at is None and "at" not in _query(job)
 
 
 def test_only_the_first_beats_tween_is_read_as_zero():
-    beats = export.authored_beats([{"secs": 3, "view": "map"}, {"secs": 3, "view": "linear"},
+    beats = export.authored_beats([{"secs": 3, "view": "map", "at": "08:00"},
+                                   {"secs": 3, "view": "linear"},
                                    {"secs": 3, "view": "time", "tween": 0.5}])
     assert beats[0].tween == 0
     assert beats[1].tween is None and beats[2].tween == 0.5
     job = export.plan(KEY, "instagram-reel", storyboard=beats)
     assert [b["tween"] for b in job.beats] == [0, 1.2, 0.5]
     # A null tween on the first beat is read the same as an absent one.
-    assert export.authored_beats([{"secs": 3, "view": "map", "tween": None}])[0].tween == 0
+    assert export.authored_beats(
+        [{"secs": 3, "view": "map", "at": "08:00", "tween": None}])[0].tween == 0
 
 
 # -------------------------------------------------------------- every bound
 
-OK = {"secs": 1, "view": "map"}
+OK = {"secs": 1, "view": "map", "at": "08:00"}
 
+# Each hint names the beat and the field as one path, ``storyboard[1].at``, so
+# a two-letter field cannot pass by appearing anywhere in the sentence.
 BOUNDS = [
-    pytest.param([OK, {"secs": 0.4}], "storyboard[1]", "secs", id="secs-0.4"),
-    pytest.param([OK, {"secs": 30.5}], "storyboard[1]", "secs", id="secs-30.5"),
-    pytest.param([{"secs": 30, "view": "map"}, {"secs": 30}, {"secs": 30}, {"secs": 0.5}],
-                 "storyboard[3]", "90 seconds", id="total-90.5"),
+    pytest.param([OK, {"secs": 0.4}], "storyboard[1].secs", "", id="secs-0.4"),
+    pytest.param([OK, {"secs": 30.5}], "storyboard[1].secs", "", id="secs-30.5"),
+    pytest.param([{"secs": 30, "view": "map", "at": "08:00"}, {"secs": 30}, {"secs": 30},
+                  {"secs": 0.5}], "storyboard[3].secs", "90 seconds", id="total-90.5"),
     pytest.param([OK] * 17, "storyboard[16]", "16 beats", id="seventeen"),
-    pytest.param([OK, {"secs": 1, "sweep": True, "hours": 0}], "storyboard[1]", "hours",
+    pytest.param([OK, {"secs": 1, "sweep": True, "hours": 0}], "storyboard[1].hours", "",
                  id="hours-0"),
-    pytest.param([OK, {"secs": 1, "sweep": True, "hours": 24.5}], "storyboard[1]", "hours",
+    pytest.param([OK, {"secs": 1, "sweep": True, "hours": 24.5}], "storyboard[1].hours", "",
                  id="hours-24.5"),
-    pytest.param([OK, {"secs": 1, "speed": -1}], "storyboard[1]", "speed", id="speed--1"),
+    pytest.param([OK, {"secs": 1, "speed": -1}], "storyboard[1].speed", "", id="speed--1"),
     pytest.param([OK, {"secs": 1, "sweep": True, "span": ["09:00", "08:00"]}],
-                 "storyboard[1]", "span", id="span-backwards"),
+                 "storyboard[1].span", "", id="span-backwards"),
     pytest.param([OK, {"secs": 1, "sweep": True, "span": ["09:00", "09:00"]}],
-                 "storyboard[1]", "span", id="span-empty"),
-    pytest.param([OK, {"secs": 1, "at": "7am"}], "storyboard[1]", "at", id="at-7am"),
-    pytest.param([OK, {"secs": 1, "view": "plan"}], "storyboard[1]", "view", id="view-plan"),
-    pytest.param([OK, {"secs": 1, "labels": "yes"}], "storyboard[1]", "labels",
+                 "storyboard[1].span", "", id="span-empty"),
+    pytest.param([OK, {"secs": 1, "at": "7am"}], "storyboard[1].at", "", id="at-7am"),
+    pytest.param([OK, {"secs": 1, "view": "plan"}], "storyboard[1].view", "", id="view-plan"),
+    pytest.param([OK, {"secs": 1, "labels": "yes"}], "storyboard[1].labels", "",
                  id="labels-yes"),
-    pytest.param([OK, {"secs": 1, "sweep": "yes"}], "storyboard[1]", "sweep", id="sweep-yes"),
-    pytest.param([OK, {"secs": 1, "tween": -1}], "storyboard[1]", "tween", id="tween--1"),
-    pytest.param([OK, {"secs": 1, "lo": 0}], "storyboard[1]", "lo", id="unknown-lo"),
+    pytest.param([OK, {"secs": 1, "sweep": "yes"}], "storyboard[1].sweep", "",
+                 id="sweep-yes"),
+    pytest.param([OK, {"secs": 1, "tween": -1}], "storyboard[1].tween", "", id="tween--1"),
+    pytest.param([OK, {"secs": 1, "lo": 0}], "storyboard[1] does not take lo", "",
+                 id="unknown-lo"),
 ]
 
 
-@pytest.mark.parametrize("beats,where,field", BOUNDS)
-def test_every_bound_is_refused_by_beat_and_field(beats, where, field):
+@pytest.mark.parametrize("beats,path,also", BOUNDS)
+def test_every_bound_is_refused_by_beat_and_field(beats, path, also):
     hint = _refused(beats)
-    assert where in hint and field in hint, hint
+    assert path in hint and also in hint, hint
 
 
 def test_ninety_seconds_is_the_ceiling_and_plans_2700_frames():
-    three = [{"secs": 30, "view": "map"}, {"secs": 30}, {"secs": 30}]
+    three = [{"secs": 30, "view": "map", "at": "08:00"}, {"secs": 30}, {"secs": 30}]
     assert serve._export_options({"storyboard": three})["storyboard"] == \
         export.authored_beats(three)
     plan = export.plan(KEY, "instagram-reel", storyboard=three)
@@ -275,7 +312,7 @@ def test_ninety_seconds_is_the_ceiling_and_plans_2700_frames():
 
 
 def test_each_bound_on_its_edge_is_taken():
-    export.authored_beats([{"secs": 0.5, "view": "map", "speed": 0},
+    export.authored_beats([{"secs": 0.5, "view": "map", "at": "00:00", "speed": 0},
                            {"secs": 30, "sweep": True, "hours": 24},
                            {"secs": 1, "sweep": True, "span": ["08:59", "09:00"]},
                            {"secs": 1, "tween": 0, "labels": False, "at": "25:44"}])
@@ -338,8 +375,8 @@ def test_a_name_and_its_own_beats_are_described_alike(name):
 
 
 def test_a_list_is_described_by_its_views_and_named_by_none(tmp_path):
-    beats = export.authored_beats([{"secs": 3, "view": "linear"}, {"secs": 3, "view": "time"},
-                                   {"secs": 3, "view": "linear"}])
+    beats = export.authored_beats([{"secs": 3, "view": "linear", "at": "08:00"},
+                                   {"secs": 3, "view": "time"}, {"secs": 3, "view": "linear"}])
     payload = tuple(export.beat_payload(beats))
     assert export.storyboard_views(beats) == "linear -> time"
     assert export.storyboard_views(payload) == "linear -> time"

@@ -412,8 +412,12 @@ def authored_beats(beats: Sequence[Beat | dict]) -> tuple[Beat, ...]:
     sentence naming the beat, counted from 0 (``storyboard[2]``), and the
     field. Frame 0 has to already be in a view, so the first beat names one
     and does not transition into it: a ``tween`` left out or null there is
-    read as 0, and any other is refused. Later beats are kept as written, so
-    a null ``tween`` stays null and ``beat_payload`` gives it its default.
+    read as 0, and any other is refused. Frame 0 also has to be at a known
+    time, or two captures of one plan differ, so the first beat names ``at``
+    unless it sweeps without ``hours``, whose span the recorder seeks to
+    itself: the desktop app's capture refuses any other first beat, and this
+    is its rule. Later beats are kept as written, so a null ``tween`` stays
+    null and ``beat_payload`` gives it its default.
     """
     if not isinstance(beats, (list, tuple)):
         raise ValueError("storyboard must be a storyboard's name or a list of beats")
@@ -486,6 +490,13 @@ def authored_beats(beats: Sequence[Beat | dict]) -> tuple[Beat, ...]:
                 raise ValueError(f"{where}.tween must be 0 or left out: frame 0 must "
                                  f"already be in a view, so the first beat cannot "
                                  f"transition into one")
+            # A sweep with no hours carries its span's two ends to the
+            # recorder, which seeks to the first; anything else starts
+            # wherever the page's clock happened to be.
+            if at is None and not (sweep and hours is None):
+                raise ValueError(f"{where}.at is missing: frame 0 is not reproducible "
+                                 f"without a clock, so the first beat names one, unless "
+                                 f"it sweeps a span rather than a number of hours")
         out.append(Beat(secs, view=view, labels=labels, at=at, speed=speed, sweep=sweep,
                         hours=hours, span=span, tween=tween))
     return tuple(out)
