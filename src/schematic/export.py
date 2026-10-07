@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 import os
 import re
 import shutil
@@ -39,7 +40,7 @@ import tempfile
 import threading
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Sequence
 
 from . import feeds, loom
 from .config import REPO_ROOT
@@ -191,8 +192,11 @@ PRESETS: dict[str, Preset] = {p.name: p for p in [
     # --- video ---------------------------------------------------------------
     Preset("instagram-reel", "Instagram", 1080, 1920, "video", "mp4",
            storyboard="tour", safe_zones=True),
+    # Bluesky's own client allows 300 MB a video (read 6 Oct 2026). The 50 MB
+    # this said before refused a long export at high quality, and only after
+    # its capture had run.
     Preset("bluesky-video", "Bluesky", 1080, 1350, "video", "mp4",
-           storyboard="tour", max_bytes=50_000_000),
+           storyboard="tour", max_bytes=300_000_000),
     Preset("linkedin-video", "LinkedIn", 1200, 1200, "video", "mp4",
            storyboard="tour"),
 
@@ -333,6 +337,10 @@ STORYBOARDS: dict[str, tuple[Beat, ...]] = {
     "run": (Beat(20, view="map", at="07:30", speed=240),),
 }
 
+# What a plan names for a storyboard a client wrote as a list of beats rather
+# than chose by name. Never a key of STORYBOARDS.
+CUSTOM = "custom"
+
 
 # Above this many simulated seconds per frame a sweep reads as flicker.
 READABLE_SWEEP = 60.0
@@ -363,6 +371,124 @@ def _span_seconds(beat: Beat, bounds: tuple[float, float]) -> tuple[float, float
 
 def frame_count(beats: tuple[Beat, ...], fps: int) -> int:
     return sum(round(b.secs * fps) for b in beats)
+
+
+# A time of day as the protocol writes one, its `Clock`. The server compiles
+# this same text, so what a beat's clock may be cannot drift from what an
+# export's `at` may be.
+CLOCK = r"^[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?$"
+_CLOCK = re.compile(CLOCK)
+
+# The bounds of a storyboard a client writes (the desktop app's ADR-051). The
+# 90 seconds is that record's number, not a platform's: 2,700 frames at 30 fps,
+# about seven minutes of capture.
+MAX_BEATS = 16
+BEAT_SECS = (0.5, 30.0)
+MAX_SECONDS = 90.0
+MAX_HOURS = 24.0
+
+# A beat's fields as the protocol's StoryboardBeat names them.
+BEAT_FIELDS = ("secs", "view", "labels", "at", "speed", "sweep", "hours", "span", "tween")
+
+# A list's first beat says where it opens, so nothing beside the list may.
+BESIDE_A_LIST = "view and at go on a list's first beat (storyboard[0]), not beside the list"
+
+
+def _number(value: object) -> bool:
+    """A number as JSON carries one: not a bool, and finite."""
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value))
+
+
+def _clock(value: object) -> bool:
+    return isinstance(value, str) and bool(_CLOCK.match(value))
+
+
+def authored_beats(beats: Sequence[Beat | dict]) -> tuple[Beat, ...]:
+    """A storyboard a client wrote, checked, as ``Beat``s.
+
+    ``beats`` holds objects with ``StoryboardBeat``'s fields, as the protocol
+    carries them, or ``Beat``s. A refusal is a ``ValueError`` with one
+    sentence naming the beat, counted from 0 (``storyboard[2]``), and the
+    field. Frame 0 has to already be in a view, so the first beat names one
+    and does not transition into it: a ``tween`` left out or null there is
+    read as 0, and any other is refused. Later beats are kept as written, so
+    a null ``tween`` stays null and ``beat_payload`` gives it its default.
+    """
+    if not isinstance(beats, (list, tuple)):
+        raise ValueError("storyboard must be a storyboard's name or a list of beats")
+    if not beats:
+        raise ValueError(f"storyboard holds no beats: a list holds 1 to {MAX_BEATS}")
+    if len(beats) > MAX_BEATS:
+        raise ValueError(f"storyboard[{MAX_BEATS}] is one beat too many: a list holds "
+                         f"1 to {MAX_BEATS} beats")
+    low, high = BEAT_SECS
+    out: list[Beat] = []
+    total = 0.0
+    for i, raw in enumerate(beats):
+        where = f"storyboard[{i}]"
+        if isinstance(raw, Beat):
+            fields = {name: getattr(raw, name) for name in BEAT_FIELDS}
+        elif isinstance(raw, dict):
+            fields = dict(raw)
+        else:
+            raise ValueError(f"{where} must be an object with a beat's fields")
+        extra = [str(name) for name in fields if name not in BEAT_FIELDS]
+        if extra:
+            raise ValueError(f"{where} does not take {', '.join(extra)}; a beat's fields are "
+                             + ", ".join(BEAT_FIELDS))
+        secs = fields.get("secs")
+        if not (_number(secs) and low <= secs <= high):
+            raise ValueError(f"{where}.secs must be seconds, from {low:g} to {high:g}")
+        total = round(total + secs, 6)
+        if total > MAX_SECONDS:
+            raise ValueError(f"{where}.secs brings the storyboard to {total:g} seconds, past "
+                             f"the {MAX_SECONDS:g} seconds a list may last")
+        view = fields.get("view")
+        if view is not None and view not in VIEWS:
+            raise ValueError(f"{where}.view must be one of {', '.join(VIEWS)}, or null")
+        if i == 0 and view is None:
+            raise ValueError(f"{where}.view is missing: the first beat names the view "
+                             f"frame 0 is in")
+        labels = fields.get("labels")
+        if labels is not None and not isinstance(labels, bool):
+            raise ValueError(f"{where}.labels must be true, false or null")
+        at = fields.get("at")
+        if at is not None and not _clock(at):
+            raise ValueError(f"{where}.at must be a clock, HH:MM, or null")
+        speed = fields.get("speed")
+        if speed is not None and not (_number(speed) and speed >= 0):
+            raise ValueError(f"{where}.speed must be simulated seconds a second, 0 or "
+                             f"more, or null")
+        sweep = fields.get("sweep", False)
+        if not isinstance(sweep, bool):
+            raise ValueError(f"{where}.sweep must be true or false")
+        hours = fields.get("hours")
+        if hours is not None and not (_number(hours) and 0 < hours <= MAX_HOURS):
+            raise ValueError(f"{where}.hours must be more than 0 and at most {MAX_HOURS:g}, "
+                             f"or null")
+        span = fields.get("span")
+        if span is not None:
+            if not (isinstance(span, (list, tuple)) and len(span) == 2
+                    and all(_clock(c) for c in span)):
+                raise ValueError(f"{where}.span must be two clocks, HH:MM, or null")
+            if not _hms(span[0]) < _hms(span[1]):
+                raise ValueError(f"{where}.span must run forward: {span[0]} is not "
+                                 f"before {span[1]}")
+            span = (span[0], span[1])
+        tween = fields.get("tween")
+        if tween is not None and not (_number(tween) and tween >= 0):
+            raise ValueError(f"{where}.tween must be seconds, 0 or more, or null")
+        if i == 0:
+            if tween is None:
+                tween = 0
+            elif tween != 0:
+                raise ValueError(f"{where}.tween must be 0 or left out: frame 0 must "
+                                 f"already be in a view, so the first beat cannot "
+                                 f"transition into one")
+        out.append(Beat(secs, view=view, labels=labels, at=at, speed=speed, sweep=sweep,
+                        hours=hours, span=span, tween=tween))
+    return tuple(out)
 
 
 # ---------------------------------------------------------------------- naming
@@ -417,20 +543,42 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
     return base + "?" + urlencode(q)
 
 
+def _beats_of(storyboard: str | Sequence[Beat | dict] | None) -> tuple[Beat | dict, ...]:
+    """A storyboard's beats, given its name or the beats themselves: ``Beat``s,
+    or the payloads a plan carries, whose ``view`` is the same."""
+    if isinstance(storyboard, str):
+        return STORYBOARDS.get(storyboard, ())
+    return tuple(storyboard or ())
+
+
+def _view_of(beat: Beat | dict) -> str | None:
+    return beat.get("view") if isinstance(beat, dict) else beat.view
+
+
+def _views_visited(storyboard: str | Sequence[Beat | dict] | None) -> list[str]:
+    seen: list[str] = []
+    for b in _beats_of(storyboard):
+        view = _view_of(b)
+        if view and view not in seen:
+            seen.append(view)
+    return seen
+
+
 def wants_geographic(*, view: str | None = None, preset: Preset | None = None,
-                     storyboard: str | None = None) -> bool:
-    """Whether this export asks for the pre-octilinear geometry anywhere."""
+                     storyboard: str | Sequence[Beat | dict] | None = None) -> bool:
+    """Whether this export asks for the pre-octilinear geometry anywhere.
+    ``storyboard`` is a name or the beats themselves."""
     if view == GEO_VIEW:
         return True
     if view is None and preset is not None and preset.view == GEO_VIEW:
         return True
-    name = storyboard or (preset.storyboard if preset else "")
-    return any(b.view == GEO_VIEW for b in STORYBOARDS.get(name, ()))
+    board = storyboard or (preset.storyboard if preset else "")
+    return any(_view_of(b) == GEO_VIEW for b in _beats_of(board))
 
 
 def check_geographic(key: str, *, view: str | None = None,
                      preset: Preset | None = None,
-                     storyboard: str | None = None) -> None:
+                     storyboard: str | Sequence[Beat | dict] | None = None) -> None:
     """Refuse a geographic export of a feed that has no geographic geometry.
 
     The page degrades quietly here -- with nothing to raise, it simply shows the
@@ -458,27 +606,23 @@ VIEW_PHRASE = {
 }
 
 
-def storyboard_views(name: str) -> str:
-    """The views a storyboard visits, in order, as one readable field."""
-    seen: list[str] = []
-    for b in STORYBOARDS.get(name, ()):
-        if b.view and b.view not in seen:
-            seen.append(b.view)
-    return " -> ".join(seen)
+def storyboard_views(storyboard: str | Sequence[Beat | dict]) -> str:
+    """The views a storyboard visits, in order, as one readable field. Given
+    a name or the beats themselves, so a list a client wrote is described the
+    way a name is."""
+    return " -> ".join(_views_visited(storyboard))
 
 
-def storyboard_alt(key: str, name: str, *, stations: int = 0, lines: int = 0) -> str:
+def storyboard_alt(key: str, storyboard: str | Sequence[Beat | dict], *, stations: int = 0,
+                   lines: int = 0) -> str:
     """Alt text for a clip that passes through several views.
 
     A storyboard video described as its preset's single view is simply wrong --
     "schematic map of..." for a clip that opens on geography and ends on a
-    chart. The views it visits are the description.
+    chart. The views it visits are the description, so a name and its own
+    beats read the same, and a list a client wrote is never given a name.
     """
-    beats = STORYBOARDS.get(name, ())
-    seen: list[str] = []
-    for b in beats:
-        if b.view and b.view not in seen:
-            seen.append(b.view)
+    seen = _views_visited(storyboard)
     if len(seen) < 2:
         return alt_text(key, seen[0] if seen else "map", stations=stations, lines=lines)
 
@@ -788,7 +932,7 @@ class CaptureJob:
     stem: str
     theme: str
     view: str
-    storyboard: str                    # "" for a still
+    storyboard: str                    # its name; CUSTOM for a list; "" for a still
     at: float | None = None            # the clock, in seconds, a still is taken at
     notes: tuple[str, ...] = ()        # what a person should hear before the capture
 
@@ -819,8 +963,8 @@ class CaptureJob:
 def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = None,
          labels: bool | None = None, title: bool = True, clock: bool | None = None,
          at: str | None = None, lines: tuple[str, ...] = (),
-         storyboard: str | None = None, quality: str = "standard", fade: float = 0.0,
-         safe: bool = False, tag: str = "", page: str | None = None,
+         storyboard: str | Sequence[Beat | dict] | None = None, quality: str = "standard",
+         fade: float = 0.0, safe: bool = False, tag: str = "", page: str | None = None,
          date: str | None = None) -> CaptureJob:
     """Describe an export without doing any of it.
 
@@ -829,6 +973,12 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
     capture and is refused; ``run`` handles it. ``page`` is the page's own
     address when it is not the site's file, and ``date`` the service day its
     title names, when the caller knows them; the desktop app knows both.
+
+    ``storyboard`` is a storyboard's name or a list of beats, which
+    ``authored_beats`` checks; a still ignores it. For a video, ``view`` and
+    ``at`` open a named storyboard: its first beat takes them with no
+    transition, so the page's address and frame 0 agree (issue 31). Beside a
+    list they are refused, since the list's first beat is where they go.
     """
     if key not in feeds.all():
         raise KeyError(f"unknown feed {key!r}")
@@ -839,7 +989,28 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
         raise ValueError(f"{preset_name} is a vector preset: nothing to capture")
     if quality not in QUALITY:
         raise ValueError(f"quality is draft, standard or high, not {quality!r}")
-    check_geographic(key, view=view, preset=preset, storyboard=storyboard)
+    # The beats a video plays, settled before anything reads `view` or `at`:
+    # where a video opens is its first beat, and the address says the same.
+    board, planned = "", ()
+    if preset.kind == "video":
+        if storyboard is None or isinstance(storyboard, str):
+            board = storyboard or preset.storyboard
+            if board not in STORYBOARDS:
+                raise KeyError(f"unknown storyboard {board!r}")
+            planned = STORYBOARDS[board]
+            if view or at:
+                first = planned[0]
+                planned = (replace(first, view=view or first.view, at=at or first.at,
+                                   tween=0),) + planned[1:]
+        elif view or at:
+            raise ValueError(BESIDE_A_LIST)
+        else:
+            board, planned = CUSTOM, authored_beats(storyboard)
+        if board == CUSTOM or view or at:
+            view, at = planned[0].view, planned[0].at
+    # A still's storyboard is ignored, and a name judged as it always was.
+    check_geographic(key, view=view, preset=preset,
+                     storyboard=planned or (storyboard if isinstance(storyboard, str) else None))
     scale, keep, crf = QUALITY[quality]
     stem = (f"{key}-{preset.name}" + (f"-{theme}" if theme != "dark" else "")
             + (f"-{tag}" if tag else ""))
@@ -847,15 +1018,11 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
                   theme=theme, at=at, lines=lines, safe=safe, page=page, date=date)
     beats: tuple[dict, ...] = ()
     notes: list[str] = []
-    board = ""
     if preset.kind == "video":
-        board = storyboard or preset.storyboard
-        if board not in STORYBOARDS:
-            raise KeyError(f"unknown storyboard {board!r}")
         # A sweep faster than this stops reading as motion: a train that lives
         # 2,000 seconds appears in a handful of frames and jumps between them.
         # Worth saying before spending a minute capturing it.
-        for b in STORYBOARDS[board]:
+        for b in planned:
             if b.sweep:
                 rate = sweep_rate(b, preset.fps, (0.0, 86_400.0))
                 if rate > READABLE_SWEEP:
@@ -864,7 +1031,7 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
                                  f"the beat's span, or lengthen it.")
         # The clock bounds are the feed's, so a sweep with no explicit span
         # covers whatever service day this network actually has.
-        beats = tuple(beat_payload(STORYBOARDS[board]))
+        beats = tuple(beat_payload(planned))
     # A video's beats pin the clock themselves; a still is pinned here.
     pinned = _hms(at) if at else (_hms(PAGE_START) if preset.kind == "still" else None)
     return CaptureJob(key=key, preset=preset.name, mode=preset.kind, url=url,
@@ -929,7 +1096,7 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
             _resample(source, dest, preset)
         check_size(dest, preset)
         _write_sidecar(job.key, preset, [dest], theme=job.theme, view=job.view,
-                       storyboard=job.storyboard, provenance=provenance,
+                       storyboard=job.storyboard, beats=job.beats, provenance=provenance,
                        alt=(provenance or {}).get("alt"))
     except BaseException:
         for path in (dest, sidecar_path(dest)):
@@ -1007,6 +1174,7 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
 
 def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
                    theme: str, view: str, storyboard: str = "",
+                   beats: Sequence[Beat | dict] = (),
                    provenance: dict | None = None,
                    alt: str | None = None) -> None:
     """What this file is, beside the file. Includes the caveats the atlas shows:
@@ -1030,11 +1198,11 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
             "size": f"{preset.width}x{preset.height}" if preset.width else "native",
             # A storyboard visits several views, so naming one of them here
             # would misdescribe the file it sits beside.
-            "view": storyboard_views(storyboard) or view,
+            "view": storyboard_views(beats or storyboard) or view,
             "storyboard": storyboard or None,
             "theme": theme,
             "alt": alt if alt is not None else (
-                storyboard_alt(key, storyboard, **stats) if storyboard
+                storyboard_alt(key, beats or storyboard, **stats) if storyboard
                 else alt_text(key, view, **stats)),
             "service_date": prov.get("service_date"),
             "trips": prov.get("trips"),

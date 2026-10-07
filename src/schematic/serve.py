@@ -62,7 +62,7 @@ ENGINE_ERROR = -32000
 KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 DATE_PATTERN = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
-CLOCK_PATTERN = re.compile(r"^[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?$")
+CLOCK_PATTERN = re.compile(export.CLOCK)
 URL_PATTERN = re.compile(r"^[a-z][a-z0-9+.-]*://[^\s]+$")
 STEM_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
@@ -390,10 +390,18 @@ def _export_options(value: Any) -> dict[str, Any]:
     lines = _strings(left, "lines")
     if lines is not None:
         out["lines"] = tuple(lines)
-    board = _optional(left, "storyboard", lambda v: v in export.STORYBOARDS,
-                      "must be the name of a storyboard; export.storyboards lists them")
-    if board is not None:
+    # A name or a list of beats; the type first, since a list is not a key.
+    board = left.pop("storyboard", None)
+    if isinstance(board, list):
+        try:
+            out["storyboard"] = export.authored_beats(board)
+        except ValueError as exc:
+            raise invalid_params(str(exc)) from exc
+    elif isinstance(board, str) and board in export.STORYBOARDS:
         out["storyboard"] = board
+    elif board is not None:
+        raise invalid_params("storyboard must be the name of a storyboard; "
+                             "export.storyboards lists them")
     quality = _optional(left, "quality", lambda v: v in export.QUALITY,
                         "must be draft, standard or high")
     if quality is not None:
@@ -475,8 +483,9 @@ def _capture_job(value: Any) -> export.CaptureJob:
     if view not in export.VIEWS:
         raise invalid_params("plan.view must be one of " + ", ".join(export.VIEWS))
     board = left.pop("storyboard", "")
-    if not isinstance(board, str) or (board and board not in export.STORYBOARDS):
-        raise invalid_params("plan.storyboard must be a storyboard's name, or empty")
+    if not isinstance(board, str) or (board and board != export.CUSTOM
+                                      and board not in export.STORYBOARDS):
+        raise invalid_params("plan.storyboard must be a storyboard's name, custom, or empty")
     at = left.pop("at", None)
     if at is not None and not _number(at):
         raise invalid_params("plan.at must be seconds, or null")
@@ -880,6 +889,12 @@ class EngineEndpoint(Endpoint):
         date = _date(left.pop("date")).isoformat() if "date" in left else None
         options = _export_options(left.pop("options", None))
         _no_extra("export.plan", left)
+        # Refused here rather than by export.plan, so it is the caller's
+        # mistake (params) and not the export's; a still ignores a list.
+        if (export.PRESETS[preset].kind == "video"
+                and not isinstance(options.get("storyboard", ""), str)
+                and (options.get("view") or options.get("at"))):
+            raise invalid_params(export.BESIDE_A_LIST)
         try:
             job = export.plan(key, preset, page=page, date=date, **options)
         except (KeyError, ValueError) as exc:
