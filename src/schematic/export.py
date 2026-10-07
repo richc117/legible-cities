@@ -656,12 +656,42 @@ def _ffmpeg(args: list[str], *, progress: Progress | None = None,
         raise RuntimeError(f"ffmpeg failed ({proc.returncode}):\n" + "\n".join(tail))
 
 
+def _still_quality(preset: Preset) -> list[str]:
+    """What a still's encoder is told besides its size: a JPEG's quality, the
+    one setting either way of making a still (``_resample``, ``_transcode``)
+    shares, so the same capture is the same picture whichever made it."""
+    return ["-q:v", "3"] if preset.fmt == "jpg" else []
+
+
 def _resample(src: Path, dest: Path, preset: Preset) -> None:
     """Down to the preset's exact size. Lanczos, because these maps are mostly
     one-pixel strokes and a box filter turns them to mush."""
-    q = ["-q:v", "3"] if preset.fmt == "jpg" else []
     _ffmpeg(["-i", str(src), "-vf", f"scale={preset.width}:{preset.height}:flags=lanczos",
-             *q, str(dest)])
+             *_still_quality(preset), str(dest)])
+
+
+# What a still's first bytes say it is, for the two formats a still preset can ask for.
+_STILL_MAGIC = (("png", b"\x89PNG\r\n\x1a\n"), ("jpg", b"\xff\xd8\xff"))
+
+
+def _still_format(path: Path) -> str | None:
+    """A still's format from its own first bytes, never from its name: the
+    defect this answers is a file labelled one thing and holding another, and
+    a client's name for what it captured is a label like any other. ``None``
+    when it is neither a PNG nor a JPEG."""
+    with open(path, "rb") as f:
+        head = f.read(8)
+    for fmt, magic in _STILL_MAGIC:
+        if head.startswith(magic):
+            return fmt
+    return None
+
+
+def _transcode(src: Path, dest: Path, preset: Preset) -> None:
+    """A still into the preset's format at the size it was captured: the call
+    ``_resample`` makes, without its ``scale``, because ``keep`` is the plan
+    saying the capture's pixels are the deliverable's."""
+    _ffmpeg(["-i", str(src), *_still_quality(preset), str(dest)])
 
 
 def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
@@ -885,7 +915,16 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
             _encode(source, dest, preset, fade=job.fade, crf=job.crf, keep=job.keep,
                     progress=progress)
         elif job.keep:
-            shutil.copyfile(source, dest)
+            # Kept as captured, when it is already what the preset delivers. A
+            # client that captures for itself (the desktop app writes PNG) can
+            # hand over a format the preset is not, and a copy would put those
+            # bytes under the preset's extension: a .jpg that is a PNG, or a
+            # PNG over the platform's limit that a JPEG would have met (issue
+            # 30). Then it is transcoded, at the size it was captured.
+            if _still_format(source) == preset.fmt:
+                shutil.copyfile(source, dest)
+            else:
+                _transcode(source, dest, preset)
         else:
             _resample(source, dest, preset)
         check_size(dest, preset)

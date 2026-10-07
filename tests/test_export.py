@@ -7,6 +7,7 @@ the agreement between the three places the palette is written down.
 
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -486,9 +487,110 @@ def test_every_ffmpeg_call_goes_through_the_resolver(tmp_path, monkeypatch):
     from PIL import Image
     Image.new("RGB", (400, 400), "#15120f").save(big)
     export.encode(still, big, tmp_path / "out" / still.filename)
+    kept = export.plan("la-metro-rail", "bluesky", quality="draft")   # keep: a PNG transcoded
+    export.encode(kept, big, tmp_path / "out" / "kept.jpg")
     calls = log.read_text().splitlines()
-    assert len(calls) == 3, calls          # palettegen, paletteuse, the resample
+    assert len(calls) == 4, calls          # palettegen, paletteuse, the resample, the transcode
     assert all("-loglevel error" in c for c in calls)
+
+
+# ------------------------------------------------ a kept still, in whose format
+
+MAGIC = {"png": b"\x89PNG\r\n\x1a\n", "jpg": b"\xff\xd8"}      # a file's first bytes
+PIL_NAME = {"png": "PNG", "jpg": "JPEG"}
+
+
+def _still(path: Path, fmt: str, size: tuple[int, int] = (640, 480), *,
+           noise: bool = False) -> Path:
+    """A captured still in ``fmt``, whatever ``path`` is called. ``noise`` is
+    the worst case for a codec: a PNG of it is far over Bluesky's limit."""
+    from PIL import Image, ImageDraw
+    if noise:
+        im = Image.frombytes("RGB", size, random.Random(30).randbytes(size[0] * size[1] * 3))
+    else:
+        im = Image.new("RGB", size, "#15120f")
+        ImageDraw.Draw(im).rectangle([40, 40, size[0] - 40, size[1] - 40],
+                                     outline="#e8b04a", width=1)
+    im.save(path, format=PIL_NAME[fmt])
+    return path
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("quality", ["draft", "high"])      # the two that keep
+@pytest.mark.parametrize("captured,preset_name,delivered", [
+    ("png", "bluesky", "jpg"),              # issue 30: a PNG capture for the JPEG preset
+    ("jpg", "instagram-square", "png"),     # and a JPEG for a PNG preset
+    ("png", "instagram-square", "png"),     # the formats agree: a copy
+    ("jpg", "bluesky", "jpg"),              # agree, as the engine's own recorder writes it
+])
+def test_a_kept_still_is_in_the_presets_format_at_the_size_it_was_captured(
+        tmp_path, quality, captured, preset_name, delivered):
+    from PIL import Image
+    preset = export.PRESETS[preset_name]
+    assert preset.fmt == delivered
+    job = export.plan("la-metro-rail", preset_name, quality=quality)
+    assert job.keep
+    source = _still(tmp_path / f"capture.{captured}", captured)
+    before = source.read_bytes()
+    dest = tmp_path / "out" / job.filename
+    assert export.encode(job, source, dest) == [dest]
+    data = dest.read_bytes()
+    assert data.startswith(MAGIC[delivered]), data[:8].hex()
+    with Image.open(dest) as im:
+        assert im.format == PIL_NAME[delivered]
+        # Not the preset's 1200x900 or 1080x1080: a kept capture is not resampled.
+        assert im.size == (640, 480) != (preset.width, preset.height)
+    if captured == delivered:
+        assert data == before, "the formats agree, so it is the capture itself"
+    export.check_size(dest, preset)
+    assert export.sidecar_path(dest).exists()
+    assert source.read_bytes() == before, "the source is the caller's"
+
+
+@needs_ffmpeg
+def test_a_dense_png_capture_for_the_jpeg_preset_is_transcoded_under_its_limit(tmp_path):
+    """The case that made it matter: a dense map is well over Bluesky's limit
+    as a PNG, so the copy was refused by ``check_size``; as the JPEG the
+    preset is, it is not."""
+    preset = export.PRESETS["bluesky"]
+    job = export.plan("la-metro-rail", "bluesky", quality="high")
+    source = _still(tmp_path / "capture.png", "png", (800, 600), noise=True)
+    assert source.stat().st_size > preset.max_bytes
+    dest = tmp_path / "out" / job.filename
+    export.encode(job, source, dest)
+    assert dest.read_bytes().startswith(MAGIC["jpg"])
+    assert dest.stat().st_size <= preset.max_bytes
+    export.check_size(dest, preset)
+
+
+@needs_ffmpeg
+def test_a_stills_bytes_decide_its_format_not_its_name(tmp_path):
+    """A client's name for what it captured is a label, and a mislabelled
+    file is the defect: PNG bytes called ``.jpg`` still go to the JPEG preset
+    as a transcode, and JPEG bytes called ``.png`` to a PNG preset likewise."""
+    bluesky = export.plan("la-metro-rail", "bluesky", quality="draft")
+    liar = _still(tmp_path / "capture.jpg", "png")
+    out = export.encode(bluesky, liar, tmp_path / "a" / bluesky.filename)[0]
+    assert out.read_bytes().startswith(MAGIC["jpg"])
+    square = export.plan("la-metro-rail", "instagram-square", quality="draft")
+    liar = _still(tmp_path / "capture.png", "jpg")
+    out = export.encode(square, liar, tmp_path / "b" / square.filename)[0]
+    assert out.read_bytes().startswith(MAGIC["png"])
+
+
+@needs_ffmpeg
+def test_a_kept_still_that_is_no_image_leaves_nothing_behind(tmp_path):
+    """Copied as it was, it would have been delivered under an image's name
+    with a sidecar vouching for it. Transcoded, ffmpeg refuses it, and an
+    encode that fails leaves neither file."""
+    job = export.plan("la-metro-rail", "bluesky", quality="draft")
+    junk = tmp_path / "capture.png"
+    junk.write_bytes(b"not a picture")
+    dest = tmp_path / "out" / job.filename
+    with pytest.raises(RuntimeError, match="ffmpeg failed"):
+        export.encode(job, junk, dest)
+    assert not dest.exists() and not export.sidecar_path(dest).exists()
+    assert junk.read_bytes() == b"not a picture"
 
 
 def test_the_sidecar_names_a_persons_source_without_its_secrets(tmp_path, monkeypatch):
