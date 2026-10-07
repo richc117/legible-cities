@@ -5,6 +5,146 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.11.0] - 2026-10-06
+
+### Added
+
+- **A registry entry says whether its feed publishes headways** (issue 46).
+  `feeds.list` and `feeds.add` answer a new boolean, `headways`, for every
+  feed: true when the operator runs its service from `frequencies.txt`
+  (trains at a scheduled interval) rather than a timetable of trip times,
+  which the engine had said only in prose in Mexico City's notes. Among
+  the presets it is true for Mexico City alone; Phoenix carries 4
+  frequency rows among 18,157 trips, and Chicago and Pittsburgh ship the
+  file empty, so they stay false. For a feed a person adds it is decided
+  where the zip is checked: `frequencies.txt` has rows and the trips they
+  name in `trips.txt` are at least half of the feed's trips; a member the
+  library cannot read answers false and the feed is still added. The
+  answer is written to `user-feeds.json`, so a restart does not open the
+  zip again, and a record written before the field existed reads as
+  false. `FeedRecord` lists the field as required.
+- **`map.build` writes a small picture of the map beside the page**
+  (issue 51). After the page, `map.build` writes `<key>-thumb-dark.svg`
+  and `<key>-thumb-light.svg` into the same folder as `<key>.html`: the
+  network alone, about 400 units wide, with no stations' names and no
+  ground rectangle, in the request's own line colours, default colour and
+  line order. The furniture colours (station fill and outline) are written
+  as literals, resolved through `export.resolve` against the dark and
+  light entries of `export.PALETTES`, so the files read correctly in an
+  `<img>`, where a `var()` falls back to white. New York's pair is 61 KB
+  each. `MapBuildResult.files` gained two required keys, `thumb_dark` and
+  `thumb_light`. The drawing is `schematic.thumbnail.draw`, which the
+  sample cities' pictures call.
+- **A picture of every sample city** (issue 52). `bin/thumbnails <folder>`
+  writes `<key>-dark.svg` and `<key>-light.svg` for every preset that has a
+  layout stored at the pinned LOOM. It reads the stored octi stage, which is
+  the graph `map.build` draws, without the schedule, the animation or a
+  page, and draws each picture with `thumbnail.draw` in the feed's own
+  colours and order. A README beside the files names the engine, the LOOM
+  commit, the date, the count and total size, and each preset left without
+  a picture and why (feed not downloaded, no layout at this LOOM, or a
+  layout that would not draw, which also fails the run). A picture an
+  earlier run left for a preset that now has none is removed. A feed a
+  person added is left out, because it is not a sample city and its network
+  is theirs. The SVGs carry no date, so a second run writes the same bytes.
+  The desktop app ships the output on its front door: the 22 presets came to
+  44 files and 619 KB.
+- **Two pictures of the map's themes, for the app to choose by**
+  (issue 53). `bin/theme-thumbnails <folder>` writes `theme-warm-dark.svg`
+  and `theme-sepia.svg`, and a README saying which engine made them and
+  when, so the desktop app can offer its Warm dark and Sepia themes as two
+  small pictures. Each is the same unlabelled drawing of an invented
+  network of four lines and twelve stations on a 16 by 10 grid, drawn
+  directly by the renderer from positions already on the grid rather than
+  through LOOM, so it needs no Docker or feed and writes the same bytes on
+  every run; resolved through its theme's palette and padded to 16:10
+  without cropping. The ground is the palette's own `bg` (`#15120f` and
+  `#f7efe1`), which is what the viewer and every export show, not the page
+  card's `--map-bg`.
+- **The page's seam can change the theme** (issue 29).
+  `window.__present.setTheme(name)` takes `warm-dark` or `sepia`, sets or
+  removes `data-theme` as the boot script does, answers false and changes
+  nothing for any other name, and never writes storage (`rc-theme` stays
+  the site's script's key); `state()` gains `theme`. Nothing calls it on
+  load, so an export's `?theme=` still wins at boot and a captured frame is
+  the one it was. The desktop app can restyle a shown map without
+  reloading it, which threw away the clock, the view and the scrub.
+
+### Changed
+
+- **`feeds.remove` is a job, and a cancel reaches it** (issue 35). It was
+  a plain handler on the server's one reader thread, so while it deleted a
+  feed's zips and layouts nothing else was read: `feeds.list` queued behind
+  it, and a `$/cancelRequest` for it was not read until it had returned
+  and was then ignored. It now runs like `feeds.add`, so the reader keeps
+  answering while it works. The write of `user-feeds.json` is its point of
+  no return, and that write is now atomic (beside itself under a name of
+  the writer's own, then moved into place, with the scratch file removed if
+  it fails). A cancel before it leaves the feed registered with every file
+  in place and is answered with the cancelled error. A cancel after it is
+  not honoured, since the feed is already forgotten: the files are removed
+  to the end, in name order, and the answer carries
+  `"cancel_too_late": true`. The answer for the normal case is still
+  exactly `{"ok": true}`; the result is now `FeedsRemoveResult`, which adds
+  that one optional field. Removing a feed also removes the folders the
+  native backend unpacked it into (`<key>.normalized` and its scratch),
+  which every laid-out feed used to leave behind in the home; an add of the
+  same key while a removal is still deleting now waits for it rather than
+  losing its new zip; and a key that is not a key is refused by the library
+  as the server already refused it.
+- **The recorder records with Playwright's full Chromium, not the headless
+  shell** (issue 21). Bare `launch()` starts a stripped build whose
+  rasteriser is not the full browser's: at one version they disagreed on
+  every frame of one capture by up to 99 of 255 levels on glyph and stroke
+  edges. `bin/_record.js` now names `channel: "chromium"`, the same kind
+  of build a viewer's browser and the desktop app's own capture run, so
+  every raster the recorder makes (a still, a video, a GIF, a safe-area
+  preview) differs from one made before this release, and
+  `npx playwright install chromium` is the install, never `--only-shell`.
+  The full browser also requests the page's icon links, which under
+  `file://` are not there; the recorder no longer counts that as the
+  page's failure. A launch failure is printed without the browser's path.
+- **Four presets fetch their feed over https** (issue 17): New York City
+  Subway and the Long Island Rail Road from the MTA's own bucket, where
+  the old addresses redirected, and Miami and DART over the same paths as
+  before. A test holds every preset to https unless a test-side list names
+  it as plain http with a reason. The layout id hashes the feed's bytes,
+  not its address, so no stored layout moves; the sidecar's `source` and
+  the atlas's "Source feed" link say the new address for new exports and
+  renders, and the atlas needs a rebuild to show it.
+- **The site's service days are pinned** (issue 25).
+  `site/src/_data/service-days.json` records the day each published map
+  was drawn for, seeded with the 22 published days; a rebuild never moves
+  a day, `bin/build-site --redate <key>` chooses one network's day again,
+  and a stored day the feed's calendar no longer covers is refused with
+  the sentence that says so rather than drawn as a page with no trips.
+- **The page's four view icons are Phosphor's** (issue 19). The switcher
+  draws Phosphor's regular `map-trifold`, `graph`, `line-segments` and
+  `clock`, copied unmodified from the 2.1.1 release of
+  `@phosphor-icons/core` under the MIT licence, with its `LICENSE` beside
+  them in `page/icons/`; the site's masks, its Framework and App credits
+  and the README's Licence section follow. The four Esri Calcite icons
+  they replace were redistributed under a Master License Agreement whose
+  current terms forbid combining them in a manner that would subject them
+  to GPL-style terms, which this repository's licence is. `graph` needs no
+  turn, so the schematic button's 90 degree CSS rotation is gone. The
+  page's bytes changed by the icon data, one rule and two comments,
+  nothing an export's frames read.
+
+### Fixed
+
+- **A kept still is delivered in the preset's format** (issue 30). At
+  draft and high quality the engine kept the captured file as it was, so a
+  PNG capture for a JPEG preset was copied whole under a `.jpg` name and
+  a JPEG for a PNG preset the other way. `export.encode` now reads the
+  file's first bytes: a still already in the preset's format is copied,
+  any other is transcoded by ffmpeg at the preset's quality, and a file
+  that is no image fails rather than being copied.
+
+The schema's bytes moved (`FeedRecord.headways`, `MapBuildResult.files`,
+`FeedsRemoveResult`), all additive at protocol 1; the desktop app's pin
+takes them with its fingerprint.
+
 ## [0.10.1] - 2026-09-29
 
 ### Fixed
