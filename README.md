@@ -299,7 +299,6 @@ it.
 desktop app chooses by (`theme-warm-dark.svg`, `theme-sepia.svg`), drawn from a
 made-up network, so it needs no feed, Docker or `data/`.
 
-
 `bin/thumbnails <folder>` writes a small picture of every sample city in each of the
 interface's two palettes (`<key>-dark.svg`, `<key>-light.svg`) from the layouts already
 stored, for the desktop app to ship; it lays nothing out, so a preset that is not
