@@ -276,9 +276,23 @@ __SOCIAL__
      nothing where the halo is the whole point. So it takes the ground the map
      sits on instead: --bg, the literal export.resolve() writes into a
      standalone SVG. A rule outranks the presentation attribute, so the SVG's
-     own text is as it was and only this page changes. (The script below hides
-     this group and draws a label layer of its own, which carries no halo.) */
+     own text is as it was and only this page changes. (This group is hidden
+     once the script has drawn the page's own labels, which is what the rules
+     below are for.) */
   :root[data-present] #stage svg #labels text[stroke] { stroke: var(--bg); }
+  /* The page draws its own labels over the map's and hides the map's group, so
+     the halo the renderer gave a label that sits over a line, and that every
+     standalone SVG paints, was dropped when the linear view took the labels
+     over. The script marks the page's label `haloed` while the schematic map is
+     what shows and its source text carries the renderer's halo, and this paints
+     it as the renderer wrote it (render.py: 3.2 wide, round, behind the glyphs).
+     Off present mode that is the card the map is drawn on, --map-bg, which is
+     what the renderer meant; in present mode, where the card is transparent,
+     it is the ground the map sits on. */
+  #linear-labels text.haloed {
+    paint-order: stroke; stroke: var(--map-bg); stroke-width: 3.2; stroke-linejoin: round;
+  }
+  :root[data-present] #linear-labels text.haloed { stroke: var(--bg); }
   :root[data-present] #stage {
     padding: 0; overflow: hidden; height: 100vh;
     display: grid; place-items: center;
@@ -661,6 +675,9 @@ __SOCIAL__
         x: +t.getAttribute("x"), y: +t.getAttribute("y"),
         anchor: t.getAttribute("text-anchor") || "start",
         rotate: (t.getAttribute("transform") || "").match(/rotate\(([-\d.]+)/),
+        // The renderer's own word for a label that sits over a line, read from
+        // the element it wrote and kept off the page's data.
+        halo: t.getAttribute("paint-order") === "stroke",
       });
     });
   }
@@ -987,6 +1004,10 @@ __SOCIAL__
     }
 
     for (const t of texts) {
+      // The renderer solved the halo against the schematic map, so it is drawn
+      // there and on no other view: on the geographic map the label has been
+      // carried off its slot, and beside a row it has no line to cross.
+      t.el.classList.toggle("haloed", !!(t.primary && t.spec.halo) && m === 0 && sf === 0 && g === 0);
       const lp = linXY(t.label, t.node);
       if (!lp && !(g > 0)) continue;
       // Label boxes are solved against the drawn map, so on the geographic one

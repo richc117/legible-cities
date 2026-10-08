@@ -1374,25 +1374,33 @@ CROWDED_STATIONS = {"n0": (0, 40), "n1": (50, 60), "n5": (20, 50), "n9": (60, 30
 CROWDED_EDGES = [("n5", "n10", "A"), ("n0", "n10", "B"), ("n5", "n0", "C"),
                  ("n0", "n1", "C"), ("n10", "n11", "D"), ("n1", "n9", "E")]
 CROWDED_COLOURS = {"A": "0072bc", "B": "e4002b", "C": "00a651", "D": "ffd700", "E": "7b3f98"}
+# The same stations nudged, standing for the network before octi straightened
+# it, so the page has the geographic view and its button.
+CROWDED_NUDGED = {"n0": (3, 38), "n1": (47, 63), "n5": (24, 46), "n9": (58, 34),
+                  "n10": (33, 58), "n11": (-3, 22)}
+
+
+def _crowded_graph(at: dict[str, tuple[float, float]]) -> LineGraph:
+    feats = [{"type": "Feature", "geometry": {"type": "Point", "coordinates": list(xy)},
+              "properties": {"id": n, "station_id": "S" + n[1:],
+                             "station_label": f"Station Name Number {n[1:]}"}}
+             for n, xy in at.items()]
+    for a, b, line in CROWDED_EDGES:
+        feats.append({"type": "Feature",
+                      "geometry": {"type": "LineString",
+                                   "coordinates": [list(at[a]), list(at[b])]},
+                      "properties": {"from": a, "to": b,
+                                     "lines": [{"id": line, "label": line,
+                                                "color": CROWDED_COLOURS[line]}]}})
+    return LineGraph.from_geojson({"type": "FeatureCollection", "features": feats})
 
 
 def _crowded_page(into: Path) -> tuple[str, str]:
     """The crowded network's page, drawn the way the pipeline draws it (themed),
     and the SVG it was given."""
-    feats = [{"type": "Feature", "geometry": {"type": "Point", "coordinates": list(xy)},
-              "properties": {"id": n, "station_id": "S" + n[1:],
-                             "station_label": f"Station Name Number {n[1:]}"}}
-             for n, xy in CROWDED_STATIONS.items()]
-    for a, b, line in CROWDED_EDGES:
-        feats.append({"type": "Feature",
-                      "geometry": {"type": "LineString",
-                                   "coordinates": [list(CROWDED_STATIONS[a]),
-                                                   list(CROWDED_STATIONS[b])]},
-                      "properties": {"from": a, "to": b,
-                                     "lines": [{"id": line, "label": line,
-                                                "color": CROWDED_COLOURS[line]}]}})
-    network = LineGraph.from_geojson({"type": "FeatureCollection", "features": feats})
+    network = _crowded_graph(CROWDED_STATIONS)
     drawn = render(network, title="Crowded", style=Style(themed=True))
+    geo = animate.geographic_tracks(_crowded_graph(CROWDED_NUDGED), network, drawn)
 
     seven = 7 * 3600
     runs = [("a", "A", ["n5", "n10"]), ("b", "B", ["n0", "n10"]),
@@ -1402,7 +1410,8 @@ def _crowded_page(into: Path) -> tuple[str, str]:
                   [Call("S" + n[1:], n, seven - 60 + i * 120, seven - 40 + i * 120)
                    for i, n in enumerate(nodes)])
              for trip_id, line, nodes in runs]
-    animation = animate.build(drawn, network, trips, dt.date(2026, 9, 10))
+    animation = animate.build(drawn, network, trips, dt.date(2026, 9, 10), geo=geo)
+    assert animation.geo
     _, html = animate.write(animation, drawn.svg, into, stem="crowded", name="Crowded")
     return html.as_uri(), drawn.svg
 
@@ -1484,3 +1493,104 @@ def test_a_haloed_label_is_stroked_in_the_ground_the_map_sits_on_in_present_mode
         for label in plain["haloed"]:
             assert label["stroke"] == _rgb(tokens[theme]["map-bg"]), (theme, label)
             assert label["width"] == "3.2px" and label["order"] == "stroke", label
+
+
+# The halo the renderer wrote on a label is not drawn from the SVG's own text:
+# the page hides that group once its script has drawn labels of its own
+# (#linear-labels), and those had no halo, so the one thing the halo is for was
+# dropped on the page, in every mode, when the linear view took the labels over
+# (issue 56 as first written found the stroke transparent in present mode and
+# missed that it was never painted). The page marks the label it draws `haloed`
+# while the schematic map is what shows and strokes it as the renderer wrote it.
+# Only the schematic map: the renderer solved the halo against that placement,
+# the geographic map has carried the label off its slot, and beside a row there
+# is no line for it to cross.
+VISIBLE = BROWSER + r"""
+main(async browser => {
+  const out = {};
+  for (const theme of ["warm-dark", "sepia"]) {
+    for (const present of [true, false]) {
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                             reducedMotion: "no-preference" });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on("pageerror", e => problems.push(e.message));
+      await page.goto(job.url + "?" + (present ? "present=1&" : "") + "theme=" + theme,
+                      { waitUntil: "load" });
+      await ready(page);
+      const show = async name => {
+        await page.evaluate(n => { window.__present.showView(n, 0); window.__present.settle(); },
+                            name);
+        await frames(page, 2);
+      };
+      // What an element draws now, by the same element every time it is asked.
+      const look = el => page.evaluate(e => {
+        const cs = getComputedStyle(e);
+        return { text: e.textContent, haloed: e.classList.contains("haloed"), stroke: cs.stroke,
+                 width: cs.strokeWidth, order: cs.paintOrder, join: cs.strokeLinejoin,
+                 opacity: cs.opacity, display: cs.display };
+      }, el);
+      // Every label the page draws: how many carry the class, and how many that
+      // do not carry a stroke all the same.
+      const census = () => page.evaluate(() => {
+        const all = [...document.querySelectorAll("#linear-labels text")];
+        const on = all.filter(t => t.classList.contains("haloed"));
+        return { total: all.length, haloed: on.length,
+                 strayStrokes: all.filter(t => !t.classList.contains("haloed")
+                                              && getComputedStyle(t).stroke !== "none").length };
+      });
+      const seen = { present: await page.evaluate(
+                       () => document.documentElement.hasAttribute("data-present")),
+                     geo: await page.evaluate(() => window.__present.hasGeo()),
+                     problems, views: {} };
+      await show("schematic");
+      const handle = await page.evaluateHandle(
+        () => document.querySelector("#linear-labels text.haloed"));
+      const el = handle.asElement();
+      for (const name of ["schematic", "geographic", "linear", "time", "schematic"]) {
+        await show(name);
+        const key = name + (name === "schematic" && seen.views.time ? " again" : "");
+        seen.views[key] = { label: el ? await look(el) : null, census: await census() };
+      }
+      out[theme + (present ? " present" : " plain")] = seen;
+      await ctx.close();
+    }
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_the_label_that_shows_on_the_schematic_map_keeps_the_halo_the_renderer_gave_it(tmp_path):
+    url, svg = _crowded_page(tmp_path)
+    tokens = _tokens(PAGE.read_text(encoding="utf-8"))
+    written = len(_haloed(svg))
+    assert written >= 1
+    seen = _run(VISIBLE, {"url": url})
+    for theme in ("warm-dark", "sepia"):
+        for mode in ("present", "plain"):
+            run = seen[f"{theme} {mode}"]
+            assert run["present"] == (mode == "present") and run["geo"] and not run["problems"], run
+            # Present mode strokes it in the ground the map sits on; the page
+            # outside it, in the card the map is drawn on, as the renderer meant.
+            ground = _rgb(tokens[theme]["bg" if mode == "present" else "map-bg"])
+
+            for view in ("schematic", "schematic again"):
+                shown = run["views"][view]
+                label = shown["label"]
+                assert label, f"{theme} {mode} {view}: no label carries the halo"
+                assert label["haloed"] and label["stroke"] == ground, (theme, mode, view, label)
+                assert label["width"] == "3.2px" and label["order"] == "stroke", label
+                assert label["join"] == "round" and label["display"] != "none", label
+                assert label["opacity"] == "1", label
+                # One label, and no other label gains a stroke from it.
+                assert shown["census"]["haloed"] == written, shown
+                assert shown["census"]["strayStrokes"] == 0, shown
+
+            # The same element, on every other view: no class, no stroke.
+            for view in ("geographic", "linear", "time"):
+                shown = run["views"][view]
+                label = shown["label"]
+                assert not label["haloed"] and label["stroke"] == "none", (theme, mode, view, label)
+                assert shown["census"]["haloed"] == 0 and shown["census"]["strayStrokes"] == 0, shown
