@@ -897,6 +897,9 @@ def _numbered_page(into: Path, line_order: list[str] | None = None):
     (["10", "B"], ["10", "B", "1", "2"]),  # two of four, the rest as the engine has them
     (["Z", "B", "B"], ["B", "1", "10", "2"]),  # what is unknown or repeated counts once
     (["2", "1", "10", "B"], ["2", "1", "10", "B"]),
+    # Every line, in the order the engine writes an unordered map: the list is the
+    # same as without an order, and is still written, because it was asked for.
+    (["1", "10", "2", "B"], ["1", "10", "2", "B"]),
 ])
 def test_the_page_is_told_of_an_arrangement_only_when_the_map_was_built_with_one(
         tmp_path, order, arranged):
@@ -929,7 +932,9 @@ const sortState = page => page.evaluate(() => {
   for (const b of group.querySelectorAll("button")) {
     state[b.id] = { pressed: b.getAttribute("aria-pressed"), shown: b.getClientRects().length > 0 };
   }
-  return { group: group.getClientRects().length > 0, buttons: state };
+  const names = [...group.querySelectorAll("button")]
+    .filter(b => b.getClientRects().length > 0).map(b => b.textContent.trim());
+  return { group: group.getClientRects().length > 0, buttons: state, names };
 });
 main(async browser => {
   const out = {};
@@ -998,6 +1003,24 @@ main(async browser => {
       await settle(page);
       seen.present[view] = await rows(page);
     }
+    // A phone. A coarse pointer gives every button display:inline-flex, which beats
+    // the [hidden] a browser would otherwise obey, so what the page means to hide has
+    // to be hidden by a rule that outranks it. The panel starts closed on a screen this narrow.
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 },
+                                             hasTouch: true });
+    const small = await phone.newPage();
+    small.on("pageerror", e => seen.problems.push(e.message));
+    await small.goto(job.url + "?theme=" + theme, { waitUntil: "load" });
+    await ready(small);
+    await small.evaluate(() => {
+      document.getElementById("view-linear").click();
+      const more = document.getElementById("more");
+      if (more.getAttribute("aria-expanded") === "false") more.click();
+    });
+    await settle(small);
+    seen.touch = { coarse: await small.evaluate(() => matchMedia("(pointer: coarse)").matches),
+                   ...(await sortState(small)) };
+    await phone.close();
     out[theme] = seen;
     await ctx.close();
   }
@@ -1057,6 +1080,11 @@ def test_a_map_built_with_an_order_lists_its_rows_as_arranged_and_the_other_sort
         assert run["present"] == {"linear": arranged, "time": arranged}, run["present"]
         # The Sort group by keyboard: As arranged leads, then A-Z and Stations, as named.
         assert [s["name"] for s in run["stops"]] == ["As arranged", "A–Z", "Stations"]
+        # On a phone too: three buttons, the arrangement pressed.
+        touch = run["touch"]
+        assert touch["coarse"] and touch["group"], (theme, touch)
+        assert touch["names"] == ["As arranged", "A–Z", "Stations"], (theme, touch)
+        assert pressed(touch) == as_arranged, (theme, touch)
 
 
 @needs_browser
@@ -1078,6 +1106,12 @@ def test_a_map_built_without_an_order_lists_its_rows_a_to_z_and_has_no_third_but
         assert run["present"] == {"linear": A_TO_Z, "time": A_TO_Z}, run["present"]
         # The Sort group is what it was: two buttons, with the names they had.
         assert [s["name"] for s in run["stops"]] == ["A–Z", "Stations"]
+        # On a phone as well, where a coarse pointer would show a button that is only hidden.
+        touch = run["touch"]
+        assert touch["coarse"], "the phone the test opens is not a coarse pointer"
+        assert touch["group"] and touch["names"] == ["A–Z", "Stations"], (theme, touch)
+        assert not touch["buttons"]["sort-arranged"]["shown"], (theme, touch)
+        assert pressed(touch) == a_to_z, (theme, touch)
 
 
 # ---------------------------------------------------------------- service days

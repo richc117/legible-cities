@@ -353,7 +353,14 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
           names: dict[str, str] | None = None) -> Animation:
     """Route every trip and collect the deduplicated paths. ``names`` is a
     display name per line label, which the page writes in the line's chip,
-    row, band and train titles; the caller gives names for drawn lines only."""
+    row, band and train titles; the caller gives names for drawn lines only.
+
+    The layout the page draws its rows from is in ``line_order`` first and
+    the rest after. When the order names a line the layout carries, the
+    layout also carries ``arranged``, its lines in that order, so the page
+    opens its rows in it; without one it carries nothing, and the rows
+    open A-Z as they always did.
+    """
     net = RouteNetwork.build(render)
     layout = linear.build(graph, order=line_order)
     layout_json = layout.to_json()

@@ -173,6 +173,9 @@ __SOCIAL__
   .sort { color: var(--muted); font-size: 0.86rem; display: inline-flex;
           align-items: center; gap: 0.45rem; }
   .sort[hidden] { display: none; }
+  /* The touch rule below gives every button a display of its own, which beats
+     [hidden]; this one is more specific than it. */
+  .sort button[hidden] { display: none; }
 
   /* The stage scrolls, not the page. The inset edge shading is the only hint
      that there is more chart to the right, so it is worth the two lines. */
