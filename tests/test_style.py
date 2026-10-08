@@ -99,6 +99,10 @@ def test_the_table_and_the_schema_agree():
     assert style["type"] == "object" and style["additionalProperties"] is False
     assert "required" not in style
     assert set(props) == set(RANGES) | set(COLORS)
+    # The server's own list of colour fields is held to the schema too, so a
+    # fifth colour added to the server alone cannot be accepted where the
+    # schema refuses it, the one direction the hand-validation test cannot see.
+    assert set(serve.STYLE_COLORS) == set(COLORS)
     assert {name: bounds[:2] for name, bounds in STYLE_RANGES.items()} == RANGES
 
     defaults = Style()
