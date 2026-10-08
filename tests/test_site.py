@@ -2206,7 +2206,9 @@ def _published_colours() -> dict[str, str]:
     found.update({f"pittsburgh-t {label}": colour for label, colour in snapshot["lines"].items()})
     found.update({f"the hand-made page's {label}": "#" + colour for label, colour in WEAK.items()})
     for key, feed in feeds.FEEDS.items():
-        if not feed.zip_path.exists():
+        # Not downloaded, or not a zip: the engine's own guard (feeds.py), so a
+        # bad cache is left out here rather than failing the test.
+        if not zipfile.is_zipfile(feed.zip_path):
             continue
         with zipfile.ZipFile(feed.zip_path) as archive:
             member = next((n for n in archive.namelist() if n.rsplit("/", 1)[-1] == "routes.txt"), None)
