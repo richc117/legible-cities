@@ -21,7 +21,7 @@ import pytest
 
 from schematic import animate, config, feeds, pipeline, site
 from schematic.linegraph import LineGraph
-from schematic.render import render
+from schematic.render import Style, render
 from schematic.schedule import Call, Trip
 
 SITE_JSON = site.SRC_DIR / "_data" / "site.json"
@@ -1354,3 +1354,133 @@ def test_a_write_cut_short_leaves_the_file_as_it_was(build, monkeypatch):
     assert stored_days() == before
     # Git does not ignore it and nothing else would remove it.
     assert [f.name for f in site.DATA_DIR.iterdir()] == ["service-days.json"]
+
+
+# A label's halo in present mode (issue 56). The renderer writes the halo of a
+# label that crosses a line as a stroke in the map's own ground,
+# stroke="var(--map-bg, ...)", painted behind the glyphs. Present mode sets
+# --map-bg to transparent so the map sits on the page's ground, and the stroke
+# went with it: a halo painted in nothing. The page now strokes it in --bg, the
+# ground the map sits on there, and only there.
+#
+# The hand-made network above places every label clear of its lines, and a halo
+# is what a label gets when it cannot be. This one is crowded on purpose, six
+# stations and five lines in a box where the label of Station 5 has no clean
+# slot, and the test below asserts that it comes out haloed, so a change to the
+# placement that finds it a slot fails there and not by leaving the browser test
+# with nothing to look at.
+CROWDED_STATIONS = {"n0": (0, 40), "n1": (50, 60), "n5": (20, 50), "n9": (60, 30),
+                    "n10": (30, 60), "n11": (0, 20)}
+CROWDED_EDGES = [("n5", "n10", "A"), ("n0", "n10", "B"), ("n5", "n0", "C"),
+                 ("n0", "n1", "C"), ("n10", "n11", "D"), ("n1", "n9", "E")]
+CROWDED_COLOURS = {"A": "0072bc", "B": "e4002b", "C": "00a651", "D": "ffd700", "E": "7b3f98"}
+
+
+def _crowded_page(into: Path) -> tuple[str, str]:
+    """The crowded network's page, drawn the way the pipeline draws it (themed),
+    and the SVG it was given."""
+    feats = [{"type": "Feature", "geometry": {"type": "Point", "coordinates": list(xy)},
+              "properties": {"id": n, "station_id": "S" + n[1:],
+                             "station_label": f"Station Name Number {n[1:]}"}}
+             for n, xy in CROWDED_STATIONS.items()]
+    for a, b, line in CROWDED_EDGES:
+        feats.append({"type": "Feature",
+                      "geometry": {"type": "LineString",
+                                   "coordinates": [list(CROWDED_STATIONS[a]),
+                                                   list(CROWDED_STATIONS[b])]},
+                      "properties": {"from": a, "to": b,
+                                     "lines": [{"id": line, "label": line,
+                                                "color": CROWDED_COLOURS[line]}]}})
+    network = LineGraph.from_geojson({"type": "FeatureCollection", "features": feats})
+    drawn = render(network, title="Crowded", style=Style(themed=True))
+
+    seven = 7 * 3600
+    runs = [("a", "A", ["n5", "n10"]), ("b", "B", ["n0", "n10"]),
+            ("c", "C", ["n5", "n0", "n1"]), ("d", "D", ["n10", "n11"]),
+            ("e", "E", ["n1", "n9"])]
+    trips = [Trip(trip_id, line, "end",
+                  [Call("S" + n[1:], n, seven - 60 + i * 120, seven - 40 + i * 120)
+                   for i, n in enumerate(nodes)])
+             for trip_id, line, nodes in runs]
+    animation = animate.build(drawn, network, trips, dt.date(2026, 9, 10))
+    _, html = animate.write(animation, drawn.svg, into, stem="crowded", name="Crowded")
+    return html.as_uri(), drawn.svg
+
+
+def _haloed(svg: str) -> list[str]:
+    """The opening tags of the labels the renderer wrote with a halo."""
+    labels = svg[svg.index('<g id="labels"'):svg.index('<g id="trains"')]
+    return re.findall(r'<text [^>]*paint-order="stroke"[^>]*>', labels)
+
+
+def test_the_crowded_map_has_a_label_with_a_halo_in_the_card_ground(tmp_path):
+    _, svg = _crowded_page(tmp_path)
+    haloed = _haloed(svg)
+    assert haloed, "no label of the crowded map came out haloed"
+    # The SVG's own bytes are what the renderer has always written; the page's
+    # rule changes what the browser paints, never what is written.
+    for tag in haloed:
+        assert 'stroke="var(--map-bg, #ffffff)"' in tag, tag
+        assert 'stroke-width="3.2"' in tag, tag
+
+
+HALO = BROWSER + r"""
+main(async browser => {
+  const out = {};
+  for (const theme of ["warm-dark", "sepia"]) {
+    for (const present of [true, false]) {
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                             reducedMotion: "no-preference" });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on("pageerror", e => problems.push(e.message));
+      await page.goto(job.url + "?" + (present ? "present=1&" : "") + "theme=" + theme,
+                      { waitUntil: "load" });
+      await ready(page);
+      // Chosen by the attribute the renderer writes on a halo and not by the
+      // page's rule, so a label the rule does not reach is still counted.
+      const seen = await page.evaluate(() => ({
+        present: document.documentElement.hasAttribute("data-present"),
+        haloed: [...document.querySelectorAll('#labels text[paint-order="stroke"]')].map(t => {
+          const cs = getComputedStyle(t);
+          return { text: t.textContent, attr: t.getAttribute("stroke"), stroke: cs.stroke,
+                   width: cs.strokeWidth, order: cs.paintOrder };
+        }),
+      }));
+      out[theme + (present ? " present" : " plain")] = { ...seen, problems };
+      await ctx.close();
+    }
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_a_haloed_label_is_stroked_in_the_ground_the_map_sits_on_in_present_mode(tmp_path):
+    url, svg = _crowded_page(tmp_path)
+    tokens = _tokens(PAGE.read_text(encoding="utf-8"))
+    written = len(_haloed(svg))
+    assert written >= 1
+    seen = _run(HALO, {"url": url})
+    for theme in ("warm-dark", "sepia"):
+        # Present mode: the page's ground, as the rgb() the browser computes.
+        present = seen[theme + " present"]
+        assert present["present"] and not present["problems"], present
+        assert len(present["haloed"]) == written, present
+        for label in present["haloed"]:
+            assert label["stroke"] == _rgb(tokens[theme]["bg"]), (theme, label)
+            # The rule changes the colour of the stroke and nothing about it.
+            assert label["width"] == "3.2px" and label["order"] == "stroke", label
+            # The SVG still carries the card's variable; the page's rule won.
+            assert label["attr"].startswith("var(--map-bg"), label
+
+        # Outside present mode nothing moved: the card ground, as it was. (The
+        # sepia card is the page's ground, so only the warm dark can tell the
+        # two apart, and only if the rule leaked would it differ.)
+        plain = seen[theme + " plain"]
+        assert not plain["present"] and not plain["problems"], plain
+        assert len(plain["haloed"]) == written, plain
+        for label in plain["haloed"]:
+            assert label["stroke"] == _rgb(tokens[theme]["map-bg"]), (theme, label)
+            assert label["width"] == "3.2px" and label["order"] == "stroke", label

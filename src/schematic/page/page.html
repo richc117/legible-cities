@@ -271,6 +271,14 @@ __SOCIAL__
   :root[data-present][data-controls] #more-panel { display: none; }
   :root[data-present], :root[data-present] body { height: 100%; overflow: hidden; }
   :root[data-present] { --map-bg: transparent; }
+  /* The halo of a label that crosses a line is a stroke the SVG writes in
+     --map-bg, and that is transparent here, which leaves a stroke that paints
+     nothing where the halo is the whole point. So it takes the ground the map
+     sits on instead: --bg, the literal export.resolve() writes into a
+     standalone SVG. A rule outranks the presentation attribute, so the SVG's
+     own text is as it was and only this page changes. (The script below hides
+     this group and draws a label layer of its own, which carries no halo.) */
+  :root[data-present] #stage svg #labels text[stroke] { stroke: var(--bg); }
   :root[data-present] #stage {
     padding: 0; overflow: hidden; height: 100vh;
     display: grid; place-items: center;
