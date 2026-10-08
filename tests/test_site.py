@@ -1191,6 +1191,143 @@ def test_one_rule_hides_whatever_button_the_header_hides():
     assert "header button[hidden] { display: none; }" in page
 
 
+# ------------------------------------------------------------------ the stage
+#
+# Issue 60. Chromium makes a scroller with nothing focusable inside a keyboard
+# stop, and the page's stage is a scroller (overflow-x: auto), so the last Tab
+# stop on the page was `main` with no name and the browser's own ring. Found in
+# Chromium: the stage is a stop wherever its content overflows by any amount, and
+# the page sizes the map to a whole number of pixels, which is 0.4px over what
+# the padding leaves in every window wider than 700px, so it is a stop there
+# though nothing scrolls; at 700px and under, where the padding is 0 and the map
+# fits exactly, it is not one; and a window that makes the map overflow for real
+# (a tall one, narrow: the map fills the height and pans) makes it a stop that
+# scrolls. The stop comes and goes with the window, so it is not made
+# unconditional: it is named in the markup and draws the page's ring when it is there.
+
+STAGE = BROWSER + r"""
+main(async browser => {
+  const out = {};
+  for (const theme of ["warm-dark", "sepia"]) {
+    out[theme] = {};
+    for (const [name, [width, height]] of Object.entries(job.windows)) {
+      const ctx = await browser.newContext({ viewport: { width, height },
+                                             reducedMotion: "no-preference" });
+      const page = await ctx.newPage();
+      const cdp = await ctx.newCDPSession(page);
+      const seen = { problems: [], walk: [] };
+      page.on("pageerror", e => seen.problems.push(e.message));
+      await page.goto(job.url + "?theme=" + theme, { waitUntil: "load" });
+      await ready(page);
+      await page.evaluate(() => window.__present.settle());
+      seen.overflow = await page.evaluate(() => {
+        const s = document.getElementById("stage");
+        return s.scrollWidth - s.clientWidth;
+      });
+      // Tab from the top of the document, as a person does, until the stage or the edge.
+      for (let i = 0; i < 40; i++) {
+        await page.keyboard.press("Tab");
+        const here = await active(page);
+        if (here === null) { seen.walk.push("(edge)"); break; }
+        seen.walk.push(here);
+        if (here === "stage") break;
+      }
+      if (seen.walk[seen.walk.length - 1] === "stage") {
+        seen.stage = await page.evaluate(() => {
+          const el = document.activeElement, cs = getComputedStyle(el);
+          return { tag: el.tagName.toLowerCase(), label: el.getAttribute("aria-label"),
+                   visible: el.matches(":focus-visible"), fade: el.classList.contains("scrollable-right"),
+                   outline: [cs.outlineStyle, cs.outlineWidth, cs.outlineColor, cs.outlineOffset],
+                   mask: cs.maskImage };
+        });
+        const { result } = await cdp.send("Runtime.evaluate", { expression: "document.activeElement" });
+        const { nodes } = await cdp.send("Accessibility.getPartialAXTree",
+                                         { objectId: result.objectId, fetchRelatives: false });
+        seen.stage.role = nodes[0].role.value;
+        seen.stage.name = nodes[0].name ? nodes[0].name.value : "";
+        // What is painted: the viewport, for the pixels at the stage's two side edges.
+        seen.shot = (await page.screenshot({ type: "png" })).toString("base64");
+      }
+      out[theme][name] = seen;
+      await ctx.close();
+    }
+  }
+  return out;
+}).catch(fail);
+"""
+
+# The header's stops at a width where the panel is closed, in the order the page has them.
+CLOSED_PANEL = ["view-geo", "view-map", "view-linear", "view-string", "play", "scrub", "speed", "more"]
+
+
+@needs_browser
+def test_the_stage_is_named_and_rings_like_the_headers_controls_when_tab_reaches_it(tmp_path):
+    from PIL import Image
+    import base64
+    import io
+
+    tokens = _tokens(PAGE.read_text(encoding="utf-8"))
+    windows = {"scrolls": (390, 1400), "wide": (1280, 800), "fits": (600, 800)}
+    seen = _run(STAGE, {"url": _hand_made_page(tmp_path), "windows": windows})
+    for theme, token in tokens.items():
+        runs = seen[theme]
+        assert all(not r["problems"] for r in runs.values()), runs
+        ring = ["solid", "2px", _rgb(token["focus"]), "-2px"]
+        focus = tuple(int(token["focus"][i:i + 2], 16) for i in (1, 3, 5))
+
+        # A window in which the map overflows for real, which is the stop's use: Tab
+        # reaches it, last, it is a landmark called Map, and it draws the page's ring.
+        scrolls = runs["scrolls"]
+        assert scrolls["overflow"] > 1, "the test's window no longer makes the map overflow"
+        assert scrolls["walk"][-1] == "stage", (theme, scrolls["walk"])
+        # A wide window the map fits in: Chromium (as of this writing) makes the stage a
+        # stop here too, and then it is the same stop. Were it not, nothing else moves.
+        wide = runs["wide"]
+        assert wide["overflow"] <= 0, "the map overflows in the wide window, so it is not the fit"
+        reached = [("scrolls", scrolls)]
+        if wide["walk"][-1] == "stage":
+            reached.append(("wide", wide))
+        else:
+            assert wide["walk"][-1] == "(edge)" and wide["walk"][-2] == "more", wide["walk"]
+        for where, run in reached:
+            stage = run["stage"]
+            assert (stage["tag"], stage["label"]) == ("main", "Map"), (theme, where, stage)
+            assert (stage["role"], stage["name"]) == ("main", "Map"), (theme, where, stage)
+            assert stage["visible"], "reached by Tab and not matching :focus-visible"
+            assert stage["outline"] == ring, (theme, where, stage["outline"])
+            # The ring is whole at the stage's side edges (the viewport's own), where the
+            # fade that hints at more to the right would otherwise dim it to 35%.
+            shot = Image.open(io.BytesIO(base64.b64decode(run["shot"]))).convert("RGB")
+            width = shot.size[0]
+            for x in (0, 1, width - 2, width - 1):
+                assert shot.getpixel((x, 300)) == focus, (theme, where, x, shot.getpixel((x, 300)))
+        assert scrolls["stage"]["fade"], "the fade the ring has to survive is not there"
+        assert scrolls["stage"]["mask"] == "none", scrolls["stage"]["mask"]
+
+        # Where the map fits exactly, Tab does not reach the stage, and the header's
+        # stops are those it had: the page's own controls and then the edge.
+        fits = runs["fits"]
+        assert fits["overflow"] <= 0 and "stage" not in fits["walk"], (theme, fits)
+        assert fits["walk"][0].startswith("a.back"), fits["walk"]
+        assert fits["walk"][1:] == CLOSED_PANEL + ["(edge)"], fits["walk"]
+
+
+def test_the_stage_ring_clears_three_to_one_on_the_page_and_on_the_maps_card():
+    """The ring is inset on the stage, so what it sits on is the stage's padding
+    (--bg) and, where the padding is 0 and the map reaches the edge, the map's own
+    ground (--map-bg). --focus is the header's ring and is not changed for this."""
+    page = PAGE.read_text(encoding="utf-8")
+    for theme, token in _tokens(page).items():
+        for ground in ("bg", "map-bg"):
+            ratio = _contrast(token["focus"], token[ground])
+            assert ratio >= 3, (theme, ground, round(ratio, 2))
+    squash = re.sub(r"\s+", " ", page)
+    assert '<main id="stage" aria-label="Map">' in squash
+    assert "#stage:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }" in squash
+    assert ("#stage.scrollable-right:focus-visible "
+            "{ -webkit-mask-image: none; mask-image: none; }") in squash
+
+
 # ---------------------------------------------------------------- service days
 
 # Two presets, so no test reads the person's own feeds: site.export() is given

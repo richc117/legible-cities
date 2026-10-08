@@ -192,6 +192,18 @@ __SOCIAL__
     -webkit-mask-image: linear-gradient(to right, #000 92%, rgba(0,0,0,0.35));
             mask-image: linear-gradient(to right, #000 92%, rgba(0,0,0,0.35));
   }
+  /* The browser makes a scroller with nothing focusable inside a Tab stop, and
+     whether the stage is one depends on the window (a pixel of overflow is
+     enough), so it is a stop that comes and goes. When it is there it is named
+     in the markup and rings like the header's controls. The ring is inset: the
+     stage is the viewport's edge and an outer one would be cut off. It sits on
+     --bg, and on --map-bg where the padding is 0 and the map reaches the edge;
+     --focus clears 3:1 on both in both themes. Nothing in a capture has focus. */
+  #stage:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  /* The fade above dims whatever is painted under it, and the ring's right edge
+     is: at 35% it read 1.7:1 on the sepia ground. While the stage has the
+     keyboard's focus the ring is drawn whole and the hint gives way to it. */
+  #stage.scrollable-right:focus-visible { -webkit-mask-image: none; mask-image: none; }
   /* Row labels in the linear view's gutter, in each line's own colour. */
   .rowname { font-weight: 700; font-size: 13px; dominant-baseline: middle; }
   /* Width is set by the script, which is the only thing that knows the view:
@@ -421,7 +433,7 @@ __SOCIAL__
     </div>
   </div>
 </header>
-<main id="stage">__SVG__</main>
+<main id="stage" aria-label="Map">__SVG__</main>
 <div id="present-overlay" aria-hidden="true">
   <div class="name" hidden><b></b><span></span><span class="when" hidden></span><span class="caption" hidden></span></div>
   <div class="time" hidden></div>
