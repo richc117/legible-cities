@@ -1,6 +1,5 @@
 """The site's sharing tags and the card they point at.
 
-import csv
 A link preview fails silently: the tags are either absent or relative, the page
 looks perfect in a browser, and the only symptom is a bare link in somebody
 else's chat window. So the things asserted here are the ones that cannot be
@@ -8,6 +7,7 @@ seen by opening the site -- that an origin exists, that both consumers of it
 emit whole URLs, and that the card is the size it claims to be.
 """
 
+import csv
 import datetime as dt
 import io
 import json
