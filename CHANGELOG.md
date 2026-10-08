@@ -5,6 +5,142 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.12.0] - 2026-10-07
+
+### Added
+
+- **`map.build` takes an optional `style` object** (issue 36). Its numeric
+  fields are `line_width` (1 to 24), `line_gap` (1 to 3, a multiple of the
+  line width), `station_radius` (1 to 20), `interchange_radius` (1 to 30),
+  `station_stroke` (0 to 8), `label_size` (6 to 32), `label_offset` (0 to 40)
+  and `padding` (0 to 200). All but `line_gap` are in one unit, SVG user units
+  at the map's width: the map is fitted to `width`, 1,800 by default, so a line
+  width of 7 is seven of 1,800. The four colours `background`, `station_fill`,
+  `station_stroke_color` and `label_color`, each written `#rrggbb`, are
+  accepted for the command line and the site; the desktop app does not send
+  them, because the page's theme owns the furniture. Omitting `style`, or
+  sending `{}`, draws exactly what was drawn before. A field outside its range,
+  a key that is not on the list and an `interchange_radius` below
+  `station_radius` are refused with the `params` kind and a sentence naming the
+  field; the radius rule is judged on the values the map would be drawn with,
+  so a `station_radius` above 6 sent alone is refused as well. `label_size` and
+  `label_offset` re-place the labels and move the `viewBox`, never the stored
+  layout. The geographic layer now follows the map's track spacing, where it
+  was spaced by the default style whatever the map was drawn with.
+  `MapBuildParams` gained `style` (`$defs/MapStyle`).
+- **`export.encode` takes an `alt` of a person's own words** (issue 41).
+  `Provenance` gained an optional `alt`: a description of the file that the
+  sidecar carries trimmed and otherwise verbatim, in place of the sentence the
+  engine generates. Omitted, the sidecar is written exactly as before, byte for
+  byte. The bound is 1,000 characters, counted as Unicode code points, since
+  the platforms' published limits run from 100 to 2,000 and a smaller field
+  would cut what a person pastes into it. An empty or blank `alt` is refused
+  with a sentence saying to omit it, and one over the bound is refused with the
+  count and the 1,000 in the sentence.
+- **`export.plan` takes a storyboard written as a list of beats** (issues 39
+  and 31). `ExportOptions.storyboard` was one of eight names. It is now a name
+  or a list of 1 to 16 beats, written as `export.storyboards` writes them, each
+  0.5 to 30 seconds and 90 seconds in all; each refusal has the `params` kind
+  and names the beat and the field (`storyboard[3].secs`). A list's first beat
+  names its view and opens on it with no transition, its plan says `custom`,
+  and its sidecar describes the views it visits rather than naming a
+  storyboard. A list's first beat also names its clock unless it sweeps a span
+  rather than a number of hours, because a capture that starts wherever the
+  page's clock happened to be is not reproducible, and the desktop app refuses
+  that plan. A named storyboard given `view` or `at` now opens on them, with
+  the page's address and the first beat agreeing, which closes issue 31:
+  before, the reel opened on the requested view and then morphed away from it,
+  and a client checking the address's clock checked a time the reel never
+  showed. The eight names plan exactly as before, and `bluesky-video`'s size
+  limit is now Bluesky's own 300 MB, where 50 MB refused a long export at high
+  quality after its capture had run.
+- **`render.stage` describes the stage it drew** (issue 54). Beside `svg` and
+  `counts` it answers a `description` (`StageDescription`), from which the
+  desktop app writes the text alternative of its geographic pane: for each
+  line its two ends (one for a loop), its stations in order, where it meets
+  other lines, and its branches with the station each leaves at, every name
+  the one the map draws. Given the project's service day as the new optional
+  `RenderStageParams.date`, each line also carries its commonest trip that day
+  in whole minutes (its trips grouped by their first and last mapped calls,
+  ties broken by the group with more trips, then the shorter median, then the
+  names; half a minute rounds up), and `extent` is the longest of them;
+  without a day both are null and no timetable is read. The minutes are cached
+  per layout and day and `map.build` fills that cache, so a description after
+  a draw does not read the timetable again. The cache is kept for the life of
+  the process, so after a forced re-layout under the same id a day's minutes
+  are those of the previous set until that day is drawn again. The SVG and the
+  counts are unchanged, and `RenderStageResult.description` is required.
+- **`map.build` can name a line and hide one** (issue 42, its first half).
+  `map.build` takes `lines`, keyed by line label, each value an optional
+  `name` (1 to 40 characters with no line break) and an optional `hidden`
+  flag, described in the schema as `LineOptions`; a label the layout does not
+  carry is ignored, as `colors` ignores one. A name is written where the page
+  writes a line's label (its chip, its row and the time chart's band, the
+  trains' titles, and the A to Z sort) through a new `data.names`, sent only
+  when there is a name, so `data.lines` stays the colour lookup it was; the
+  SVG writes no line text and the sidecar counts lines rather than naming
+  them. A hidden line is taken off the line graph before anything reads it,
+  so it has no track, no trips, no chip, row or band and no colour in either
+  thumbnail; a station only it served is not drawn, one that was an
+  interchange only because of it is drawn as a plain station, and the lines
+  it shared track with close up over its place. The service day is still
+  counted over every line, hiding every line is refused, nothing stored
+  changes and `render.stage` still shows every line. With `lines` omitted the
+  map, the positions file and the page's data are byte-identical.
+- **An export can carry a caption, and the clock can sit in any corner**
+  (issue 40). `ExportOptions` gained `caption`, 1 to 80 characters on one
+  line, which the page draws as text under the title, and `clock_corner`,
+  which keeps the clock bottom right by default as before, except on the reel
+  and the story, where it now defaults to top right: there bottom right is
+  refused (the reel's button rail, the story's bottom zone) and bottom left
+  comes with a note. The safe zones became a dated table in `export.py` that
+  the plan writes onto the page's address and the page draws from, so the
+  preview's bottom zone is 35% where it was 22%, and on the reel and the story
+  the name block, the clock and the map now sit below Instagram's top zone.
+  Every other preset's address and pixels are unchanged, and `ExportOptions`
+  and `CaptureJob` gained the two fields.
+- **`bin/audit-page`** runs axe over an animation page in both themes, with
+  `@axe-core/playwright` as the site's one new development dependency
+  (issue 34).
+
+### Changed
+
+- **An accessibility pass over the animation page's header** (issue 34). axe
+  reported nothing on the page as it stood, so the pass was done by keyboard
+  and from the browser's own accessibility tree, and what it found was fixed
+  in the header. Play and Pause now say what they do and announce the change
+  once, politely, and the scrub reads as a time. Every control shows a 2px
+  focus ring that clears 3:1 in both themes (the line chips had fallen back
+  on the browser's own ring, and the view switcher's was cut off by its
+  group). A line chip's dot whose colour fails 3:1 against the ground gets a
+  ring in that theme, and a held key on a chip counts as one press. Under
+  reduced motion the trains start paused and a view change lands at once,
+  while present mode and every export are unchanged. With the pressed state
+  gone from the Play button, its word is drawn muted while playing, as the
+  header's other buttons are.
+
+### Fixed
+
+- **The page's Linear and Time views show the lines in the order `map.build`
+  was given** (issue 63). They had sorted their rows A to Z whatever
+  `line_order` said, so rearranging a project's lines moved nothing in either
+  view, in the page or in an export's frames. A map built with an order now
+  carries it to the page as `arranged` in the layout, and the Sort group gains
+  a third button, "As arranged", pressed on load and not drawn when there is
+  no order, on fine and coarse pointers alike, so the rows start in that order
+  in both views and in every export; A to Z and Stations are as they were. A
+  map built without an order writes no `arranged`, and its page data and every
+  frame are unchanged by a byte (the page's numeric A to Z of "1", "2", "10"
+  stays its own, not the engine's "1", "10", "2").
+
+The schema's bytes moved (`MapBuildParams.style` and `.lines`,
+`Provenance.alt`, `ExportOptions.storyboard`, `.caption` and `.clock_corner`,
+`StoryboardBeat`, `CaptureJob`, `RenderStageParams.date`,
+`RenderStageResult.description`), all additive at protocol 1. The Pittsburgh
+snapshot's `page_without_data` was re-pinned once for the page changes of
+issues 42, 40, 34 and 63; its `svg`, `data_without_lines` and `lines` did not
+move.
+
 ## [0.11.0] - 2026-10-06
 
 ### Added

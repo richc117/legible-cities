@@ -178,7 +178,7 @@ Writes `out/la-metro-rail.svg`, `out/la-metro-rail.html` and
 time-of-day scrubber, playback speeds, per-line toggles, a four-way view
 switcher &mdash; **Geographic** (where the track actually runs), **Schematic**
 (straightened onto the 45&deg; grid), **Linear**, which unfolds the map into one
-row per line (sortable by name or station count), and **Time**, which plots the
+row per line (sortable as arranged, by name or by station count), and **Time**, which plots the
 whole service day as a Marey chart &mdash; and a
 **Labels** button that hides the station names — dense networks read far better without
 them when you are watching the trains, and hiding them also tightens the view
@@ -188,7 +188,10 @@ A line's colour is an input, resolved once for the map and the page
 together: `pipeline.run(..., colors={"A": "#123456"})` overrides one line's
 colour over the feed's own `route_color`, `default_color="#888888"` is the
 colour of a line the feed leaves uncoloured, and `line_order=["A", "B"]` is
-the stacking on shared track. Every line the map draws has an entry in the
+the stacking on shared track and the order of the page's rows in the Linear
+and Time views, and `style=Style(line_width=12)` (or `map.build`'s `style`
+object over the sidecar) the widths, radii, label size and padding the map is
+drawn with. Every line the map draws has an entry in the
 page's `data.lines` in the colour it was drawn, so the chips, the train dots
 and the time chart never fall back on their own; a colour is written
 `#rrggbb` or refused; an override for a line the layout does not carry is
