@@ -845,6 +845,241 @@ def test_every_control_has_a_role_a_name_a_ring_and_a_state_in_both_themes(tmp_p
                     assert _rgb(tokens[showing]["text"]) in dot["shadow"] and "1px" in dot["shadow"]
 
 
+# ---------------------------------------------------------- the rows' order
+#
+# Issue 63. `map.build` takes a line order and the engine lays the lines out in
+# it, but the page sorted its rows A-Z whatever the data said. The page is now
+# told, by `arranged`, only when the map was built with an order, and then shows
+# a third sort, pressed by default. These pages hold four lines whose three
+# orders all differ: Python sorts the labels 1, 10, 2, B (the order an unordered
+# map's layout is written in), the page's own A-Z reads 1, 2, 10, B, and by
+# station count they run 10, 1, 2, B.
+
+NUMBERED = {"1": 3, "2": 3, "10": 4, "B": 2}
+ENGINES = ["1", "10", "2", "B"]
+A_TO_Z = ["1", "2", "10", "B"]
+BY_SIZE = ["10", "1", "2", "B"]
+
+
+def _numbered_page(into: Path, line_order: list[str] | None = None):
+    """The page of ``NUMBERED``'s lines, built with ``line_order``, and the
+    animation it was written from."""
+    features, trips = [], []
+    seven = 7 * 3600
+    for i, (label, size) in enumerate(NUMBERED.items()):
+        for j in range(size):
+            features.append({"type": "Feature",
+                             "geometry": {"type": "Point", "coordinates": [30.0 * i, 10.0 * j]},
+                             "properties": {"id": f"n{i}_{j}", "station_id": f"S{i}_{j}",
+                                            "station_label": f"Stop {i}.{j}"}})
+        for j in range(size - 1):
+            features.append({"type": "Feature",
+                             "geometry": {"type": "LineString",
+                                          "coordinates": [[30.0 * i, 10.0 * j],
+                                                          [30.0 * i, 10.0 * (j + 1)]]},
+                             "properties": {"from": f"n{i}_{j}", "to": f"n{i}_{j + 1}",
+                                            "lines": [{"id": label, "label": label,
+                                                       "color": "0072bc"}]}})
+        trips.append(Trip(f"t{i}", label, "end",
+                          [Call(f"S{i}_{j}", f"n{i}_{j}", seven + j * 120, seven + j * 120 + 20)
+                           for j in range(size)]))
+    network = LineGraph.from_geojson({"type": "FeatureCollection", "features": features})
+    drawn = render(network, title="Numbered")
+    animation = animate.build(drawn, network, trips, dt.date(2026, 9, 10), line_order=line_order)
+    _, html = animate.write(animation, drawn.svg, into, stem="numbered", name="Numbered")
+    return html.as_uri(), animation
+
+
+@pytest.mark.parametrize("order, arranged", [
+    (None, None),                          # no order was given
+    ([], None),                            # an empty one is none
+    (["X", "Y"], None),                    # names no line the layout carries
+    (["10", "B"], ["10", "B", "1", "2"]),  # two of four, the rest as the engine has them
+    (["Z", "B", "B"], ["B", "1", "10", "2"]),  # what is unknown or repeated counts once
+    (["2", "1", "10", "B"], ["2", "1", "10", "B"]),
+])
+def test_the_page_is_told_of_an_arrangement_only_when_the_map_was_built_with_one(
+        tmp_path, order, arranged):
+    _, animation = _numbered_page(tmp_path, order)
+    linear = animation.to_json()["linear"]
+    if arranged is None:
+        # Nothing is written, so an unordered map's page data is what it was.
+        assert "arranged" not in linear, linear.get("arranged")
+        assert set(linear) == {"columns", "lines", "names"}
+        # What the page would otherwise have mistaken for an arrangement: the
+        # engine's own order, which is not the page's A-Z.
+        assert [line["label"] for line in linear["lines"]] == ENGINES
+    else:
+        assert linear["arranged"] == arranged
+        # It is the order the layout is in, not a second opinion.
+        assert [line["label"] for line in linear["lines"]] == arranged
+
+
+# Opens one page in both themes and reads the row order the way a person sees it:
+# the line names down the left, by their height, once the page has settled. It
+# presses the Sort group's buttons through the Linear and Time views, and walks
+# the Sort group by Tab for what each button is called, says and rings.
+SORTING = BROWSER + r"""
+const rows = page => page.evaluate(() => [...document.querySelectorAll("#linear-names text.rowname")]
+  .map(t => [+t.getAttribute("y"), t.textContent]).sort((a, b) => a[0] - b[0]).map(p => p[1]));
+const settle = page => page.evaluate(() => window.__present.settle());
+const sortState = page => page.evaluate(() => {
+  const group = document.getElementById("sort-group");
+  const state = {};
+  for (const b of group.querySelectorAll("button")) {
+    state[b.id] = { pressed: b.getAttribute("aria-pressed"), shown: b.getClientRects().length > 0 };
+  }
+  return { group: group.getClientRects().length > 0, buttons: state };
+});
+main(async browser => {
+  const out = {};
+  for (const theme of ["warm-dark", "sepia"]) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                           reducedMotion: "no-preference" });
+    const page = await ctx.newPage();
+    const cdp = await ctx.newCDPSession(page);
+    const axNode = async expression => {
+      const { result } = await cdp.send("Runtime.evaluate", { expression });
+      const { nodes } = await cdp.send("Accessibility.getPartialAXTree",
+                                       { objectId: result.objectId, fetchRelatives: false });
+      return nodes[0];
+    };
+    const seen = { problems: [], steps: [], present: {}, stops: [] };
+    page.on("pageerror", e => seen.problems.push(e.message));
+    await page.goto(job.url + "?theme=" + theme, { waitUntil: "load" });
+    await ready(page);
+
+    const snap = async name => {
+      await settle(page);
+      seen.steps.push({ name, rows: await rows(page), ...(await sortState(page)) });
+    };
+    await snap("schematic");
+    await page.click("#view-linear");
+    await snap("linear");
+    await page.click("#view-string");
+    await snap("time");
+    await page.click("#sort-line");
+    await snap("time, A-Z");
+    await page.click("#view-linear");
+    await snap("linear, A-Z");
+    await page.click("#sort-size");
+    await snap("linear, Stations");
+    if (job.arranged) {
+      await page.click("#sort-arranged");
+      await snap("linear, as arranged");
+      await page.click("#view-string");
+      await snap("time, as arranged");
+    }
+
+    // The Sort group by keyboard, from the control before it: what each button
+    // is, is called, shows and rings, as the browser's own accessibility tree has it.
+    await page.click("#view-linear");
+    await page.focus("#labels-toggle");
+    const group = await axNode("document.getElementById('sort-group')");
+    seen.group = { role: group.role.value, name: group.name.value };
+    for (let i = 0; i < 2 + (job.arranged ? 1 : 0); i++) {
+      await page.keyboard.press("Tab");
+      const info = await page.evaluate(() => {
+        const el = document.activeElement, cs = getComputedStyle(el);
+        return { id: el.id, text: el.textContent.trim(),
+                 outline: [cs.outlineStyle, cs.outlineWidth, cs.outlineColor] };
+      });
+      const node = await axNode("document.activeElement");
+      info.role = node.role.value;
+      info.name = node.name.value.trim();
+      info.props = (node.properties || []).map(p => p.name);
+      seen.stops.push(info);
+    }
+
+    // What an export opens: the page in present mode, a view on its address.
+    for (const view of ["linear", "time"]) {
+      await page.goto(job.url + "?present=1&theme=" + theme + "&view=" + view, { waitUntil: "load" });
+      await ready(page);
+      await settle(page);
+      seen.present[view] = await rows(page);
+    }
+    out[theme] = seen;
+    await ctx.close();
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+def _sorted_rows(tmp_path, order):
+    url, _ = _numbered_page(tmp_path, order)
+    seen = _run(SORTING, {"url": url, "arranged": order is not None})
+    tokens = _tokens(PAGE.read_text(encoding="utf-8"))
+    for theme, run in seen.items():
+        assert not run["problems"], (theme, run["problems"])
+        # Whatever the order, a button the page shows is one a person can name,
+        # press and see: a role, a name that is its text, a state, the page's ring.
+        for stop in run["stops"]:
+            assert (stop["role"], stop["name"]) == ("button", stop["text"]), (theme, stop)
+            assert "pressed" in stop["props"], (theme, stop)
+            assert tuple(stop["outline"]) == ("solid", "2px", _rgb(tokens[theme]["focus"])), (
+                theme, stop["id"], stop["outline"])
+        assert run["group"] == {"role": "group", "name": "Sort"}, run["group"]
+    return seen
+
+
+@needs_browser
+def test_a_map_built_with_an_order_lists_its_rows_as_arranged_and_the_other_sorts_still_work(tmp_path):
+    order = ["B"]
+    arranged = ["B", "1", "10", "2"]      # the one named, then the engine's own order
+    assert arranged not in (A_TO_Z, BY_SIZE, ENGINES), "the test's lines no longer tell the orders apart"
+    for theme, run in _sorted_rows(tmp_path, order).items():
+        steps = {s["name"]: s for s in run["steps"]}
+        pressed = lambda s: {k: v["pressed"] for k, v in s["buttons"].items()}
+        as_arranged = {"sort-arranged": "true", "sort-line": "false", "sort-size": "false"}
+
+        # On a view change, and in every view the page has: the arrangement, with the
+        # third button there, pressed and visible. In the schematic nothing is sorted
+        # and the whole group is out of sight, as it always was.
+        assert not steps["schematic"]["group"]
+        for name in ("linear", "time"):
+            assert steps[name]["rows"] == arranged, (theme, name, steps[name]["rows"])
+            assert steps[name]["group"] and pressed(steps[name]) == as_arranged, (theme, name)
+            assert steps[name]["buttons"]["sort-arranged"]["shown"], (theme, name)
+        # A-Z and Stations take over, in the view they are pressed in and the other.
+        assert steps["time, A-Z"]["rows"] == A_TO_Z, steps["time, A-Z"]["rows"]
+        assert steps["linear, A-Z"]["rows"] == A_TO_Z
+        assert pressed(steps["linear, A-Z"]) == {"sort-arranged": "false", "sort-line": "true",
+                                                 "sort-size": "false"}
+        assert steps["linear, Stations"]["rows"] == BY_SIZE, steps["linear, Stations"]["rows"]
+        assert pressed(steps["linear, Stations"]) == {"sort-arranged": "false", "sort-line": "false",
+                                                      "sort-size": "true"}
+        # And As arranged brings the arrangement back.
+        for name in ("linear, as arranged", "time, as arranged"):
+            assert steps[name]["rows"] == arranged, (theme, name, steps[name]["rows"])
+            assert pressed(steps[name]) == as_arranged
+        # An export opens the page in present mode on a view and presses nothing.
+        assert run["present"] == {"linear": arranged, "time": arranged}, run["present"]
+        # The Sort group by keyboard: As arranged leads, then A-Z and Stations, as named.
+        assert [s["name"] for s in run["stops"]] == ["As arranged", "A–Z", "Stations"]
+
+
+@needs_browser
+def test_a_map_built_without_an_order_lists_its_rows_a_to_z_and_has_no_third_button(tmp_path):
+    assert A_TO_Z != ENGINES, "the test's lines no longer tell the engine's order from A-Z"
+    for theme, run in _sorted_rows(tmp_path, None).items():
+        steps = {s["name"]: s for s in run["steps"]}
+        pressed = lambda s: {k: v["pressed"] for k, v in s["buttons"].items()}
+        a_to_z = {"sort-arranged": "false", "sort-line": "true", "sort-size": "false"}
+
+        # The engine wrote its lines 1, 10, 2, B; the page reads them 1, 2, 10, B, as it always did.
+        for name in ("linear", "time"):
+            assert steps[name]["rows"] == A_TO_Z, (theme, name, steps[name]["rows"])
+            assert steps[name]["group"] and pressed(steps[name]) == a_to_z, (theme, name)
+            # The third button is not on show, and is not what is pressed.
+            assert not steps[name]["buttons"]["sort-arranged"]["shown"], (theme, name)
+        assert steps["linear, Stations"]["rows"] == BY_SIZE
+        assert steps["linear, A-Z"]["rows"] == A_TO_Z
+        assert run["present"] == {"linear": A_TO_Z, "time": A_TO_Z}, run["present"]
+        # The Sort group is what it was: two buttons, with the names they had.
+        assert [s["name"] for s in run["stops"]] == ["A–Z", "Stations"]
+
+
 # ---------------------------------------------------------------- service days
 
 # Two presets, so no test reads the person's own feeds: site.export() is given

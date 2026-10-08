@@ -364,6 +364,14 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
         for n in graph.stations if n.station_label
     }
 
+    # Whether the map was built with an order. The layout is always in some
+    # order, but without one it is Python's sort of the labels, not the page's
+    # A-Z ("10" before "2"), so the page cannot tell an arrangement from an
+    # accident. It is told only when the order names a line the layout carries,
+    # and an unordered map's data stays what it was, byte for byte.
+    if {line.label for line in layout.lines}.intersection(line_order or ()):
+        layout_json["arranged"] = [line.label for line in layout.lines]
+
     # The colours the map was drawn in, every line included: the page's
     # chips, dots and chart read this and never fall back on their own, so
     # an uncoloured line looks the same in all four places.

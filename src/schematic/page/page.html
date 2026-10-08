@@ -383,6 +383,7 @@ __SOCIAL__
         <button id="labels-toggle" aria-pressed="true">Labels</button>
         <span class="sort" id="sort-group" role="group" aria-label="Sort" hidden>
           <span class="panel-label">Sort</span>
+          <button id="sort-arranged" aria-pressed="false" hidden>As arranged</button>
           <button id="sort-line" aria-pressed="true">A&ndash;Z</button>
           <button id="sort-size" aria-pressed="false">Stations</button>
         </span>
@@ -1335,12 +1336,19 @@ __SOCIAL__
       : mode === "string" ? "time" : mode;
 
   const sortBtns = {
+    arranged: document.getElementById("sort-arranged"),
     line: document.getElementById("sort-line"),
     size: document.getElementById("sort-size"),
   };
   const sized = new Map(layout.lines.map(l => [l.label, l.stations]));
+  // The order the map was built with, which the engine writes only when it was
+  // given one. Without it there is nothing to follow: the third sort stays
+  // hidden and the rows start A-Z, as they always did.
+  const arrangedAt = new Map((layout.arranged || []).map((l, i) => [l, i]));
+  const at = l => arrangedAt.has(l) ? arrangedAt.get(l) : arrangedAt.size;
   const applySort = how => {
     const sorted = order.slice().sort((a, b) =>
+      how === "arranged" ? (at(a) - at(b)) || display(a).localeCompare(display(b), undefined, { numeric: true }) :
       how === "size" ? (sized.get(b) - sized.get(a)) || display(a).localeCompare(display(b))
                      : display(a).localeCompare(display(b), undefined, { numeric: true }));
     sorted.forEach((label, i) => rowTarget.set(label, i));
@@ -1348,9 +1356,11 @@ __SOCIAL__
       sortBtns[k].setAttribute("aria-pressed", String(k === how)));
     dirty = true;
   };
+  sortBtns.arranged.onclick = () => applySort("arranged");
   sortBtns.line.onclick = () => applySort("line");
   sortBtns.size.onclick = () => applySort("size");
-  applySort("line");
+  sortBtns.arranged.hidden = arrangedAt.size === 0;
+  applySort(arrangedAt.size ? "arranged" : "line");
   for (const entry of rowTarget) rowPos.set(entry[0], entry[1]);
 
   const lines = document.getElementById("line-toggles");
