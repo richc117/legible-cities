@@ -2263,6 +2263,49 @@ def test_every_rows_name_reads_whatever_colour_its_feed_publishes():
                     f"{ratio:.2f}:1 on {ground} in {theme}")
 
 
+
+def _chart_opacities(page: str) -> tuple[float, float]:
+    """The chart's two constants, the termini's and the hours', as the page has them."""
+    found = dict(re.findall(r"\n  const (CHART_(?:NAME|AXIS)_OPACITY) = ([\d.]+);", page))
+    assert set(found) == {"CHART_NAME_OPACITY", "CHART_AXIS_OPACITY"}, found
+    return float(found["CHART_NAME_OPACITY"]), float(found["CHART_AXIS_OPACITY"])
+
+
+def _blend(colour: str, ground: str, opacity: float) -> str:
+    """``colour`` drawn at ``opacity`` over ``ground``, a channel at a time, as
+    the browser composites it: ground + (colour - ground) * opacity."""
+    def channel(i: int) -> int:
+        under, over = int(ground[i:i + 2], 16), int(colour[i:i + 2], 16)
+        return round(under + (over - under) * opacity)
+    return "#" + "".join(f"{channel(i):02x}" for i in (1, 3, 5))
+
+
+def _faint(tokens: dict[str, dict[str, str]], opacity: float) -> tuple[float, str, str]:
+    """The worst ratio --map-label at ``opacity`` reads at, over every ground of
+    both themes, and where."""
+    return min((_contrast(_blend(token["map-label"], token[ground], opacity), token[ground]),
+                theme, ground) for theme, token in tokens.items() for ground in MAP_GROUNDS)
+
+
+def test_the_charts_faint_text_reads_on_every_ground_and_stays_under_the_rows_names():
+    """The termini (11px) and the hours (13px) are small text, so 4.5:1, on the
+    ground an export shows and on the card, in both themes. Each opacity is the
+    smallest hundredth that clears it, so the chart stays as quiet as it can; the
+    termini are no stronger than the hours, and neither is stronger than a row's
+    name, which is the label colour at full strength."""
+    page = PAGE.read_text(encoding="utf-8")
+    tokens = _tokens(page)
+    names, hours = _chart_opacities(page)
+    assert 't.setAttribute("opacity", CHART_NAME_OPACITY);' in page
+    assert 'lab.setAttribute("opacity", CHART_AXIS_OPACITY);' in page
+    for what, opacity in (("the termini", names), ("the hours", hours)):
+        ratio, theme, ground = _faint(tokens, opacity)
+        assert ratio >= 4.5, f"{what} at {opacity} read at {ratio:.2f}:1 on {ground} in {theme}"
+        fainter = round(opacity - 0.01, 2)
+        assert _faint(tokens, fainter)[0] < 4.5, f"{what} would read at {fainter} as well"
+    assert names <= hours <= 1, (names, hours)
+
+
 # Opens the hand-made page in each theme, stops its clock, and in each of the
 # four views, settled, reads the rows' names and swatches, the chart's two faint
 # texts, and where everything else in the network was drawn.
@@ -2327,6 +2370,7 @@ def test_the_rows_names_are_in_the_label_colour_with_a_swatch_in_the_time_view(t
     seen = _run(ROWS, {"url": _hand_made_page(tmp_path)})
     tokens = _tokens(PAGE.read_text(encoding="utf-8"))
     stroke = Style().line_width                     # what the hand-made map is drawn with
+    chart_names, chart_hours = _chart_opacities(PAGE.read_text(encoding="utf-8"))
     for theme, run in seen.items():
         assert not run["problems"], (theme, run["problems"])
         views = run["views"]
@@ -2350,6 +2394,11 @@ def test_the_rows_names_are_in_the_label_colour_with_a_swatch_in_the_time_view(t
                      "linear": ("1.00", "0.00"), "time": ("1.00", "1.00")}[view]
             assert {(n["opacity"], s["opacity"]) for n, s in zip(names, swatches)} == {shown}, (theme, view)
         assert run["hidden"] == [["A", True, True], ["B", False, False], ["C", True, True]], theme
+        # The chart's termini, two to a band, and its hours, at the page's two constants.
+        chart = views["time"]["chart"]
+        assert len(chart["names"]) == 2 * len(WEAK) and chart["hours"], (theme, chart)
+        assert {float(o) for o in chart["names"]} == {chart_names}, (theme, chart["names"])
+        assert {float(o) for o in chart["hours"]} == {chart_hours}, (theme, chart["hours"])
     # Nothing a theme draws moves anything: the same coordinates in both, view by view.
     for view in seen["warm-dark"]["views"]:
         assert seen["warm-dark"]["views"][view]["drawn"] == seen["sepia"]["views"][view]["drawn"], view

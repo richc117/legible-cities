@@ -880,6 +880,15 @@ __SOCIAL__
   // Each route's trips are concatenated into one path in band-local space, so
   // re-sorting only moves a group transform rather than rebuilding 8,000
   // subpaths. Drawn faintly: where the diagonals crowd, that is frequency.
+  //
+  // The chart's own text is fainter than the rows' names: the termini beside
+  // each band and the hours above it are --map-label at these opacities. Each
+  // is the smallest hundredth at which that clears 4.5:1 on both grounds of
+  // both themes, the --bg an export shows and the card's --map-bg, and the
+  // termini are never stronger than the hours (issue 59; a test reads these
+  // two lines and works the ratios out from the stylesheet).
+  const CHART_NAME_OPACITY = 0.65;
+  const CHART_AXIS_OPACITY = 0.65;
   const stringLayer = document.createElementNS(NS, "g");
   stringLayer.setAttribute("id", "stringline");
   stringLayer.setAttribute("opacity", "0");
@@ -1030,7 +1039,7 @@ __SOCIAL__
           t.setAttribute("text-anchor", "end");
           t.setAttribute("font-size", "11");
           t.setAttribute("fill", "var(--map-label, #111)");
-          t.setAttribute("opacity", "0.6");
+          t.setAttribute("opacity", CHART_NAME_OPACITY);
           t.textContent = nm;
           g.appendChild(t);
         });
@@ -1057,7 +1066,7 @@ __SOCIAL__
       lab.setAttribute("text-anchor", "middle");
       lab.setAttribute("font-size", "13");
       lab.setAttribute("fill", "var(--map-label, #111)");
-      lab.setAttribute("opacity", "0.55");
+      lab.setAttribute("opacity", CHART_AXIS_OPACITY);
       lab.textContent = String(Math.floor(t / 3600) % 24).padStart(2, "0") + ":00";
       axisLayer.appendChild(lab);
     }
