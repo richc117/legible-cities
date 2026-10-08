@@ -56,9 +56,9 @@ __SOCIAL__
   a:focus-visible, button:focus-visible, input:focus-visible, .chip:focus-visible {
     outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px;
   }
-  /* Said to a screen reader and drawn nowhere: the one live region, below. Out of
-     the flow, so it adds no gap to the bar it sits in and no height to the
-     header. */
+  /* Said to a screen reader and drawn nowhere: the one live region, below, and
+     the map's description. Out of the flow, so it adds no gap to the bar it sits
+     in, no height to the header and nothing to the stage. */
   .sr-only {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
     overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
@@ -528,6 +528,93 @@ __SOCIAL__
   const order = layout.lines.map(l => l.label);
   const rowPos = new Map(order.map((l, i) => [l, i]));
   const rowTarget = new Map(rowPos);
+
+  // ------------------------------------------------------------ the map in words
+  // What a screen reader is told of the drawing (engine issue 61): an image whose
+  // name is the network's and its count of lines, and whose description is one
+  // paragraph composed here from the layout the rows are drawn from:
+  //
+  //   "A from Stop 4 to Stop 0, 5 stations."  A sentence a line, in the order its
+  //     rows open in. The ends are the first and last named stations of its
+  //     spine; "branching" is said when a row forks off that spine, and "in 2
+  //     pieces" when a row is a part of the line that meets the rest nowhere.
+  //   "The lines meet at Stop 2 and Stop 5."  The stations on two lines or more,
+  //     those on the most lines first, up to eight and then a count.
+  //   "Trains move along the lines as the clock runs, and the controls above the
+  //     map change the view."
+  //
+  // Everything drawn inside the SVG is hidden from the tree: the station and row
+  // names, and the trains, which come and go every frame. An image's children are
+  // presentational, but Chromium keeps them in its own tree and leaves pruning
+  // them to each platform, so each layer is hidden outright, and a train is born
+  // inside #trains, hidden. Called once, at the end of boot, when every layer is
+  // in the SVG.
+  //
+  // It describes the network, which nothing on the page changes: hiding a line
+  // (a chip, setRoutes), changing the view or turning the labels off changes what
+  // is drawn, so nothing rewrites the paragraph, and it says nothing of what is
+  // hidden. It goes after the SVG inside #stage and is sr-only, out of the flow,
+  // so the stage lays the SVG out exactly as before and no frame moves.
+  function describeMap() {
+    const stationName = layout.names || {};
+    // A node the map draws no dot for is a junction LOOM inserted, not a station.
+    const named = n => mapXY.has(n) && stationName[n];
+    const count = (n, word) => n + " " + word + (n === 1 ? "" : "s");
+    // As arranged where the map was built with an order, else the page's A-Z.
+    const reading = layout.arranged ? layout.lines.slice() : layout.lines.slice().sort((a, b) =>
+      display(a.label).localeCompare(display(b.label), undefined, { numeric: true }));
+    const linesAt = new Map();       // station node -> the lines whose rows hold it
+    const sentences = reading.map(line => {
+      const stations = new Set();
+      for (const row of line.rows) {
+        for (const pair of row.nodes) {
+          if (!mapXY.has(pair[0])) continue;
+          stations.add(pair[0]);
+          if (!linesAt.has(pair[0])) linesAt.set(pair[0], new Set());
+          linesAt.get(pair[0]).add(line.label);
+        }
+      }
+      const ends = ((line.rows[0] || {}).nodes || []).map(p => p[0]).filter(named)
+        .map(n => stationName[n]);
+      const from = ends[0], to = ends[ends.length - 1];
+      const where = from && from !== to ? " from " + from + " to " + to : from ? " at " + from : "";
+      // A branch starts a column past its junction; a row at column 0 is a piece
+      // of the line on its own (NYC's three shuttles), which is no branch.
+      const off = line.rows.filter(r => r.depth > 0 && r.nodes.length);
+      const branching = off.some(r => r.nodes[0][1] > 0);
+      const pieces = 1 + off.filter(r => r.nodes[0][1] === 0).length;
+      return display(line.label) + where + (branching ? ", branching" : "")
+        + (pieces > 1 ? ", in " + pieces + " pieces" : "") + ", "
+        + count(stations.size, "station") + ".";
+    });
+    if (reading.length > 1) {
+      // Sorted stably, so stations on as many lines keep the order they are read in.
+      const meet = [...linesAt].filter(e => e[1].size > 1 && named(e[0]))
+        .sort((a, b) => b[1].size - a[1].size).map(e => stationName[e[0]])
+        .filter((name, i, all) => all.indexOf(name) === i);
+      const SHOWN = 8;
+      const listed = meet.slice(0, SHOWN);
+      if (meet.length > SHOWN) listed.push((meet.length - SHOWN) + " more");
+      sentences.push(!listed.length ? "No two lines share a station."
+        : "The lines meet at " + (listed.length > 1
+          ? listed.slice(0, -1).join(", ") + " and " + listed[listed.length - 1] : listed[0]) + ".");
+    }
+    sentences.push("Trains move along the lines as the clock runs, and the controls above the map change the view.");
+
+    const paragraph = document.createElement("p");
+    paragraph.id = "map-description";
+    paragraph.className = "sr-only";
+    paragraph.textContent = sentences.join(" ");
+    svg.after(paragraph);
+    // "Map of", not "Schematic map of": the same image is the geographic view,
+    // the rows and the time chart, and the name stays put while it changes.
+    const network = document.querySelector("h1").textContent.trim();
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label",
+      (network ? "Map of " + network : "Map") + ", " + count(layout.lines.length, "line"));
+    svg.setAttribute("aria-describedby", "map-description");
+    for (const layer of svg.children) layer.setAttribute("aria-hidden", "true");
+  }
 
   const linXY = (label, node) => {
     const c = cell.get(label + " " + node);
@@ -1498,6 +1585,7 @@ __SOCIAL__
   };
   lineCount.textContent = routes.length + " of " + routes.length;
 
+  describeMap();
   setMode("map");
   setMore(window.innerWidth > 900);
   addEventListener("resize", () => { dirty = true; });

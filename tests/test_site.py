@@ -1913,3 +1913,236 @@ def test_the_label_that_shows_on_the_schematic_map_keeps_the_halo_the_renderer_g
                 label = shown["label"]
                 assert not label["haloed"] and label["stroke"] == "none", (theme, mode, view, label)
                 assert shown["census"]["haloed"] == 0 and shown["census"]["strayStrokes"] == 0, shown
+
+
+# ------------------------------------------------------------ the map in words
+#
+# Engine issue 61. The map reached a screen reader as one unnamed drawing: every
+# station name a text run in no order, and every train a symbol created and
+# removed as it came and went. The SVG is now an image with a name and a
+# description, a paragraph the page composes from its own layout, and what is
+# drawn inside it is hidden from the tree. The first test reads the template;
+# the others open pages drawn here and read the browser's full accessibility
+# tree over the debugging protocol, which is the tree the issue was measured in.
+
+def _describe_map() -> str:
+    page = PAGE.read_text(encoding="utf-8")
+    start = page.index("  function describeMap() {")
+    return page[start:page.index("\n  }\n", start)]
+
+
+def test_the_page_describes_its_map_once_from_the_layout_it_already_has(tmp_path):
+    page, body = PAGE.read_text(encoding="utf-8"), _describe_map()
+    # From the layout the rows are drawn from, each line by the name the page writes for it.
+    for read in ("layout.lines", "layout.arranged", "line.rows", "layout.names", "mapXY",
+                 "display(line.label)"):
+        assert read in body, read
+    # An image, named and described by the paragraph, with everything drawn inside it hidden.
+    assert 'svg.setAttribute("role", "img");' in body
+    assert 'svg.setAttribute("aria-describedby", "map-description");' in body
+    assert 'paragraph.id = "map-description";' in body
+    assert 'paragraph.className = "sr-only";' in body
+    assert 'for (const layer of svg.children) layer.setAttribute("aria-hidden", "true");' in body
+    # Written once: one call, made once every layer is in the SVG, and nothing else
+    # writes the paragraph, so neither the frame loop nor a control rewrites it.
+    assert page.count("describeMap()") == 2, "the function and its one call"
+    call = page.index("\n  describeMap();\n")
+    assert call > page.index("svg.appendChild(defs);")
+    assert call > page.index("svg.insertBefore(stringLayer, trainsGroup);")
+    assert page.count("map-description") == 2 and page.count("paragraph.textContent") == 1
+    seam = page[page.index("window.__present = {"):page.index("__PRESENT__")]
+    assert "describeMap" not in seam and "map-description" not in seam
+    # The page's data did not grow to carry it: the keys an unnamed, unordered map writes.
+    _hand_made_page(tmp_path)
+    data = json.loads((tmp_path / "testville.positions.json").read_text(encoding="utf-8"))
+    assert set(data) == {"date", "lines", "linear", "paths", "trips", "geo"}
+    assert set(data["linear"]) == {"columns", "lines", "names"}
+
+
+# The SVG's node in the full tree, found by the element behind it so a page whose
+# SVG is not an image is read too, and every node under it by childIds, ignored
+# ones included. The clock is held and moved by hand: from 06:58 at 0.15 times
+# real time, each advance(600) is a minute and a half of the hand-made day, in
+# which its four trains enter and two of them leave.
+MAP_TREE = BROWSER + r"""
+const read = async (page, cdp) => {
+  await frames(page, 2);
+  const { result } = await cdp.send("Runtime.evaluate",
+                                    { expression: 'document.querySelector("#stage svg")' });
+  const { nodes: [own] } = await cdp.send("Accessibility.getPartialAXTree",
+                                          { objectId: result.objectId, fetchRelatives: false });
+  const { nodes } = await cdp.send("Accessibility.getFullAXTree");
+  const byId = new Map(nodes.map(n => [n.nodeId, n]));
+  const svg = nodes.find(n => n.backendDOMNodeId === own.backendDOMNodeId);
+  const below = [];
+  const walk = id => {
+    const n = byId.get(id);
+    if (!n) return;
+    below.push(n);
+    (n.childIds || []).forEach(walk);
+  };
+  (svg.childIds || []).forEach(walk);
+  const roles = {};
+  for (const n of below) {
+    const role = (n.role ? n.role.value : "?") + (n.ignored ? " (ignored)" : "");
+    roles[role] = (roles[role] || 0) + 1;
+  }
+  return { role: svg.role ? svg.role.value : "", name: svg.name ? svg.name.value : "",
+           description: svg.description ? svg.description.value : "",
+           size: below.length, roles,
+           // Chromium calls an SVG with nothing exposed inside it an image whatever its
+           // role; other browsers do not, so the attribute is read as well.
+           attribute: await page.evaluate(() => document.querySelector("#stage svg").getAttribute("role")),
+           trains: await page.evaluate(() => document.querySelectorAll("#trains .train").length) };
+};
+main(async browser => {
+  const out = [];
+  for (const run of job.pages) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                               reducedMotion: "no-preference" });
+    const page = await context.newPage();
+    const seen = { problems: [], reads: [] };
+    page.on("pageerror", e => seen.problems.push(e.message));
+    await page.goto(run.url, { waitUntil: "load" });
+    await ready(page);
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Accessibility.enable");
+    await page.evaluate(() => {
+      const P = window.__present;
+      P.setCapture(true); P.seek(6 * 3600 + 58 * 60); P.setSpeed(0.15); P.setPlaying(true);
+      P.settle();
+    });
+    seen.reads.push(await read(page, cdp));
+    for (let i = 0; i < run.advances; i++) {
+      await page.evaluate(() => { window.__present.advance(600); window.__present.settle(); });
+      seen.reads.push(await read(page, cdp));
+    }
+    out.push(seen);
+    await context.close();
+  }
+  return out;
+}).catch(fail);
+"""
+
+TESTVILLE = ("A from Stop 4 to Stop 0, 5 stations. B from Stop 5 to Stop 2, 2 stations. "
+             "C from Stop 6 to Stop 5, 2 stations. The lines meet at Stop 2 and Stop 5. "
+             "Trains move along the lines as the clock runs, and the controls above the map "
+             "change the view.")
+
+
+@needs_browser
+def test_the_map_is_one_named_and_described_image_and_its_trains_never_reach_the_tree(tmp_path):
+    [seen] = _run(MAP_TREE, {"pages": [{"url": _hand_made_page(tmp_path), "advances": 3}]})
+    assert not seen["problems"], seen["problems"]
+    first = seen["reads"][0]
+    print("the SVG in the tree:", first["role"], repr(first["name"]))
+    print("described as:", first["description"])
+    for r in seen["reads"]:
+        print(f"{r['trains']} trains drawn, {r['size']} nodes under the SVG: {r['roles']}")
+    assert (first["role"], first["attribute"]) == ("image", "img"), first
+    assert first["name"] == "Map of Testville, 3 lines", first["name"]
+    # Each line by its name, its ends and its stations, and where the lines meet.
+    for line in ("A", "B", "C"):
+        assert f"{line} from Stop " in first["description"], (line, first["description"])
+    assert "The lines meet at Stop 2" in first["description"]
+    assert first["description"] == TESTVILLE
+
+    # The trains came and went under the image, and nothing under it reached the
+    # tree or changed it: the same number of nodes at every read, none of them a
+    # text run or a train, none of them exposed.
+    trains = [r["trains"] for r in seen["reads"]]
+    assert len(set(trains)) > 1 and max(trains) > 0, f"no train came or went: {trains}"
+    for r in seen["reads"]:
+        assert r["size"] == first["size"], [(x["trains"], x["size"], x["roles"]) for x in seen["reads"]]
+        bare = {role.split(" ")[0] for role in r["roles"]}
+        assert not bare & {"StaticText", "graphics-symbol"}, r["roles"]
+        assert all(role.endswith("(ignored)") for role in r["roles"]), r["roles"]
+        assert (r["role"], r["name"], r["description"]) == (first["role"], first["name"], TESTVILLE)
+
+
+def _network_page(into: Path, stem: str, points: dict[str, tuple[float, float]],
+                  edges: list[tuple[str, str, list[str]]], *, junctions: tuple[str, ...] = (),
+                  names: dict[str, str] | None = None,
+                  line_order: list[str] | None = None) -> str:
+    """The page of a network drawn as given: every point a station named "Stop"
+    and its id but the ``junctions``, which stand for nodes LOOM inserts, and one
+    trip a line over the first edge listed for it, which joins two stations."""
+    feats = [{"type": "Feature", "geometry": {"type": "Point", "coordinates": list(xy)},
+              "properties": {"id": n} if n in junctions else
+              {"id": n, "station_id": "S" + n, "station_label": "Stop " + n}}
+             for n, xy in points.items()]
+    first: dict[str, tuple[str, str]] = {}
+    for a, b, labels in edges:
+        feats.append({"type": "Feature",
+                      "geometry": {"type": "LineString",
+                                   "coordinates": [list(points[a]), list(points[b])]},
+                      "properties": {"from": a, "to": b,
+                                     "lines": [{"id": label, "label": label, "color": "0072bc"}
+                                               for label in labels]}})
+        for label in labels:
+            first.setdefault(label, (a, b))
+    network = LineGraph.from_geojson({"type": "FeatureCollection", "features": feats})
+    drawn = render(network, title=stem)
+    seven = 7 * 3600
+    trips = [Trip("t" + label, label, "end",
+                  [Call("S" + a, a, seven, seven + 20), Call("S" + b, b, seven + 120, seven + 140)])
+             for label, (a, b) in first.items()]
+    animation = animate.build(drawn, network, trips, dt.date(2026, 9, 10),
+                              line_order=line_order, names=names)
+    _, html = animate.write(animation, drawn.svg, into, stem=stem.lower(), name=stem)
+    return html.as_uri()
+
+
+# P and Q share a run of ten stations; Y forks at y2, passes a junction LOOM put
+# in, and ends at s0, the one station on three lines and the last of the ten met
+# in reading order; S is two pieces, neither of them a branch. Y is called Rowan,
+# which puts it before S from A to Z.
+FORKS = {f"s{i}": (10.0 * i, 0.0) for i in range(10)}
+FORKS.update({"y0": (-40.0, 30.0), "y1": (-30.0, 20.0), "y2": (-20.0, 10.0), "j": (-10.0, 5.0),
+              "y3": (-20.0, 25.0), "z0": (0.0, 40.0), "z1": (10.0, 40.0), "z2": (30.0, 40.0),
+              "z3": (40.0, 40.0), "z4": (50.0, 40.0)})
+FORK_EDGES = ([(f"s{i}", f"s{i + 1}", ["P", "Q"]) for i in range(9)]
+              + [("y0", "y1", ["Y"]), ("y1", "y2", ["Y"]), ("y2", "j", ["Y"]), ("j", "s0", ["Y"]),
+                 ("y2", "y3", ["Y"]), ("z0", "z1", ["S"]), ("z2", "z3", ["S"]), ("z3", "z4", ["S"])])
+
+
+@needs_browser
+def test_the_description_follows_the_names_the_order_and_the_shape_of_the_lines(tmp_path):
+    def page(name: str, **kw) -> str:
+        return _network_page(tmp_path / name, name, FORKS, FORK_EDGES, junctions=("j",),
+                             names={"Y": "Rowan"}, **kw)
+
+    pages = [page("Forkton"), page("Arranged", line_order=["S", "Y"]),
+             _numbered_page(tmp_path / "numbered", None)[0],
+             _numbered_page(tmp_path / "ordered", ["2", "1", "10", "B"])[0]]
+    seen = _run(MAP_TREE, {"pages": [{"url": url, "advances": 0} for url in pages]})
+    assert not any(s["problems"] for s in seen), [s["problems"] for s in seen]
+    forks, arranged, numbered, ordered = (s["reads"][0] for s in seen)
+    for r in (forks, arranged, numbered, ordered):
+        print(r["name"], "--", r["description"])
+        assert (r["role"], r["attribute"], r["size"]) == ("image", "img", 0), r
+
+    sentences = forks["description"].split(". ")
+    assert forks["name"] == "Map of Forkton, 4 lines"
+    # A to Z by the name the page writes, so Rowan (Y) comes before S; no sentence says "Y".
+    assert [s.split(" ")[0] for s in sentences[:4]] == ["P", "Q", "Rowan", "S"], sentences
+    assert "Y " not in forks["description"]
+    p, _, rowan, s = sentences[:4]
+    # Its branch is said and its stations counted, the junction not among them.
+    assert ", branching, 5 stations" in rowan and "Stop s0" in rowan, rowan
+    assert p.endswith("10 stations") and "branching" not in p, p
+    # Two pieces are not a branch, and are said.
+    assert "branching" not in s and s.endswith(", in 2 pieces, 5 stations"), s
+    # Where the lines meet: the station on three lines first, eight named and the rest counted.
+    meet = sentences[4]
+    assert meet.startswith("The lines meet at Stop s0, ") and meet.endswith(" and 2 more"), meet
+    assert meet.count("Stop s") == 8, meet
+
+    # As arranged where the map was built with an order: the two named, then the rest.
+    assert [s.split(" ")[0] for s in arranged["description"].split(". ")[:4]] == ["S", "Rowan", "P", "Q"]
+    # Without one, the page's own A to Z, which is not the engine's 1, 10, 2, B.
+    assert [s.split(" ")[0] for s in numbered["description"].split(". ")[:4]] == A_TO_Z
+    assert [s.split(" ")[0] for s in ordered["description"].split(". ")[:4]] == ["2", "1", "10", "B"]
+    for r in (numbered, ordered):
+        assert r["name"] == "Map of Numbered, 4 lines"
+        assert "No two lines share a station." in r["description"], r["description"]
