@@ -1328,6 +1328,110 @@ def test_the_stage_ring_clears_three_to_one_on_the_page_and_on_the_maps_card():
             "{ -webkit-mask-image: none; mask-image: none; }") in squash
 
 
+# ------------------------------------------------------ the seam's Play button
+#
+# Issue 62. The header's Play button says what pressing it does and says "Playing"
+# or "Paused" once, but only its own handler did either: a script driving
+# `setPlaying` through the seam left the word and the announcement stale, and the
+# next press then did the opposite of what the button said. One function sets the
+# state, the word and the announcement; the button and the seam both call it.
+
+# The seam as the desktop app (viewer.ts) and the recorder (bin/_record.js) read it:
+# these names, in this order. A new method goes at the end, and into this list.
+SEAM = ["advance", "seek", "setCapture", "setPlaying", "setSpeed", "setView", "setGeo",
+        "showView", "hasGeo", "setLabels", "setRoutes", "setFrame", "setTheme", "settle",
+        "bounds", "onDraw", "state"]
+
+PLAYING = BROWSER + r"""
+main(async browser => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                         reducedMotion: "no-preference" });
+  const page = await ctx.newPage();
+  const cdp = await ctx.newCDPSession(page);
+  const out = { problems: [], steps: {} };
+  page.on("pageerror", e => out.problems.push(e.message));
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  out.seam = await page.evaluate(() => Object.keys(window.__present));
+
+  // What the header says, what the clock does, and the button's accessible name.
+  const look = async name => {
+    const first = await now(page);
+    await page.waitForTimeout(300);
+    const later = await now(page);
+    const header = await page.evaluate(() => ({
+      word: document.getElementById("play").textContent,
+      said: document.getElementById("announce").textContent }));
+    const { result } = await cdp.send("Runtime.evaluate",
+      { expression: 'document.getElementById("play")' });
+    const { nodes } = await cdp.send("Accessibility.getPartialAXTree",
+                                     { objectId: result.objectId, fetchRelatives: false });
+    out.steps[name] = { ...header, moving: later > first, name: nodes[0].name.value.trim() };
+  };
+  const seam = (name, on) => page.evaluate(
+    ([name, on]) => window.__present[name](on), [name, on]);
+
+  await look("boot");
+  await seam("setPlaying", false);
+  await look("seam pause");
+  // A repeat is the same word and the same text again, which is what "once" is.
+  await seam("setPlaying", false);
+  await look("seam pause again");
+  await seam("setPlaying", true);
+  await look("seam play");
+
+  // By keyboard, from the button itself: one press flips the word and says so.
+  await page.focus("#play");
+  await page.keyboard.press("Enter");
+  await look("press");
+  await page.keyboard.press("Space");
+  await look("press again");
+  // A press after the seam has paused it resumes, because the button said so.
+  await seam("setPlaying", false);
+  await page.keyboard.press("Enter");
+  await look("seam pause, then a press");
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_the_seams_set_playing_leaves_the_play_button_and_its_announcement_true(tmp_path):
+    seen = _run(PLAYING, {"url": _hand_made_page(tmp_path)})
+    assert not seen["problems"], seen["problems"]
+    # The seam is what it was: no method added, dropped or moved.
+    assert seen["seam"] == SEAM, seen["seam"]
+
+    playing = {"word": "Pause", "name": "Pause", "moving": True}
+    paused = {"word": "Play", "name": "Play", "moving": False}
+    expected = {
+        # Nothing was said at the start, and the trains run.
+        "boot": {**playing, "said": ""},
+        # setPlaying(false): the word and the name are the next press's, the region
+        # says Paused, and the clock has stopped. The reverse after setPlaying(true).
+        "seam pause": {**paused, "said": "Paused"},
+        "seam pause again": {**paused, "said": "Paused"},
+        "seam play": {**playing, "said": "Playing"},
+        # The button's own press does what it did: it flips, and says so.
+        "press": {**paused, "said": "Paused"},
+        "press again": {**playing, "said": "Playing"},
+        # After the seam paused it, the press the button names resumes it.
+        "seam pause, then a press": {**playing, "said": "Playing"},
+    }
+    for step, want in expected.items():
+        got = seen["steps"][step]
+        assert {k: got[k] for k in want} == want, (step, got)
+
+
+def test_the_play_buttons_handler_and_the_seam_share_one_function():
+    page = PAGE.read_text(encoding="utf-8")
+    assert "playBtn.onclick = () => setPlaying(!playing);" in page
+    assert page.count("    setPlaying(on) { setPlaying(on); },\n") == 1
+    # The state is set in one place, not in the seam's method and again in the button's.
+    assert page.count("playing = on;") == 1
+    assert page.count("announce.textContent") == 1
+
+
 # ---------------------------------------------------------------- service days
 
 # Two presets, so no test reads the person's own feeds: site.export() is given

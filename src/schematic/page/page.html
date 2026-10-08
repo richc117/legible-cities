@@ -1229,12 +1229,18 @@ __SOCIAL__
   // The button names what pressing it does, so it carries no pressed state.
   const showPlay = () => { playBtn.textContent = playing ? "Pause" : "Play"; };
   showPlay();     // read at boot: under reduced motion the page starts paused
-  playBtn.onclick = () => {
-    playing = !playing;
+  playBtn.onclick = () => setPlaying(!playing);
+  // The one place the playing state is set, with the button's word and what is
+  // said about it, so the header always says what the next press does. The
+  // button and the seam's setPlaying both come here: a script driving the seam
+  // leaves the header as true as a press does. A repeat sets the same word and
+  // the same text again, which a reader does not say twice.
+  function setPlaying(on) {
+    playing = on;
     showPlay();
-    // The one thing said without focus moving, and only when a person asked.
+    // The one thing said without focus moving, and only when it is asked for.
     announce.textContent = playing ? "Playing" : "Paused";
-  };
+  }
   scrub.oninput = () => { now = +scrub.value; draw(); };
 
   // One button showing the current rate, tapped to cycle. Four buttons for a
@@ -1571,7 +1577,7 @@ __SOCIAL__
         rafId = requestAnimationFrame(frame);
       }
     },
-    setPlaying(on) { playing = on; },
+    setPlaying(on) { setPlaying(on); },
     setSpeed(x) { speed = x; },
     // setView and setGeo are the two axes, unchanged and independent:
     // bin/_record.js raises geo and *then* names a view, so a setView that
