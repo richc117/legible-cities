@@ -204,7 +204,8 @@ __SOCIAL__
      is: at 35% it read 1.6:1 on the sepia ground and 2.0:1 on warm dark's. While the stage has the
      keyboard's focus the ring is drawn whole and the hint gives way to it. */
   #stage.scrollable-right:focus-visible { -webkit-mask-image: none; mask-image: none; }
-  /* Row labels in the linear view's gutter, in each line's own colour. */
+  /* The rows' names in the Linear and Time views' gutter, in the map's label
+     colour, which the script sets. */
   .rowname { font-weight: 700; font-size: 13px; dominant-baseline: middle; }
   /* Width is set by the script, which is the only thing that knows the view:
      the map wants to fill the height and pan, while the rows want a legible
@@ -804,8 +805,13 @@ __SOCIAL__
 
   const dots = [];      // {el, label, node, mapPt, r}
   const texts = [];     // {el, label, node, spec, primary}
-  const names = [];     // {el, label}
+  const names = [];     // {el, label, swatch}
   const seenLabel = new Set();
+  // Each line's stroke on the map, which is how tall its swatch is drawn.
+  const strokeOf = new Map();
+  svg.querySelectorAll("#lines g.line").forEach(g => {
+    strokeOf.set(g.getAttribute("data-line"), +g.getAttribute("stroke-width") || 7);
+  });
 
   for (const line of layout.lines) {
     for (const st of lineStations.get(line.label) || []) {
@@ -842,10 +848,25 @@ __SOCIAL__
     const name = document.createElementNS(NS, "text");
     name.setAttribute("class", "rowname");
     name.setAttribute("text-anchor", "end");
-    name.setAttribute("fill", data.lines[line.label] || "currentColor");
+    // In the label colour, never the line's: no colour reads at 4.5:1 on both
+    // themes' grounds, so a name in its line's colour failed in one theme or
+    // the other on every feed (issue 58).
+    name.setAttribute("fill", "var(--map-label, #111)");
     name.textContent = display(line.label);
     nameLayer.appendChild(name);
-    names.push({ el: name, label: line.label });
+    // The line's colour beside its name in the Time view, where the band's own
+    // strokes are faint and need not start near the name: a short bar as tall
+    // as the line's stroke, in the gap between the name and the band. In the
+    // Linear view the row itself starts there, so the bar comes in only with
+    // the chart. Decoration, not text: it is not measured for contrast.
+    const swatch = document.createElementNS(NS, "rect");
+    swatch.setAttribute("class", "rowswatch");
+    swatch.setAttribute("fill", data.lines[line.label] || "#888");
+    swatch.setAttribute("width", "8");
+    swatch.setAttribute("height", strokeOf.get(line.label) || 7);
+    swatch.setAttribute("opacity", "0");
+    nameLayer.appendChild(swatch);
+    names.push({ el: name, label: line.label, swatch: swatch });
   }
 
   if (mapStations) mapStations.style.display = "none";
@@ -1149,8 +1170,13 @@ __SOCIAL__
       // In the chart a line occupies a whole band, so its name centres on it.
       const rowLine = vbY + LABEL_RISE + band * (base + 0.15);
       const rowBand = bandTop(n.label) + bandInner() / 2;
-      n.el.setAttribute("y", lerp(rowLine, rowBand, sf).toFixed(1));
+      const y = lerp(rowLine, rowBand, sf);
+      n.el.setAttribute("y", y.toFixed(1));
       n.el.setAttribute("opacity", Math.max(m, sf).toFixed(2));
+      // From 3 past the name's end to 3 short of the band, on the name's middle.
+      n.swatch.setAttribute("x", (vbX + GUTTER - 11).toFixed(1));
+      n.swatch.setAttribute("y", (y - n.swatch.getAttribute("height") / 2).toFixed(1));
+      n.swatch.setAttribute("opacity", sf.toFixed(2));
     }
   }
 
@@ -1524,7 +1550,7 @@ __SOCIAL__
        .forEach(g => g.style.display = off);
     for (const d of dots) if (d.label === r) d.el.style.display = off;
     for (const t of texts) if (t.label === r) t.el.style.display = off;
-    for (const n of names) if (n.label === r) n.el.style.display = off;
+    for (const n of names) if (n.label === r) n.el.style.display = n.swatch.style.display = off;
     const sg = stringGroups.get(r);
     if (sg) sg.style.display = off;
     lineCount.textContent = (routes.length - hidden.size) + " of " + routes.length;

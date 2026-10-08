@@ -1,5 +1,6 @@
 """The site's sharing tags and the card they point at.
 
+import csv
 A link preview fails silently: the tags are either absent or relative, the page
 looks perfect in a browser, and the only symptom is a bare link in somebody
 else's chat window. So the things asserted here are the ones that cannot be
@@ -8,11 +9,13 @@ emit whole URLs, and that the card is the size it claims to be.
 """
 
 import datetime as dt
+import io
 import json
 import re
 import shutil
 import struct
 import subprocess
+import zipfile
 from html.parser import HTMLParser
 from pathlib import Path
 from types import SimpleNamespace
@@ -2156,3 +2159,197 @@ def test_the_description_follows_the_names_the_order_and_the_shape_of_the_lines(
     for r in (numbered, ordered):
         assert r["name"] == "Map of Numbered, 4 lines"
         assert "No two lines share a station." in r["description"], r["description"]
+
+
+# ------------------------------------------------- the rows' names and the chart
+#
+# Issues 58 and 59. The Linear and Time views name each row in the gutter, and
+# the Time view writes its termini and its hours beside them. A row's name was
+# drawn in its line's colour; it is now drawn in --map-label, with a swatch of
+# the line's colour beside it in the Time view. The chart's two faint texts were
+# under 4.5:1 in sepia.
+
+# The grounds the map sits on: --bg in present mode, which is what an export
+# shows (--map-bg is transparent there), and --map-bg, the card, everywhere else.
+MAP_GROUNDS = ("bg", "map-bg")
+
+
+def _row_name_code(page: str) -> str:
+    """The script that makes a row's name, from its class to its entry in ``names``."""
+    return page[page.index('name.setAttribute("class", "rowname");'):
+                page.index("names.push({ el: name")]
+
+
+def _name_colour(page: str, theme: str, line_colour: str) -> str:
+    """The colour the page draws a row's name in, in ``theme``, for a line drawn
+    in ``line_colour``: read off the script's fill, which is either one of the
+    theme's tokens or an expression over the line's own colour."""
+    fills = re.findall(r'name\.setAttribute\("fill", (.+?)\);', _row_name_code(page))
+    assert len(fills) == 1, fills
+    token = re.fullmatch(r'"var\(--([\w-]+), #[0-9a-fA-F]{3,6}\)"', fills[0])
+    if token:
+        return _tokens(page)[theme][token.group(1)]
+    assert "data.lines" in fills[0], f"a row's name is filled with what this test cannot read: {fills[0]}"
+    return line_colour
+
+
+def _published_colours() -> dict[str, str]:
+    """Every colour a line is drawn in that this suite can see, by where it came
+    from: the engine's default for a line the feed leaves uncoloured, the
+    Pittsburgh snapshot's (the one feed whose colours are committed), the
+    hand-made page's, and every ``route_color`` of a preset whose feed is
+    downloaded, read from its zip as the renderer reads one (six hex digits,
+    with or without the hash)."""
+    found = {"the engine's default": Style().default_line_color}
+    snapshot = json.loads((Path(__file__).parent / "fixtures" / "colors" / "pittsburgh-t.json")
+                          .read_text(encoding="utf-8"))
+    found.update({f"pittsburgh-t {label}": colour for label, colour in snapshot["lines"].items()})
+    found.update({f"the hand-made page's {label}": "#" + colour for label, colour in WEAK.items()})
+    for key, feed in feeds.FEEDS.items():
+        if not feed.zip_path.exists():
+            continue
+        with zipfile.ZipFile(feed.zip_path) as archive:
+            member = next((n for n in archive.namelist() if n.rsplit("/", 1)[-1] == "routes.txt"), None)
+            if member is None:
+                continue
+            text = archive.read(member).decode("utf-8-sig", errors="replace")
+        for row in csv.DictReader(io.StringIO(text)):
+            value = (row.get("route_color") or "").strip().lstrip("#")
+            if re.fullmatch(r"[0-9a-fA-F]{6}", value):
+                found[f"{key} {row.get('route_id', '?')}"] = "#" + value.lower()
+    return found
+
+
+def test_a_rows_name_is_drawn_in_the_label_colour_which_reads_on_every_ground():
+    """13px bold is not large text, so 4.5:1: on the card and on the ground an
+    export shows, in both themes. The fill is the script's, with the fallback the
+    chart's text has, and no rule in the stylesheet overrides it."""
+    page = PAGE.read_text(encoding="utf-8")
+    fills = re.findall(r'name\.setAttribute\("fill", (.+?)\);', _row_name_code(page))
+    assert fills == ['"var(--map-label, #111)"'], fills
+    rules = re.findall(r"\.rowname[^{]*\{([^}]*)\}", page)
+    assert rules and not any(re.search(r"\b(fill|color)\s*:", rule) for rule in rules), rules
+    for theme, token in _tokens(page).items():
+        for ground in MAP_GROUNDS:
+            ratio = _contrast(token["map-label"], token[ground])
+            assert ratio >= 4.5, (theme, ground, round(ratio, 2))
+
+
+def test_every_rows_name_reads_whatever_colour_its_feed_publishes():
+    """Why the name left its line's colour: no colour reads at 4.5:1 in both
+    themes. To clear warm dark's grounds a colour must be lighter than sepia's
+    allow, so every colour a feed publishes fails on one ground or the other.
+    The name is drawn in what the script fills it with, read off the page, and
+    that reads on all four grounds for every colour this suite can see; a
+    downloaded feed's colours are read from its zip when there is one."""
+    page = PAGE.read_text(encoding="utf-8")
+    tokens = _tokens(page)
+    darkest = max(_luminance(tokens["warm-dark"][g]) for g in MAP_GROUNDS)
+    lightest = min(_luminance(tokens["sepia"][g]) for g in MAP_GROUNDS)
+    needs_at_least = 4.5 * (darkest + 0.05) - 0.05     # to clear warm dark's grounds
+    allows_at_most = (lightest + 0.05) / 4.5 - 0.05     # to clear sepia's
+    assert needs_at_least > allows_at_most, "a colour can now read in both themes; read issue 58 again"
+
+    for where, colour in _published_colours().items():
+        worst = min((_contrast(colour, tokens[theme][g]), theme, g)
+                    for theme in tokens for g in MAP_GROUNDS)
+        assert worst[0] < 4.5, (where, colour, worst)    # the reason, for this colour
+        for theme, token in tokens.items():
+            drawn = _name_colour(page, theme, colour)
+            for ground in MAP_GROUNDS:
+                ratio = _contrast(drawn, token[ground])
+                assert ratio >= 4.5, (
+                    f"{where}: a row's name is drawn in {drawn}, which reads at "
+                    f"{ratio:.2f}:1 on {ground} in {theme}")
+
+
+# Opens the hand-made page in each theme, stops its clock, and in each of the
+# four views, settled, reads the rows' names and swatches, the chart's two faint
+# texts, and where everything else in the network was drawn.
+ROWS = BROWSER + r"""
+main(async browser => {
+  const out = {};
+  for (const theme of ["warm-dark", "sepia"]) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                           reducedMotion: "no-preference" });
+    const page = await ctx.newPage();
+    const seen = { problems: [], views: {} };
+    page.on("pageerror", e => seen.problems.push(e.message));
+    await page.goto(job.url + "?theme=" + theme, { waitUntil: "load" });
+    await ready(page);
+    await page.evaluate(() => { window.__present.setCapture(true); window.__present.seek(7 * 3600); });
+    for (const view of ["schematic", "geographic", "linear", "time"]) {
+      await page.evaluate(v => { window.__present.showView(v, 0); window.__present.settle(); }, view);
+      await frames(page, 2);
+      seen.views[view] = await page.evaluate(() => {
+        const all = sel => [...document.querySelectorAll(sel)];
+        const attrs = (sel, names) => all(sel).map(el => names.map(n => el.getAttribute(n)));
+        return {
+          state: window.__present.state().viewName,
+          names: all("#linear-names text.rowname").map(t => ({
+            text: t.textContent, fill: getComputedStyle(t).fill, opacity: t.getAttribute("opacity"),
+            x: +t.getAttribute("x"), y: +t.getAttribute("y") })),
+          swatches: all("#linear-names rect.rowswatch").map(r => ({
+            fill: r.getAttribute("fill"), opacity: r.getAttribute("opacity"),
+            x: +r.getAttribute("x"), y: +r.getAttribute("y"),
+            width: +r.getAttribute("width"), height: +r.getAttribute("height") })),
+          chart: {
+            names: all("#stringline > g:not(#stringline-axis) > text").map(t => getComputedStyle(t).opacity),
+            hours: all("#stringline-axis > text").map(t => getComputedStyle(t).opacity),
+          },
+          drawn: {
+            tracks: attrs("#lines path[data-src]", ["d"]),
+            dots: attrs("#linear-stations circle", ["cx", "cy", "r"]),
+            labels: attrs("#linear-labels text", ["x", "y", "transform", "opacity"]),
+            bands: attrs("#stringline > g:not(#stringline-axis)", ["transform"]),
+            hours: attrs("#stringline-axis > text", ["x", "y"]),
+          },
+        };
+      });
+    }
+    // A line hidden from its chip takes its name and its swatch with it.
+    seen.hidden = await page.evaluate(() => {
+      window.__present.setRoutes(["A", "C"]);
+      const shown = el => getComputedStyle(el).display !== "none";
+      return [...document.querySelectorAll("#linear-names text.rowname")].map((t, i) =>
+        [t.textContent, shown(t), shown(document.querySelectorAll("#linear-names rect.rowswatch")[i])]);
+    });
+    out[theme] = seen;
+    await ctx.close();
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_the_rows_names_are_in_the_label_colour_with_a_swatch_in_the_time_view(tmp_path):
+    seen = _run(ROWS, {"url": _hand_made_page(tmp_path)})
+    tokens = _tokens(PAGE.read_text(encoding="utf-8"))
+    stroke = Style().line_width                     # what the hand-made map is drawn with
+    for theme, run in seen.items():
+        assert not run["problems"], (theme, run["problems"])
+        views = run["views"]
+        # The page calls the schematic its map.
+        assert [views[v]["state"] for v in views] == ["map", "geographic", "linear", "time"], theme
+        column = {n["x"] for v in views.values() for n in v["names"]}
+        assert len(column) == 1, (theme, "a row's name left its column", column)
+        for view, at in views.items():
+            names, swatches = at["names"], at["swatches"]
+            assert [n["text"] for n in names] == list(WEAK), (theme, view, names)
+            # In every view, shown or not: the label colour, never the line's.
+            for n in names:
+                assert n["fill"] == _rgb(tokens[theme]["map-label"]), (theme, view, n)
+            # One swatch to a row, in its line's colour, between the name's end
+            # (the name is anchored at its end, 14 short of the band) and the band.
+            assert [s["fill"] for s in swatches] == ["#" + c for c in WEAK.values()], (theme, view)
+            for n, s in zip(names, swatches):
+                assert s["x"] == n["x"] + 3 and s["x"] + s["width"] == n["x"] + 11, (theme, view, n, s)
+                assert s["height"] == stroke and s["y"] + s["height"] / 2 == pytest.approx(n["y"], abs=0.051)
+            shown = {"schematic": ("0.00", "0.00"), "geographic": ("0.00", "0.00"),
+                     "linear": ("1.00", "0.00"), "time": ("1.00", "1.00")}[view]
+            assert {(n["opacity"], s["opacity"]) for n, s in zip(names, swatches)} == {shown}, (theme, view)
+        assert run["hidden"] == [["A", True, True], ["B", False, False], ["C", True, True]], theme
+    # Nothing a theme draws moves anything: the same coordinates in both, view by view.
+    for view in seen["warm-dark"]["views"]:
+        assert seen["warm-dark"]["views"][view]["drawn"] == seen["sepia"]["views"][view]["drawn"], view
