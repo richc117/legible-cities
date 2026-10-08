@@ -338,8 +338,9 @@ def test_one_polite_live_region_and_the_clock_is_not_in_it():
     for role in ("status", "alert", "log", "timer", "marquee"):
         assert f'role="{role}"' not in page, role
     assert page.count("announce.textContent") == 1
-    handler = page[page.index("playBtn.onclick"):]
-    assert "announce.textContent" in handler[:handler.index("};")]
+    # The handler and the seam share one function since issue 62; the one write is in it.
+    shared = page[page.index("function setPlaying(on) {"):]
+    assert "announce.textContent" in shared[:shared.index("\n  }")]
 
 
 def test_the_scrub_reads_as_a_time_and_not_as_a_count_of_seconds():
@@ -1288,7 +1289,7 @@ def test_the_stage_is_named_and_rings_like_the_headers_controls_when_tab_reaches
         if wide["walk"][-1] == "stage":
             reached.append(("wide", wide))
         else:
-            assert wide["walk"][-1] == "(edge)" and wide["walk"][-2] == "more", wide["walk"]
+            assert wide["walk"][-1] == "(edge)" and wide["walk"][-2] == "labels-toggle", wide["walk"]
         for where, run in reached:
             stage = run["stage"]
             assert (stage["tag"], stage["label"]) == ("main", "Map"), (theme, where, stage)
