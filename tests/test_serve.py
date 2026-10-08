@@ -23,6 +23,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import types
@@ -294,6 +295,103 @@ def test_patterns_agree_with_the_schema():
     assert defs["PresetName"]["enum"] == list(export.PRESETS)
     assert defs["StoryboardName"]["enum"] == list(export.STORYBOARDS)
     assert defs["View"]["enum"] == list(export.VIEWS)
+
+
+# Per compiled pattern in serve: a value it accepts, then each place the server
+# reads it, as (method, the params with the value in that place, the field a
+# refusal names). A reading is a call to the method itself, so the refusal is
+# the server's own and not the pattern's alone. export.encode wants an existing
+# folder outside the repository for a video's frames: the temporary folder is one.
+READINGS = {
+    "KEY_PATTERN": ("bart", [
+        ("feeds.inspect", lambda v: {"key": v}, "key"),
+        ("feeds.add", lambda v: {"source": "https://x.test/a.zip", "key": v}, "key"),
+    ]),
+    "TOKEN_PATTERN": ("run-1", [
+        ("map.build", lambda v: {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "out": v}, "out"),
+        ("export.plan", lambda v: {"key": KEY, "preset": "instagram-reel",
+                                   "options": {"tag": v}}, "tag"),
+    ]),
+    "DATE_PATTERN": ("2026-10-07", [
+        ("map.build", lambda v: {"key": KEY, "layout": NO_LAYOUT, "date": v}, "date"),
+        ("feeds.inspect", lambda v: {"key": KEY, "anchor": v}, "anchor"),
+    ]),
+    "CLOCK_PATTERN": ("06:30", [
+        ("export.plan", lambda v: {"key": KEY, "preset": "instagram-reel",
+                                   "options": {"at": v}}, "at"),
+    ]),
+    "URL_PATTERN": ("https://example.test/page.html", [
+        ("export.plan", lambda v: {"key": KEY, "preset": "instagram-reel", "page": v}, "page"),
+        ("export.encode", lambda v: {"plan": {**_plan_dict(), "url": v},
+                                     "source": tempfile.gettempdir(),
+                                     "dest": "/elsewhere/out.mp4"}, "plan.url"),
+    ]),
+    "STEM_PATTERN": ("bart-reel", [
+        ("export.encode", lambda v: {"plan": {**_plan_dict(), "stem": v},
+                                     "source": tempfile.gettempdir(),
+                                     "dest": "/elsewhere/out.mp4"}, "plan.stem"),
+    ]),
+    "LINE_NAME_PATTERN": ("Airport Line", [
+        ("map.build", lambda v: {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                 "lines": {"A": {"name": v}}}, "lines['A'].name"),
+    ]),
+    "CAPTION_PATTERN": ("Rush hour", [
+        ("export.plan", lambda v: {"key": KEY, "preset": "instagram-reel",
+                                   "options": {"caption": v}}, "caption"),
+    ]),
+    "MODE_PATTERN": ("tram,subway", [
+        ("feeds.add", lambda v: {"source": "https://x.test/a.zip", "mode": v}, "mode"),
+    ]),
+    "LAYOUT_PATTERN": ("0123456789abcdef" * 4, [
+        ("map.build", lambda v: {"key": KEY, "layout": v, "date": DATE}, "layout"),
+    ]),
+    "COLOR_PATTERN": ("#abcdef", [
+        ("map.build", lambda v: {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                 "default_color": v}, "default_color"),
+        ("map.build", lambda v: {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                 "colors": {"A": v}}, "colors"),
+        ("map.build", lambda v: {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                 "style": {"background": v}}, "style.background"),
+    ]),
+}
+
+
+@pytest.mark.parametrize("name", sorted(
+    n for n in dir(serve) if n.endswith("_PATTERN") and isinstance(getattr(serve, n), re.Pattern)))
+def test_a_pattern_is_read_whole_so_a_trailing_newline_is_refused(client, monkeypatch, name):
+    """Issue 57: ``$`` also matches just before a final newline, so a pattern read
+    with ``match`` passed ``"bart\\n"`` where the app's validators (ECMAScript,
+    whose ``$`` is the very end) refuse it. The server reads every pattern with
+    ``fullmatch``; this pins that per pattern, then through each method that reads
+    it, which must refuse with the ``params`` kind and a sentence naming the field.
+
+    These rows cannot sit in ``BAD_PARAMS``: that table is also checked against the
+    schema, and Python's ``jsonschema`` reads ``pattern`` with ``re.search``, which
+    accepts the trailing newline. A new ``*_PATTERN`` in serve fails here until it
+    has a row in ``READINGS``."""
+    assert name in READINGS, f"{name} has no row in READINGS: give it a value and its readings"
+    good, readings = READINGS[name]
+    pattern = getattr(serve, name)
+    assert pattern.fullmatch(good), f"{good!r} should be accepted by {name}"
+    assert not pattern.fullmatch(good + "\n")
+    # The long methods validate before they start work; a stand-in for the job
+    # lets the good value through to an answer without running any. A mode is
+    # also checked against LOOM's names, which no trailing newline passes, so
+    # that check is let through to leave the pattern's reading alone to refuse.
+    monkeypatch.setattr(serve.EngineEndpoint, "_job", lambda self, work: (lambda: {}))
+    monkeypatch.setattr(feeds, "valid_mode", lambda value: True)
+    for method, params, field in readings:
+        accepted = client.call(method, params(good))
+        assert "result" in accepted, (method, field, accepted)
+        refused = client.call(method, params(good + "\n"))
+        assert "error" in refused, (method, field, refused)
+        error = refused["error"]
+        assert error["code"] == -32602, (method, field, error)
+        check(error["data"], "ErrorData")
+        assert error["data"]["kind"] == "params", (method, field, error)
+        # The pattern's own sentence, "<field> must ...": a date is also refused as
+        # "not a calendar day" once past the pattern, which would hide a bad reading.
+        assert error["data"]["hint"].startswith(f"{field} must"), (method, field, error)
 
 
 def test_every_registered_key_is_a_valid_feed_key():

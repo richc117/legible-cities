@@ -170,7 +170,7 @@ def _no_extra(method: str, left: dict[str, Any]) -> None:
 
 
 def _feed_key(value: Any) -> str:
-    if not isinstance(value, str) or not KEY_PATTERN.match(value):
+    if not isinstance(value, str) or not KEY_PATTERN.fullmatch(value):
         raise invalid_params("key must be a feed key: lower-case letters, digits and hyphens")
     if value not in feeds.all():
         raise EngineError("feed", f"{value!r} is not a registered feed")
@@ -184,7 +184,7 @@ def _date(value: Any, name: str = "date") -> dt.date:
                 "date is required: the service day to draw, as YYYY-MM-DD. The engine "
                 "never picks one, because its choice would depend on the day you asked.")
         raise invalid_params(f"{name} must be a calendar day as YYYY-MM-DD, or left out")
-    if not isinstance(value, str) or not DATE_PATTERN.match(value):
+    if not isinstance(value, str) or not DATE_PATTERN.fullmatch(value):
         raise invalid_params(f"{name} must be a calendar day as YYYY-MM-DD")
     try:
         return dt.date.fromisoformat(value)
@@ -193,7 +193,7 @@ def _date(value: Any, name: str = "date") -> dt.date:
 
 
 def _token(value: Any) -> str:
-    if not isinstance(value, str) or not TOKEN_PATTERN.match(value):
+    if not isinstance(value, str) or not TOKEN_PATTERN.fullmatch(value):
         raise invalid_params("out must be a folder name: letters, digits, dot, underscore "
                              "and hyphen, not starting with a dot, never a path")
     return value
@@ -218,7 +218,7 @@ def _overrides(left: dict[str, Any]) -> dict[str, Any]:
     """What a build may change about the registry entry (``feeds.OVERRIDES``)."""
     out: dict[str, Any] = {}
     mode = _optional(left, "mode",
-                     lambda v: isinstance(v, str) and bool(MODE_PATTERN.match(v))
+                     lambda v: isinstance(v, str) and bool(MODE_PATTERN.fullmatch(v))
                      and feeds.valid_mode(v),
                      "must be what gtfs2graph -m takes: names such as tram, subway or rail, "
                      "or route_type numbers, comma-joined")
@@ -239,7 +239,7 @@ def _layout(value: Any) -> str:
     if value is None:
         raise invalid_params("layout is required: the id graph.build answered with. A map is "
                              "drawn from a stored layout and never lays one out itself.")
-    if not isinstance(value, str) or not LAYOUT_PATTERN.match(value):
+    if not isinstance(value, str) or not LAYOUT_PATTERN.fullmatch(value):
         raise invalid_params("layout must be a layout id: 64 hex digits, as graph.build reports")
     return value
 
@@ -275,7 +275,7 @@ def _color(left: dict[str, Any], name: str) -> str | None:
     value = left.pop(name, None)
     if value is None:
         return None
-    if not isinstance(value, str) or not COLOR_PATTERN.match(value):
+    if not isinstance(value, str) or not COLOR_PATTERN.fullmatch(value):
         raise invalid_params(f"{name} must be a colour written #rrggbb")
     return value
 
@@ -286,7 +286,7 @@ def _colors(left: dict[str, Any], name: str) -> dict[str, str] | None:
     if value is None:
         return None
     if not isinstance(value, dict) or not all(
-            isinstance(k, str) and isinstance(v, str) and COLOR_PATTERN.match(v)
+            isinstance(k, str) and isinstance(v, str) and COLOR_PATTERN.fullmatch(v)
             for k, v in value.items()):
         raise invalid_params(f"{name} must be an object of line label to a colour "
                              f"written #rrggbb")
@@ -371,7 +371,7 @@ def _style(value: Any) -> Style | None:
         if name not in left:
             continue
         color = left.pop(name)
-        if not isinstance(color, str) or not COLOR_PATTERN.match(color):
+        if not isinstance(color, str) or not COLOR_PATTERN.fullmatch(color):
             raise invalid_params(f"style.{name} must be a colour written #rrggbb")
         fields[name] = color
     _no_extra("style", left)
@@ -423,7 +423,7 @@ def _export_options(value: Any) -> dict[str, Any]:
     theme = _optional(left, "theme", lambda v: v in ("dark", "light"), "must be dark or light")
     if theme is not None:
         out["theme"] = theme
-    at = _optional(left, "at", lambda v: isinstance(v, str) and bool(CLOCK_PATTERN.match(v)),
+    at = _optional(left, "at", lambda v: isinstance(v, str) and bool(CLOCK_PATTERN.fullmatch(v)),
                    "must be a clock, HH:MM")
     if at is not None:
         out["at"] = at
@@ -449,7 +449,7 @@ def _export_options(value: Any) -> dict[str, Any]:
     fade = _optional(left, "fade", lambda v: _number(v) and v >= 0, "must be seconds, 0 or more")
     if fade is not None:
         out["fade"] = float(fade)
-    tag = _optional(left, "tag", lambda v: isinstance(v, str) and bool(TOKEN_PATTERN.match(v)),
+    tag = _optional(left, "tag", lambda v: isinstance(v, str) and bool(TOKEN_PATTERN.fullmatch(v)),
                     "must be a short filename suffix: letters, digits, dot, underscore, hyphen")
     if tag is not None:
         out["tag"] = tag
@@ -504,7 +504,7 @@ def _capture_job(value: Any) -> export.CaptureJob:
     if mode not in ("still", "video"):
         raise invalid_params("plan.mode must be still or video")
     url = left.pop("url", None)
-    if not isinstance(url, str) or not URL_PATTERN.match(url):
+    if not isinstance(url, str) or not URL_PATTERN.fullmatch(url):
         raise invalid_params("plan.url must be the page's address")
     ints: dict[str, int] = {}
     for name, low in (("width", 1), ("height", 1), ("scale", 1), ("fps", 1), ("settle", 0),
@@ -527,7 +527,7 @@ def _capture_job(value: Any) -> export.CaptureJob:
     if not _number(fade) or fade < 0:
         raise invalid_params("plan.fade must be seconds, 0 or more")
     stem = left.pop("stem", None)
-    if not isinstance(stem, str) or not STEM_PATTERN.match(stem):
+    if not isinstance(stem, str) or not STEM_PATTERN.fullmatch(stem):
         raise invalid_params("plan.stem must be a file name without a path or an extension")
     theme = left.pop("theme", None)
     if theme not in ("dark", "light"):
@@ -844,7 +844,8 @@ class EngineEndpoint(Endpoint):
                 not source.startswith(("http://", "https://")) and not os.path.isabs(source)):
             raise invalid_params("source must be a URL with its scheme, or an absolute path "
                                  "to a zip the client owns")
-        key = _optional(left, "key", lambda v: isinstance(v, str) and bool(KEY_PATTERN.match(v)),
+        key = _optional(left, "key",
+                        lambda v: isinstance(v, str) and bool(KEY_PATTERN.fullmatch(v)),
                         "must be a feed key: lower-case letters, digits and hyphens")
         name = _optional(left, "name", lambda v: isinstance(v, str) and 0 < len(v.strip()) <= 120,
                          "must be text, up to 120 characters")
@@ -960,7 +961,8 @@ class EngineEndpoint(Endpoint):
         left = _object("export.plan", params)
         key = _feed_key(left.pop("key", None))
         preset = _preset(left.pop("preset", None))
-        page = _optional(left, "page", lambda v: isinstance(v, str) and bool(URL_PATTERN.match(v)),
+        page = _optional(left, "page",
+                         lambda v: isinstance(v, str) and bool(URL_PATTERN.fullmatch(v)),
                          "must be the page's address, with its scheme")
         date = _date(left.pop("date")).isoformat() if "date" in left else None
         options = _export_options(left.pop("options", None))
