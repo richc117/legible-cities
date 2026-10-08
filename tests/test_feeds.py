@@ -530,6 +530,28 @@ def test_remove_refuses_what_is_not_a_key_before_it_reads_the_registry(home):
     assert (graphs / "keep.json").exists() and registry.exists()
 
 
+def test_add_refuses_a_key_with_a_trailing_newline(home, tmp_path):
+    """Issue 57: ``$`` also matches before a final newline, so ``match`` took
+    ``"mine\\n"`` as a key. A library caller gets the refusal the server's own
+    check gives, and nothing is added."""
+    with pytest.raises(feeds.FeedError, match="lower-case letters, digits and hyphens"):
+        feeds.add(gtfs_zip(tmp_path / "n.zip"), key="mine\n")
+    assert len(feeds.all()) == len(feeds.FEEDS)
+    assert not feeds.user_file().exists()
+
+
+def test_remove_refuses_a_key_with_a_trailing_newline(home):
+    """The same, for the removal: a registry written by hand with ``"up\\n"`` in it
+    keeps its entry, because the key is refused before the registry is read."""
+    registry = feeds.user_file()
+    registry.parent.mkdir(parents=True)
+    registry.write_text(json.dumps([{"key": "up\n", "name": "Up", "url": ""}]))
+    before = registry.read_bytes()
+    with pytest.raises(feeds.FeedError, match="lower-case letters, digits and hyphens"):
+        feeds.remove("up\n")
+    assert registry.read_bytes() == before
+
+
 def test_a_file_feed_whose_zip_is_gone_says_so(home, tmp_path):
     feed = feeds.add(gtfs_zip(tmp_path / "a.zip"), key="mine")
     feed.zip_path.unlink()

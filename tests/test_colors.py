@@ -60,8 +60,10 @@ def test_an_override_wins_then_the_feed_then_the_default():
     assert resolved == {"A": "#ABCDEF", "B": "#123456", "C": "#ff0000"}
 
 
+# "#123456\n": ``$`` also matches before a final newline, so a colour read with
+# ``match`` passed it (issue 57); the app's validators refuse it.
 @pytest.mark.parametrize("bad", ["red", "123456", "#12345", "#1234567", "#ggg000", "", 0x123456,
-                                 None, ["#123456"]])
+                                 None, ["#123456"], "#123456\n", "#abcdef\n"])
 def test_a_colour_not_written_rrggbb_is_refused(bad):
     graph = _graph([[("A", None)]])
     with pytest.raises(ValueError, match="'A' must be a colour written #rrggbb"):

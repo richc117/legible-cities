@@ -462,7 +462,7 @@ def _number(value: object) -> bool:
 
 
 def _clock(value: object) -> bool:
-    return isinstance(value, str) and bool(_CLOCK.match(value))
+    return isinstance(value, str) and bool(_CLOCK.fullmatch(value))
 
 
 def authored_beats(beats: Sequence[Beat | dict]) -> tuple[Beat, ...]:

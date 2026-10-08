@@ -338,6 +338,35 @@ def test_each_bound_on_its_edge_is_taken():
                            {"secs": 1, "tween": 0, "labels": False, "at": "25:44"}])
 
 
+# ------------------------------------------------------ a clock read whole
+
+@pytest.mark.parametrize("beats,path", [
+    pytest.param([{"secs": 2, "view": "map", "at": "06:30\n"}], "storyboard[0].at",
+                 id="first-beats-at"),
+    pytest.param([OK, {"secs": 1, "at": "09:00\n"}], "storyboard[1].at", id="later-beats-at"),
+    pytest.param([OK, {"secs": 1, "sweep": True, "span": ["08:00", "09:00\n"]}],
+                 "storyboard[1].span", id="span-end"),
+    pytest.param([OK, {"secs": 1, "sweep": True, "span": ["08:00\n", "09:00"]}],
+                 "storyboard[1].span", id="span-start"),
+])
+def test_a_beats_clock_with_a_trailing_newline_is_refused(client, beats, path):
+    """Issue 57: ``$`` also matches before a final newline, so a clock read with
+    ``match`` took ``"06:30\\n"`` and planned it as 06:30 where the app's validators
+    refuse it. The beat's ``at`` and the two ends of a ``span`` now read ``Clock``
+    whole, as the ``at`` option beside a name already did. Not a ``BOUNDS`` row:
+    those are judged on the sentence alone, and this one is judged over the method too."""
+    hint = _refused(beats)
+    assert path in hint, hint
+    params = {"key": KEY, "preset": "instagram-reel", "options": {"storyboard": beats}}
+    error = client.call("export.plan", params)["error"]
+    assert error["code"] == -32602, error
+    check(error["data"], "ErrorData")
+    assert error["data"]["kind"] == "params"
+    assert path in error["data"]["hint"], error
+    with pytest.raises(ValueError, match=re.escape(path)):
+        export.authored_beats(beats)
+
+
 # ------------------------------------------------------------ beside a list
 
 

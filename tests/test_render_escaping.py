@@ -70,6 +70,8 @@ def test_the_document_still_parses_whatever_the_feed_published(color):
     ("#12345", DEFAULT),
     ("#1234567", DEFAULT),
     ("0072bc ", DEFAULT),
+    ("0072bc\n", DEFAULT),         # ``$`` matches before a final newline (issue 57)
+    ("#0072bc\n", DEFAULT),
     ("", DEFAULT),
     (None, DEFAULT),
 ])

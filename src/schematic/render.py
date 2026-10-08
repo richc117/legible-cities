@@ -124,7 +124,7 @@ def _color(hexish: str | None, fallback: str) -> str:
     if not isinstance(hexish, str) or not hexish:
         return fallback
     value = hexish if hexish.startswith("#") else f"#{hexish}"
-    return value if _HEX_COLOR.match(value) else fallback
+    return value if _HEX_COLOR.fullmatch(value) else fallback
 
 
 def _attr(value: str) -> str:
@@ -137,7 +137,7 @@ def _attr(value: str) -> str:
 def check_color(value: object, what: str) -> str:
     """``value`` as a colour written ``#rrggbb``, or a ValueError naming
     ``what`` was wrong."""
-    if not isinstance(value, str) or not _HEX_COLOR.match(value):
+    if not isinstance(value, str) or not _HEX_COLOR.fullmatch(value):
         raise ValueError(f"{what} must be a colour written #rrggbb, not {value!r}")
     return value
 

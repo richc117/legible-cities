@@ -654,7 +654,7 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
         fallback = Path(urlsplit(source_text).path if from_url else source_text).stem
     except ValueError:
         fallback = ""
-    if key is not None and not KEY_PATTERN.match(key):
+    if key is not None and not KEY_PATTERN.fullmatch(key):
         raise FeedError("a feed key is lower-case letters, digits and hyphens, up to 64")
     if not valid_mode(mode):
         raise FeedError(f"{mode!r} is not a mode LOOM knows")
@@ -726,7 +726,7 @@ def remove(key: str, *, cancelled: "Callable[[], bool] | None" = None,
     native backend unpacked them into (``<key>.normalized`` and its scratch
     ``.unpacking``), and its own folder under the graphs folder are removed.
     """
-    if not KEY_PATTERN.match(key):
+    if not KEY_PATTERN.fullmatch(key):
         raise FeedError("a feed key is lower-case letters, digits and hyphens, up to 64")
     if key in FEEDS:
         raise FeedError(f"{key!r} is a built-in feed and cannot be removed")
