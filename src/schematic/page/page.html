@@ -537,11 +537,15 @@ __SOCIAL__
   //   "A from Stop 4 to Stop 0, 5 stations."  A sentence a line, in the order its
   //     rows open in. The ends are the first and last named stations of its
   //     spine; "branching" is said when a row forks off that spine, and "in 2
-  //     pieces" when a row is a part of the line that meets the rest nowhere.
+  //     pieces" when a row is a part of the line that meets the rest nowhere. A
+  //     loop line reads as its spine with a branch: the layout carries no
+  //     adjacency to tell a ring from a fork, and the page's data may not grow to
+  //     carry one.
   //   "The lines meet at Stop 2 and Stop 5."  The stations on two lines or more,
   //     those on the most lines first, up to eight and then a count.
   //   "Trains move along the lines as the clock runs, and the controls above the
-  //     map change the view."
+  //     map change the view."  In present mode, which hides the header, it ends
+  //     at "runs".
   //
   // Everything drawn inside the SVG is hidden from the tree: the station and row
   // names, and the trains, which come and go every frame. An image's children are
@@ -599,7 +603,8 @@ __SOCIAL__
         : "The lines meet at " + (listed.length > 1
           ? listed.slice(0, -1).join(", ") + " and " + listed[listed.length - 1] : listed[0]) + ".");
     }
-    sentences.push("Trains move along the lines as the clock runs, and the controls above the map change the view.");
+    sentences.push("Trains move along the lines as the clock runs"
+      + (present ? "." : ", and the controls above the map change the view."));
 
     const paragraph = document.createElement("p");
     paragraph.id = "map-description";

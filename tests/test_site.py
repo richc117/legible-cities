@@ -1936,7 +1936,7 @@ def test_the_page_describes_its_map_once_from_the_layout_it_already_has(tmp_path
     # From the layout the rows are drawn from, each line by the name the page writes for it.
     for read in ("layout.lines", "layout.arranged", "line.rows", "layout.names", "mapXY",
                  "display(line.label)"):
-        assert read in body, read
+        assert read in body, f"{read}: the description is no longer composed from it"
     # An image, named and described by the paragraph, with everything drawn inside it hidden.
     assert 'svg.setAttribute("role", "img");' in body
     assert 'svg.setAttribute("aria-describedby", "map-description");' in body
@@ -1947,8 +1947,11 @@ def test_the_page_describes_its_map_once_from_the_layout_it_already_has(tmp_path
     # writes the paragraph, so neither the frame loop nor a control rewrites it.
     assert page.count("describeMap()") == 2, "the function and its one call"
     call = page.index("\n  describeMap();\n")
-    assert call > page.index("svg.appendChild(defs);")
-    assert call > page.index("svg.insertBefore(stringLayer, trainsGroup);")
+    for last in ("svg.appendChild(defs);", "svg.insertBefore(stringLayer, trainsGroup);"):
+        assert last in page, (f"{last}: a layer is added some other way; "
+                              "read where describeMap() is called")
+        assert call > page.index(last), (f"describeMap() runs before {last}, "
+                                         "so that layer is not hidden")
     assert page.count("map-description") == 2 and page.count("paragraph.textContent") == 1
     seam = page[page.index("window.__present = {"):page.index("__PRESENT__")]
     assert "describeMap" not in seam and "map-description" not in seam
@@ -2032,8 +2035,11 @@ TESTVILLE = ("A from Stop 4 to Stop 0, 5 stations. B from Stop 5 to Stop 2, 2 st
 
 @needs_browser
 def test_the_map_is_one_named_and_described_image_and_its_trains_never_reach_the_tree(tmp_path):
-    [seen] = _run(MAP_TREE, {"pages": [{"url": _hand_made_page(tmp_path), "advances": 3}]})
-    assert not seen["problems"], seen["problems"]
+    url = _hand_made_page(tmp_path)
+    seen, presented = _run(MAP_TREE, {"pages": [{"url": url, "advances": 3},
+                                                {"url": url + "?present=1", "advances": 0}]})
+    assert not seen["problems"] and not presented["problems"], (
+        seen["problems"], presented["problems"])
     first = seen["reads"][0]
     print("the SVG in the tree:", first["role"], repr(first["name"]))
     print("described as:", first["description"])
@@ -2046,14 +2052,18 @@ def test_the_map_is_one_named_and_described_image_and_its_trains_never_reach_the
         assert f"{line} from Stop " in first["description"], (line, first["description"])
     assert "The lines meet at Stop 2" in first["description"]
     assert first["description"] == TESTVILLE
+    # Present mode hides the header, so there are no controls above the map to name.
+    short = presented["reads"][0]["description"]
+    assert short.endswith("The lines meet at Stop 2 and Stop 5. "
+                          "Trains move along the lines as the clock runs."), short
 
     # The trains came and went under the image, and nothing under it reached the
-    # tree or changed it: the same number of nodes at every read, none of them a
-    # text run or a train, none of them exposed.
+    # tree or changed it: no node under it at any read, so no text run, no train
+    # and nothing exposed.
     trains = [r["trains"] for r in seen["reads"]]
     assert len(set(trains)) > 1 and max(trains) > 0, f"no train came or went: {trains}"
     for r in seen["reads"]:
-        assert r["size"] == first["size"], [(x["trains"], x["size"], x["roles"]) for x in seen["reads"]]
+        assert r["size"] == 0, [(x["trains"], x["size"], x["roles"]) for x in seen["reads"]]
         bare = {role.split(" ")[0] for role in r["roles"]}
         assert not bare & {"StaticText", "graphics-symbol"}, r["roles"]
         assert all(role.endswith("(ignored)") for role in r["roles"]), r["roles"]
