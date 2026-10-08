@@ -176,6 +176,11 @@ __SOCIAL__
   /* The touch rule below gives every button a display of its own, which beats
      [hidden]; this one is more specific than it. */
   .sort button[hidden] { display: none; }
+  /* One rule for whatever button the header hides, because the touch rule below
+     gives every button a display of its own and a display beats [hidden]. The
+     Labels button in the Time view is the one that needed it; the rule above is
+     this one's older, narrower twin for the Sort group's. */
+  header button[hidden] { display: none; }
 
   /* The stage scrolls, not the page. The inset edge shading is the only hint
      that there is more chart to the right, so it is worth the two lines. */

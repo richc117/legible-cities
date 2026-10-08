@@ -1114,6 +1114,83 @@ def test_a_map_built_without_an_order_lists_its_rows_a_to_z_and_has_no_third_but
         assert pressed(touch) == a_to_z, (theme, touch)
 
 
+# --------------------------------------------- what the header hides, on touch
+#
+# Issue 64. `hidden` is the browser's own `display: none`, and the touch rule gives
+# every button a display of its own, which wins: on a phone the Time view kept a
+# Labels button that does nothing there. One rule outranks it for the whole header.
+
+HIDDEN = BROWSER + r"""
+main(async browser => {
+  const out = {};
+  const read = page => page.evaluate(() => {
+    const el = document.getElementById("labels-toggle");
+    return { hidden: el.hidden, display: getComputedStyle(el).display,
+             parentless: el.offsetParent === null, rects: el.getClientRects().length,
+             coarse: matchMedia("(pointer: coarse)").matches,
+             more: document.getElementById("more").getAttribute("aria-expanded") };
+  });
+  const contexts = {
+    fine: { viewport: { width: 1280, height: 800 } },
+    coarse: { viewport: { width: 390, height: 844 }, hasTouch: true },
+  };
+  for (const [pointer, options] of Object.entries(contexts)) {
+    const ctx = await browser.newContext({ ...options, reducedMotion: "no-preference" });
+    const page = await ctx.newPage();
+    const seen = { problems: [], views: {} };
+    page.on("pageerror", e => seen.problems.push(e.message));
+    await page.goto(job.url, { waitUntil: "load" });
+    await ready(page);
+    // The panel starts closed on a phone, and a button in a closed panel is not
+    // rendered in any view, which would prove nothing about this one.
+    await page.evaluate(() => {
+      const more = document.getElementById("more");
+      if (more.getAttribute("aria-expanded") === "false") more.click();
+    });
+    for (const view of ["map", "string", "linear", "string", "map"]) {
+      await page.evaluate(v => {
+        document.getElementById("view-" + v).click();
+        window.__present.settle();
+      }, view);
+      seen.views[view] = await read(page);
+    }
+    out[pointer] = seen;
+    await ctx.close();
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_the_labels_button_is_not_rendered_in_the_time_view_on_a_fine_pointer_or_a_coarse_one(
+        tmp_path):
+    seen = _run(HIDDEN, {"url": _hand_made_page(tmp_path)})
+    for pointer, coarse in (("fine", False), ("coarse", True)):
+        run = seen[pointer]
+        assert not run["problems"], (pointer, run["problems"])
+        for view, state in run["views"].items():
+            assert state["coarse"] is coarse, f"the {pointer} context is not one: {state}"
+            assert state["more"] == "true", (pointer, view, state)
+            if view == "string":
+                # The chart has its own axis and no station names to switch off.
+                assert state["hidden"], (pointer, state)
+                assert state["display"] == "none", (pointer, state)
+                assert state["parentless"] and state["rects"] == 0, (pointer, state)
+            else:
+                # Everywhere else it is a button a person can see and press, as it was.
+                assert not state["hidden"], (pointer, view, state)
+                assert state["display"] != "none", (pointer, view, state)
+                assert not state["parentless"] and state["rects"] > 0, (pointer, view, state)
+
+
+def test_one_rule_hides_whatever_button_the_header_hides():
+    """A rule for each button is a rule forgotten for the next one: this is the
+    second time the touch rule's display has shown what the page hid."""
+    page = re.sub(r"\s+", " ", PAGE.read_text(encoding="utf-8"))
+    assert "header button[hidden] { display: none; }" in page
+
+
 # ---------------------------------------------------------------- service days
 
 # Two presets, so no test reads the person's own feeds: site.export() is given
