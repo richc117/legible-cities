@@ -563,6 +563,19 @@
           ],
           "additionalProperties": false
         },
+        "stations": {
+          "description": "Every station the map draws, sorted by name as code points and then by id: what a client offers to pick a trip from. A station only a hidden line served is not drawn and not listed.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "The station's node id in the stored layout: what the page's window.__present.setTrip takes." },
+              "name": { "type": "string", "description": "The name the map writes for it; the empty string where the feed gives none." }
+            },
+            "required": ["id", "name"],
+            "additionalProperties": false
+          }
+        },
         "summary": {
           "type": "string",
           "description": "Result.summary(), the lines the CLI prints."
@@ -585,6 +598,7 @@
         "layout",
         "date",
         "files",
+        "stations",
         "summary",
         "diagnostics",
         "caveats",

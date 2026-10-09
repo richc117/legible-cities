@@ -42,6 +42,7 @@ from test_colors import _graph
 
 from schematic import (__version__, config, diagnostics, export, feeds, loom, pipeline, schedule,
                        serve, thumbnail)
+from schematic.linegraph import LineGraph
 
 SCHEMA = serve.schema()
 KEY = "la-metro-rail"
@@ -551,6 +552,46 @@ def test_map_build_hands_the_lines_chosen_to_the_pipeline(client, tmp_path, monk
     assert client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
                                      "out": "p8"})["result"]
     assert asked["lines"] is None
+
+
+def test_map_build_answers_the_maps_stations_sorted_by_name(client, tmp_path, monkeypatch):
+    """Issue 49: ``stations``, what a client's trip pickers offer: every station
+    the map draws, by the node id the page's setTrip takes and the name the map
+    writes, sorted by name and then by id, never a junction LOOM put in. Stood in
+    as the thumbnail test above is, on a graph whose ids run in another order."""
+    monkeypatch.setenv(config.ENV, str(tmp_path))
+    names = {"n0": "Oak", "n1": "Alder", "j": None, "n2": "Maple", "n3": "Alder"}
+    feats = [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [i * 10.0, 0.0]},
+              "properties": {"id": nid, **({"station_id": "S" + nid, "station_label": name}
+                                           if name else {})}}
+             for i, (nid, name) in enumerate(names.items())]
+    feats += [{"type": "Feature",
+               "geometry": {"type": "LineString", "coordinates": [[i * 10.0, 0.0], [i * 10.0 + 10, 0.0]]},
+               "properties": {"from": a, "to": b, "lines": [{"id": "A", "label": "A"}]}}
+              for i, (a, b) in enumerate(zip(names, list(names)[1:]))]
+    graph = LineGraph.from_geojson({"type": "FeatureCollection", "features": feats})
+    diag = diagnostics.Diagnostics(
+        key="p9", name="Nine", date=dt.date.fromisoformat(DATE), stations=4, junctions=1,
+        edges=4, lines=("A",), octilinear=1.0,
+        stops=diagnostics.StopMatching(4, 4, 4, 0, 0, ()), trips_total=0, paths=0, unrouted=0,
+        skipped_calls=0, borrowed_track=0, labels_dropped=0, peak_concurrent=0)
+
+    def stood_in(key, **kwargs):
+        kwargs["out_dir"].mkdir(parents=True)
+        return SimpleNamespace(layout=NO_LAYOUT, date=dt.date.fromisoformat(DATE), graph=graph,
+                               diagnostics=lambda: diag)
+
+    monkeypatch.setattr(pipeline, "run", stood_in)
+    response = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                         "out": "p9"})
+    assert "result" in response, response
+    check(response["result"], "MapBuildResult")
+    assert response["result"]["stations"] == [
+        {"id": "n1", "name": "Alder"}, {"id": "n3", "name": "Alder"},
+        {"id": "n2", "name": "Maple"}, {"id": "n0", "name": "Oak"}]
+    schema = SCHEMA["$defs"]["MapBuildResult"]
+    assert "stations" in schema["required"]
+    assert schema["properties"]["stations"]["items"]["required"] == ["id", "name"]
 
 
 BAD_PARAMS = [

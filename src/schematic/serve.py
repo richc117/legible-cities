@@ -48,6 +48,7 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 from . import (__version__, config, diagnostics, export, feeds, loom, pipeline, schedule,
                thumbnail)
 from .crs import to_mercator
+from .describe import station_name
 from .linegraph import LineGraph
 from .render import (HEX_COLOR_PATTERN, octilinearity, stage as render_stage,
                      summary as render_summary)
@@ -796,6 +797,9 @@ class EngineEndpoint(Endpoint):
                           "html": str(where / f"{key}.html"),
                           "positions": str(where / f"{key}.positions.json"),
                           **{name: str(path) for name, path in thumbs.items()}},
+                # What a client's trip pickers offer (engine issue 49): the
+                # stations of the map just drawn, a hidden line's own gone.
+                "stations": _stations(result.graph),
                 "summary": diag.summary(),
                 "diagnostics": diag.to_dict(),
                 "caveats": diagnostics.caveats(diag),
@@ -1021,6 +1025,15 @@ def _download_report(progress: Progress) -> feeds.DownloadProgress:
 
 def _stage_summary(graph: LineGraph) -> dict[str, Any]:
     return render_summary(graph)
+
+
+def _stations(graph: LineGraph) -> list[dict[str, str]]:
+    """Every station the map draws, as ``map.build`` answers them: the node's
+    id, which is what the page's ``setTrip`` takes, and the name the map
+    writes (empty for a station the feed gives none). Sorted by name, as code
+    points, then by id, which tells apart the stations that share a name."""
+    return sorted(({"id": node.id, "name": station_name(node)} for node in graph.stations),
+                  key=lambda station: (station["name"], station["id"]))
 
 
 def _feed_record(feed: feeds.Feed) -> dict[str, Any]:
