@@ -1959,7 +1959,7 @@ __SOCIAL__
     return tripCopy();
   }
   function askTrip(from, to) {
-    tripAsked = from === null || from === undefined ? null : { from: from, to: to };
+    tripAsked = from === null || from === undefined ? null : { from: from, to: to === undefined ? null : to };
     answerTrip();
   }
   // A trip asked for is answered again whenever the lines shown change.
