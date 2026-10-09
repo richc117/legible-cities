@@ -2360,3 +2360,224 @@ def test_the_schema_names_a_layout_in_progress_and_in_a_not_yet_refusal_optional
     check({**refusal, "layout": "0" * 64, "stage": "topo", "building": True}, "ErrorData")
     assert invalid({**refusal, "building": False}, "ErrorData")
     assert invalid({**refusal, "stage": "labels"}, "ErrorData")
+
+
+# ---------------------------------------------------- layout tuning (issue 37)
+#
+# graph.build's ``tuning``: LOOM's own flags, by name. The stand-in LOOM
+# records the arguments each tool was called with, so these run in
+# milliseconds and without Docker; what a real octi does with the flags is
+# not asserted here. The flags themselves are test_tuning's.
+
+TUNING = test_layouts.TUNED
+TUNING_OCTI = test_layouts.TUNED_OCTI
+DEFAULT_TUNING = {"merge_distance": 50, "grid": "octilinear", "grid_size": 100,
+                  "penalties": {"deg45": 2, "deg90": 1.5, "deg135": 1, "deg180": 0,
+                                "diagonal": 0.5}}
+
+
+def lay_out_with(client: Client, params: dict) -> tuple[dict, list[dict], list[str]]:
+    """graph.build to its answer: the result, what job/progress said and the
+    lines job/log carried, for the request alone."""
+    msg_id = client.send("graph.build", params)
+    response = client.wait(msg_id)
+    assert "result" in response, response
+    check(response["result"], "GraphBuildResult")
+    return (response["result"], client.notifications("job/progress", msg_id),
+            [note["line"] for note in client.notifications("job/log", msg_id)])
+
+
+def test_graph_build_hands_a_tuning_to_the_tools_and_the_meta_shows_it(
+        client, tmp_path, monkeypatch):
+    small_home(tmp_path, monkeypatch)
+    fake = FakeLoom(monkeypatch)
+    mode = feeds.FEEDS[KEY].mode
+    plain, plain_notes, plain_log = lay_out_with(client, {"key": KEY})
+    assert fake.calls == [f"gtfs2graph -m {mode}", "topo", "loom", "octi"]
+    fake.calls.clear()
+
+    tuned, notes, log = lay_out_with(client, {"key": KEY, "tuning": TUNING})
+    assert fake.calls == [f"gtfs2graph -m {mode}", "topo -d 75", "loom", TUNING_OCTI]
+    assert tuned["meta"]["stages"] == [
+        ["gtfs2graph", ["-m", mode]], ["topo", ["-d", "75"]], ["loom", []],
+        ["octi", TUNING_OCTI.split()[1:]]]
+    assert tuned["layout"] != plain["layout"]
+    assert plain["meta"]["stages"][1:] == [["topo", []], ["loom", []], ["octi", []]]
+    check(tuned["meta"], "LayoutMeta")
+
+    # job/progress and the log say what they said, stage for stage: the flags
+    # are in the meta and nowhere else.
+    for note in notes:
+        check(note, "JobProgress")
+        assert note["layout"] == tuned["layout"]
+    assert [(n["stage"], n["fraction"], n["message"], sorted(n)) for n in notes] == [
+        (n["stage"], n["fraction"], n["message"], sorted(n)) for n in plain_notes]
+    assert [note["stage"] for note in notes] == STAGES
+
+    def untimed(lines: list[str]) -> list[str]:
+        return [re.sub(r" \(\d+\.\d s\)$", "", line) for line in lines]
+
+    assert len(log) == 4 and untimed(log) == untimed(plain_log)
+    assert not any("--" in line or " -" in line for line in log), log
+
+
+def test_graph_build_names_one_layout_for_no_tuning_an_empty_one_and_one_of_defaults(
+        client, tmp_path, monkeypatch):
+    small_home(tmp_path, monkeypatch)
+    fake = FakeLoom(monkeypatch)
+    feed = feeds.FEEDS[KEY]
+    stored_today = pipeline.layout_id(pipeline.layout_inputs(
+        feed, feed_sha256=pipeline.feed_digest(feed.zip_path), loom_commit=None))
+    today, _notes, _log = lay_out_with(client, {"key": KEY})
+    assert today["layout"] == stored_today
+    fake.calls.clear()
+    for tuning in ({}, {"merge_distance": 50.0, "grid": "octilinear"}, DEFAULT_TUNING):
+        again, notes, _log = lay_out_with(client, {"key": KEY, "tuning": tuning})
+        assert again["layout"] == stored_today, tuning
+        assert again["meta"] == today["meta"], "and its meta is what it was"
+        assert [note["stage"] for note in notes] == STAGES
+    assert fake.calls == [], "a default writes no flag, so nothing is laid out again"
+    assert [p.name for p in (config.graphs_dir() / KEY).iterdir()] == [stored_today]
+
+
+def test_graph_build_lays_a_different_tuning_out_beside_the_first_and_finds_the_same_one_again(
+        client, tmp_path, monkeypatch):
+    small_home(tmp_path, monkeypatch)
+    fake = FakeLoom(monkeypatch)
+    plain, _n, _l = lay_out_with(client, {"key": KEY})
+    tuned, _n, _l = lay_out_with(client, {"key": KEY, "tuning": TUNING})
+    other, _n, _l = lay_out_with(client, {"key": KEY, "tuning": {**TUNING, "grid": "orthoradial"}})
+    assert len({plain["layout"], tuned["layout"], other["layout"]}) == 3
+    assert fake.calls.count("loom") == 3
+
+    fake.calls.clear()
+    again, notes, _l = lay_out_with(client, {"key": KEY, "tuning": TUNING})
+    assert again["layout"] == tuned["layout"] and again["meta"] == tuned["meta"]
+    assert fake.calls == [], "the same tuning runs no tool"
+    assert [note["stage"] for note in notes] == STAGES, "and is still reported stage by stage"
+    assert sorted(p.name for p in (config.graphs_dir() / KEY).iterdir()) == sorted(
+        [plain["layout"], tuned["layout"], other["layout"]])
+    # A tuned layout is drawn from like any other: the stage the app asks for.
+    drawn = client.call("render.stage", {"key": KEY, "layout": tuned["layout"], "stage": "octi"})
+    assert "result" in drawn, drawn
+
+
+def test_graph_build_takes_each_bound_of_the_tuning_itself(client, tmp_path, monkeypatch):
+    small_home(tmp_path, monkeypatch)
+    fake = FakeLoom(monkeypatch)
+    low = {"merge_distance": 5, "grid_size": 25, "penalties": dict.fromkeys(pipeline.PENALTIES, 0)}
+    high = {"merge_distance": 500, "grid_size": 400,
+            "penalties": dict.fromkeys(pipeline.PENALTIES, 10)}
+    ids = set()
+    for tuning in (low, high, *({"grid": grid} for grid in pipeline.GRIDS)):
+        assert not invalid({"key": KEY, "tuning": tuning}, "GraphBuildParams"), tuning
+        ids.add(lay_out_with(client, {"key": KEY, "tuning": tuning})[0]["layout"])
+    assert len(ids) == 6, "each bound and each grid is a layout; the default grid is today's"
+    assert "topo -d 5" in fake.calls and "topo -d 500" in fake.calls
+    assert ("octi -g 25% --pen-45 0 --pen-90 0 --pen-135 0 --diag-pen 0") in fake.calls
+    assert ("octi -g 400% --pen-45 10 --pen-90 10 --pen-135 10 --pen-180 10 --diag-pen 10") \
+        in fake.calls
+    assert "octi -b hexalinear" in fake.calls
+    assert not any("octilinear" in call for call in fake.calls), "the default writes no flag"
+
+
+# Each tuning the server refuses, the field its sentence begins with and the
+# words of the range, the four grids or the shape it asks for.
+GRIDS_SAID = "octilinear, ortholinear, orthoradial, hexalinear"
+REFUSED_TUNINGS = [
+    *(({field: past}, f"tuning.{field}", said)
+      for field, said, (below, above) in (
+          ("merge_distance", "from 5 to 500, in metres", (4.9, 500.1)),
+          ("grid_size", "from 25 to 400, as a percentage", (24.9, 400.1)))
+      for past in (below, above)),
+    *(({"penalties": {name: past}}, f"tuning.penalties.{name}", "from 0 to 10")
+      for name in pipeline.PENALTIES for past in (-0.1, 10.1)),
+    ({"grid": "quadtree"}, "tuning.grid", GRIDS_SAID),
+    ({"grid": "octihanan"}, "tuning.grid", GRIDS_SAID),
+    ({"grid": "Octilinear"}, "tuning.grid", GRIDS_SAID),
+    ({"grid": ""}, "tuning.grid", GRIDS_SAID),
+    ({"grid": 3}, "tuning.grid", GRIDS_SAID),
+    ({"grid": None}, "tuning.grid", GRIDS_SAID),
+    ({"merge_distance": "75"}, "tuning.merge_distance", "from 5 to 500"),
+    ({"merge_distance": True}, "tuning.merge_distance", "from 5 to 500"),
+    ({"merge_distance": None}, "tuning.merge_distance", "from 5 to 500"),
+    ({"grid_size": "150"}, "tuning.grid_size", "from 25 to 400"),
+    ({"grid_size": [150]}, "tuning.grid_size", "from 25 to 400"),
+    ({"penalties": {"deg90": "1.5"}}, "tuning.penalties.deg90", "from 0 to 10"),
+    ({"penalties": {"deg180": False}}, "tuning.penalties.deg180", "from 0 to 10"),
+    ({"penalties": {"diagonal": None}}, "tuning.penalties.diagonal", "from 0 to 10"),
+    ({"merge_distance": 75, "penalties": {"deg45": 3, "deg90": 11}},
+     "tuning.penalties.deg90", "from 0 to 10"),
+    ({"penalties": None}, "tuning.penalties", "must be an object of deg45, deg90"),
+    ({"penalties": 2}, "tuning.penalties", "must be an object of deg45, deg90"),
+    ({"penalties": [1, 2]}, "tuning.penalties", "must be an object of deg45, deg90"),
+    ({"gridsize": 100}, "tuning", "does not take gridsize"),
+    ({"vertical": 1}, "tuning", "does not take vertical"),
+    ({"merge_distance": 75, "ilp": True, "density": 10}, "tuning", "does not take density, ilp"),
+    ({"penalties": {"vertical": 1}}, "tuning.penalties", "does not take vertical"),
+    ({"penalties": {"deg45": 3, "deg46": 1}}, "tuning.penalties", "does not take deg46"),
+    (None, "tuning", "must be an object"),
+    ("fast", "tuning", "must be an object"),
+    (7, "tuning", "must be an object"),
+    ([], "tuning", "must be an object"),
+]
+
+
+@pytest.mark.parametrize("tuning,field,said", REFUSED_TUNINGS)
+def test_graph_build_refuses_a_bad_tuning_naming_the_field_before_any_tool_starts(
+        client, tmp_path, monkeypatch, tuning, field, said):
+    small_home(tmp_path, monkeypatch)
+    fake = FakeLoom(monkeypatch)
+    params = {"key": KEY, "tuning": tuning}
+    error = client.call("graph.build", params)["error"]
+    assert error["code"] == -32602, error
+    check(error["data"], "ErrorData")
+    assert error["data"]["kind"] == "params"
+    hint = error["data"]["hint"]
+    assert hint.startswith(field + " ") and said in hint, hint
+    assert fake.calls == [], "no tool started"
+    assert not (config.graphs_dir() / KEY).exists(), "and nothing was stored or begun"
+    assert invalid(params, "GraphBuildParams"), "the schema refuses what the server does"
+
+
+def test_the_schema_holds_the_tuning_and_the_table_it_is_judged_by():
+    defs = SCHEMA["$defs"]
+    params = defs["GraphBuildParams"]
+    assert params["required"] == ["key"], "tuning is optional"
+    assert params["properties"]["tuning"] == {"$ref": "#/$defs/LayoutTuning"}
+    tuning, penalties = defs["LayoutTuning"], defs["LayoutPenalties"]
+    assert tuning["type"] == penalties["type"] == "object"
+    assert tuning["additionalProperties"] is False and penalties["additionalProperties"] is False
+    assert "required" not in tuning and "required" not in penalties
+    assert list(tuning["properties"]) == ["merge_distance", "grid", "grid_size", "penalties"]
+    assert tuning["properties"]["penalties"] == {"$ref": "#/$defs/LayoutPenalties"}
+    assert tuning["properties"]["grid"]["enum"] == list(pipeline.GRIDS)
+    assert pipeline.GRID_DEFAULT in pipeline.GRIDS
+    for name, tunable in (("merge_distance", pipeline.MERGE_DISTANCE),
+                          ("grid_size", pipeline.GRID_SIZE)):
+        field = tuning["properties"][name]
+        assert (field["type"], field["minimum"], field["maximum"]) == (
+            "number", tunable.low, tunable.high), name
+    assert list(penalties["properties"]) == list(pipeline.PENALTIES)
+    for name, tunable in pipeline.PENALTIES.items():
+        field = penalties["properties"][name]
+        assert (field["type"], field["minimum"], field["maximum"]) == (
+            "number", tunable.low, tunable.high), name
+        assert str(tunable.flag) in field["description"], "each names the flag it writes"
+    # The documented shape validates; a field that is not on the list does not.
+    check({"key": KEY}, "GraphBuildParams")
+    check({"key": KEY, "tuning": {}}, "GraphBuildParams")
+    check({"key": KEY, "tuning": TUNING}, "GraphBuildParams")
+    check(TUNING, "LayoutTuning")
+    check(TUNING["penalties"], "LayoutPenalties")
+    assert invalid({**TUNING, "vertical": 1}, "LayoutTuning")
+    assert invalid({**TUNING, "penalties": {**TUNING["penalties"], "vertical": 1}}, "LayoutTuning")
+    assert invalid({"key": KEY, "tuning": None}, "GraphBuildParams")
+    assert invalid({"key": KEY, "tuning": {"grid": "quadtree"}}, "GraphBuildParams")
+    # What a layout records is the schema's own type, flags included.
+    flags = ["octi", ["-b", "hexalinear", "-g", "150%", "--pen-45", "3"]]
+    meta = {"feed": KEY, "feed_sha256": "0" * 64, "mode": "all", "agency": None,
+            "label_pattern": None, "label_strip": None, "loom": None,
+            "stages": [["gtfs2graph", ["-m", "all"]], ["topo", ["-d", "75"]], ["loom", []], flags],
+            "engine": __version__, "made": "2026-10-09T00:00:00+00:00", "migrated": False}
+    check(meta, "LayoutMeta")
