@@ -385,6 +385,64 @@ def _style(value: Any) -> Style | None:
     return style
 
 
+def _tuned(path: str, number: Any, tunable: pipeline.Tunable) -> Any:
+    """A number of the tuning inside its closed range, as given; the sentence
+    names its field by the path a client wrote and says what it counts."""
+    if not _number(number) or not tunable.low <= number <= tunable.high:
+        raise invalid_params(f"{path} must be from {tunable.low:g} to {tunable.high:g}, "
+                             f"{tunable.unit}")
+    return number
+
+
+def _penalties(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise invalid_params("tuning.penalties must be an object of "
+                             + ", ".join(pipeline.PENALTIES))
+    left = dict(value)
+    fields: dict[str, Any] = {}
+    for name, tunable in pipeline.PENALTIES.items():
+        if name in left:
+            fields[name] = _tuned(f"tuning.penalties.{name}", left.pop(name), tunable)
+    _no_extra("tuning.penalties", left)
+    return fields
+
+
+def _tuning(value: Any) -> dict[str, Any]:
+    """The tuning a client asked a layout to be made with, judged before any
+    tool starts.
+
+    Only called when the parameter is present, so ``tuning: null`` is refused
+    rather than taken for ``tuning`` left out, as ``render.stage``'s ``date``
+    is. An object of optional fields, LOOM's own flags by name with no slider
+    mapped over them (the table is ``pipeline``'s): ``merge_distance`` and
+    ``grid_size`` numbers inside their closed ranges, ``grid`` one of
+    ``pipeline.GRIDS``, ``penalties`` an object of the five costs, each inside
+    its range. Any other key is refused, at either level, and so is a string
+    where a number goes; every sentence names its field as the client wrote it.
+
+    The result is the fields as given. What they mean for the tools' flags,
+    and for the layout's id, is ``pipeline.stages_for``'s."""
+    if not isinstance(value, dict):
+        raise invalid_params("tuning must be an object of LOOM's own settings, or left out")
+    left = dict(value)
+    fields: dict[str, Any] = {}
+    if "merge_distance" in left:
+        fields["merge_distance"] = _tuned("tuning.merge_distance", left.pop("merge_distance"),
+                                          pipeline.MERGE_DISTANCE)
+    if "grid" in left:
+        grid = left.pop("grid")
+        if not isinstance(grid, str) or grid not in pipeline.GRIDS:
+            raise invalid_params("tuning.grid must be one of " + ", ".join(pipeline.GRIDS))
+        fields["grid"] = grid
+    if "grid_size" in left:
+        fields["grid_size"] = _tuned("tuning.grid_size", left.pop("grid_size"),
+                                     pipeline.GRID_SIZE)
+    if "penalties" in left:
+        fields["penalties"] = _penalties(left.pop("penalties"))
+    _no_extra("tuning", left)
+    return fields
+
+
 # ---- the export methods' parameters: a preset, a page, the options, a plan
 
 def _number(value: Any) -> bool:
@@ -752,10 +810,15 @@ class EngineEndpoint(Endpoint):
         key = _feed_key(left.pop("key", None))
         force = _flag(left, "force")
         overrides = _overrides(left)
+        # The tuning's flags are part of the layout's id, so a tuned layout is
+        # a layout of its own; a tuning of nothing or of LOOM's defaults gives
+        # the stages every earlier build ran with, and the id stored today.
+        tuned = pipeline.stages_for(_tuning(left.pop("tuning")) if "tuning" in left else None)
         _no_extra("graph.build", left)
 
         def work(job: loom.Job, progress: Progress) -> dict[str, Any]:
-            layout = pipeline.lay_out(key, force=force, progress=progress, **overrides)
+            layout = pipeline.lay_out(key, force=force, stages=tuned, progress=progress,
+                                      **overrides)
             paths = layout.paths
             octi = LineGraph.from_geojson(paths["octi"])
             pipeline.require_edges(layout.feed, octi)

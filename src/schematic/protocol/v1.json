@@ -179,7 +179,7 @@
             "minItems": 2,
             "maxItems": 2
           },
-          "description": "The graph-to-graph stages and their arguments, in order."
+          "description": "The graph-to-graph stages and their arguments, in order. A layout laid out with a tuning shows LOOM's flags for it here (topo's -d; octi's -b, -g, --pen-N and --diag-pen), written as LOOM prints numbers; a field left at LOOM's default shows none."
         },
         "engine": {
           "type": "string",
@@ -210,7 +210,7 @@
       "additionalProperties": false
     },
     "GraphBuildParams": {
-      "description": "Lay a registered feed out: gtfs2graph, topo, loom and octi, stored under the home as one layout named by the hash of its inputs (the feed's bytes, the mode, the agency, the label options, the LOOM build). The same inputs name the same layout; a layout already stored is answered without running anything. Mode, agency and the label options default to the registry entry.",
+      "description": "Lay a registered feed out: gtfs2graph, topo, loom and octi, stored under the home as one layout named by the hash of its inputs (the feed's bytes, the mode, the agency, the label options, the tuning, the LOOM build). The same inputs name the same layout; a layout already stored is answered without running anything. Mode, agency and the label options default to the registry entry; the tuning, to LOOM's own settings.",
       "type": "object",
       "properties": {
         "key": {
@@ -240,11 +240,77 @@
           "type": "boolean",
           "default": false,
           "description": "Lay the feed out again under the same id. The stored layout stays until the new set is whole, then is replaced; a new layout may place stations differently."
+        },
+        "tuning": {
+          "$ref": "#/$defs/LayoutTuning"
         }
       },
       "required": [
         "key"
       ],
+      "additionalProperties": false
+    },
+    "LayoutTuning": {
+      "description": "LOOM's own settings for a layout, by name, with no slider mapped over them. Every field is optional. Each is passed to the tool it belongs to as that tool's flag (merge_distance to topo as -d; grid, grid_size and the penalties to octi as -b, -g and --pen-N or --diag-pen), and the flags are part of the layout's id: a tuned layout is a layout of its own, the same tuning always names the same one, and LayoutMeta.stages shows the flags. A field equal to LOOM's default writes no flag, so leaving the object out, sending {} and sending nothing but defaults all name the layout stored today. Numbers are written as LOOM's own help prints them (50, 1.5, never 50.0), so equal values name the same layout whether they were sent as integers or as decimals. A value outside its range, a grid that is not one of the four, a field that is not on the list and a null where an object goes are refused with the params kind and a sentence naming the field (tuning.merge_distance, tuning.penalties.deg45), before any tool starts. LOOM's other flags are not offered.",
+      "type": "object",
+      "properties": {
+        "merge_distance": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 500,
+          "description": "How far apart two segments of track may be, in metres, and still be merged into one (topo's -d, --max-aggr-dist). LOOM's default is 50, which writes no flag."
+        },
+        "grid": {
+          "enum": ["octilinear", "ortholinear", "orthoradial", "hexalinear"],
+          "description": "The grid octi lays the network on (octi's -b, --base-graph): octilinear, the 45-degree multiples the map has always been drawn on, ortholinear, orthoradial or hexalinear. LOOM's default is octilinear, which writes no flag. Its research variants (quadtree, octihanan, chulloctilinear, porthoradial, pseudoorthoradial) are not offered."
+        },
+        "grid_size": {
+          "type": "number",
+          "minimum": 25,
+          "maximum": 400,
+          "description": "The grid's cell length as a percentage of the distance between adjacent stations (octi's -g, --grid-size, written with a percent sign). A smaller cell gives octi more places to put a station, a larger one fewer. LOOM's default is 100, which writes no flag."
+        },
+        "penalties": {
+          "$ref": "#/$defs/LayoutPenalties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LayoutPenalties": {
+      "description": "The costs octi adds while it routes, in its own scale, which has no unit: a higher cost makes octi avoid what it prices. Every field is optional, from 0 to 10, and one equal to LOOM's default writes no flag.",
+      "type": "object",
+      "properties": {
+        "deg45": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "octi's --pen-45, the cost where a route makes that angle. LOOM's default is 2."
+        },
+        "deg90": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "octi's --pen-90, the cost where a route makes that angle. LOOM's default is 1.5."
+        },
+        "deg135": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "octi's --pen-135, the cost where a route makes that angle. LOOM's default is 1."
+        },
+        "deg180": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "octi's --pen-180, the cost where a route makes that angle. LOOM's default is 0."
+        },
+        "diagonal": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "octi's --diag-pen, the cost of running on a diagonal. LOOM's default is 0.5."
+        }
+      },
       "additionalProperties": false
     },
     "StageSummary": {
