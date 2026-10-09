@@ -22,8 +22,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from schematic import animate, config, feeds, pipeline, site
-from schematic.linegraph import LineGraph
+from schematic import animate, config, feeds, pipeline, site, theme_thumbnails
+from schematic.linegraph import Edge, Line, LineGraph, Node
+from schematic.names import display_name
 from schematic.render import Style, render
 from schematic.schedule import Call, Trip
 
@@ -782,6 +783,9 @@ def test_every_control_has_a_role_a_name_a_ring_and_a_state_in_both_themes(tmp_p
         ("speed", "button", "Playback speed 60×"), ("more", "button", "Less"),
         ("lines-all", "button", "All"), ("lines-none", "button", "None"),
         *[(c, "button", c[-1]) for c in chips], ("labels-toggle", "button", "Labels"),
+        # After the stage, in the trip's own aside (issue 49): the station cursor,
+        # named for the station it is on, the first from A to Z.
+        ("station-pick", "button", "Stop 0"),
     ]
     for theme, token in tokens.items():
         run = seen[theme]
@@ -1262,6 +1266,8 @@ main(async browser => {
 
 # The header's stops at a width where the panel is closed, in the order the page has them.
 CLOSED_PANEL = ["view-geo", "view-map", "view-linear", "view-string", "play", "scrub", "speed", "more"]
+# The one stop after the stage: the station cursor, in the trip's aside (issue 49).
+AFTER_STAGE = ["station-pick"]
 
 
 @needs_browser
@@ -1292,7 +1298,8 @@ def test_the_stage_is_named_and_rings_like_the_headers_controls_when_tab_reaches
         if wide["walk"][-1] == "stage":
             reached.append(("wide", wide))
         else:
-            assert wide["walk"][-1] == "(edge)" and wide["walk"][-2] == "labels-toggle", wide["walk"]
+            assert wide["walk"][-2 - len(AFTER_STAGE):] == ["labels-toggle", *AFTER_STAGE, "(edge)"], \
+                wide["walk"]
         for where, run in reached:
             stage = run["stage"]
             assert (stage["tag"], stage["label"]) == ("main", "Map"), (theme, where, stage)
@@ -1309,11 +1316,12 @@ def test_the_stage_is_named_and_rings_like_the_headers_controls_when_tab_reaches
         assert scrolls["stage"]["mask"] == "none", scrolls["stage"]["mask"]
 
         # Where the map fits exactly, Tab does not reach the stage, and the header's
-        # stops are those it had: the page's own controls and then the edge.
+        # stops are those it had: the page's own controls, the station cursor after
+        # where the stage would be, and then the edge.
         fits = runs["fits"]
         assert fits["overflow"] <= 0 and "stage" not in fits["walk"], (theme, fits)
         assert fits["walk"][0].startswith("a.back"), fits["walk"]
-        assert fits["walk"][1:] == CLOSED_PANEL + ["(edge)"], fits["walk"]
+        assert fits["walk"][1:] == CLOSED_PANEL + AFTER_STAGE + ["(edge)"], fits["walk"]
 
 
 def test_the_stage_ring_clears_three_to_one_on_the_page_and_on_the_maps_card():
@@ -1344,7 +1352,7 @@ def test_the_stage_ring_clears_three_to_one_on_the_page_and_on_the_maps_card():
 # these names, in this order. A new method goes at the end, and into this list.
 SEAM = ["advance", "seek", "setCapture", "setPlaying", "setSpeed", "setView", "setGeo",
         "showView", "hasGeo", "setLabels", "setRoutes", "setFrame", "setTheme", "settle",
-        "bounds", "onDraw", "state"]
+        "bounds", "onDraw", "state", "setTrip"]
 
 PLAYING = BROWSER + r"""
 main(async browser => {
@@ -2404,3 +2412,597 @@ def test_the_rows_names_are_in_the_label_colour_with_a_swatch_in_the_time_view(t
     # Nothing a theme draws moves anything: the same coordinates in both, view by view.
     for view in seen["warm-dark"]["views"]:
         assert seen["warm-dark"]["views"][view]["drawn"] == seen["sepia"]["views"][view]["drawn"], view
+
+
+# ------------------------------------------------------------------ route mode
+#
+# Engine issue 49 (app ADR-048, app spec 030). The page finds a trip between two
+# stations itself, over the line graph its own drawing carries, and answers it as
+# `state().trip`; everything keyed to a line the trip does not ride fades to 0.16
+# and every station name off the trip is hidden, unless an exporter is driving
+# the page. Three networks, each built in code with its places set, as
+# theme_thumbnails builds issue 53's:
+#
+# - spec 030's, the Blue, Red and Green Lines its FR-006 names, which issue 53's
+#   twelve stations ("Stop 1,5" on lines A to D) cannot answer;
+# - issue 53's own (theme_thumbnails.fixture), whose four lines meet at two
+#   interchanges, one of them on three lines, for the fade;
+# - a town of ties, four pieces that never meet, each deciding one trip by one
+#   part of the cost rule.
+
+def _lines_graph(lines: dict[str, tuple[str, list[tuple[str, str, float, float]]]],
+                 loom: dict[str, dict] | None = None) -> LineGraph:
+    """Each line a colour and its stations in order, each station an id, a name
+    and a place; two lines between the same two stations get an edge each. A
+    line's id is its label, and ``loom`` is LOOM's properties by node."""
+    nodes: dict[str, Node] = {}
+    edges: list[Edge] = []
+    for label, (colour, stops) in lines.items():
+        for nid, name, x, y in stops:
+            nodes.setdefault(nid, Node(id=nid, coord=(x, y), station_id=nid, station_label=name,
+                                       props=dict((loom or {}).get(nid, {}))))
+        for (a, _, ax, ay), (b, _, bx, by) in zip(stops, stops[1:]):
+            edges.append(Edge(src=a, dst=b, geometry=[(ax, ay), (bx, by)],
+                              lines=[Line(id=label, label=label, color=colour)]))
+    return LineGraph(nodes=nodes, edges=edges)
+
+
+def _trip_page(into: Path, stem: str, graph: LineGraph) -> str:
+    """The page of ``graph`` as drawn, with a trip a line over the first edge
+    that carries it, so every line has a chip and a train at seven."""
+    drawn = render(graph, title=stem)
+    first: dict[str, Edge] = {}
+    for edge in graph.edges:
+        for line in edge.lines:
+            first.setdefault(line.label, edge)
+    seven = 7 * 3600
+    trips = [Trip(f"t{i}", label, "end", [Call(e.src, e.src, seven, seven + 20),
+                                          Call(e.dst, e.dst, seven + 120, seven + 140)])
+             for i, (label, e) in enumerate(first.items())]
+    animation = animate.build(drawn, graph, trips, dt.date(2026, 9, 10))
+    _, html = animate.write(animation, drawn.svg, into, stem=stem.lower(), name=stem)
+    return html.as_uri()
+
+
+def _stations(names: list[str], *at: tuple[float, float]) -> list[tuple[str, str, float, float]]:
+    return [(name.lower(), name, float(x), float(y)) for name, (x, y) in zip(names, at)]
+
+
+# App spec 030's fixture: the Blue Line west to east, the Red Line north to south
+# across it at Cedar, the Green Line west to east across the Red at Hazel. A
+# station's id is its name in lower case.
+SPEC_030 = {
+    "Blue Line": ("#2f6fd6", _stations(["Alder", "Birch", "Cedar", "Damson", "Elm"],
+                                       (1, 6), (3, 6), (5, 6), (7, 6), (9, 6))),
+    "Red Line": ("#d6322f", _stations(["Fir", "Cedar", "Gorse", "Hazel", "Oak"],
+                                      (5, 8), (5, 6), (5, 4), (5, 2), (5, 0))),
+    "Green Line": ("#1e9150", _stations(["Ivy", "Hazel", "Juniper", "Larch", "Maple"],
+                                        (3, 2), (5, 2), (7, 2), (9, 2), (11, 2))),
+}
+SPEC_030_NAMES = {nid: name for _, stops in SPEC_030.values() for nid, name, _, _ in stops}
+
+# FR-006's three trips: the legs, and the sentences the spec writes for them.
+FR_006 = {
+    ("alder", "damson"): (
+        [("Blue Line", "elm", "alder", "damson", 3)],
+        ["At Alder, board the Blue Line towards Elm. Ride 3 stops to Damson and get off."]),
+    ("alder", "gorse"): (
+        [("Blue Line", "elm", "alder", "cedar", 2), ("Red Line", "oak", "cedar", "gorse", 1)],
+        ["At Alder, board the Blue Line towards Elm. Ride 2 stops to Cedar.",
+         "At Cedar, change to the Red Line towards Oak. Ride 1 stop to Gorse and get off."]),
+    ("alder", "larch"): (
+        [("Blue Line", "elm", "alder", "cedar", 2), ("Red Line", "oak", "cedar", "hazel", 2),
+         ("Green Line", "maple", "hazel", "larch", 2)],
+        ["At Alder, board the Blue Line towards Elm. Ride 2 stops to Cedar.",
+         "At Cedar, change to the Red Line towards Oak. Ride 2 stops to Hazel.",
+         "At Hazel, change to the Green Line towards Maple. Ride 2 stops to Larch and get off."]),
+}
+
+
+def _legs(trip: dict) -> list[tuple]:
+    return [(leg["line"], leg["towards"], leg["board"], leg["alight"], leg["stops"])
+            for leg in trip["legs"]]
+
+
+def _steps(trip: dict, names: dict[str, str]) -> list[str]:
+    """FR-006's sentences, composed from a trip as the app's list composes them."""
+    out = []
+    for i, leg in enumerate(trip["legs"]):
+        n, last = leg["stops"], i == len(trip["legs"]) - 1
+        out.append(f"At {names[leg['board']]}, {'change to' if i else 'board'} the {leg['line']}"
+                   f" towards {names[leg['towards']]}. Ride {n} stop{'' if n == 1 else 's'}"
+                   f" to {names[leg['alight']]}{' and get off' if last else ''}.")
+    return out
+
+
+# The town of ties. a1 to b1 is decided by the penalty: Long's 6 stops beat Up and
+# Over's 4 and a change (8), where 4 would win if a change cost nothing. a2 to b2
+# by fewer changes: Far's 8 stops tie Hop and Skip's 4 and a change. a3 to b3 by
+# the label: Pine and Quay run the same two stops. a4 to b4 by the station: X and
+# Y share two stations, and a change at either costs the same.
+def _row(*stops: tuple[str, float, float]) -> list[tuple[str, str, float, float]]:
+    return [(nid, nid.upper(), float(x), float(y)) for nid, x, y in stops]
+
+
+TIES = {
+    "Long": ("#2f6fd6", _row(("a1", 0, 0), *[(f"l{i}", i, 0) for i in range(1, 6)], ("b1", 6, 0))),
+    "Up": ("#d6322f", _row(("a1", 0, 0), ("u1", 1, 2), ("c1", 3, 2))),
+    "Over": ("#1e9150", _row(("c1", 3, 2), ("o1", 5, 2), ("b1", 6, 0))),
+    "Far": ("#c2690f", _row(("a2", 0, 5), *[(f"f{i}", i, 5) for i in range(1, 8)], ("b2", 8, 5))),
+    "Hop": ("#7b3f98", _row(("a2", 0, 5), ("h1", 1, 7), ("c2", 3, 7))),
+    "Skip": ("#00838f", _row(("c2", 3, 7), ("s1", 5, 7), ("b2", 8, 5))),
+    "Pine": ("#8d6e63", _row(("a3", 0, 10), ("m3", 1, 10), ("b3", 2, 10))),
+    "Quay": ("#558b2f", _row(("a3", 0, 10), ("m3", 1, 10), ("b3", 2, 10))),
+    "X": ("#ad1457", _row(("a4", 0, 13), ("m4", 1, 13), ("n4", 2, 13))),
+    "Y": ("#283593", _row(("m4", 1, 13), ("n4", 2, 13), ("b4", 3, 13))),
+}
+TIE_TRIPS = {
+    ("a1", "b1"): [("Long", "b1", "a1", "b1", 6)],
+    ("a2", "b2"): [("Far", "b2", "a2", "b2", 8)],
+    ("a3", "b3"): [("Pine", "b3", "a3", "b3", 2)],
+    ("a4", "b4"): [("X", "n4", "a4", "m4", 1), ("Y", "b4", "m4", "b4", 2)],
+}
+
+# What a capture's frames are compared at (tests/test_determinism.py): a level or
+# so is the rasteriser, tens are content.
+DRIFT = 8
+
+# Each run opens a page, holds its clock and takes the steps it is given, keeping
+# every step's answer. `look` reads what route mode changes, by the line it is
+# keyed to, as computed opacities so an attribute and a rule read alike, and the
+# station names the map shows; `marks` is every attribute and inline style it
+# could write, element by element, for "nothing changed".
+TRIPS = BROWSER + r"""
+// The page's own dots, each with its line and node: the page builds them line by
+// line and row by row, one to each drawn station of the row.
+const dotsOf = () => {
+  const data = JSON.parse(document.getElementById("data").textContent);
+  const drawn = new Set([...document.querySelectorAll("#stations circle[data-node]")]
+    .map(c => c.getAttribute("data-node")));
+  const els = document.querySelectorAll("#linear-stations circle"), out = [];
+  for (const line of data.linear.lines) {
+    for (const row of line.rows) {
+      for (const pair of row.nodes) {
+        if (drawn.has(pair[0])) out.push({ line: line.label, node: pair[0], el: els[out.length] });
+      }
+    }
+  }
+  return out;
+};
+// Where a station sits on the screen, by its name, read off the map's own circle.
+const placeOf = name => {
+  const names = JSON.parse(document.getElementById("data").textContent).linear.names;
+  const node = Object.keys(names).find(n => names[n] === name);
+  const c = document.querySelector('#stations circle[data-node="' + node + '"]');
+  const svg = document.querySelector("#stage svg");
+  return new DOMPoint(+c.getAttribute("cx"), +c.getAttribute("cy")).matrixTransform(svg.getScreenCTM());
+};
+const inPage = (fn, arg) => page => page.evaluate(
+  `(${fn})(${JSON.stringify(arg)}, ${dotsOf}, ${placeOf})`);
+const look = inPage((_, dotsOf) => {
+  const data = JSON.parse(document.getElementById("data").textContent);
+  const labelOf = {};
+  for (const [label, colour] of Object.entries(data.lines)) labelOf[colour.toLowerCase()] = label;
+  const op = el => +getComputedStyle(el).opacity;
+  const out = { group: {}, dots: {}, trains: {}, band: {}, row: {}, names: [], hidden: 0 };
+  const add = (key, label, value) => {
+    const seen = out[key][label] = out[key][label] || [];
+    if (!seen.includes(value)) seen.push(value);
+  };
+  for (const g of document.querySelectorAll("#lines g.line")) add("group", g.getAttribute("data-line"), op(g));
+  for (const d of dotsOf()) add("dots", d.line, op(d.el));
+  for (const t of document.querySelectorAll("#trains .train")) {
+    add("trains", labelOf[t.getAttribute("fill").toLowerCase()], op(t));
+  }
+  const bands = document.querySelectorAll("#stringline > g:not(#stringline-axis)");
+  const rows = document.querySelectorAll("#linear-names text.rowname");
+  data.linear.lines.forEach((line, i) => {
+    add("band", line.label, op(bands[i]));
+    add("row", line.label, +rows[i].getAttribute("opacity"));
+  });
+  for (const t of document.querySelectorAll("#linear-labels text")) {
+    if (getComputedStyle(t).visibility === "hidden") out.hidden++;
+    else if (+t.getAttribute("opacity") > 0.5) out.names.push(t.textContent);
+  }
+  return out;
+});
+const marks = inPage(() => [...document.querySelectorAll("#stage svg *")].map(el =>
+  [el.tagName, el.getAttribute("opacity"), el.getAttribute("visibility"), el.style.display,
+   el.style.opacity, el.style.visibility].join("|")).join("\n"));
+// The opacity of one line's group.
+const groupOf = label => +getComputedStyle([...document.querySelectorAll("#lines g.line")]
+  .find(g => g.getAttribute("data-line") === label)).opacity;
+const doStep = async (page, step) => {
+  const P = (fn, arg) => page.evaluate(fn, arg);
+  switch (step.do) {
+    case "trip": return P(a => window.__present.setTrip(a[0], a[1]), [step.from, step.to]);
+    // A line's group read in the same task as the call: what the call itself
+    // drew, before any frame could move a fade on.
+    case "trip+group": return page.evaluate(`(a => ({ answer: window.__present.setTrip(a[0], a[1]),
+      group: (${groupOf})(a[2]) }))(${JSON.stringify([step.from, step.to, step.line])})`);
+    case "until": return page.waitForFunction(`(${groupOf})(${JSON.stringify(step.line)}) === ${step.opacity}`,
+                                              null, { timeout: 10000 }).then(() => true);
+    case "state": return P(() => {
+      const s = window.__present.state();
+      return { trip: s.trip, changePenalty: s.changePenalty };
+    });
+    case "routes": return P(keep => window.__present.setRoutes(keep), step.keep);
+    case "capture": return P(on => window.__present.setCapture(on), step.on);
+    case "view": return P(name => { window.__present.showView(name, 0); window.__present.settle(); },
+                          step.name);
+    case "settle": return P(() => window.__present.settle());
+    case "look": await frames(page, 2); return look(page);
+    case "marks": await frames(page, 2); return marks(page);
+    case "shot":
+      await frames(page, 2);
+      return (await page.screenshot({ type: "png" })).toString("base64");
+    case "has": return P(ids => ids.map(id => !!document.getElementById(id)), step.ids);
+    case "tab":
+      for (let i = 0; i < 60; i++) {
+        await page.keyboard.press("Tab");
+        if ((await active(page)) === step.to) return true;
+      }
+      return false;
+    case "keys":
+      for (const key of step.keys) await page.keyboard.press(key);
+      await frames(page, 2);
+      return P(() => {
+        const panel = document.querySelector("#trip .panel"), note = panel.querySelector("p");
+        return { focus: document.activeElement && document.activeElement.id,
+                 name: document.getElementById("station-pick").textContent,
+                 panel: panel.hidden ? null : { note: note.hidden ? null : note.textContent,
+                   steps: [...panel.querySelectorAll("li")].map(li => li.textContent) },
+                 trip: window.__present.state().trip };
+      });
+    // How far the cursor's ring is from the place of the station it names.
+    case "ring": return inPage((name, _, placeOf) => {
+      const box = document.getElementById("station-pick").getBoundingClientRect(), at = placeOf(name);
+      return [box.left + box.width / 2 - at.x, box.top + box.height / 2 - at.y];
+    }, step.name)(page);
+    // A press `by` pixels down and right of a station, brought to the middle first.
+    case "press": {
+      const at = await inPage((a, _, placeOf) => {
+        const first = placeOf(a[0]);
+        scrollBy(first.x - innerWidth / 2, first.y - innerHeight / 2);
+        const p = placeOf(a[0]);
+        return [p.x + a[1], p.y + a[1]];
+      }, [step.name, step.by || 0])(page);
+      await page.mouse.click(at[0], at[1]);
+      await frames(page, 2);
+      return P(() => window.__present.state().trip);
+    }
+  }
+  throw new Error("no step " + step.do);
+};
+main(async browser => {
+  const out = [];
+  for (const run of job.runs) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                           reducedMotion: run.reduce ? "reduce" : "no-preference" });
+    const page = await ctx.newPage();
+    const seen = { problems: [], results: [] };
+    page.on("pageerror", e => seen.problems.push(e.message));
+    await page.goto(run.url, { waitUntil: "load" });
+    await ready(page);
+    // The clock held where the page opened, so nothing moves between two reads.
+    await page.evaluate(() => {
+      window.__present.setPlaying(false);
+      window.__present.seek(7 * 3600);
+    });
+    for (const step of run.steps) {
+      try {
+        seen.results.push(await doStep(page, step));
+      } catch (e) {
+        seen.problems.push(step.do + ": " + String(e.message).split("\n")[0]);
+        seen.results.push(null);
+      }
+    }
+    out.push(seen);
+    await ctx.close();
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+def _trips(runs: list[dict]) -> list[dict]:
+    return _run(TRIPS, {"runs": runs})
+
+
+@needs_browser
+def test_spec_030s_three_trips_answer_the_legs_and_the_sentences_it_lists(tmp_path):
+    url = _trip_page(tmp_path, "Spec030", _lines_graph(SPEC_030))
+    asked = [(a, b) for (a, b) in FR_006 for _ in (0, 1)]       # each one twice
+    [run] = _trips([{"url": url, "reduce": True, "steps":
+                     [{"do": "trip", "from": a, "to": b} for a, b in asked] + [{"do": "state"}]}])
+    assert not run["problems"], run["problems"]
+    answers = run["results"][:-1]
+    for pair, answer in zip(asked, answers):
+        legs, sentences = FR_006[pair]
+        assert (answer["from"], answer["to"]) == pair
+        assert _legs(answer) == legs, (pair, answer)
+        assert answer["changes"] == len(legs) - 1 and "reason" not in answer, answer
+        # The spec's own words, made from the legs and the names the map writes.
+        assert _steps(answer, SPEC_030_NAMES) == sentences, pair
+    # The same call twice gives the same answer, and state() says what the last said.
+    assert answers[0::2] == answers[1::2]
+    assert run["results"][-1] == {"trip": answers[-1], "changePenalty": 4}
+
+
+@needs_browser
+def test_the_cost_is_stops_and_four_a_change_and_ties_go_to_changes_label_station(tmp_path):
+    url = _trip_page(tmp_path, "Tieton", _lines_graph(TIES))
+    [run] = _trips([{"url": url, "reduce": True, "steps":
+                     [{"do": "trip", "from": a, "to": b} for a, b in TIE_TRIPS]}])
+    assert not run["problems"], run["problems"]
+    for (pair, legs), answer in zip(TIE_TRIPS.items(), run["results"]):
+        print(pair, _legs(answer))
+        assert _legs(answer) == legs, (pair, answer)
+        assert answer["changes"] == len(legs) - 1
+
+
+@needs_browser
+def test_a_hidden_line_is_routed_around_and_with_none_left_the_answer_names_it(tmp_path):
+    url = _trip_page(tmp_path, "Tieton", _lines_graph(TIES))
+    without = lambda *gone: [label for label in TIES if label not in gone]
+    [run] = _trips([{"url": url, "reduce": True, "steps": [
+        {"do": "trip", "from": "a1", "to": "b1"},
+        {"do": "routes", "keep": without("Long")},         # answered again: around Long
+        {"do": "state"}, {"do": "look"},
+        {"do": "routes", "keep": without("Long", "Up")},   # and now no way at all
+        {"do": "state"}, {"do": "look"},
+        {"do": "routes", "keep": None},                    # every line again
+        {"do": "state"},
+        {"do": "routes", "keep": without("Long")},
+        {"do": "trip", "from": "a1", "to": "a3"},          # two pieces nothing joins
+    ]}])
+    assert not run["problems"], run["problems"]
+    _, _, around, around_look, _, gone, gone_look, _, back, _, apart = run["results"]
+    up = {"line": "Up", "towards": "c1", "board": "a1", "alight": "c1", "stops": 2}
+    over = {"line": "Over", "towards": "b1", "board": "c1", "alight": "b1", "stops": 2}
+    assert around["trip"] == {"from": "a1", "to": "b1", "legs": [up, over], "changes": 1,
+                              "hidden": ["Long"]}
+    # Up and Over are ridden; a line off the trip fades with the rest.
+    assert around_look["group"]["Up"] == around_look["group"]["Over"] == [1]
+    assert around_look["group"]["Far"] == [0.16]
+    assert gone["trip"] == {"from": "a1", "to": "b1", "legs": None, "changes": 0,
+                            "reason": "no trip without hidden lines", "hidden": ["Long", "Up"]}
+    # With no trip the map is whole: no line faded and no name hidden.
+    assert all(v == [1] for v in gone_look["group"].values()), gone_look["group"]
+    assert gone_look["hidden"] == 0
+    assert _legs(back["trip"]) == TIE_TRIPS[("a1", "b1")] and "hidden" not in back["trip"]
+    assert apart == {"from": "a1", "to": "a3", "legs": None, "changes": 0,
+                     "reason": "no trip joins these stations"}
+
+
+@needs_browser
+def test_the_same_station_an_unknown_one_and_no_way_answer_a_reason_and_change_nothing(tmp_path):
+    url = _trip_page(tmp_path, "Tieton", _lines_graph(TIES))
+    refused = {("a1", "a1"): "start and end are the same station",
+               ("a1", "nowhere"): "the end is not a station on this map",
+               ("nowhere", "a1"): "the start is not a station on this map",
+               (42, "a1"): "the start is not a station on this map",
+               ("a1", "a3"): "no trip joins these stations"}
+    steps = [{"do": "marks"}]
+    for a, b in refused:
+        steps += [{"do": "trip", "from": a, "to": b}, {"do": "marks"}]
+    # And after a trip that faded the map, a refusal leaves it whole again.
+    steps += [{"do": "trip", "from": "a1", "to": "b1"}, {"do": "marks"},
+              {"do": "trip", "from": "b1", "to": "b1"}, {"do": "marks"}]
+    [run] = _trips([{"url": url, "reduce": True, "steps": steps}])
+    assert not run["problems"], run["problems"]
+    whole, rest = run["results"][0], run["results"][1:]
+    for ((a, b), reason), answer, after in zip(refused.items(), rest[0:10:2], rest[1:10:2]):
+        assert answer == {"from": a, "to": b, "legs": None, "changes": 0, "reason": reason}
+        assert after == whole, (a, b, "the map changed")
+    faded, refusal, after = rest[11], rest[12], rest[13]
+    assert faded != whole, "the trip faded nothing, so the last check proves nothing"
+    assert refusal["reason"] == "start and end are the same station" and after == whole
+
+
+@needs_browser
+def test_off_the_trip_every_line_fades_to_0_16_and_its_names_hide_until_cleared(tmp_path):
+    url = _trip_page(tmp_path, "Twelve", theme_thumbnails.fixture())
+    # A then C, changing at the station on three lines; then B alone, through the
+    # station it shares with A, whose name the map writes on A.
+    steps = [{"do": "look"},
+             {"do": "trip", "from": "x1y5", "to": "x14y2"}, {"do": "look"},
+             {"do": "view", "name": "linear"}, {"do": "look"}, {"do": "view", "name": "map"},
+             {"do": "trip", "from": None, "to": None}, {"do": "look"},
+             {"do": "trip", "from": "x5y9", "to": "x5y1"}, {"do": "look"}]
+    runs = [{"url": url, "reduce": True, "steps": steps},
+            # Under no preference the call draws nothing faded yet, and the fade follows.
+            {"url": url, "reduce": False, "steps": [
+                {"do": "trip+group", "from": "x1y5", "to": "x14y2", "line": "B"},
+                {"do": "until", "line": "B", "opacity": 0.16},
+                {"do": "trip+group", "from": None, "to": None, "line": "B"},
+                {"do": "until", "line": "B", "opacity": 1}]},
+            # Under reduced motion it lands with the call.
+            {"url": url, "reduce": True, "steps": [
+                {"do": "trip+group", "from": "x1y5", "to": "x14y2", "line": "B"}]}]
+    quick, slow, snap = _trips(runs)
+    for run in (quick, slow, snap):
+        assert not run["problems"], run["problems"]
+    before, trip, trip_look, _, linear, _, _, cleared, _, only_b = quick["results"]
+    assert _legs(trip) == [("A", "x15y5", "x1y5", "x11y5", 3), ("C", "x14y2", "x11y5", "x14y2", 1)]
+
+    def faded(seen: dict, ridden: set[str]) -> None:
+        for part in ("group", "dots", "trains", "band"):
+            assert set(seen[part]) == {"A", "B", "C", "D"}, (part, seen[part])
+            for line, opacities in seen[part].items():
+                assert opacities == ([1] if line in ridden else [0.16]), (part, line, opacities)
+
+    shown = sorted(before["names"])
+    assert len(shown) == 12 and before["hidden"] == 0, before
+    faded(trip_look, {"A", "C"})
+    faded(linear, {"A", "C"})
+    # The rows' names, in the gutter of the Linear view.
+    assert linear["row"] == {"A": [1], "B": [0.16], "C": [1], "D": [0.16]}
+    # On the map only the names of the stations the trip passes, each once. The
+    # page writes a name a line and station, fifteen here, eight of them at the
+    # five stations passed; the other seven are hidden.
+    passed = ["Stop 1,5", "Stop 5,5", "Stop 8,5", "Stop 11,5", "Stop 14,2"]
+    assert sorted(trip_look["names"]) == sorted(passed), trip_look["names"]
+    assert trip_look["hidden"] == 7, trip_look["hidden"]
+    # Cleared, everything is as it was.
+    for part in ("group", "dots", "trains", "band"):
+        assert cleared[part] == before[part], part
+    assert sorted(cleared["names"]) == shown and cleared["hidden"] == 0
+    # B alone keeps the name of the station it shares with A, which the map writes on A.
+    faded(only_b, {"B"})
+    assert sorted(only_b["names"]) == ["Stop 5,1", "Stop 5,5", "Stop 5,9"], only_b["names"]
+
+    # Under no preference the fade moves after the call; under reduced motion it lands with it.
+    assert slow["results"][0]["group"] == 1 and slow["results"][1] is True
+    assert slow["results"][2]["group"] == 0.16 and slow["results"][3] is True
+    assert snap["results"][0]["group"] == 0.16
+
+
+# What LOOM says of a line, which the drawing does not: the Express passes e2 and
+# e3 without stopping, which the Local serves; LOOM says the Spur does not stop at
+# z, its only station beyond e4, as it says wrongly of an eighth of the
+# registry's pairs; and T does not run through y from t1 to t2, the other way
+# being allowed. y is a station, so from t1 a rider changes trains there, onto T
+# again; changing onto T3 and back would be the same move at twice the cost.
+LOOMVILLE = {
+    "Express": ("#2f6fd6", _row(("e1", 0, 0), ("e2", 1, 0), ("e3", 2, 0), ("e4", 3, 0))),
+    "Local": ("#d6322f", _row(("e1", 0, 0), ("e2", 1, 0), ("e3", 2, 0), ("e4", 3, 0))),
+    "Spur": ("#1e9150", _row(("e4", 3, 0), ("z", 4, 1))),
+    "T": ("#c2690f", _row(("t1", 0, 4), ("y", 1, 4), ("t2", 2, 4))),
+    "T3": ("#7b3f98", _row(("y", 1, 4), ("t3", 1, 5))),
+}
+LOOMVILLE_PROPS = {
+    "e2": {"not_serving": ["Express"]}, "e3": {"not_serving": ["Express"]},
+    "z": {"not_serving": ["Spur"]},
+    "y": {"excluded_conn": [{"line": "T", "node_from": "t1", "node_to": "t2"}]},
+}
+
+
+@needs_browser
+def test_loom_s_turns_and_stops_are_honoured_and_an_unserved_stop_gives_way_with_a_reason(
+        tmp_path):
+    url = _trip_page(tmp_path, "Loomville", _lines_graph(LOOMVILLE, LOOMVILLE_PROPS))
+    pairs = [("e1", "e4"), ("e1", "e3"), ("e1", "z"), ("t1", "t2"), ("t2", "t1")]
+    [run] = _trips([{"url": url, "reduce": True, "steps":
+                     [{"do": "trip", "from": a, "to": b} for a, b in pairs]}])
+    assert not run["problems"], run["problems"]
+    express, local, spur, barred, allowed = run["results"]
+    # Passing a station is not a stop, and a line neither boards nor alights there.
+    assert _legs(express) == [("Express", "e4", "e1", "e4", 1)], express
+    assert _legs(local) == [("Local", "e4", "e1", "e3", 2)], local
+    # Trusted, not_serving leaves z out of reach; routed as though it were served,
+    # and said so.
+    assert _legs(spur) == [("Express", "e4", "e1", "e4", 3), ("Spur", "z", "e4", "z", 1)], spur
+    assert spur["reason"] == "a stop on this trip is one the map's data says its line does not make"
+    assert "reason" not in express and "reason" not in local
+    # A turn LOOM forbids is never ridden through, in the direction it forbids it:
+    # at a station it is a change of trains, and the first train ends there.
+    assert _legs(barred) == [("T", "y", "t1", "y", 1), ("T", "t2", "y", "t2", 1)], barred
+    assert barred["changes"] == 1
+    assert _legs(allowed) == [("T", "t1", "t2", "t1", 2)], allowed
+
+
+def _worst(a: str, b: str) -> int:
+    """The largest difference of any channel of any pixel between two shots, in RGB."""
+    from PIL import Image, ImageChops
+    import base64
+    import io
+    shot = lambda s: Image.open(io.BytesIO(base64.b64decode(s))).convert("RGB")
+    return max(band[1] for band in ImageChops.difference(shot(a), shot(b)).getextrema())
+
+
+@needs_browser
+def test_while_an_exporter_drives_the_page_a_trip_changes_nothing_it_draws(tmp_path):
+    url = _trip_page(tmp_path, "Spec030", _lines_graph(SPEC_030)) + "?present=1"
+    [run] = _trips([{"url": url, "reduce": True, "steps": [
+        {"do": "capture", "on": True}, {"do": "settle"}, {"do": "shot"}, {"do": "marks"},
+        {"do": "trip", "from": "alder", "to": "damson"}, {"do": "settle"},
+        {"do": "shot"}, {"do": "marks"}, {"do": "state"},
+        # The control: once the exporter lets go, the same trip is drawn.
+        {"do": "capture", "on": False}, {"do": "settle"}, {"do": "shot"}, {"do": "marks"},
+        # And taking hold again with a trip on show leaves the map whole at once.
+        {"do": "capture", "on": True}, {"do": "settle"}, {"do": "shot"}, {"do": "marks"},
+        {"do": "has", "ids": ["trip", "station-pick"]},
+    ]}])
+    assert not run["problems"], run["problems"]
+    r = run["results"]
+    before_shot, before_marks = r[2], r[3]
+    trip, during_shot, during_marks, state = r[4], r[6], r[7], r[8]
+    after_shot, after_marks = r[11], r[12]
+    again_shot, again_marks = r[15], r[16]
+    assert _legs(trip) == FR_006[("alder", "damson")][0] and state["trip"] == trip
+    worst = _worst(before_shot, during_shot)
+    print("captured, before and after setTrip: worst channel", worst)
+    assert during_marks == before_marks and worst <= DRIFT, worst
+    assert after_marks != before_marks and _worst(before_shot, after_shot) > DRIFT, \
+        "the trip draws nothing off capture either, so the check above proves nothing"
+    assert again_marks == before_marks and _worst(before_shot, again_shot) <= DRIFT
+    # Present mode has no picking at all.
+    assert r[17] == [False, False]
+
+
+@needs_browser
+def test_a_station_is_picked_by_keyboard_on_its_dot_or_by_a_press_and_escape_clears(tmp_path):
+    url = _trip_page(tmp_path, "Spec030", _lines_graph(SPEC_030))
+    [run] = _trips([{"url": url, "reduce": True, "steps": [
+        {"do": "tab", "to": "station-pick"},
+        {"do": "keys", "keys": []},                      # on the first station, A to Z
+        {"do": "ring", "name": "Alder"},
+        {"do": "keys", "keys": ["ArrowRight"]},          # the nearest to its right
+        {"do": "ring", "name": "Birch"},
+        {"do": "keys", "keys": ["ArrowLeft", "Enter"]},  # back, and the start
+        {"do": "keys", "keys": ["l"]},                   # Larch, by its letter
+        {"do": "keys", "keys": ["Enter"]},               # the end, and the trip
+        {"do": "keys", "keys": ["Escape"]},
+        {"do": "press", "name": "Damson", "by": 6},      # beside its dot, not on it
+        {"do": "press", "name": "Fir"},
+        {"do": "keys", "keys": []},
+    ]}])
+    assert not run["problems"], run["problems"]
+    (reached, first, ring_a, right, ring_b, start, larch, picked, cleared,
+     pressed, trip, after) = run["results"]
+    assert reached is True
+    assert first["name"] == "Alder" and first["panel"] is None and first["trip"] is None
+    assert right["name"] == "Birch"
+    # The ring is drawn round the dot it names, wherever that is.
+    for ring in (ring_a, ring_b):
+        assert all(abs(d) <= 1 for d in ring), ring
+    assert start["panel"] == {"note": "From Alder. Pick where the trip ends.", "steps": []}
+    assert start["trip"] is None and larch["name"] == "Larch"
+    # The steps say what spec 030 says, and state() has the trip.
+    assert picked["panel"]["steps"] == FR_006[("alder", "larch")][1]
+    assert _legs(picked["trip"]) == FR_006[("alder", "larch")][0]
+    assert picked["focus"] == "station-pick"
+    assert cleared["trip"] is None and cleared["panel"] is None
+    # A press near a dot picks it; a second press is the end.
+    assert pressed is None and (trip["from"], trip["to"]) == ("damson", "fir")
+    assert after["panel"]["steps"] == [
+        "At Damson, board the Blue Line towards Alder. Ride 1 stop to Cedar.",
+        "At Cedar, change to the Red Line towards Fir. Ride 1 stop to Fir and get off."]
+
+
+# The two criterion pairs of the penalty's sweep (app ADR-048, as of 6 Oct 2026),
+# on the stored layouts: they skip without them, as the colours tests do.
+CRITERIA = {
+    "bart": ("12th Street / Oakland City Center", "Warm Springs / South Fremont", 10, 0),
+    "sf-muni-metro": ("Balboa Park BART/Mezzanine Level", "Right Of Way/Ocean Ave", 10, 1),
+}
+
+
+@needs_browser
+@pytest.mark.parametrize("key", list(CRITERIA))
+def test_the_criterion_trips_on_the_stored_layouts(key, tmp_path):
+    found = pipeline.stored(key)
+    if found is None:
+        pytest.skip(f"needs the stored layout for {key}")
+    days = json.loads((site.SRC_DIR / "_data" / "service-days.json").read_text())
+    result = pipeline.run(key, layout=found.id, date=dt.date.fromisoformat(days[key]),
+                          out_dir=tmp_path)
+    by_name = {display_name(n.station_label): n.id for n in result.graph.stations}
+    start, end, stops, changes = CRITERIA[key]
+    [run] = _trips([{"url": (tmp_path / f"{key}.html").as_uri(), "reduce": True, "steps": [
+        {"do": "trip", "from": by_name[start], "to": by_name[end]}]}])
+    assert not run["problems"], run["problems"]
+    [trip] = run["results"]
+    print(key, trip)
+    assert trip["changes"] == changes and sum(leg["stops"] for leg in trip["legs"]) == stops, trip

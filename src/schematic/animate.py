@@ -327,6 +327,10 @@ class Animation:
     trips_with_skipped_calls: int = 0
     # Trips routed over another line's track for at least one hop.
     trips_with_borrowed_track: int = 0
+    # What the page's trip router needs beyond the drawing (``route_rules``).
+    # Written into the page beside the data, never into ``to_json``: the
+    # positions file and the page's data stay what they were.
+    routing: dict = field(default_factory=dict)
 
     def to_json(self) -> dict:
         return {
@@ -345,6 +349,47 @@ class Animation:
                           for nid, c in self.geo.nodes.items()},
             }} if self.geo else {}),
         }
+
+
+def route_rules(graph: LineGraph) -> dict:
+    """LOOM's word on how each line runs through a node, by label, for the
+    page's trip router (engine issue 49).
+
+    The router reads the line graph off the drawing, as the page reads its
+    stations: every track the map draws is one line between two nodes, and
+    every station has a dot. What the drawing cannot say is in two node
+    properties LOOM writes against a line's id, one id per direction of a
+    line, so they are given here by label instead:
+
+    - ``excluded``, from ``excluded_conn``: ``{node: [[label, from, to]]}``,
+      a turn the line does not make at the node, from the neighbour ``from``
+      on to the neighbour ``to``, in that direction only, as LOOM lists it;
+    - ``unserved``, from ``not_serving``: ``{node: [label]}``, a line that
+      passes the station without stopping (LOOM lists every id of such a
+      label at the node, so the label stands for them all).
+
+    A line the graph no longer carries, because the map hid it, takes its
+    entries with it. Sorted, so a page is written the same way twice, and
+    each key is left out when it is empty: a graph without either property
+    gives ``{}``. Here rather than in ``linegraph``, which is read-only to
+    this change, because it is the page's and only the page's shape.
+    """
+    label_of = {ln.id: ln.label for e in graph.edges for ln in e.lines}
+    excluded: dict[str, list[list[str]]] = {}
+    unserved: dict[str, list[str]] = {}
+    for node in graph.nodes.values():
+        turns = {(label_of[str(c["line"])], str(c["node_from"]), str(c["node_to"]))
+                 for c in node.props.get("excluded_conn") or ()
+                 if str(c.get("line")) in label_of}
+        if turns:
+            excluded[node.id] = [list(turn) for turn in sorted(turns)]
+        passed = {label_of[str(i)] for i in node.props.get("not_serving") or ()
+                  if str(i) in label_of}
+        if passed:
+            unserved[node.id] = sorted(passed)
+    return {key: value for key, value in (("excluded", dict(sorted(excluded.items()))),
+                                          ("unserved", dict(sorted(unserved.items()))))
+            if value}
 
 
 def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
@@ -462,7 +507,7 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
                      names=dict(names or {}), geo=geo or GeoLayer(),
                      unrouted=unrouted, trips_with_skipped_calls=skipped_calls,
                      trips_with_borrowed_track=borrowed,
-                     linear=layout_json)
+                     linear=layout_json, routing=route_rules(graph))
 
 
 # Emitted only when the caller says where the icons live, so a page written for
@@ -497,6 +542,10 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
     html_path = out_dir / f"{stem}.html"
     html_path.write_text(
         _HTML.replace("__PRESENT__", _PRESENT_JS)
+             # First, while the template is the only text in the page, and with
+             # every underscore escaped (JSON reads "_" back as "_"), so no
+             # placeholder replaced below can match inside a feed's labels here.
+             .replace("__ROUTING__", _json_for_script(animation.routing).replace("_", "\\u005f"))
              # Named for the button, not the file: map-trifold draws Geographic,
              # graph the schematic view, line-segments the linear one.
              .replace("__ICON_GEO__", _VIEW_ICONS["map-trifold"])

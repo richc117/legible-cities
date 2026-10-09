@@ -384,6 +384,32 @@ __SOCIAL__
   #present-safe { position: fixed; inset: 0; pointer-events: none; z-index: 11; }
   #present-safe div { position: absolute; background: rgba(255,0,80,0.22);
                       outline: 1px dashed rgba(255,0,80,0.8); }
+
+  /* Picking a trip on the page itself (engine issue 49), where nothing but the
+     page runs: the script builds #trip only off present mode, so no frame an
+     export captures can hold any of it. The station cursor is a button the
+     keyboard moves from dot to dot; it is drawn only as the page's focus ring,
+     round, over the dot it names, and a pointer goes through it to the map.
+     Every size is its own, so the touch rule below does not make it 44px tall. */
+  #station-pick {
+    position: absolute; left: 0; top: 0; z-index: 4; display: block;
+    width: 20px; height: 20px; min-height: 0; padding: 0; border: 0;
+    border-radius: 50%; background: none; pointer-events: none;
+  }
+  #station-pick:focus-visible { border-radius: 50%; }
+  #station-pick[hidden] { display: none; }
+  /* The trip's steps, or what to do next, over the map's lower left corner and
+     only while there is something to say. */
+  #trip .panel {
+    position: fixed; left: 1rem; bottom: 1rem; z-index: 6;
+    max-width: min(26rem, calc(100vw - 2rem)); padding: 0.6rem 0.9rem;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    font-size: 0.86rem; line-height: 1.5;
+  }
+  #trip .panel p, #trip .panel ol { margin: 0 0 0.45rem; }
+  #trip .panel ol { padding-left: 1.3rem; }
+  #trip .panel[hidden], #trip .panel [hidden] { display: none; }
+  :root[data-present] #trip { display: none; }
 </style>
 <header>
   <div class="bar">
@@ -440,6 +466,7 @@ __SOCIAL__
   <div class="time" hidden></div>
 </div>
 <script id="data" type="application/json">__DATA__</script>
+<script id="routing" type="application/json">__ROUTING__</script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("data").textContent);
@@ -968,6 +995,17 @@ __SOCIAL__
   const routes = [...new Set(trips.map(t => t.r))].sort();
   const hidden = new Set();
   const nodes = new Map();
+  // Route mode's fade (engine issue 49; the trip itself is further down): the
+  // opacity each line is drawn at now, by label, for a line on its way to or
+  // from TRIP_FADE or held there. Empty while no trip is shown, and then
+  // nothing writes an opacity it did not write before the trip existed.
+  // Declared here because draw() and geometry() read it from the first frame.
+  const fadeAt = new Map();
+  const fadeOf = label => (fadeAt.has(label) ? fadeAt.get(label) : 1);
+  let fadeDirty = false;
+  let tripRidden = null;     // the labels the trip on show rides, or null
+  let tripPassed = null;     // the stations it passes, or null
+  let pickCursor = null;     // the station cursor, off present mode only
 
   // Under reduced motion the trains start paused, and a reader can still press
   // Play. `reduced` is false in present mode, so a capture starts as it always did.
@@ -1181,17 +1219,22 @@ __SOCIAL__
       const rowBand = bandTop(n.label) + bandInner() / 2;
       const y = lerp(rowLine, rowBand, sf);
       n.el.setAttribute("y", y.toFixed(1));
-      n.el.setAttribute("opacity", Math.max(m, sf).toFixed(2));
+      // Times the line's fade, which is exactly 1 while no trip is shown.
+      n.el.setAttribute("opacity", (Math.max(m, sf) * fadeOf(n.label)).toFixed(2));
       // From 3 past the name's end to 3 short of the band, on the name's middle.
       n.swatch.setAttribute("x", (vbX + GUTTER - 11).toFixed(1));
       n.swatch.setAttribute("y", (y - n.swatch.getAttribute("height") / 2).toFixed(1));
-      n.swatch.setAttribute("opacity", sf.toFixed(2));
+      n.swatch.setAttribute("opacity", (sf * fadeOf(n.label)).toFixed(2));
     }
   }
 
   function draw() {
     const m = ease(view), sf = ease(str), gf = ease(geo);
-    if (dirty) { geometry(m, sf, gf); dirty = false; }
+    if (fadeDirty) { applyFade(); fadeDirty = false; }
+    if (dirty) {
+      geometry(m, sf, gf); dirty = false;
+      if (pickCursor) placePick();
+    }
     if (sf > 0) {
       const hx = timeX(now);
       playhead.setAttribute("x1", hx.toFixed(1));
@@ -1266,6 +1309,9 @@ __SOCIAL__
       }
       dot.setAttribute("cx", x.toFixed(1));
       dot.setAttribute("cy", y.toFixed(1));
+      // A train on a line off the trip fades with its line; no trip, no write.
+      if (fadeAt.has(trip.r)) dot.setAttribute("opacity", fadeAt.get(trip.r).toFixed(3));
+      else if (dot.hasAttribute("opacity")) dot.removeAttribute("opacity");
       alive.add(i);
       shown++;
     }
@@ -1338,6 +1384,8 @@ __SOCIAL__
         dirty = true;
       }
     }
+    // The rows' names fade in geometry(), so a moving fade marks it dirty.
+    if (stepFade(dt, false)) dirty = true;
   }
 
   function frame(ts) {
@@ -1449,6 +1497,8 @@ __SOCIAL__
     // Station names belong to the network views; the chart has its own axis.
     sortGroup.hidden = next === "map";
     labelsBtn.hidden = next === "string";
+    // So does picking a station: the chart draws none to pick.
+    if (pickCursor) pickCursor.hidden = next === "string";
     syncBox();
     dirty = true;
   };
@@ -1549,8 +1599,10 @@ __SOCIAL__
   const lineCount = document.getElementById("line-count");
   const chips = new Map();
 
-  // One place decides what a hidden line means, across all three views.
-  const setRoute = (r, on) => {
+  // One place decides what a hidden line means, across all three views. It was
+  // setRoute, one letter from the seam's setRoutes, beside which setTrip now
+  // stands: names for lines and for a trip that a reader could not tell apart.
+  const setLineShown = (r, on) => {
     if (on) hidden.delete(r); else hidden.add(r);
     const off = on ? "" : "none";
     const chip = chips.get(r);
@@ -1600,7 +1652,8 @@ __SOCIAL__
     dot.style.background = data.lines[r] || "#333";
     chip.append(dot, display(r));
     const toggle = () => {
-      setRoute(r, chip.getAttribute("aria-pressed") !== "true");
+      setLineShown(r, chip.getAttribute("aria-pressed") !== "true");
+      answerTripAgain();
       draw();
     };
     chip.onclick = toggle;
@@ -1616,14 +1669,577 @@ __SOCIAL__
     lines.appendChild(chip);
   }
   document.getElementById("lines-all").onclick = () => {
-    for (const r of routes) setRoute(r, true);
+    for (const r of routes) setLineShown(r, true);
+    answerTripAgain();
     draw();
   };
   document.getElementById("lines-none").onclick = () => {
-    for (const r of routes) setRoute(r, false);
+    for (const r of routes) setLineShown(r, false);
+    answerTripAgain();
     draw();
   };
   lineCount.textContent = routes.length + " of " + routes.length;
+
+  // ------------------------------------------------------------------ a trip
+  // Route mode (engine issue 49, app ADR-048): two stations in, the trip
+  // between them out, found here so that the page gives one answer wherever it
+  // runs: in the desktop app, on the site and in the essay. Asked for through
+  // the seam's setTrip and, off present mode, by picking two stations.
+  //
+  // The graph is the one the map draws, read back off the drawing as the
+  // stations are: every track is one line's run between two nodes, and a node
+  // with a dot is a station. What the drawing cannot say comes beside the data
+  // (#routing, written by animate.route_rules): a turn a line does not make at
+  // a node (LOOM's excluded_conn, from one neighbour on to another, in that
+  // direction) and a station a line passes without stopping (not_serving).
+  // Never the timetable.
+  //
+  // The cost is stops plus CHANGE_PENALTY for every boarding after the first.
+  // A stop is a station the line calls at, and a leg's stops are counted after
+  // boarding, the alighting one included. Of two trips that cost the same, the
+  // one with fewer changes is taken, then the one whose lines' labels, in the
+  // order it rides them, come first, then the one whose boarding stations' ids
+  // do, both compared as code units, so a call made twice, or in another
+  // browser, gives one answer. A train never turns back on itself at a node. A
+  // change is at a station both lines serve, and may be onto the line's own
+  // trains, so a turn LOOM says a line does not make is, at a station, a change
+  // of trains, and never ridden through.
+  //
+  // not_serving is advisory: trusted, it parts an eighth of the registry's
+  // station pairs. So a trip is found first with it honoured -- a line neither
+  // boards nor alights at a station it does not serve, and passing one is not
+  // a stop -- and only when that finds none is it found again as though every
+  // line stopped at every station it passes, with `reason` saying so.
+  //
+  // A line hidden on the page (a chip, setRoutes) is never ridden, and when no
+  // trip is left without it the answer says so and names the lines hidden. A
+  // line the map was built without (map.build's `hidden`) is not on the page
+  // at all: no trip can ride it, and the page cannot name it.
+  const CHANGE_PENALTY = 4;
+  // The lowest rung of the page's own ladder (the time chart's busiest lines).
+  const TRIP_FADE = 0.16;
+  const SEP = "\u0000";
+  const byUnits = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const isStation = id => typeof id === "string" && mapXY.has(id);
+
+  const routing = (() => {
+    try { return JSON.parse(document.getElementById("routing").textContent) || {}; }
+    catch (e) { return {}; }
+  })();
+  const unserved = new Map(Object.entries(routing.unserved || {})
+    .map(entry => [entry[0], new Set(entry[1])]));
+  const barred = new Set();
+  for (const [node, turns] of Object.entries(routing.excluded || {})) {
+    for (const t of turns) barred.add([node, t[0], t[1], t[2]].join(SEP));
+  }
+  const turnBarred = (node, line, from, to) => barred.has([node, line, from, to].join(SEP));
+
+  // node -> [{ line, to }], one entry a line and neighbour, by label then node.
+  const runsAt = new Map();
+  {
+    const found = new Map();
+    for (const t of tracks) {
+      if (t.src === t.dst) continue;
+      for (const [a, b] of [[t.src, t.dst], [t.dst, t.src]]) {
+        if (!found.has(a)) found.set(a, new Map());
+        found.get(a).set(t.label + SEP + b, { line: t.label, to: b });
+      }
+    }
+    for (const [node, runs] of found) {
+      runsAt.set(node, [...runs.values()].sort((x, y) => byUnits(x.line, y.line) || byUnits(x.to, y.to)));
+    }
+  }
+  const aheadOn = (line, node) => (runsAt.get(node) || []).filter(r => r.line === line).map(r => r.to);
+  // node -> the lines through it, by label.
+  const linesAt = new Map([...runsAt].map(entry =>
+    [entry[0], [...new Set(entry[1].map(r => r.line))]]));
+
+  // The least first: the cost, then the changes, the labels and the boardings.
+  const listOrder = (a, b) => {
+    for (let i = 0; i < a.length && i < b.length; i++) {
+      const o = byUnits(a[i], b[i]);
+      if (o) return o;
+    }
+    return a.length - b.length;
+  };
+  const tripOrder = (a, b) => a.cost - b.cost || a.changes - b.changes
+    || listOrder(a.lines, b.lines) || listOrder(a.boards, b.boards);
+  // Then the order offered, so that two ways equal in all four leave the heap
+  // in the same order every time.
+  const heapOrder = (a, b) => tripOrder(a.key, b.key) || a.key.n - b.key.n;
+  function heapPush(heap, item) {
+    heap.push(item);
+    for (let i = heap.length - 1; i > 0;) {
+      const up = (i - 1) >> 1;
+      if (heapOrder(heap[i], heap[up]) >= 0) break;
+      [heap[i], heap[up]] = [heap[up], heap[i]];
+      i = up;
+    }
+  }
+  function heapPop(heap) {
+    const top = heap[0], end = heap.pop();
+    if (heap.length) {
+      heap[0] = end;
+      for (let i = 0;;) {
+        const l = 2 * i + 1, r = l + 1;
+        let least = i;
+        if (l < heap.length && heapOrder(heap[l], heap[least]) < 0) least = l;
+        if (r < heap.length && heapOrder(heap[r], heap[least]) < 0) least = r;
+        if (least === i) break;
+        [heap[i], heap[least]] = [heap[least], heap[i]];
+        i = least;
+      }
+    }
+    return top;
+  }
+
+  // The cheapest trip from one station to another, as legs, or null. A state is
+  // a node, the line ridden and the node it came from, which is what a turn
+  // LOOM forbids depends on. `honour` is whether not_serving is trusted, and
+  // `shut` the lines not to ride.
+  function route(from, to, honour, shut) {
+    const serves = (line, node) => mapXY.has(node)
+      && !(honour && unserved.has(node) && unserved.get(node).has(line));
+    const best = new Map(), back = new Map(), heap = [];
+    let offered = 0;
+    const offer = (state, key, before) => {
+      const id = state.node + SEP + state.line + SEP + (state.prev === null ? "" : state.prev);
+      const had = best.get(id);
+      if (had && tripOrder(key, had) >= 0) return;
+      key.n = offered++;
+      best.set(id, key);
+      back.set(id, { state: state, before: before });
+      heapPush(heap, { key: key, state: state, id: id });
+    };
+    for (const run of runsAt.get(from) || []) {
+      if (shut.has(run.line) || !serves(run.line, from)) continue;
+      offer({ node: from, line: run.line, prev: null },
+            { cost: 0, changes: 0, lines: [run.line], boards: [from] }, null);
+    }
+    while (heap.length) {
+      const { key, state, id } = heapPop(heap);
+      if (best.get(id) !== key) continue;      // a better way here was found since
+      const { node, line, prev } = state;
+      if (node === to && serves(line, to)) return legsOf(id, back, serves);
+      for (const run of runsAt.get(node) || []) {
+        if (run.line !== line) continue;
+        if (run.to === prev || (prev !== null && turnBarred(node, line, prev, run.to))) continue;
+        offer({ node: run.to, line: line, prev: node },
+              { cost: key.cost + (serves(line, run.to) ? 1 : 0), changes: key.changes,
+                lines: key.lines, boards: key.boards }, id);
+      }
+      // A change: off the line and onto any line that serves the station, its
+      // own included, so a turn the line does not make is a change of trains.
+      if (node !== from && serves(line, node)) {
+        for (const other of linesAt.get(node)) {
+          if (shut.has(other) || !serves(other, node)) continue;
+          offer({ node: node, line: other, prev: null },
+                { cost: key.cost + CHANGE_PENALTY, changes: key.changes + 1,
+                  lines: key.lines.concat(other), boards: key.boards.concat(node) }, id);
+        }
+      }
+    }
+    return null;
+  }
+
+  // A leg begins at every boarding: the first state, and each after a change.
+  function legsOf(id, back, serves) {
+    const states = [];
+    for (let at = id; at !== null; at = back.get(at).before) states.push(back.get(at).state);
+    states.reverse();
+    const legs = [];
+    for (const s of states) {
+      if (s.prev === null) legs.push({ line: s.line, nodes: [s.node] });
+      else legs[legs.length - 1].nodes.push(s.node);
+    }
+    return legs.map(l => ({
+      line: l.line, towards: towards(l.line, l.nodes),
+      board: l.nodes[0], alight: l.nodes[l.nodes.length - 1],
+      stops: l.nodes.slice(1).filter(n => serves(l.line, n)).length,
+      nodes: l.nodes,
+    }));
+  }
+
+  // Each line's spine, node -> its place along it (linear.spine, the line's
+  // longest run, whose two ends are the ends the map draws).
+  const spines = new Map(layout.lines.map(l =>
+    [l.label, new Map(((l.rows[0] || {}).nodes || []).map((pair, i) => [pair[0], i]))]));
+  // A loop is a line whose nodes make one cycle: two neighbours each, all joined.
+  const loops = new Map();
+  function isLoop(line) {
+    if (!loops.has(line)) {
+      const on = [...runsAt.keys()].filter(n => aheadOn(line, n).length);
+      let ring = on.length > 2 && on.every(n => aheadOn(line, n).length === 2);
+      if (ring) {
+        const reached = new Set([on[0]]), queue = [on[0]];
+        while (queue.length) {
+          for (const n of aheadOn(line, queue.pop())) {
+            if (!reached.has(n)) { reached.add(n); queue.push(n); }
+          }
+        }
+        ring = reached.size === on.length;
+      }
+      loops.set(line, ring);
+    }
+    return loops.get(line);
+  }
+  // Where a leg is heading: the end of its line that riding on past where it
+  // alights reaches, never a headsign. Ridden on along the line's own track
+  // through the turns it makes; where the track forks it keeps to the line's
+  // spine, and coming onto the spine from a branch it takes the side with more
+  // of the spine left, the start's side on a tie (anywhere else, the smaller
+  // node id). Where nothing lies beyond the alighting station, it is that one.
+  // On a loop, which has no end, it is the first station after boarding.
+  function towards(line, path) {
+    if (isLoop(line)) return path.slice(1).find(n => mapXY.has(n)) || path[path.length - 1];
+    const spine = spines.get(line) || new Map(), last = spine.size - 1;
+    const seen = new Set(path);
+    let prev = path[path.length - 2], here = path[path.length - 1], end = here;
+    for (;;) {
+      const from = prev, at = here;
+      const ahead = aheadOn(line, at)
+        .filter(n => !seen.has(n) && !turnBarred(at, line, from, n)).sort(byUnits);
+      if (!ahead.length) break;
+      const on = ahead.filter(n => spine.has(n));
+      const left = n => (!spine.has(at) ? Math.max(spine.get(n), last - spine.get(n))
+        : spine.get(n) > spine.get(at) ? last - spine.get(n) : spine.get(n));
+      const next = on.length > 1
+        ? on.sort((a, b) => left(b) - left(a) || spine.get(a) - spine.get(b))[0]
+        : (on[0] || ahead[0]);
+      seen.add(next);
+      prev = at;
+      here = next;
+      if (mapXY.has(here)) end = here;
+    }
+    return end;
+  }
+
+  // The answer for two stations: always an object, with legs or with a reason.
+  function findTrip(from, to) {
+    const answer = (reason, more) => ({
+      trip: Object.assign({ from: from, to: to, legs: null, changes: 0, reason: reason }, more),
+      legs: null });
+    if (!isStation(from)) return answer("the start is not a station on this map");
+    if (!isStation(to)) return answer("the end is not a station on this map");
+    if (from === to) return answer("start and end are the same station");
+    const shut = new Set(hidden), none = new Set();
+    let legs = route(from, to, true, shut), caveat = null;
+    if (!legs) {
+      legs = route(from, to, false, shut);
+      if (legs) caveat = "a stop on this trip is one the map's data says its line does not make";
+    }
+    if (!legs) {
+      if (shut.size && (route(from, to, true, none) || route(from, to, false, none))) {
+        return answer("no trip without hidden lines", { hidden: [...shut].sort(byUnits) });
+      }
+      return answer("no trip joins these stations");
+    }
+    const trip = {
+      from: from, to: to,
+      legs: legs.map(l => ({ line: l.line, towards: l.towards, board: l.board,
+                             alight: l.alight, stops: l.stops })),
+      changes: legs.length - 1,
+    };
+    if (caveat) trip.reason = caveat;
+    if (shut.size) trip.hidden = [...shut].sort(byUnits);
+    return { trip: trip, legs: legs };
+  }
+
+  let tripAsked = null;      // the two stations last asked for, or null
+  let tripAnswer = null;     // what state().trip says: null, a trip or a reason
+  let pickFrom = null;       // a start picked on the page, waiting for its end
+  let pickAt = null;         // the station the cursor is on
+  let placePick = () => {};  // puts the cursor over its dot while it has focus
+  let tripPanel = null;      // the steps, off present mode only
+  const tripCopy = () => (tripAnswer ? JSON.parse(JSON.stringify(tripAnswer)) : null);
+
+  function setTrip(from, to) {
+    pickFrom = null;
+    askTrip(from, to);
+    return tripCopy();
+  }
+  function askTrip(from, to) {
+    tripAsked = from === null || from === undefined ? null : { from: from, to: to };
+    answerTrip();
+  }
+  // A trip asked for is answered again whenever the lines shown change.
+  function answerTripAgain() {
+    if (tripAsked) answerTrip();
+  }
+  function answerTrip() {
+    const found = tripAsked ? findTrip(tripAsked.from, tripAsked.to) : null;
+    tripAnswer = found ? found.trip : null;
+    const legs = found && found.legs;
+    tripRidden = legs ? new Set(legs.map(l => l.line)) : null;
+    tripPassed = legs ? new Set([].concat(...legs.map(l => l.nodes)).filter(isStation)) : null;
+    showTrip();
+  }
+
+  // What the trip changes on the map, which is nothing while an exporter
+  // drives the page, so no captured frame can hold one. Under reduced motion
+  // the fade lands at once. `reduced` is false in present mode, where an
+  // export's transitions must stay transitions, but the fade never runs while
+  // capturing, so the reader's wish holds in present mode too: the mode the
+  // desktop app's viewer runs the page in.
+  const quietFade = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Everything keyed to a line: its group, its dots and its band in the time
+  // chart. Its trains are faded in draw() and its row's name in geometry(),
+  // which write them every frame anyway.
+  const lineParts = new Map();
+  const partOf = (label, el) => {
+    if (!lineParts.has(label)) lineParts.set(label, []);
+    lineParts.get(label).push(el);
+  };
+  svg.querySelectorAll("#lines g.line").forEach(g => partOf(g.getAttribute("data-line"), g));
+  for (const d of dots) partOf(d.label, d.el);
+  for (const [label, g] of stringGroups) partOf(label, g);
+  const fadeTarget = label =>
+    (tripRidden && !capture && !tripRidden.has(label) ? TRIP_FADE : 1);
+  // One step of the fade, or all of it at once. True when anything moved.
+  function stepFade(dt, snap) {
+    if (!tripRidden && !fadeAt.size) return false;
+    let moved = false;
+    for (const label of lineParts.keys()) {
+      const was = fadeOf(label), target = fadeTarget(label);
+      if (was === target) continue;
+      let next = snap || quietFade ? target : was + (target - was) * Math.min(dt * 6, 1);
+      if (Math.abs(target - next) < 0.002) next = target;
+      if (next === 1) fadeAt.delete(label); else fadeAt.set(label, next);
+      moved = true;
+    }
+    if (moved) fadeDirty = true;
+    return moved;
+  }
+  function applyFade() {
+    for (const [label, parts] of lineParts) {
+      const at = fadeAt.has(label) ? fadeAt.get(label).toFixed(3) : null;
+      for (const el of parts) {
+        if (at !== null) el.setAttribute("opacity", at);
+        else if (el.hasAttribute("opacity")) el.removeAttribute("opacity");
+      }
+    }
+  }
+  // Station names off the trip are hidden, not faded, and kept by station: the
+  // map draws one opaque name per station, and it may sit on a line off the trip.
+  function applyNames() {
+    const keep = tripPassed && !capture ? tripPassed : null;
+    for (const t of texts) {
+      if (keep && !keep.has(t.node)) t.el.setAttribute("visibility", "hidden");
+      else if (t.el.hasAttribute("visibility")) t.el.removeAttribute("visibility");
+    }
+  }
+  function showTrip() {
+    applyNames();
+    if (capture || quietFade) stepFade(0, true);
+    fadeDirty = true;
+    dirty = true;
+    draw();
+    if (tripPanel) tripPanel.show();
+  }
+
+  // ------------------------------------------------- picking a trip on the page
+  // For the site, where nothing but the page runs: a station is picked by a
+  // press on or near its dot, or by keyboard with the station cursor, the first
+  // pick the start and the second the end; Escape, or the panel's button, shows
+  // the whole network again. Built off present mode only, so present mode and
+  // every export have none of it. The cursor and the panel are an aside of
+  // their own after the stage: inside the stage the cursor would stop the
+  // browser making the stage a Tab stop, and inside the image it would be a
+  // control in a picture.
+  if (!present) buildPicking();
+  function buildPicking() {
+    const nameOf = n => (layout.names || {})[n] || n;
+    const dotsOf = new Map();
+    for (const d of dots) {
+      if (!dotsOf.has(d.node)) dotsOf.set(d.node, []);
+      dotsOf.get(d.node).push(d);
+    }
+    // Each station once, at its first dot, and A to Z for the letter keys.
+    const byName = [...dotsOf.keys()].sort((a, b) =>
+      nameOf(a).localeCompare(nameOf(b), undefined, { numeric: true }) || byUnits(a, b));
+    if (!byName.length) return;
+    const shownAt = n => dotsOf.get(n).some(d => d.el.style.display !== "none");
+    const at = n => {
+      const el = dotsOf.get(n)[0].el;
+      return [+el.getAttribute("cx"), +el.getAttribute("cy")];
+    };
+
+    const aside = document.createElement("aside");
+    aside.id = "trip";
+    aside.setAttribute("aria-label", "Trip");
+    const cursor = document.createElement("button");
+    cursor.id = "station-pick";
+    cursor.type = "button";
+    cursor.setAttribute("aria-describedby", "trip-help");
+    const label = document.createElement("span");
+    label.className = "sr-only";
+    cursor.appendChild(label);
+    const help = document.createElement("p");
+    help.id = "trip-help";
+    help.className = "sr-only";
+    help.textContent = "Plan a trip on the map. The arrow keys move between stations, a letter "
+      + "goes to the next station whose name starts with it, Enter picks where the trip "
+      + "starts and then where it ends, and Escape shows the whole network.";
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.hidden = true;
+    const note = document.createElement("p");
+    const steps = document.createElement("ol");
+    const after = document.createElement("p");
+    const clear = document.createElement("button");
+    clear.id = "trip-clear";
+    clear.type = "button";
+    clear.textContent = "Show the whole network";
+    panel.append(note, steps, after, clear);
+    aside.append(cursor, help, panel);
+    stage.after(aside);
+    pickCursor = cursor;
+    cursor.hidden = mode === "string";
+
+    placePick = () => {
+      if (document.activeElement !== cursor) return;
+      const box = dotsOf.get(pickAt)[0].el.getBoundingClientRect();
+      const half = cursor.offsetWidth / 2, root = document.documentElement;
+      const x = box.left + box.width / 2 + scrollX - half, y = box.top + box.height / 2 + scrollY - half;
+      // Held inside the document, so a dot at its edge never widens the page.
+      cursor.style.left = Math.max(0, Math.min(x, root.scrollWidth - 2 * half)).toFixed(1) + "px";
+      cursor.style.top = Math.max(0, y).toFixed(1) + "px";
+    };
+    const moveTo = (n, reveal) => {
+      pickAt = n;
+      label.textContent = nameOf(n);
+      if (reveal) dotsOf.get(n)[0].el.scrollIntoView({ block: "nearest", inline: "nearest" });
+      placePick();
+    };
+    moveTo(byName[0], false);
+
+    // The station nearest along an arrow: ahead of the cursor, and the one
+    // least far ahead counting a step aside as two.
+    const nearest = (ax, ay) => {
+      const [px, py] = at(pickAt);
+      let best = null, score = Infinity;
+      for (const n of byName) {
+        if (n === pickAt || !shownAt(n)) continue;
+        const [qx, qy] = at(n), dx = qx - px, dy = qy - py;
+        const along = dx * ax + dy * ay;
+        if (along <= 0) continue;
+        const s = along + 2 * Math.abs(dx * ay - dy * ax);
+        if (s < score) { score = s; best = n; }
+      }
+      return best;
+    };
+    const byLetter = key => {
+      const c = key.toLocaleLowerCase(), i = byName.indexOf(pickAt);
+      for (let k = 1; k <= byName.length; k++) {
+        const n = byName[(i + k) % byName.length];
+        if (shownAt(n) && nameOf(n).toLocaleLowerCase().startsWith(c)) return n;
+      }
+      return null;
+    };
+    const pick = n => {
+      if (tripAsked || pickFrom === null) {
+        pickFrom = n;
+        if (tripAsked) askTrip(null);
+        else tripPanel.show();
+      } else {
+        const start = pickFrom;
+        pickFrom = null;
+        askTrip(start, n);
+      }
+    };
+    const clearTrip = () => {
+      pickFrom = null;
+      askTrip(null);
+    };
+
+    const ARROWS = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
+    cursor.addEventListener("focus", () => {
+      if (!shownAt(pickAt)) {
+        const first = byName.find(shownAt);
+        if (first) moveTo(first, false);
+      }
+      placePick();
+    });
+    // Back to the corner it waits in, so a place left over from a wider window
+    // never widens the page.
+    cursor.addEventListener("blur", () => { cursor.style.left = cursor.style.top = ""; });
+    cursor.addEventListener("keydown", e => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (ARROWS[e.key]) {
+        e.preventDefault();
+        const n = nearest(ARROWS[e.key][0], ARROWS[e.key][1]);
+        if (n) moveTo(n, true);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        // A held key is one pick, as it is one press on a chip.
+        if (!e.repeat) pick(pickAt);
+      } else if (e.key.length === 1) {
+        const n = byLetter(e.key);
+        if (n) moveTo(n, true);
+      }
+    });
+    aside.addEventListener("keydown", e => {
+      if (e.key === "Escape" && (pickFrom !== null || tripAsked)) {
+        e.preventDefault();
+        clearTrip();
+      }
+    });
+    clear.onclick = () => { clearTrip(); cursor.focus(); };
+    stage.addEventListener("scroll", () => placePick(), { passive: true });
+
+    // A press picks the station whose dot is nearest, within REACH pixels.
+    const REACH = 16;
+    svg.addEventListener("click", e => {
+      if (mode === "string") return;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+      const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+      let best = null, far = REACH / Math.hypot(ctm.a, ctm.b);
+      for (const d of dots) {
+        if (d.el.style.display === "none") continue;
+        const gap = Math.hypot(+d.el.getAttribute("cx") - p.x, +d.el.getAttribute("cy") - p.y);
+        if (gap < far) { far = gap; best = d.node; }
+      }
+      if (best !== null) {
+        moveTo(best, false);
+        pick(best);
+      }
+    });
+
+    // The steps, in the words the desktop app's list uses (its spec 030), each
+    // name as the map writes it: built as text, never as markup, since every
+    // name is the feed's.
+    const sentence = s => s.charAt(0).toUpperCase() + s.slice(1) + ".";
+    const lineList = labels => labels.map(display).join(", ");
+    tripPanel = {
+      show() {
+        const t = tripAnswer;
+        note.textContent = after.textContent = steps.textContent = "";
+        if (pickFrom !== null) {
+          note.textContent = "From " + nameOf(pickFrom) + ". Pick where the trip ends.";
+        } else if (t && t.legs) {
+          t.legs.forEach((leg, i) => {
+            const item = document.createElement("li");
+            item.textContent = "At " + nameOf(leg.board) + ", " + (i ? "change to" : "board")
+              + " the " + display(leg.line) + " towards " + nameOf(leg.towards) + ". Ride "
+              + leg.stops + (leg.stops === 1 ? " stop" : " stops") + " to " + nameOf(leg.alight)
+              + (i === t.legs.length - 1 ? " and get off." : ".");
+            steps.appendChild(item);
+          });
+          after.textContent = [t.reason ? sentence(t.reason) : "",
+            t.hidden ? "Avoids the lines you hid: " + lineList(t.hidden) + "." : ""]
+            .filter(Boolean).join(" ");
+        } else if (t) {
+          note.textContent = sentence(t.reason)
+            + (t.hidden ? " The lines you hid: " + lineList(t.hidden) + "." : "");
+        }
+        note.hidden = !note.textContent;
+        steps.hidden = !steps.childElementCount;
+        after.hidden = !after.textContent;
+        panel.hidden = pickFrom === null && !t;
+      },
+    };
+  }
 
   describeMap();
   setMode("map");
@@ -1704,6 +2320,8 @@ __SOCIAL__
         last = performance.now();
         rafId = requestAnimationFrame(frame);
       }
+      // A trip on show leaves the map whole for as long as a capture runs.
+      if (tripAsked) showTrip();
     },
     setPlaying(on) { setPlaying(on); },
     setSpeed(x) { speed = x; },
@@ -1718,7 +2336,8 @@ __SOCIAL__
     hasGeo() { return !!geoData; },
     setLabels(on) { setLabels(on); },
     setRoutes(keep) {
-      for (const r of routes) setRoute(r, !keep || keep.indexOf(r) >= 0);
+      for (const r of routes) setLineShown(r, !keep || keep.indexOf(r) >= 0);
+      answerTripAgain();
       // Showing everything again means the drawn box is right again.
       if (hidden.size) fitVisible();
       else { subsetBox = subsetLinBox = null; dirty = true; }
@@ -1752,15 +2371,25 @@ __SOCIAL__
       view = viewTarget; str = strTarget; geo = geoTarget;
       viewTween = strTween = geoTween = null;
       for (const entry of rowTarget) rowPos.set(entry[0], entry[1]);
+      stepFade(0, true);
       dirty = true; draw();
     },
     bounds() { return { t0: t0, t1: t1 }; },
     onDraw(fn) { onDraw = fn; },
+    // `trip` is null, or what setTrip last answered; `changePenalty` is the
+    // stops a change costs a trip.
     state() {
       return { now: now, clock: fmt(now), shown: shown, mode: mode,
                view: view, str: str, geo: geo, box: lastBox.slice(),
-               viewName: viewName(), labels: labelsOn, theme: themeName() };
+               viewName: viewName(), labels: labelsOn, theme: themeName(),
+               trip: tripCopy(), changePenalty: CHANGE_PENALTY };
     },
+    // A trip between two stations, by the ids map.build's `stations` lists:
+    // everything keyed to a line it does not ride fades and every station
+    // name off it is hidden, unless an exporter is driving the page. Answers
+    // what state().trip then says: the legs, or `legs: null` and a reason,
+    // with the map left whole. setTrip(null) shows the whole network again.
+    setTrip(from, to) { return setTrip(from, to); },
   };
   __PRESENT__
   rafId = requestAnimationFrame(frame);
