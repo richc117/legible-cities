@@ -499,10 +499,10 @@ def draw_stage(graph: LineGraph, stage: str, *, width: float = 1200.0, labels: b
                minutes: dict | None = None) -> tuple[str, dict, dict]:
     """A stage graph as LOOM wrote it, in lon/lat, drawn as ``stage`` draws a
     stored one: the SVG, the counts and the description, ``minutes`` being
-    ``pipeline.line_minutes``' answer or None. Apart from ``stage``, which
-    finds the file by a stored layout's id, so that a stage a build is still
-    running has finished, read from its scratch, is drawn the same way (E27,
-    engine issue 43)."""
+    ``pipeline.line_minutes``' answer or None. ``stage`` finds a stored
+    layout's file by its id and calls this; ``serve._drawn_stage`` calls it
+    with a graph read from a running build's scratch, so both are drawn one
+    way (issue 43)."""
     from .crs import to_mercator
     from .describe import describe
 
