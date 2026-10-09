@@ -473,8 +473,6 @@ def stage(key: str, stage: str, *, layout: str | None = None, width: float = 120
     nothing here picks a day.
     """
     from . import pipeline  # here, not at the top: pipeline imports this module
-    from .crs import to_mercator
-    from .describe import describe
 
     if stage not in pipeline.STAGE_FILES:
         raise ValueError(f"{stage!r} is not a stage; the stages are "
@@ -492,7 +490,23 @@ def stage(key: str, stage: str, *, layout: str | None = None, width: float = 120
     if not path.is_file():
         raise pipeline.LayoutMissing(
             f"{key!r} has no stored {stage} graph; lay the feed out first (graph.build)")
-    graph = LineGraph.from_geojson(path).reproject(to_mercator)
+    graph = LineGraph.from_geojson(path)
+    minutes = pipeline.line_minutes(found, date) if date is not None else None
+    return draw_stage(graph, stage, width=width, labels=labels, minutes=minutes)
+
+
+def draw_stage(graph: LineGraph, stage: str, *, width: float = 1200.0, labels: bool = False,
+               minutes: dict | None = None) -> tuple[str, dict, dict]:
+    """A stage graph as LOOM wrote it, in lon/lat, drawn as ``stage`` draws a
+    stored one: the SVG, the counts and the description, ``minutes`` being
+    ``pipeline.line_minutes``' answer or None. Apart from ``stage``, which
+    finds the file by a stored layout's id, so that a stage a build is still
+    running has finished, read from its scratch, is drawn the same way (E27,
+    engine issue 43)."""
+    from .crs import to_mercator
+    from .describe import describe
+
+    graph = graph.reproject(to_mercator)
     counts = summary(graph)
     if stage == "octi":
         ok, total = octilinearity(graph)
@@ -500,6 +514,5 @@ def stage(key: str, stage: str, *, layout: str | None = None, width: float = 120
     r = render(graph, width=width, labels=labels, style=Style(themed=True))
     counts["width"] = r.width
     counts["height"] = r.height
-    minutes = pipeline.line_minutes(found, date) if date is not None else None
     return r.svg, counts, describe(graph, minutes)
 

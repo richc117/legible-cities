@@ -10,8 +10,9 @@ directory before anything runs; a change to any of them names a new one and
 leaves the old untouched. A layout is written whole into a scratch directory
 and moved into place, never stage by stage into the directory a reader
 might be reading, so a cancel or a failure leaves nothing that looks
-finished. ``lay_out`` makes one, ``stored`` finds one, ``run`` draws from
-one.
+finished. While it is written, the stages it has finished can be read from
+its scratch and nowhere else (``in_flight``). ``lay_out`` makes one,
+``stored`` finds one, ``run`` draws from one.
 
     from schematic import pipeline
     result = pipeline.run("la-metro-rail")
@@ -28,7 +29,7 @@ import shutil
 import tempfile
 import threading
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -213,6 +214,83 @@ _lock = threading.Lock()
 _building: dict[tuple[str, str], threading.Event] = {}
 
 
+@dataclass
+class _Scratch:
+    """Where a build in flight is writing, and which of its stage files are
+    whole there (E27, engine issue 43). A stage joins ``whole`` once its file
+    is written and before its report goes out, so a client that asks for it on
+    the report finds it, and never before the write, so nobody reads half a
+    file. The inputs are the meta the build will write, which a description's
+    minutes read the feed from."""
+
+    dir: Path
+    inputs: dict[str, Any]
+    whole: set[str] = field(default_factory=set)
+
+
+# Beside ``_building`` and under the same lock: a build registers its scratch
+# when it makes it, and the registration goes before ``_building`` forgets the
+# build -- once that has gone another build of the layout may start and
+# register its own -- and, on a failure, before the scratch is removed.
+_scratches: dict[tuple[str, str], _Scratch] = {}
+
+
+class NotYet(LayoutMissing):
+    """A stage of a layout that a build in this process is laying out and has
+    not finished yet. A client asks again on its next progress report; still a
+    ``LayoutMissing``, so anything that does not tell them apart refuses it as
+    the same kind, ``layout``."""
+
+    def __init__(self, key: str, layout: str, stage: str) -> None:
+        super().__init__(f"{key!r} is still being laid out under layout {layout[:8]}, and the "
+                         f"build has not reached its {stage} stage yet; ask again when "
+                         f"job/progress reports it")
+        self.layout = layout
+        self.stage = stage
+
+
+def in_flight(key: str, layout: str, stages: list[str]) -> tuple[Layout, dict[str, bytes]] | None:
+    """The files of ``stages`` of a layout this process is laying out, read
+    whole from its build's scratch, with the layout as the build will store it:
+    what ``render.stage`` draws before the run ends (E27, engine issue 43).
+
+    None when no build of the layout is running here, or when its scratch has
+    gone (the swap has moved it into place since): the store answers then, as
+    it always has. A stage the build has not finished raises ``NotYet``, the
+    first such of ``stages`` named.
+
+    The files are read under the lock and parsed by the caller outside it: the
+    swap takes the lock too, so it never moves a directory with a file of it
+    open, which Windows refuses. The ``Layout``'s directory is the scratch and
+    its meta the build's inputs: what a description's minutes need, the files
+    being the ones returned beside it, never read from that directory.
+    """
+    with _lock:
+        scratch = _scratches.get((key, layout))
+        if scratch is None:
+            return None
+        for stage in stages:
+            if stage not in scratch.whole:
+                raise NotYet(key, layout, stage)
+        try:
+            files = {stage: (scratch.dir / STAGE_FILES[stage]).read_bytes() for stage in stages}
+        except FileNotFoundError:
+            return None
+    return Layout(key=key, id=layout, dir=scratch.dir, meta=dict(scratch.inputs)), files
+
+
+def _whole(key: str, layout: str, stage: str) -> None:
+    """A stage's file is written: a reader may have it from now on."""
+    with _lock:
+        _scratches[(key, layout)].whole.add(stage)
+
+
+def _forget(key: str, layout: str) -> None:
+    """The build's scratch is no longer to be read from."""
+    with _lock:
+        _scratches.pop((key, layout), None)
+
+
 def lay_out(key: str, *, force: bool = False,
             stages: list[tuple[str, tuple[str, ...]]] | None = None,
             progress: Progress | None = None, **overrides: Any) -> Layout:
@@ -250,13 +328,14 @@ def lay_out(key: str, *, force: bool = False,
     # client, and nothing else in the process should wait on either.
     if existing is not None:
         for stage, path in existing.paths.items():
-            _report(progress, stage, _fraction(stage, stages), path)
+            _report(progress, stage, _fraction(stage, stages), path, existing.id)
         _from_store(existing, waited)
         return existing
     try:
         return _build(feed, layout, inputs, stages, progress)
     finally:
         with _lock:
+            _scratches.pop((key, layout), None)
             _building.pop((key, layout)).set()
 
 
@@ -274,6 +353,10 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
     # A scratch of this build's own, named with the process so a sweep from
     # another can tell a live build from what a crash left.
     scratch = Path(tempfile.mkdtemp(prefix=f"{layout}.building-{os.getpid()}-", dir=folder))
+    # Readable as each stage finishes (E27): ``in_flight`` reads it, and
+    # ``lay_out`` forgets it before it forgets the build.
+    with _lock:
+        _scratches[(key, layout)] = _Scratch(dir=scratch, inputs=inputs)
     try:
         normalized = feeds.normalize(feed)
         # From here: normalizing is the feed's, not gtfs2graph's. The native
@@ -282,14 +365,16 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
         graph = loom.gtfs2graph(normalized, "-m", feed.mode)
         out = scratch / STAGE_FILES["gtfs2graph"]
         out.write_text(json.dumps(graph), encoding="utf-8", newline="\n")
-        _stage_done(progress, "gtfs2graph", _fraction("gtfs2graph", stages), out, since)
+        _whole(key, layout, "gtfs2graph")
+        _stage_done(progress, "gtfs2graph", _fraction("gtfs2graph", stages), out, since, layout)
         payload = out.read_bytes()
         for tool, args in stages:
             since = time.monotonic()
             payload = json.dumps(loom.run(tool, payload, *args)).encode()
             out = scratch / STAGE_FILES[tool]
             out.write_bytes(payload)
-            _stage_done(progress, tool, _fraction(tool, stages), out, since)
+            _whole(key, layout, tool)
+            _stage_done(progress, tool, _fraction(tool, stages), out, since, layout)
         meta = {**inputs, "engine": __version__,
                 "made": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
                 "migrated": False}
@@ -297,13 +382,17 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
                                          encoding="utf-8", newline="\n")
     except BaseException:
         # A cancel, a failure, an interrupt: the scratch goes, the stored
-        # layout, if there was one, was never touched.
+        # layout, if there was one, was never touched. Forgotten first, under
+        # the lock a reader holds while it reads: Windows will not remove a
+        # file that is open.
+        _forget(key, layout)
         shutil.rmtree(scratch, ignore_errors=True)
         raise
     try:
         with _lock:
             _swap(scratch, layout_dir(key, layout))
     except BaseException:
+        _forget(key, layout)
         shutil.rmtree(scratch, ignore_errors=True)
         raise
     found = read_layout(key, layout)
@@ -403,9 +492,33 @@ def schematize(key: str, *, force: bool = False,
     return lay_out(key, force=force, stages=stages, progress=progress, **overrides).paths
 
 
-def _report(progress: Progress | None, stage: str, fraction: float, path: Path) -> None:
+def _report(progress: Progress | None, stage: str, fraction: float, path: Path,
+            layout: str) -> None:
     if progress is not None:
-        progress(stage, fraction, LineGraph.from_geojson(path).summary())
+        _tell(progress, layout, stage, fraction, LineGraph.from_geojson(path).summary())
+
+
+# The layout whose stage is being reported, while the report's callback runs
+# on this thread (E27, engine issue 43). ``Progress`` keeps its three
+# arguments, so every caller's callback hears what it always heard; the
+# server's asks ``reporting()`` and names the layout in job/progress.
+_reporting = threading.local()
+
+
+def reporting() -> str | None:
+    """The id of the layout a stage report is of, asked from inside that
+    report's callback; None in any other report, a download's included, and
+    outside one."""
+    return getattr(_reporting, "layout", None)
+
+
+def _tell(progress: Progress, layout: str, stage: str, fraction: float, message: str) -> None:
+    previous = reporting()
+    _reporting.layout = layout
+    try:
+        progress(stage, fraction, message)
+    finally:
+        _reporting.layout = previous
 
 
 def _log(line: str) -> None:
@@ -431,15 +544,16 @@ def _took(since: float) -> str:
 
 
 def _stage_done(progress: Progress | None, stage: str, fraction: float, path: Path,
-                since: float) -> None:
-    """A LOOM stage has written ``path``: report it, and log it with its time,
-    taken before the file is read back, which is not the stage's."""
+                since: float, layout: str) -> None:
+    """A LOOM stage of ``layout`` has written ``path``: report it, and log it
+    with its time, taken before the file is read back, which is not the
+    stage's."""
     took = _took(since)
     if progress is None and loom.current_job() is None:
         return
     summary = LineGraph.from_geojson(path).summary()
     if progress is not None:
-        progress(stage, fraction, summary)
+        _tell(progress, layout, stage, fraction, summary)
     _log(f"{stage}: {summary} ({took})")
 
 
@@ -550,7 +664,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
                                 f"first (graph.build)")
         if progress is not None:
             for stage, path in found.paths.items():
-                _report(lambda st, _f, m: tick(st, m), stage, 0.0, path)
+                _report(lambda st, _f, m: tick(st, m), stage, 0.0, path, found.id)
         _from_store(found)
     else:
         found = lay_out(key, force=force,
@@ -676,15 +790,19 @@ _MINUTES: dict[tuple[str, dt.date], dict[str, dict[str, Any] | None]] = {}
 _minutes_lock = threading.Lock()
 
 
-def line_minutes(found: Layout, date: dt.date) -> dict[str, dict[str, Any] | None]:
+def line_minutes(found: Layout, date: dt.date, *,
+                 graph: LineGraph | None = None) -> dict[str, dict[str, Any] | None]:
     """Every line of a stored layout timed by its commonest trip on ``date``:
     ``{label: {"minutes", "from", "to"} | None}``, the names the octi
-    stage's. The day is read once per layout and day in a process."""
+    stage's. The day is read once per layout and day in a process. ``graph``
+    is the octi stage when the caller has read it already, as it has for a
+    layout still being laid out, whose octi file is not to be read from
+    ``found``'s directory (``in_flight``)."""
     with _minutes_lock:
         known = _MINUTES.get((found.id, date))
     if known is not None:
         return known
-    return _remember_minutes(found.id, schedule_for(found, date))
+    return _remember_minutes(found.id, schedule_for(found, date, graph=graph))
 
 
 def _remember_minutes(layout: str, day: Day) -> dict[str, dict[str, Any] | None]:
