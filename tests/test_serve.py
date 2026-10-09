@@ -2067,3 +2067,296 @@ def test_a_long_request_reports_a_presets_download_and_a_cancel_keeps_nothing(cl
     with pytest.raises(JsonRpcRequestCancelled):
         run()
     assert sorted(p.name for p in config.feeds_dir().iterdir()) == []
+
+
+# ------------------------------- a stage while its layout is laid out (issue 43)
+
+import test_layouts  # noqa: E402  its GRAPH, which one test swaps for another
+from test_layouts import FakeLoom, write_timetabled_feed  # noqa: E402  the stand-ins
+
+STAGES = list(pipeline.STAGE_FILES)
+
+
+def small_home(tmp_path: Path, monkeypatch) -> Path:
+    """test_layouts' scratch home, as a function rather than its fixture: the
+    small timetabled feed in a home of its own, and no LOOM."""
+    monkeypatch.setenv(config.ENV, str(tmp_path))
+    monkeypatch.delenv(loom.COMMIT_ENV, raising=False)
+    monkeypatch.delenv(loom.BIN_ENV, raising=False)
+    zipped = feeds.FEEDS[KEY].zip_path
+    zipped.parent.mkdir(parents=True)
+    write_timetabled_feed(zipped)
+    return tmp_path
+
+
+def held_at(monkeypatch, tool: str) -> Held:
+    """The stand-in LOOM with ``tool`` held where it starts until the test
+    lets it go; a cancel that came meanwhile ends it as the runner ends a
+    tool, with ``loom.Cancelled``."""
+    held = Held()
+
+    def hold(name: str) -> None:
+        if name != tool:
+            return
+        held.entered.set()
+        assert held.release.wait(30), "the test never let the stage go"
+        job = loom.current_job()
+        if job is not None and job.cancelled:
+            raise loom.Cancelled(f"{name}: cancelled")
+
+    FakeLoom(monkeypatch, on_tool=hold)
+    return held
+
+
+def refused_as_not_stored(client: Client, layout: str) -> None:
+    """Every stage of ``layout`` refused as a layout that is not stored, in
+    the sentence render.stage has always had, and nothing of a build in it."""
+    for stage in STAGES:
+        error = client.call("render.stage", {"key": KEY, "layout": layout,
+                                             "stage": stage})["error"]
+        check(error["data"], "ErrorData")
+        assert error["code"] == -32000 and error["data"]["kind"] == "layout"
+        assert error["data"]["hint"] == (f"{KEY!r} has no stored {stage} graph under layout "
+                                         f"{layout[:8]}; lay the feed out first (graph.build)")
+        assert set(error["data"]) == {"kind", "detail", "hint"}
+
+
+def test_job_progress_names_the_layout_of_every_stage_report(client, tmp_path, monkeypatch):
+    """Each of a build's four stage reports names the layout its answer
+    names, and so do the four a stored layout replays and the four map.build
+    replays; the download, which comes before the id is known, names none."""
+    small_home(tmp_path, monkeypatch)
+    zipped = feeds.FEEDS[KEY].zip_path
+    payload = zipped.read_bytes()
+    zipped.unlink()
+
+    class Response:
+        headers = {"Content-Length": str(len(payload))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, size):
+            for i in range(0, len(payload), 256):
+                yield payload[i:i + 256]
+
+    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    FakeLoom(monkeypatch)
+
+    def heard(method: str, params: dict) -> tuple[dict, list[tuple[str, str | None]]]:
+        msg_id = client.send(method, params)
+        response = client.wait(msg_id)
+        assert "result" in response, response
+        notes = client.notifications("job/progress", msg_id)
+        for note in notes:
+            check(note, "JobProgress")
+        return response["result"], [(note["stage"], note.get("layout")) for note in notes]
+
+    built, reports = heard("graph.build", {"key": KEY})
+    layout = built["layout"]
+    downloads = sum(1 for stage, _layout in reports if stage == "download")
+    assert downloads > 1
+    assert reports == [("download", None)] * downloads + [(stage, layout) for stage in STAGES]
+
+    _again, reports = heard("graph.build", {"key": KEY})
+    assert reports == [(stage, layout) for stage in STAGES], "a stored layout's replay names it"
+
+    _drawn, reports = heard("map.build", {"key": KEY, "layout": layout, "date": DATE,
+                                          "out": "p"})
+    assert reports == ([(stage, layout) for stage in STAGES]
+                       + [(step, None) for step in ("schedule", "render", "animate", "write")])
+
+
+def test_render_stage_draws_what_a_running_build_has_finished_and_not_yet_the_rest(
+        client, tmp_path, monkeypatch):
+    """The issue's criterion: while topo runs, gtfs2graph is drawn from the
+    build's scratch, the same bytes the store answers once the build is
+    done; topo, and a date's minutes, which wait on octi, are refused as not
+    yet, with data a client reads instead of the sentence."""
+    small_home(tmp_path, monkeypatch)
+    held = held_at(monkeypatch, "topo")
+    build = client.send("graph.build", {"key": KEY})
+    try:
+        assert held.entered.wait(30)
+        [report] = client.notifications("job/progress", build)
+        layout = report["layout"]
+        asked = {"key": KEY, "layout": layout, "width": 600}
+        early = client.call("render.stage", {**asked, "stage": "gtfs2graph"})
+        assert "result" in early, early
+        check(early["result"], "RenderStageResult")
+        for params, waits_on in (({"stage": "topo"}, "topo"),
+                                 ({"stage": "gtfs2graph", "date": DATE}, "octi")):
+            error = client.call("render.stage", {**asked, **params})["error"]
+            check(error["data"], "ErrorData")
+            assert error["code"] == -32000 and error["data"]["kind"] == "layout"
+            assert {name: error["data"].get(name) for name in ("layout", "stage", "building")} \
+                == {"layout": layout, "stage": waits_on, "building": True}
+            assert f"has not reached its {waits_on} stage yet" in error["data"]["hint"]
+        assert "leave date out to draw gtfs2graph now" in error["data"]["hint"]
+    finally:
+        held.release.set()
+    assert client.wait(build)["result"]["layout"] == layout
+    assert pipeline._scratches == {}
+    stored = client.call("render.stage", {**asked, "stage": "gtfs2graph"})["result"]
+    assert stored == early["result"]
+
+
+def test_a_stage_is_readable_once_its_file_is_written_and_before_it_is_reported(
+        tmp_path, monkeypatch):
+    """The order inside a build: a stage file is written whole before the
+    stage can be read, so nobody reads half of one, and can be read before
+    its report goes out, so a client that asks on the report finds it."""
+    small_home(tmp_path, monkeypatch)
+    FakeLoom(monkeypatch)
+    stage_of = {name: stage for stage, name in pipeline.STAGE_FILES.items()}
+    readable_at_write: dict[str, bool] = {}
+
+    def watched(real):
+        def write(self, *args, **kwargs):
+            for scratch in list(pipeline._scratches.values()):
+                if self.parent == scratch.dir and self.name in stage_of:
+                    readable_at_write[stage_of[self.name]] = stage_of[self.name] in scratch.whole
+            return real(self, *args, **kwargs)
+        return write
+
+    monkeypatch.setattr(Path, "write_text", watched(Path.write_text))
+    monkeypatch.setattr(Path, "write_bytes", watched(Path.write_bytes))
+    read_on_report: dict[str, bytes] = {}
+
+    def report(stage: str, _fraction: float, _message: str) -> None:
+        found = pipeline.in_flight(KEY, pipeline.reporting(), [stage])
+        assert found is not None, f"{stage} was reported before it could be read"
+        read_on_report[stage] = found[1][stage]
+
+    made = pipeline.lay_out(KEY, progress=report)
+    assert readable_at_write == {stage: False for stage in STAGES}
+    assert read_on_report == {stage: path.read_bytes() for stage, path in made.paths.items()}
+
+
+def test_a_cancel_mid_run_leaves_no_scratch_and_nothing_to_draw(client, tmp_path, monkeypatch):
+    small_home(tmp_path, monkeypatch)
+    held = held_at(monkeypatch, "topo")
+    build = client.send("graph.build", {"key": KEY})
+    try:
+        assert held.entered.wait(30)
+        layout = client.notifications("job/progress", build)[0]["layout"]
+        drawn = client.call("render.stage", {"key": KEY, "layout": layout,
+                                             "stage": "gtfs2graph"})
+        assert "result" in drawn, "readable while the build ran"
+        client.notify("$/cancelRequest", {"id": build})
+    finally:
+        held.release.set()
+    assert client.wait(build)["error"]["code"] == -32800
+    assert list((config.graphs_dir() / KEY).iterdir()) == [], "no scratch and nothing stored"
+    assert pipeline._scratches == {} and pipeline._building == {}
+    refused_as_not_stored(client, layout)
+
+
+def test_a_failed_run_leaves_nothing_a_later_draw_or_map_can_find(client, tmp_path, monkeypatch):
+    small_home(tmp_path, monkeypatch)
+
+    def fail(tool: str) -> None:
+        if tool == "loom":
+            raise loom.LoomError("loom exited with status 1")
+
+    FakeLoom(monkeypatch, on_tool=fail)
+    build = client.send("graph.build", {"key": KEY})
+    error = client.wait(build)["error"]
+    assert error["code"] == -32000 and error["data"]["kind"] == "loom", error
+    reports = client.notifications("job/progress", build)
+    assert [note["stage"] for note in reports] == ["gtfs2graph", "topo"]
+    layout = reports[0]["layout"]
+    assert list((config.graphs_dir() / KEY).iterdir()) == [], "no scratch and nothing stored"
+    assert pipeline._scratches == {} and pipeline._building == {}
+    refused_as_not_stored(client, layout)
+    error = client.call("map.build", {"key": KEY, "layout": layout, "date": DATE})["error"]
+    assert error["code"] == -32000 and error["data"]["kind"] == "layout"
+    assert "lay the feed out first" in error["data"]["hint"]
+
+
+def test_after_the_swap_the_store_answers_and_the_registration_goes_first(client, tmp_path,
+                                                                          monkeypatch):
+    """Between the swap and the end of the build a reader still finds the
+    registration, finds the scratch gone, and is answered from the store; and
+    the registration goes before ``_building`` forgets the build, after which
+    another build of the layout may register its own."""
+    small_home(tmp_path, monkeypatch)
+    FakeLoom(monkeypatch)
+    seen: dict = {}
+    swap, read_layout = pipeline._swap, pipeline.read_layout
+
+    def swapped(scratch, target):
+        swap(scratch, target)
+        seen["builder"] = threading.get_ident()
+
+    def read(key, layout):
+        # The build's own read of what it stored, after the swap and before
+        # lay_out's finally: the moment this test is about.
+        if seen.get("builder") == threading.get_ident() and "tail" not in seen:
+            seen["registered"] = (key, layout) in pipeline._scratches
+            seen["tail"] = client.call("render.stage", {"key": key, "layout": layout,
+                                                        "stage": "gtfs2graph"})
+        return read_layout(key, layout)
+
+    class Building(dict):
+        def pop(self, *args):
+            seen["registered at the pop"] = args[0] in pipeline._scratches
+            return super().pop(*args)
+
+    monkeypatch.setattr(pipeline, "_swap", swapped)
+    monkeypatch.setattr(pipeline, "read_layout", read)
+    monkeypatch.setattr(pipeline, "_building", Building())
+    layout = client.call("graph.build", {"key": KEY})["result"]["layout"]
+    assert seen["registered"] is True
+    assert "result" in seen["tail"], seen["tail"]
+    assert seen["registered at the pop"] is False
+    assert pipeline._scratches == {}
+    stored = client.call("render.stage", {"key": KEY, "layout": layout, "stage": "gtfs2graph"})
+    assert stored["result"] == seen["tail"]["result"]
+
+
+def test_a_forced_re_layout_draws_its_new_stages_and_the_stored_set_for_the_rest(
+        client, tmp_path, monkeypatch):
+    """A layout that is stored and being laid out again under its id: a
+    stage the new build has finished is drawn from it, and one it has not
+    reached is drawn from the store as before the build began, never refused."""
+    small_home(tmp_path, monkeypatch)
+    FakeLoom(monkeypatch)
+    layout = client.call("graph.build", {"key": KEY})["result"]["layout"]
+    asked = {"key": KEY, "layout": layout, "width": 600}
+    old = {stage: client.call("render.stage", {**asked, "stage": stage})["result"]
+           for stage in ("gtfs2graph", "topo")}
+    moved = json.loads(json.dumps(test_layouts.GRAPH))
+    moved["features"][1]["geometry"]["coordinates"] = [-118.6, 34.1]
+    moved["features"][2]["geometry"]["coordinates"][1] = [-118.6, 34.1]
+    monkeypatch.setattr(test_layouts, "GRAPH", moved)
+    held = held_at(monkeypatch, "topo")
+    build = client.send("graph.build", {"key": KEY, "force": True})
+    try:
+        assert held.entered.wait(30)
+        new = client.call("render.stage", {**asked, "stage": "gtfs2graph"})["result"]
+        assert new["svg"] != old["gtfs2graph"]["svg"]
+        assert client.call("render.stage", {**asked, "stage": "topo"})["result"] == old["topo"]
+    finally:
+        held.release.set()
+    assert client.wait(build)["result"]["layout"] == layout
+    assert client.call("render.stage", {**asked, "stage": "gtfs2graph"})["result"] == new
+    assert client.call("render.stage", {**asked, "stage": "topo"})["result"] != old["topo"]
+
+
+def test_the_schema_names_a_layout_in_progress_and_in_a_not_yet_refusal_optionally():
+    """Additive at protocol 1: JobProgress gains an optional layout, and
+    ErrorData an optional layout, stage and building, which is true or absent."""
+    defs = SCHEMA["$defs"]
+    assert defs["JobProgress"]["properties"]["layout"]["$ref"] == "#/$defs/LayoutId"
+    assert defs["JobProgress"]["required"] == ["id", "stage", "fraction", "message"]
+    assert defs["ErrorData"]["required"] == ["kind", "detail", "hint"]
+    note = {"id": 1, "stage": "download", "fraction": 0.5, "message": "downloaded 1 bytes"}
+    check(note, "JobProgress")
+    check({**note, "stage": "topo", "layout": "0" * 64}, "JobProgress")
+    assert invalid({**note, "layout": "0" * 8}, "JobProgress")
+    refusal = {"kind": "layout", "detail": "d", "hint": "h"}
+    check(refusal, "ErrorData")
+    check({**refusal, "layout": "0" * 64, "stage": "topo", "building": True}, "ErrorData")
+    assert invalid({**refusal, "building": False}, "ErrorData")
+    assert invalid({**refusal, "stage": "labels"}, "ErrorData")
