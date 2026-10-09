@@ -607,14 +607,15 @@
       "additionalProperties": false
     },
     "JobProgress": {
-      "description": "Sent while a long request runs, once per step as it finishes. A feed downloaded inside any long request -- a preset's zip fetched the first time a layout, an inspection, a service-day read or a draw needs it -- reports stage download when that download happens, once per chunk: its fraction is of the download's own bytes (0 when the server did not say how many), not of the request, and its message counts them; the request's own steps follow with their fractions of the request. A feed already on disk reports no download.",
+      "description": "Sent while a long request runs, once per step as it finishes. A feed downloaded inside any long request -- a preset's zip fetched the first time a layout, an inspection, a service-day read or a draw needs it -- reports stage download when that download happens, once per chunk: its fraction is of the download's own bytes (0 when the server did not say how many), not of the request, and its message counts them; the request's own steps follow with their fractions of the request. A feed already on disk reports no download. A report of one of a layout's four stages names the layout in `layout`: each stage as graph.build finishes it, the four graph.build replays for a stored layout, and the four map.build replays before its own steps; a client can draw a stage with render.stage as soon as it is reported, before the request ends. No other report carries it, a download's included, which comes before the layout's id is known.",
 
       "type": "object",
       "properties": {
         "id": { "$ref": "#/$defs/RequestId" },
         "stage": { "type": "string" },
         "fraction": { "type": "number", "minimum": 0, "maximum": 1 },
-        "message": { "type": "string" }
+        "message": { "type": "string" },
+        "layout": { "$ref": "#/$defs/LayoutId", "description": "The layout the reported stage is of; on stage reports alone." }
       },
       "required": ["id", "stage", "fraction", "message"],
       "additionalProperties": false
@@ -1774,7 +1775,7 @@
       ]
     },
     "RenderStageParams": {
-      "description": "One stored stage graph of a layout, drawn as SVG, with its counts (E15) and its description (StageDescription): what a geographic view shows beside the schematic map, and what its text alternative is written from. Never lays out; a stage that is not stored is refused with kind layout.",
+      "description": "One stored stage graph of a layout, drawn as SVG, with its counts (E15) and its description (StageDescription): what a geographic view shows beside the schematic map, and what its text alternative is written from. Never lays out; a stage that is not stored is refused with kind layout. While graph.build is laying the layout out in the same engine, a stage the build has finished (job/progress has reported it, naming the layout) is drawn from what the build has written, exactly as a stored stage is; one it has not reached is refused with kind layout and building true in the error's data, whose stage is the stage the answer waits on (octi when date asks for minutes, which are read from it), and is worth asking again at the next progress report. A stored layout that is being laid out again (force) is drawn from its new build once the build has finished what the answer needs, and from the store as before until then, never refused. Once the build is done the store answers, as for any stored layout; a build that is cancelled or fails leaves nothing of its own to draw.",
       "type": "object",
       "properties": {
         "key": {
@@ -1923,12 +1924,15 @@
       "additionalProperties": false
     },
     "ErrorData": {
-      "description": "The `data` of an error response. `hint` is a sentence for a person and is what a UI shows; `detail` says where, for a log.",
+      "description": "The `data` of an error response. `hint` is a sentence for a person and is what a UI shows; `detail` says where, for a log. render.stage's refusal of a stage that a running build has not reached yet also carries layout, stage and building; no other error does.",
       "type": "object",
       "properties": {
         "kind": { "enum": ["params", "feed", "loom", "schedule", "export", "io", "engine", "layout"] },
         "detail": { "type": "string" },
-        "hint": { "type": "string" }
+        "hint": { "type": "string" },
+        "layout": { "$ref": "#/$defs/LayoutId" },
+        "stage": { "$ref": "#/$defs/StageName", "description": "The stage the answer waits on." },
+        "building": { "const": true, "description": "The layout is being laid out and is not stored: ask again at the next job/progress report. Absent from the refusal of a layout that is neither stored nor building." }
       },
       "required": ["kind", "detail", "hint"],
       "additionalProperties": false
