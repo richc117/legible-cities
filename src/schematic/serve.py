@@ -50,7 +50,7 @@ from . import (__version__, config, diagnostics, export, feeds, loom, pipeline, 
 from .crs import to_mercator
 from .describe import station_name
 from .linegraph import LineGraph
-from .render import (HEX_COLOR_PATTERN, octilinearity, stage as render_stage,
+from .render import (HEX_COLOR_PATTERN, draw_stage, octilinearity, stage as render_stage,
                      summary as render_summary)
 from .render import STYLE_RANGES, Style
 
@@ -112,9 +112,9 @@ def schema() -> dict[str, Any]:
 class EngineError(JsonRpcException):
     """Code -32000: something a person can act on, with the sentence to show them."""
 
-    def __init__(self, kind: str, hint: str, detail: str | None = None) -> None:
+    def __init__(self, kind: str, hint: str, detail: str | None = None, **more: Any) -> None:
         super().__init__(message=hint, code=ENGINE_ERROR,
-                         data={"kind": kind, "detail": detail or hint, "hint": hint})
+                         data={"kind": kind, "detail": detail or hint, "hint": hint, **more})
 
 
 def invalid_params(hint: str) -> JsonRpcInvalidParams:
@@ -682,8 +682,14 @@ class EngineEndpoint(Endpoint):
         self.jobs[msg_id] = job
 
         def progress(stage: str, fraction: float, message: str) -> None:
-            self.notify("job/progress", {"id": msg_id, "stage": stage,
-                                         "fraction": round(fraction, 4), "message": message})
+            note = {"id": msg_id, "stage": stage, "fraction": round(fraction, 4),
+                    "message": message}
+            # A report of one of a layout's stages names the layout, so a
+            # client can draw the stage before the run ends (E27, issue 43).
+            layout = pipeline.reporting()
+            if layout is not None:
+                note["layout"] = layout
+            self.notify("job/progress", note)
 
         def run() -> Any:
             try:
@@ -920,7 +926,10 @@ class EngineEndpoint(Endpoint):
         """One stored stage graph of a layout, drawn, with its counts (E15) and
         its description (issue 54). ``date``, the project's service day, gives
         the description its minutes; left out, they are null and no timetable
-        is read. A null date is refused rather than taken for one left out."""
+        is read. A null date is refused rather than taken for one left out.
+        A stage a running build of the layout has finished is drawn from the
+        build's scratch, and one it has not is refused as not yet (E27,
+        issue 43; ``_drawn_stage``)."""
         left = _object("render.stage", params)
         key = _feed_key(left.pop("key", None))
         layout = _layout(left.pop("layout", None))
@@ -939,7 +948,7 @@ class EngineEndpoint(Endpoint):
         _no_extra("render.stage", left)
 
         def work(_job: loom.Job, _progress: Progress) -> dict[str, Any]:
-            svg, counts, description = render_stage(key, stage, layout=layout, width=width,
+            svg, counts, description = _drawn_stage(key, layout, stage, width=width,
                                                     labels=labels, date=date)
             width_px, height_px = counts.pop("width"), counts.pop("height")
             return {"layout": layout, "stage": stage, "svg": svg,
@@ -1025,6 +1034,41 @@ def _download_report(progress: Progress) -> feeds.DownloadProgress:
 
 def _stage_summary(graph: LineGraph) -> dict[str, Any]:
     return render_summary(graph)
+
+
+def _drawn_stage(key: str, layout: str, stage: str, *, width: float, labels: bool,
+                 date: dt.date | None) -> tuple[str, dict, dict]:
+    """``render.stage``'s drawing (E15, E27): from the scratch of a build of
+    the layout running in this process, once the build has finished what the
+    answer needs -- the stage, and the octi stage too when ``date`` asks for
+    the minutes, which are read from it -- and drawn as a stored stage is;
+    otherwise from the store, as before. A layout that is building and not
+    stored is refused as not yet, with the layout, the stage it waits on and
+    ``building`` in the error's data, so a client tells it from one that is
+    not stored without reading the sentence and asks again on its next
+    progress report. Nothing holds the lock while it draws."""
+    needed = [stage] if date is None or stage == "octi" else [stage, "octi"]
+    try:
+        building = pipeline.in_flight(key, layout, needed)
+    except pipeline.NotYet as exc:
+        # A forced re-layout's stored set answers, as it did before the build
+        # began, until the build has finished what the answer needs.
+        if pipeline.read_layout(key, layout) is not None:
+            building = None
+        else:
+            hint = str(exc)
+            if exc.stage != stage:
+                hint += (f"; the minutes of a date are read from the {exc.stage} stage, so "
+                         f"leave date out to draw {stage} now")
+            raise EngineError("layout", hint, layout=layout, stage=exc.stage,
+                              building=True) from None
+    if building is None:
+        return render_stage(key, stage, layout=layout, width=width, labels=labels, date=date)
+    found, files = building
+    graphs = {name: LineGraph.from_geojson(json.loads(data)) for name, data in files.items()}
+    minutes = (pipeline.line_minutes(found, date, graph=graphs["octi"])
+               if date is not None else None)
+    return draw_stage(graphs[stage], stage, width=width, labels=labels, minutes=minutes)
 
 
 def _stations(graph: LineGraph) -> list[dict[str, str]]:
