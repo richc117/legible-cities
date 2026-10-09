@@ -182,7 +182,10 @@ row per line (sortable as arranged, by name or by station count), and **Time**, 
 whole service day as a Marey chart &mdash; and a
 **Labels** button that hides the station names — dense networks read far better without
 them when you are watching the trains, and hiding them also tightens the view
-onto the network.
+onto the network. A trip between two stations can be asked for too: pick a start and
+an end on the station dots, by a press or from the keyboard, and everything off
+the trip fades while the steps are listed beside the map; the desktop app asks
+through the same seam.
 
 A line's colour is an input, resolved once for the map and the page
 together: `pipeline.run(..., colors={"A": "#123456"})` overrides one line's
