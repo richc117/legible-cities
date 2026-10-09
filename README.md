@@ -216,10 +216,14 @@ drawn from is the only thing that reproduces it, which is why it is kept.
 
 `python -m schematic.serve` runs the engine as a JSON-RPC 2.0 server on stdin
 and stdout, framed like a language server, which is how the desktop app
-drives it: `engine.info`, `graph.build` (which answers with the layout's id)
+drives it: `engine.info`, `graph.build` (which answers with the layout's id,
+and takes LOOM's own tuning flags by name, a tuned layout being a layout of
+its own)
 and `map.build` (which takes that id and a service day, and never lays out
 on the way to a map), with progress and LOOM's log as notifications and
-`$/cancelRequest` to stop a run. The service day is a required parameter
+`$/cancelRequest` to stop a run. While a layout runs, each progress report
+names the layout and `render.stage` draws the stages the run has finished, so
+a client can show the map as it solves. The service day is a required parameter
 of `map.build`, never picked on the way to a map; `feeds.service` is where
 a client asks for one, giving the day to scan from and the map's lines, and
 getting the feed's window and the busiest weekday back. `--schema` prints

@@ -5,6 +5,16 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.14.0] - 2026-10-09
+
+### Added
+
+- **A client can draw each stage of a layout as the run reaches it** (issue 43). `job/progress` now names the layout on every report of one of its stages (`JobProgress.layout`, optional); a download's reports carry none, because they come before the layout's id is known. `render.stage` draws a stage that a running `graph.build` has finished from the build's scratch, exactly as it draws the stored one once the run ends; a stage the build has not reached is refused with kind `layout`, and the error's data carries the layout, the stage it waits on and `building: true` (`ErrorData` gained the three, optional), so a client asks again at its next progress report; a description with a date waits for `octi`, whose minutes it reads. The scratch is still removed on a cancel or a failure and swapped into place whole on success, and nothing about a stored layout changed: a layout neither stored nor building is refused in the sentence it always was, and one being laid out again is drawn from the store until its new build has finished what is asked.
+
+- **`graph.build` takes a `tuning`: LOOM's own flags by name, with their ranges** (issue 37). `merge_distance` (topo's `-d`, 5 to 500 metres), `grid` (octi's `-b`: `octilinear`, `ortholinear`, `orthoradial` or `hexalinear`), `grid_size` (octi's `-g`, 25 to 400 percent of the distance between adjacent stations) and `penalties` (`deg45`, `deg90`, `deg135`, `deg180` and `diagonal`: octi's `--pen-*` and `--diag-pen`, each 0 to 10). A tuned layout is a layout of its own: the flags are part of its id and shown in `LayoutMeta.stages`, and the same tuning finds the same layout without running a tool. A field equal to LOOM's default writes no flag, so leaving `tuning` out, sending `{}` and sending only defaults all name the layout stored today, and nothing stored moved. A value out of range, an unknown grid, a field not on the list and a null are refused with the `params` kind before any tool starts; `job/progress` and the log are as they were. The schema gained `tuning`, `LayoutTuning` and `LayoutPenalties`, additive at protocol 1.
+
+The schema moved twice in this release, both times additive at protocol 1. No page or SVG changed: the Pittsburgh pins stand as 0.13.0 left them.
+
 ## [0.13.0] - 2026-10-08
 
 ### Added
