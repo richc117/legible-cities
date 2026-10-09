@@ -31,7 +31,7 @@ import threading
 import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from . import __version__, animate, config, feeds, loom
 from . import diagnostics as diagnostics_module
@@ -42,7 +42,11 @@ from .schedule import (StopMatch, Trip, busiest_weekday, match_stops, service_da
                        trips_on)
 
 # The LOOM stages, in order, with the arguments we run them with. Kept as data
-# so a notebook can print the pipeline or re-run one stage with a tweak.
+# so a notebook can print the pipeline or re-run one stage with a tweak. The
+# tuples are empty on purpose: every tool runs at its own defaults, and this
+# list is what an untuned layout is addressed by, so an argument written here
+# moves the id of every layout stored. A tuning's flags are appended to a
+# copy of it by ``stages_for`` and nowhere else.
 STAGES: list[tuple[str, tuple[str, ...]]] = [
     ("topo", ()),
     ("loom", ()),
@@ -53,6 +57,95 @@ STAGES: list[tuple[str, tuple[str, ...]]] = [
 # about what it produced). The JSON-RPC server turns these into notifications;
 # a notebook can print them; nothing here waits on the callback.
 Progress = Callable[[str, float, str], None]
+
+
+# ------------------------------------------------------------------- tuning
+#
+# A layout can be tuned with LOOM's own flags, by name and with no slider
+# mapped over them (issue 37). This table is the one place the protocol's
+# names meet the tools' flags, LOOM's defaults and the ranges a layout is
+# worth asking for; ``serve._tuning`` judges a request against it and
+# ``stages_for`` turns what passed into the stage tuples the layout is
+# addressed by.
+
+@dataclass(frozen=True)
+class Tunable:
+    """One number LOOM takes: the stage it belongs to, its flag, the value it
+    has when the flag is not given, the closed range worth asking for, and
+    what the number counts, for the sentence that refuses it."""
+
+    tool: str
+    flag: str
+    default: float
+    low: float
+    high: float
+    unit: str
+    suffix: str = ""
+
+
+GRID_TOOL = "octi"
+GRID_FLAG = "-b"
+GRIDS = ("octilinear", "ortholinear", "orthoradial", "hexalinear")
+GRID_DEFAULT = "octilinear"
+
+# topo's station-merge radius and octi's grid pitch. ``-g`` takes a
+# percentage of the distance between adjacent stations when its value ends
+# in a percent sign, so the pitch is written with one.
+MERGE_DISTANCE = Tunable("topo", "-d", 50, 5, 500, "in metres")
+GRID_SIZE = Tunable("octi", "-g", 100, 25, 400,
+                    "as a percentage of the distance between adjacent stations", "%")
+
+# octi's costs, in the order their flags are written: one per angle a route can
+# make at a node (``--pen-N``, N in degrees) and one for a diagonal edge. They
+# are costs in LOOM's own scale, so numbers without a unit.
+PENALTIES: dict[str, Tunable] = {
+    name: Tunable("octi", flag, default, 0, 10, "as a cost without a unit")
+    for name, flag, default in (("deg45", "--pen-45", 2), ("deg90", "--pen-90", 1.5),
+                                ("deg135", "--pen-135", 1), ("deg180", "--pen-180", 0),
+                                ("diagonal", "--diag-pen", 0.5))}
+
+
+def _written(value: float) -> str:
+    """A number as LOOM's own help prints one: ``50`` for 50.0 and ``1.5`` for
+    1.5, never ``50.0``. A flag's text is part of the layout's id, so equal
+    numbers must be written identically, whether the client sent an integer
+    or a float."""
+    number = float(value)
+    return str(int(number)) if number.is_integer() else repr(number)
+
+
+def _flag(tunable: Tunable, value: float | None) -> tuple[str, ...]:
+    """The flag for a value, or none when it is left out or is LOOM's own
+    default: a default writes nothing, so the layout stays the one every
+    untuned build already names."""
+    if value is None or value == tunable.default:
+        return ()
+    return (tunable.flag, _written(value) + tunable.suffix)
+
+
+def stages_for(tuning: Mapping[str, Any] | None = None) -> list[tuple[str, tuple[str, ...]]]:
+    """``STAGES`` with the flags of a tuning appended: topo's on ``topo``, octi's
+    on ``octi``, ``loom``'s as it was.
+
+    The tuning is one ``serve._tuning`` has judged: the fields of
+    ``GraphBuildParams.tuning``, each optional, ``penalties`` an object of its
+    own. Pure, and the same tuning always gives the same tuples: the flags are
+    written in the table's order whatever order the client named them in; a
+    field equal to LOOM's default writes none, so ``None``, ``{}`` and a tuning
+    of only defaults give exactly ``STAGES``; and numbers are written the way
+    LOOM prints them (``_written``). The result is the ``stages`` that
+    ``lay_out`` hashes into the layout's id and records in its meta."""
+    tuning = tuning or {}
+    penalties = tuning.get("penalties") or {}
+    flags: dict[str, list[str]] = {tool: [] for tool, _args in STAGES}
+    flags[MERGE_DISTANCE.tool] += _flag(MERGE_DISTANCE, tuning.get("merge_distance"))
+    grid = tuning.get("grid")
+    if grid not in (None, GRID_DEFAULT):
+        flags[GRID_TOOL] += [GRID_FLAG, grid]
+    flags[GRID_SIZE.tool] += _flag(GRID_SIZE, tuning.get("grid_size"))
+    for name, tunable in PENALTIES.items():
+        flags[tunable.tool] += _flag(tunable, penalties.get(name))
+    return [(tool, (*args, *flags[tool])) for tool, args in STAGES]
 
 
 def graph_dir(key: str) -> Path:

@@ -423,3 +423,86 @@ def test_a_draw_logs_its_stages_and_never_a_path(home, monkeypatch, tmp_path):
     assert all(re.search(r" \(\d+\.\d s\)$", line) for line in heard[1:]), heard
     assert heard[-1].startswith(f"write: {KEY}.svg, {KEY}.html and {KEY}.positions.json (")
     assert not any(str(home) in line or str(out) in line for line in heard), heard
+
+
+# ------------------------------------------------------------ tuning (issue 37)
+
+TUNED = {"merge_distance": 75, "grid": "hexalinear", "grid_size": 150,
+         "penalties": {"deg45": 3, "deg90": 2.5, "deg135": 1.25, "deg180": 0.5, "diagonal": 1}}
+TUNED_OCTI = ("octi -b hexalinear -g 150% --pen-45 3 --pen-90 2.5 --pen-135 1.25 "
+              "--pen-180 0.5 --diag-pen 1")
+
+
+def test_a_tuned_layout_runs_the_tools_with_the_flags_and_records_them(home, monkeypatch):
+    fake = FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY, stages=pipeline.stages_for(TUNED))
+    assert fake.calls == ["gtfs2graph -m all", "topo -d 75", "loom", TUNED_OCTI]
+    assert made.meta["stages"] == [
+        ["gtfs2graph", ["-m", "all"]], ["topo", ["-d", "75"]], ["loom", []],
+        ["octi", TUNED_OCTI.split()[1:]]]
+    # What the meta holds is what its id hashes, and it is the schema's type.
+    inputs = {name: made.meta[name] for name in pipeline.layout_inputs(
+        feeds.FEEDS[KEY], feed_sha256="", loom_commit=None)}
+    assert pipeline.layout_id(inputs) == made.id
+    schema = serve.schema()
+    jsonschema.validate(made.meta, {"$ref": "#/$defs/LayoutMeta", "$defs": schema["$defs"]})
+    assert (made.dir / ".meta.json").is_file()
+    assert json.loads((made.dir / ".meta.json").read_text())["stages"] == made.meta["stages"]
+
+
+def test_each_stage_is_handed_only_its_own_flags(home, monkeypatch):
+    fake = FakeLoom(monkeypatch)
+    pipeline.lay_out(KEY, stages=pipeline.stages_for({"merge_distance": 120}))
+    assert fake.calls == ["gtfs2graph -m all", "topo -d 120", "loom", "octi"]
+    fake.calls.clear()
+    pipeline.lay_out(KEY, stages=pipeline.stages_for({"penalties": {"deg90": 4}}))
+    assert fake.calls == ["gtfs2graph -m all", "topo", "loom", "octi --pen-90 4"]
+
+
+def test_a_different_tuning_is_a_layout_of_its_own_and_the_same_one_is_found_again(
+        home, monkeypatch):
+    fake = FakeLoom(monkeypatch)
+    plain = pipeline.lay_out(KEY)
+    stamp = {p.name: p.stat().st_mtime_ns for p in plain.dir.iterdir()}
+    tuned = pipeline.lay_out(KEY, stages=pipeline.stages_for(TUNED))
+    other = pipeline.lay_out(KEY, stages=pipeline.stages_for(
+        {**TUNED, "penalties": {**TUNED["penalties"], "deg45": 4}}))
+    assert len({plain.id, tuned.id, other.id}) == 3
+    assert ids_under(KEY) == sorted([plain.id, tuned.id, other.id])
+    assert {p.name: p.stat().st_mtime_ns for p in plain.dir.iterdir()} == stamp, \
+        "the untuned layout is untouched"
+
+    fake.calls.clear()
+    reports: list[str] = []
+    again = pipeline.lay_out(KEY, stages=pipeline.stages_for(TUNED),
+                             progress=lambda stage, _f, _m: reports.append(stage))
+    assert again.id == tuned.id and again.dir == tuned.dir
+    assert fake.calls == [], "the same tuning runs nothing"
+    assert reports == ["gtfs2graph", "topo", "loom", "octi"]
+    # The tuning is a set of fields, not a sequence: the order the client
+    # named them in names the same layout.
+    shuffled = {"penalties": dict(reversed(list(TUNED["penalties"].items()))),
+                "grid_size": 150.0, "grid": "hexalinear", "merge_distance": 75.0}
+    assert pipeline.lay_out(KEY, stages=pipeline.stages_for(shuffled)).id == tuned.id
+    assert fake.calls == []
+    assert len(ids_under(KEY)) == 3
+
+
+def test_a_tuning_of_nothing_or_of_defaults_names_the_layout_stored_today(home, monkeypatch):
+    feed = feeds.FEEDS[KEY]
+    today = pipeline.layout_id(pipeline.layout_inputs(
+        feed, feed_sha256=pipeline.feed_digest(feed.zip_path), loom_commit=None))
+    fake = FakeLoom(monkeypatch)
+    plain = pipeline.lay_out(KEY)
+    assert plain.id == today
+    fake.calls.clear()
+    defaults = {"merge_distance": 50, "grid": "octilinear", "grid_size": 100,
+                "penalties": {"deg45": 2, "deg90": 1.5, "deg135": 1, "deg180": 0,
+                              "diagonal": 0.5}}
+    for tuning in (None, {}, {"merge_distance": 50.0, "grid": "octilinear"}, defaults):
+        found = pipeline.lay_out(KEY, stages=pipeline.stages_for(tuning))
+        assert found.id == today, tuning
+    assert fake.calls == [], "a default writes no flag, so nothing is laid out again"
+    assert ids_under(KEY) == [today]
+    assert plain.meta["stages"] == [["gtfs2graph", ["-m", "all"]], ["topo", []], ["loom", []],
+                                    ["octi", []]], "and the meta is what it was"
