@@ -253,13 +253,37 @@ def _ride(points: list[Coord], seg: list[Coord], hops: bool) -> float:
     bridge, counted in the distance (the note in ``offsets.py``). Without it
     the trip runs from the last end straight to this track's second point, a
     chord that can leave the painted line (engine issue 70): what every map
-    drawn without a stroke of its own still does, so its data does not move."""
+    drawn without a stroke of its own still does, so its data does not move.
+
+    A train never backs up. Where a line turns at a node, this track's start
+    can lie behind the last end along this track's way (Y beside a widened X,
+    turning off it: its next track starts 10.85 back up the way it goes).
+    There the step goes from the last end to its foot on this track's first
+    segment, square to it, and the track is ridden on from the foot: no longer
+    than the hop, so the caps that bridge the hop bridge it, and the train
+    never moves back along the track it is joining."""
     run = polyline_length(seg)
-    if hops and math.dist(points[-1], seg[0]) > HOP:
-        run += math.dist(points[-1], seg[0])
-        points.append(seg[0])
+    last = points[-1]
+    if not hops or math.dist(last, seg[0]) <= HOP:
+        points.extend(seg[1:])
+        return run
+    if len(seg) > 1:
+        (ax, ay), (bx, by) = seg[0], seg[1]
+        length = math.hypot(bx - ax, by - ay)
+        ahead = (((last[0] - ax) * (bx - ax) + (last[1] - ay) * (by - ay)) / length
+                 if length > HOP else 0.0)
+        if ahead > HOP:
+            ahead = min(ahead, length)
+            foot = (ax + (bx - ax) * ahead / length, ay + (by - ay) * ahead / length)
+            rest = seg[2:] if ahead >= length else seg[1:]
+            step = math.dist(last, foot)
+            if step > HOP:
+                points.append(foot)
+            points.extend(rest)
+            return step + polyline_length([foot, *rest])
+    points.append(seg[0])
     points.extend(seg[1:])
-    return run
+    return run + math.dist(last, seg[0])
 
 
 @dataclass

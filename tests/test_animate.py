@@ -17,7 +17,7 @@ from test_lines import stand  # noqa: F401  (the fixture: the store and the feed
 
 from schematic import animate
 from schematic.linegraph import Edge, Line, LineGraph, Node
-from schematic.offsets import polyline_length
+from schematic.offsets import point_at, polyline_length
 from schematic.render import Style, line_strokes, render
 
 DAY = dt.date(2026, 9, 10)
@@ -169,6 +169,51 @@ def test_without_the_hop_the_trip_is_the_chord_it_always_was():
     kept = animate.build_trip_path(net, ["n0", "n1", "n2"], "X", hops=True)
     cut = animate.build_trip_path(net, ["n0", "n1", "n2"], "X", hops=False)
     assert (kept.points, kept.stop_lengths) == (cut.points, cut.stop_lengths)
+
+
+def _along(point, tracks) -> tuple[float, float]:
+    """Where a point is along a run of tracks laid end to end in the order a
+    train rides them: the distance from the run's start to the point's foot on
+    the nearest track, and how far the point is from it. Where two tracks are
+    as near, the later place counts."""
+    best, base = None, 0.0
+    for track in tracks:
+        for (ax, ay), (bx, by) in zip(track, track[1:]):
+            dx, dy = bx - ax, by - ay
+            length = math.hypot(dx, dy)
+            k = max(0.0, min(length, ((point[0] - ax) * dx + (point[1] - ay) * dy) / length))
+            off = math.hypot(point[0] - ax - dx * k / length, point[1] - ay - dy * k / length)
+            if best is None or off < best[1] - 1e-9 or (off <= best[1] + 1e-9
+                                                       and base + k > best[0]):
+                best = (base + k, off)
+            base += length
+    return best
+
+
+def test_a_train_never_backs_up_where_its_line_turns_at_a_node():
+    """Y runs beside X from n0 and turns south at n1, where it runs alone: its
+    first track ends 10.85 off the centre on the side it turns to, and its next
+    track starts on the centre, 10.85 back up the way it goes. The trip steps
+    from the first end to its foot on the next track (here the end itself)
+    rather than back to that track's start, so, sampled every unit, the train
+    is never further back along Y's tracks than it was, and never off Y's paint
+    (half of 10.5)."""
+    graph = _hopton()
+    drawn = render(graph, labels=False, strokes=line_strokes(WIDE))
+    first, turn = drawn.track("Y", "n0", "n1").points, drawn.track("Y", "n1", "n3").points
+    back = (first[-1][0] - turn[0][0]) * (turn[1][0] - turn[0][0]) \
+        + (first[-1][1] - turn[0][1]) * (turn[1][1] - turn[0][1])
+    assert math.dist(first[-1], turn[0]) == pytest.approx(10.85) and back > 0
+    tp = animate.build_trip_path(animate.RouteNetwork.build(drawn), ["n0", "n1", "n3"], "Y",
+                                 hops=True)
+    assert tp.stop_lengths[-1] == pytest.approx(polyline_length(tp.points))
+    total = polyline_length(tp.points)
+    samples = [point_at(tp.points, s) for s in range(int(total) + 1)] + [tp.points[-1]]
+    places = [_along(q, [first, turn]) for q in samples]
+    assert max(off for _, off in places) <= 10.5 / 2
+    went = [at for at, _ in places]
+    assert all(b >= a - 1e-9 for a, b in zip(went, went[1:])), next(
+        (i, a, b) for i, (a, b) in enumerate(zip(went, went[1:])) if b < a - 1e-9)
 
 
 def test_the_geographic_twin_makes_room_for_a_widened_line_as_the_map_does():
