@@ -609,7 +609,7 @@
           "minimum": 0.75,
           "maximum": 1.5,
           "default": 1,
-          "description": "The line's stroke as a multiple of MapStyle.line_width; 1 when omitted. A wider line keeps its place on each edge it runs on and moves the lines beside it there out by half its extra width, on its own edges only, so the bundle sums each line's room. From 0.75 to 1.5, the band of emphasis: much outside it the round caps no longer bridge the step a line makes at a node where its neighbours change. The map, the geographic view, the thumbnails, the page's row swatches and the moving dots all follow it."
+          "description": "The line's stroke as a multiple of MapStyle.line_width; 1 when omitted. A wider line keeps its place on each edge it runs on and moves the lines beside it there out by half its extra width, on its own edges only, so the bundle sums each line's room. From 0.75 to 1.5, the band of emphasis: much outside it the round caps no longer bridge the step a line makes at a node where its neighbours change. The map, the geographic view, the thumbnails and the page's row swatches follow it, and the moving dots ride the moved track."
         },
         "casing": { "$ref": "#/$defs/LineCasing" },
         "dash": {

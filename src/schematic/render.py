@@ -431,17 +431,30 @@ def build_tracks(graph: LineGraph, proj: Projection, style: Style,
     its slot (``offsets.slot_offsets``): ``strokes`` are the lines' own widths
     and casings, by label, and a line without one takes ``line_width``. An
     edge none of whose lines has a stroke is placed as it always was, to the
-    bit, so a width moves tracks only on the edges its line runs on."""
+    bit, so a width moves tracks only on the edges its line runs on.
+
+    A track's element id is its edge's index and its label with every
+    character but a letter or a digit made an underscore, so two labels on one
+    edge that differ only in those ("A-1", "A 1") would share one, and a
+    casing's use would draw the other line's track. A repeat takes the first
+    of _2, _3 and on that is free; a map with no repeat has the ids it had."""
     tracks: dict[tuple[str, str, str], TrackPath] = {}
+    ids: set[str] = set()
     for ei, edge in enumerate(graph.edges):
         centre = [proj(c) for c in edge.geometry]
         offsets = slot_offsets([slot_width(style, strokes, line.label) for line in edge.lines],
                                style.line_width, style.spacing)
         for i, line in enumerate(edge.lines):
             pts = offset_polyline(centre, offsets[i])
+            eid = f"t{ei}_{_safe(line.label)}"
+            if eid in ids:
+                n = 2
+                while f"{eid}_{n}" in ids:
+                    n += 1
+                eid = f"{eid}_{n}"
+            ids.add(eid)
             tracks[(line.label, edge.src, edge.dst)] = TrackPath(
-                element_id=f"t{ei}_{_safe(line.label)}",
-                label=line.label, src=edge.src, dst=edge.dst, points=pts)
+                element_id=eid, label=line.label, src=edge.src, dst=edge.dst, points=pts)
     return tracks
 
 

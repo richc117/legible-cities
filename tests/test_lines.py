@@ -689,3 +689,22 @@ def test_map_build_draws_the_strokes_into_the_thumbnails(tmp_path, monkeypatch):
     for theme in ("dark", "light"):
         written = Path(response["result"]["files"][f"thumb_{theme}"]).read_text(encoding="utf-8")
         assert written == drawn[theme] != thumbnail.draw(graph)[theme]
+
+
+def test_two_labels_one_edge_and_one_id_apart_get_ids_of_their_own():
+    """"A-1" and "A 1" both make t0_A_1, so the second on an edge takes
+    t0_A_1_2, and each casing draws its own line's track; a map with no such
+    pair keeps the ids it had (the Pittsburgh pin holds that too)."""
+    graph = _graph([[("A-1", "0072bc"), ("A 1", "ff6319")], [("A-1", "0072bc")]])
+    cased = {"width": 1, "casing": {"width": 0.5, "color": "#101010"}}
+    r = render(graph, labels=False, strokes=render_module.line_strokes({"A-1": cased,
+                                                                        "A 1": cased}))
+    ids = [tp.element_id for tp in r.tracks.values()]
+    assert ids == ["t0_A_1", "t0_A_1_2", "t1_A_1"] and len(set(ids)) == len(ids)
+    for label in ("A-1", "A 1"):
+        _, body = _group(r.svg, label)
+        own = re.findall(r'<path id="([^"]+)"', body)
+        assert re.findall(r'<use href="#([^"]+)"', body) == own
+        assert own == [tp.element_id for tp in r.tracks.values() if tp.label == label]
+    assert [tp.element_id for tp in render(_graph(STROKED), labels=False).tracks.values()] == [
+        f"t{ei}_{label}" for ei, edge in enumerate(STROKED) for label, _ in edge]
