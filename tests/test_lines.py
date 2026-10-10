@@ -315,8 +315,9 @@ def test_the_page_writes_a_lines_name_where_it_writes_its_label():
     assert 'title.textContent = display(trip.r) + (trip.h ? " to " + trip.h : "");' in _HTML
     assert "chip.append(dot, display(r));" in _HTML
     assert "display(a).localeCompare(display(b), undefined, { numeric: true })" in _HTML
-    # The label stays the key the page matches on.
-    assert '\'#lines g.line[data-line="\' + r + \'"]\'' in _HTML
+    # The label stays the key the page matches on, compared as an attribute's
+    # value and never written into a selector (issue 66).
+    assert 'filter(g => g.getAttribute("data-line") === r)' in _HTML
 
 
 def test_a_name_with_a_line_break_anywhere_is_refused():

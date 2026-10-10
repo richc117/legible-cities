@@ -1,16 +1,24 @@
-"""A label or a name that looks like something the page is made of (issue 65).
+"""A label or a name that looks like something the page is made of (issues 65, 66).
 
-The page is a template whose placeholders were filled one after another. A label
-equal to a placeholder (``__DATA__``) was rewritten when the placeholders after
-it were filled, because the SVG was written into the page before the data and
-the later fill read the earlier one's text again. Every placeholder is now
-filled in one pass that never reads what it has written.
+The page is a template whose placeholders were filled one after another, and its
+script finds a line's group on the map from the line's label. Both read text an
+agency's feed wrote, so both must treat that text as text:
+
+- issue 65: a label equal to a placeholder (``__DATA__``) was rewritten when the
+  placeholders after it were filled, because the SVG was written into the page
+  before the data and the later fill read the earlier one's text again. Every
+  placeholder is now filled in one pass that never reads what it has written.
+- issue 66: the chip handler built a CSS selector out of the label, so a label
+  with a ``"`` threw and a label that closed the selector selected other lines.
+  The page now compares the label as an attribute's value, in script.
 """
 
 import datetime as dt
 import json
 import re
 from html import escape
+
+from test_site import BROWSER, _run, needs_browser
 
 from schematic import animate
 from schematic.linegraph import LineGraph
@@ -138,3 +146,104 @@ def test_a_title_holding_markup_is_still_escaped_and_the_rest_is_as_it_was(tmp_p
     graph = _graph(["A", "B"], ["One", "Two", "Three"])
     _, _, page, _ = _written(tmp_path, graph, title="<i>T</i> & co", name="N", subtitle="S")
     assert "<title>&lt;i&gt;T&lt;/i&gt; &amp; co</title>" in page
+
+
+# ------------------------------------------------------------ issue 66
+
+# A quote closes the value and the selector is a syntax error; the second closes
+# the selector and names another line's group; the third ends in a backslash,
+# which escapes the closing quote; the fourth holds the other kind of quote.
+HOSTILE_LINES = [
+    "A",
+    'Say "go"]',
+    'x"], #lines g.line[data-line="A',
+    "C:\\",
+    "S'q",
+]
+
+
+def _selector_arguments(text: str) -> list[str]:
+    """The argument of every ``querySelector`` and ``querySelectorAll`` call
+    in a script, as written."""
+    call = re.compile(r"querySelector(?:All)?\(((?:[^()]|\([^()]*\))*)\)")
+    return [found.group(1).strip() for found in call.finditer(text)]
+
+
+def test_no_selector_in_the_page_is_built_out_of_data():
+    """Text over the sources, which runs without a browser: every selector the
+    page or its presentation script hands the document is one string literal,
+    but the presentation card's, which is built from the four fixed names of
+    its parts. A selector made of a label, a station's id or a name is how
+    issue 66 happened; a new one is a decision, not an edit."""
+    allowed = {"present.js": {'"." + part'}}
+    for name in ("page.html", "present.js"):
+        text = (PAGE_DIR / name).read_text(encoding="utf-8")
+        for argument in _selector_arguments(text):
+            literal = re.fullmatch(r'"[^"+]*"|\'[^\'+]*\'', argument)
+            assert literal or argument in allowed.get(name, ()), (name, argument)
+    # The four fixed names, so the exception above is the one it says it is.
+    present = (PAGE_DIR / "present.js").read_text(encoding="utf-8")
+    assert re.search(r"city: .*\n\s*network: .*\n\s*day: .*\n\s*caption: ", present)
+
+
+HOSTILE = BROWSER + r"""
+main(async browser => {
+  const out = { problems: [], shown: [], pressed: [] };
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                         reducedMotion: "reduce" });
+  const page = await ctx.newPage();
+  page.on("pageerror", e => out.problems.push(e.message));
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  // Which of the map's groups are shown, by the label each is keyed on.
+  const shown = () => page.evaluate(() => Object.fromEntries(
+    [...document.querySelectorAll("#lines g.line")]
+      .map(g => [g.getAttribute("data-line"), g.style.display !== "none"])));
+  const chip = async label => {
+    const at = await page.evaluate(label => [...document.querySelectorAll("#line-toggles .chip")]
+      .findIndex(c => c.textContent.trim() === label), label);
+    return page.locator("#line-toggles .chip").nth(at);
+  };
+  out.start = await shown();
+  for (const label of job.labels) {
+    const c = await chip(label);
+    await c.click();
+    out.shown.push([label, await shown()]);
+    out.pressed.push([label, await c.getAttribute("aria-pressed")]);
+    await c.click();
+    out.shown.push([label, await shown()]);
+    out.pressed.push([label, await c.getAttribute("aria-pressed")]);
+  }
+  // All of them, then none, then the seam's, which share the handler.
+  await page.click("#lines-none");
+  out.none = await shown();
+  await page.click("#lines-all");
+  out.all = await shown();
+  await page.evaluate(keep => window.__present.setRoutes(keep), [job.labels[1]])
+    .catch(e => out.problems.push(String(e.message).split("\n")[0]));
+  out.kept = await shown();
+  out.count = await page.textContent("#line-count");
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_pressing_the_chip_of_a_line_whose_label_holds_a_quote_toggles_that_lines_group(tmp_path):
+    _, _, _, html = _written(tmp_path, _graph(HOSTILE_LINES, ["One", "Two", "Three"]))
+    run = _run(HOSTILE, {"url": html.as_uri(), "labels": HOSTILE_LINES})
+
+    assert run["problems"] == [], run["problems"]
+    every = dict.fromkeys(HOSTILE_LINES, True)
+    assert run["start"] == every
+    for (label, shown), (_, pressed) in zip(run["shown"][0::2], run["pressed"][0::2]):
+        # Pressed once: that line's group is hidden and every other is shown.
+        assert shown == {**every, label: False}, label
+        assert pressed == "false", label
+    for (label, shown), (_, pressed) in zip(run["shown"][1::2], run["pressed"][1::2]):
+        assert shown == every, label
+        assert pressed == "true", label
+    assert run["none"] == dict.fromkeys(HOSTILE_LINES, False)
+    assert run["all"] == every
+    assert run["kept"] == {**dict.fromkeys(HOSTILE_LINES, False), HOSTILE_LINES[1]: True}
+    assert run["count"] == f"1 of {len(HOSTILE_LINES)}"

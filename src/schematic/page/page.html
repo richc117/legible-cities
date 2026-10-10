@@ -1916,8 +1916,12 @@ __SOCIAL__
     const off = on ? "" : "none";
     const chip = chips.get(r);
     if (chip) chip.setAttribute("aria-pressed", String(on));
-    svg.querySelectorAll('#lines g.line[data-line="' + r + '"]')
-       .forEach(g => g.style.display = off);
+    // Found by comparing the attribute here, never by writing the label into a
+    // selector: a label is an agency's text, and one holding a quote or a
+    // bracket would throw from querySelectorAll or select another line's group.
+    Array.from(svg.querySelectorAll("#lines g.line"))
+      .filter(g => g.getAttribute("data-line") === r)
+      .forEach(g => g.style.display = off);
     for (const d of dots) if (d.label === r) d.el.style.display = off;
     for (const t of texts) if (t.label === r) t.el.style.display = off;
     for (const n of names) if (n.label === r) n.el.style.display = n.swatch.style.display = off;
