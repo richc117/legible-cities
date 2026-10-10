@@ -106,6 +106,12 @@ const job = JSON.parse(process.argv[2] || "{}");
     // so nothing from the page's own startup leaks into frame 0.
     await page.evaluate(() => { window.__present.setCapture(true);
                                 window.__present.settle(); });
+    // The title card and the draw-in (engine issue 44). A list with a card
+    // puts it up or takes it down at every beat; a list without one never asks,
+    // so its frames are the ones it always made. A list with a draw-in starts
+    // with the network undrawn, which is what every beat before it shows.
+    const carded = job.beats.some(b => b.card);
+    if (job.beats.some(b => b.draw_in)) await page.evaluate(() => window.__present.setDrawn(0));
     const fps = job.fps;
     let n = 0;
     const t0 = Date.now();
@@ -114,8 +120,9 @@ const job = JSON.parse(process.argv[2] || "{}");
       const frames = Math.round(beat.secs * fps);
       // Everything the beat names is applied at its start; anything it leaves
       // out carries over from the beat before.
-      await page.evaluate(b => {
+      await page.evaluate(([b, carded]) => {
         const P = window.__present;
+        if (carded) P.setCard(!!b.card);
         if (b.at != null) P.seek(b.at);
         if (b.labels != null) P.setLabels(b.labels);
         if (b.speed != null) P.setSpeed(b.speed);
@@ -128,7 +135,7 @@ const job = JSON.parse(process.argv[2] || "{}");
           P.setView(geo ? "map" : (b.view === "time" ? "string" : b.view), b.tween);
         }
         P.setPlaying(!b.sweep && b.speed !== 0);
-      }, beat);
+      }, [beat, carded]);
 
       // A sweep given `hours` starts wherever the clock already is, so the
       // storyboard never jumps backwards between beats.
@@ -139,7 +146,14 @@ const job = JSON.parse(process.argv[2] || "{}");
       }
 
       for (let i = 0; i < frames; i++) {
-        if (beat.sweep) {
+        if (beat.draw_in) {
+          // The fraction takes the sweep's step, so the last frame is the
+          // whole network. The page holds the clock while it draws in, so the
+          // step before it moves nothing but a view's morph.
+          await page.evaluate(([dt, f]) => { window.__present.advance(dt);
+                                             window.__present.setDrawn(f); },
+                              [1 / fps, frames > 1 ? i / (frames - 1) : 1]);
+        } else if (beat.sweep) {
           // The sweep owns the clock outright, so a whole day can pass in a few
           // seconds without the playback rate having to be absurd.
           const p = frames > 1 ? i / (frames - 1) : 1;
