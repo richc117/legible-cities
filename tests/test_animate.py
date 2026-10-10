@@ -122,13 +122,18 @@ WIDE = {"X": {"width": 1.5, "casing": {"width": 0.5, "color": "#101010"}, "dash"
         "Y": {"width": 1.5, "casing": {"width": 0.25, "color": "#f0e0c0"}}}
 
 
-def _hopton(spots=SPOTS) -> LineGraph:
+def _hopton(spots=SPOTS, turn: list | None = None) -> LineGraph:
+    """Hopton; ``turn`` is the geometry of Y's way south from n1, which ends
+    at n3, straight from n1 when it is not given."""
+    spots = dict(spots)
+    if turn:
+        spots["n3"] = turn[-1]
     nodes = {n: Node(id=n, coord=xy, station_id=n, station_label=f"Stop {n[1:]}")
              for n, xy in spots.items()}
     return LineGraph(nodes=nodes, edges=[
         Edge("n0", "n1", [spots["n0"], spots["n1"]], [X, Y]),
         Edge("n1", "n2", [spots["n1"], spots["n2"]], [X]),
-        Edge("n1", "n3", [spots["n1"], spots["n3"]], [Y])])
+        Edge("n1", "n3", [spots["n1"], *(turn or [])[1:-1], spots["n3"]], [Y])])
 
 
 def _ride_x(hops: bool, strokes=None):
@@ -171,49 +176,170 @@ def test_without_the_hop_the_trip_is_the_chord_it_always_was():
     assert (kept.points, kept.stop_lengths) == (cut.points, cut.stop_lengths)
 
 
-def _along(point, tracks) -> tuple[float, float]:
-    """Where a point is along a run of tracks laid end to end in the order a
-    train rides them: the distance from the run's start to the point's foot on
-    the nearest track, and how far the point is from it. Where two tracks are
-    as near, the later place counts."""
-    best, base = None, 0.0
+def _places(samples, tracks) -> list[tuple[float, float]]:
+    """Where each of a train's samples is along a run of tracks laid end to end
+    in the order it rides them: the distance from the run's start to the
+    sample's foot on the nearest track, and how far the sample is from it.
+    Read from the track the last sample was on, the one before it and the two
+    after it, so a line that passes near itself elsewhere does not count; of
+    two places as near, the later."""
+    starts, base = [], 0.0
     for track in tracks:
-        for (ax, ay), (bx, by) in zip(track, track[1:]):
-            dx, dy = bx - ax, by - ay
-            length = math.hypot(dx, dy)
-            k = max(0.0, min(length, ((point[0] - ax) * dx + (point[1] - ay) * dy) / length))
-            off = math.hypot(point[0] - ax - dx * k / length, point[1] - ay - dy * k / length)
-            if best is None or off < best[1] - 1e-9 or (off <= best[1] + 1e-9
-                                                       and base + k > best[0]):
-                best = (base + k, off)
-            base += length
-    return best
+        starts.append(base)
+        base += polyline_length(track)
+    out, current = [], 0
+    for q in samples:
+        best = None
+        for t in range(max(0, current - 1), min(len(tracks), current + 3)):
+            walked = starts[t]
+            for (ax, ay), (bx, by) in zip(tracks[t], tracks[t][1:]):
+                dx, dy = bx - ax, by - ay
+                length = math.hypot(dx, dy)
+                if length == 0:
+                    continue
+                k = max(0.0, min(length, ((q[0] - ax) * dx + (q[1] - ay) * dy) / length))
+                off = math.hypot(q[0] - ax - dx * k / length, q[1] - ay - dy * k / length)
+                if best is None or off < best[1] - 1e-9 or (off <= best[1] + 1e-9
+                                                           and walked + k > best[0]):
+                    best = (walked + k, off, t)
+                walked += length
+        out.append(best[:2])
+        current = best[2]
+    return out
 
 
-def test_a_train_never_backs_up_where_its_line_turns_at_a_node():
+def _samples(points) -> list:
+    """A path's points every unit along it, and its end."""
+    return [point_at(points, s) for s in range(int(polyline_length(points)) + 1)] + [points[-1]]
+
+
+def _falls(places) -> list[tuple[int, float, float]]:
+    return [(i, a, b) for i, ((a, _), (b, _)) in enumerate(zip(places, places[1:]))
+            if b < a - 1e-6]
+
+
+# Y's way south from n1, in Hopton's own units (90 to the drawing's unit):
+# straight; with a stub of 2 drawn units at n1, as LOOM leaves at stations; and
+# with the same stub and then a bend of 45 degrees, so Y's foot is off its end.
+STUB = 2 / 90
+TURNS = {"straight": None,
+         "stub": [(10.0, 0.0), (10.0, -STUB), (10.0, -8.0)],
+         "bend": [(10.0, 0.0), (10.0, -STUB), (17.0, -STUB - 7.0)]}
+
+
+@pytest.mark.parametrize("turn", list(TURNS))
+def test_a_train_never_backs_up_where_its_line_turns_at_a_node(turn):
     """Y runs beside X from n0 and turns south at n1, where it runs alone: its
     first track ends 10.85 off the centre on the side it turns to, and its next
     track starts on the centre, 10.85 back up the way it goes. The trip steps
-    from the first end to its foot on the next track (here the end itself)
-    rather than back to that track's start, so, sampled every unit, the train
-    is never further back along Y's tracks than it was, and never off Y's paint
-    (half of 10.5)."""
-    graph = _hopton()
+    from the first end to its foot on the next track, walking past a stub at
+    n1 and round the bend after it, rather than back to that track's start;
+    so, sampled every unit, the train is never further back along Y's tracks
+    than it was, and never off Y's paint (half of 10.5)."""
+    graph = _hopton(turn=TURNS[turn])
     drawn = render(graph, labels=False, strokes=line_strokes(WIDE))
-    first, turn = drawn.track("Y", "n0", "n1").points, drawn.track("Y", "n1", "n3").points
-    back = (first[-1][0] - turn[0][0]) * (turn[1][0] - turn[0][0]) \
-        + (first[-1][1] - turn[0][1]) * (turn[1][1] - turn[0][1])
-    assert math.dist(first[-1], turn[0]) == pytest.approx(10.85) and back > 0
+    first, turning = drawn.track("Y", "n0", "n1").points, drawn.track("Y", "n1", "n3").points
+    back = (first[-1][0] - turning[0][0]) * (turning[1][0] - turning[0][0]) \
+        + (first[-1][1] - turning[0][1]) * (turning[1][1] - turning[0][1])
+    assert math.dist(first[-1], turning[0]) == pytest.approx(10.85) and back > 0
+    if turn != "straight":
+        assert math.dist(turning[0], turning[1]) == pytest.approx(2.0)
     tp = animate.build_trip_path(animate.RouteNetwork.build(drawn), ["n0", "n1", "n3"], "Y",
                                  hops=True)
     assert tp.stop_lengths[-1] == pytest.approx(polyline_length(tp.points))
-    total = polyline_length(tp.points)
-    samples = [point_at(tp.points, s) for s in range(int(total) + 1)] + [tp.points[-1]]
-    places = [_along(q, [first, turn]) for q in samples]
+    places = _places(_samples(tp.points), [first, turning])
     assert max(off for _, off in places) <= 10.5 / 2
-    went = [at for at, _ in places]
-    assert all(b >= a - 1e-9 for a, b in zip(went, went[1:])), next(
-        (i, a, b) for i, (a, b) in enumerate(zip(went, went[1:])) if b < a - 1e-9)
+    assert not _falls(places), _falls(places)[:3]
+    # Straight on or past the stub, the foot is the first track's end itself
+    # and the train runs on to n3; round the bend it steps square to the run
+    # after the stub, to a foot on neither end of it, and runs on from there.
+    after = tp.points[len(first):]
+    if turn == "bend":
+        assert 1 < math.dist(first[-1], after[0]) < 10.85
+        assert min(math.dist(after[0], p) for p in turning) > 1 and after[1:] == turning[2:]
+    else:
+        assert after == [turning[-1]]
+
+
+def _joining(points, tracks) -> list[float]:
+    """Where each sample of a trip laid over ``tracks`` (as ``_ride`` lays it)
+    is along the track it is riding or stepping onto: the distance from the
+    run's start to its foot on that track. The track is the one whose share of
+    the trip's length holds the sample."""
+    laid, spans, total = [tracks[0][0]], [], 0.0
+    for track in tracks:
+        run = animate._ride(laid, track, True)
+        spans.append(total + run)
+        total += run
+    assert laid == points
+    starts, base = [], 0.0
+    for track in tracks:
+        starts.append(base)
+        base += polyline_length(track)
+    out, k = [], 0
+    for at in range(int(total) + 1):
+        while k < len(spans) - 1 and spans[k] < at:
+            k += 1
+        q = point_at(points, at)
+        best, walked = None, starts[k]
+        for (ax, ay), (bx, by) in zip(tracks[k], tracks[k][1:]):
+            dx, dy = bx - ax, by - ay
+            length = math.hypot(dx, dy)
+            if length:
+                f = max(0.0, min(length, ((q[0] - ax) * dx + (q[1] - ay) * dy) / length))
+                off = math.hypot(q[0] - ax - dx * f / length, q[1] - ay - dy * f / length)
+                if best is None or off < best[1] - 1e-9:
+                    best = (walked + f, off)
+            walked += length
+        out.append(best[0])
+    return out
+
+
+def test_a_styled_los_angeles_never_backs_a_train_up_the_track_it_joins(tmp_path):
+    """Los Angeles from its stored layout with lines widened, cased and dashed:
+    no trip, sampled every unit, ever moves back along the track it is riding
+    or stepping onto. Also printed: how far any sample is from its own tracks,
+    how many paths leave their paint (LOOM's reorders the caps cannot bridge,
+    engine issue 70's), and where a sample falls back along the track it is
+    leaving, which a turn whose first track runs on past the next one's start
+    makes whatever the step."""
+    from schematic import pipeline
+    found = pipeline.stored("la-metro-rail")
+    if found is None:
+        pytest.skip("needs the stored layout for la-metro-rail")
+    lines = {"A": {"width": 1.5, "casing": {"width": 0.25, "color": "#101010"},
+                   "dash": "dashed"},
+             "E": {"width": 1.25, "dash": "dotted"}, "K": {"width": 0.75}}
+    result = pipeline.run("la-metro-rail", layout=found.id, date=DAY, out_dir=tmp_path,
+                          lines=lines)
+    assert result.render.strokes and result.animation.paths
+    net = animate.RouteNetwork.build(result.render)
+    half = {label: 3.5 * (result.render.strokes[label].width
+                          if label in result.render.strokes else 1)
+            for label in result.render.colors}
+    farthest, leaving, left, joined = 0.0, 0, [], []
+    for path in result.animation.paths:
+        label, nodes = path["route"], path["nodes"]
+        tracks, cursor = [], nodes[0]
+        for a, b in zip(nodes, nodes[1:]):
+            for nxt, tp in net.shortest(label, a, b) or net.shortest(animate.ANY, a, b):
+                tracks.append(animate._oriented(tp, cursor))
+                cursor = nxt
+        trip = animate.build_trip_path(net, nodes, label, hops=True)
+        assert trip.path_d() == path["d"]
+        places = _places(_samples(trip.points), tracks)
+        worst = max(off for _, off in places)
+        farthest = max(farthest, worst)
+        leaving += worst > half[label] + 1e-6
+        left += [(label, *f) for f in _falls(places)]
+        went = _joining(trip.points, tracks)
+        joined += [(label, i, a, b) for i, (a, b) in enumerate(zip(went, went[1:]))
+                   if b < a - 1e-6]
+    print(f"\nLos Angeles, styled: {len(result.animation.paths)} paths, the farthest sample "
+          f"{farthest:.2f} from its tracks, {leaving} paths off their paint somewhere, "
+          f"{len(left)} samples falling back along the track they leave, "
+          f"{len(joined)} along the track they join")
+    assert not joined, joined[:5]
 
 
 def test_the_geographic_twin_makes_room_for_a_widened_line_as_the_map_does():

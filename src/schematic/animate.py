@@ -242,6 +242,34 @@ def _geo_oriented(tp: TrackPath, from_node: str, geo: GeoLayer) -> list[Coord]:
 HOP = 1e-6
 
 
+def _foot(last: Coord, seg: list[Coord], reach: float) -> tuple[float, float, Coord, int]:
+    """The point of a track nearest ``last`` within its first ``reach`` units
+    of arc, walking on past the end of a segment rather than stopping at it:
+    how far it is from ``last``, how far along the track, the point, and the
+    index of the segment it lies on. Of two as near, the one further along.
+    The track's start is always one of them, so the answer is never further
+    from ``last`` than the start is."""
+    best = (math.dist(last, seg[0]), 0.0, seg[0], 0)
+    walked = 0.0
+    for i in range(len(seg) - 1):
+        if walked >= reach:
+            break
+        (ax, ay), (bx, by) = seg[i], seg[i + 1]
+        length = math.hypot(bx - ax, by - ay)
+        if length <= HOP:
+            walked += length
+            continue
+        span = min(length, reach - walked)
+        k = max(0.0, min(span, ((last[0] - ax) * (bx - ax) + (last[1] - ay) * (by - ay))
+                         / length))
+        point = (ax + (bx - ax) * k / length, ay + (by - ay) * k / length)
+        off = math.dist(last, point)
+        if off < best[0] - HOP or (off <= best[0] + HOP and walked + k > best[1]):
+            best = (off, walked + k, point, i)
+        walked += length
+    return best
+
+
 def _ride(points: list[Coord], seg: list[Coord], hops: bool) -> float:
     """Add a track to a trip's points, the train running from the end of the
     last one, and answer how far that takes it.
@@ -258,32 +286,30 @@ def _ride(points: list[Coord], seg: list[Coord], hops: bool) -> float:
     A train never backs up. Where a line turns at a node, this track's start
     can lie behind the last end along this track's way (Y beside a widened X,
     turning off it: its next track starts 10.85 back up the way it goes).
-    There the step goes from the last end to its foot on this track's first
-    segment, square to it, and the track is ridden on from the foot: no longer
-    than the hop, so the caps that bridge the hop bridge it, and the train
-    never moves back along the track it is joining."""
+    There the step goes from the last end to its foot on the track, the point
+    of the track's first hop's length of arc nearest it (``_foot``), walking
+    on past a stub of a first segment, which LOOM leaves at stations shorter
+    than a line is wide, and the track is ridden on from the foot. The step is
+    no longer than the hop, so the caps that bridge the hop bridge it, and the
+    train never moves back along the track it is joining."""
     run = polyline_length(seg)
     last = points[-1]
-    if not hops or math.dist(last, seg[0]) <= HOP:
+    hop = math.dist(last, seg[0])
+    if not hops or hop <= HOP:
         points.extend(seg[1:])
         return run
-    if len(seg) > 1:
-        (ax, ay), (bx, by) = seg[0], seg[1]
-        length = math.hypot(bx - ax, by - ay)
-        ahead = (((last[0] - ax) * (bx - ax) + (last[1] - ay) * (by - ay)) / length
-                 if length > HOP else 0.0)
-        if ahead > HOP:
-            ahead = min(ahead, length)
-            foot = (ax + (bx - ax) * ahead / length, ay + (by - ay) * ahead / length)
-            rest = seg[2:] if ahead >= length else seg[1:]
-            step = math.dist(last, foot)
-            if step > HOP:
-                points.append(foot)
-            points.extend(rest)
-            return step + polyline_length([foot, *rest])
-    points.append(seg[0])
-    points.extend(seg[1:])
-    return run + math.dist(last, seg[0])
+    step, along, foot, i = _foot(last, seg, hop)
+    if along <= HOP:
+        points.append(seg[0])
+        points.extend(seg[1:])
+        return run + hop
+    rest = seg[i + 1:]
+    if rest and math.dist(foot, rest[0]) <= HOP:
+        foot, rest = rest[0], rest[1:]
+    if step > HOP:
+        points.append(foot)
+    points.extend(rest)
+    return step + run - along
 
 
 @dataclass
