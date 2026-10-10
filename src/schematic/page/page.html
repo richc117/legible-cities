@@ -2506,7 +2506,9 @@ __SOCIAL__
     showDrawn();
   }
   function setDrawn(fraction) {
-    const f = Number(fraction);
+    // A number alone counts: null and an empty string would read as 0 through
+    // Number() and draw bare ground, where a missing value means the map.
+    const f = typeof fraction === "number" ? fraction : NaN;
     drawAsked = Number.isNaN(f) ? 1 : Math.min(1, Math.max(0, f));
     showDrawn();
     draw();
