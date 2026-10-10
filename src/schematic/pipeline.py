@@ -831,8 +831,12 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     # A name for a line the map does not draw, hidden or unknown, is dropped.
     names = {label: chosen["name"] for label, chosen in (lines or {}).items()
              if "name" in chosen and label in labels}
+    # A map drawn with a line's own stroke keeps each node's hop in its trips'
+    # paths, so a train rides its painted line across a node where widened
+    # neighbours moved it (the note in offsets.py). Any other map keeps the
+    # chord it always cut, which moves no data it had (engine issue 70).
     anim = animate.build(r, graph, trips, date, geo, line_order=line_order, names=names,
-                         dot_radius=dot_radius, trail=trail)
+                         dot_radius=dot_radius, trail=trail, hops=bool(strokes))
     done("animate", f"{len(anim.paths)} distinct paths"
          + (f", {len(anim.unrouted)} unrouted" if anim.unrouted else ""))
 

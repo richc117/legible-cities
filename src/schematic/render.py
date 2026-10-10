@@ -406,6 +406,9 @@ class RenderResult:
     # chips, dots and chart show, so nothing downstream resolves a colour
     # again or falls back on its own.
     colors: dict[str, str] = field(default_factory=dict)
+    # The lines' own strokes the tracks were laid with (issue 55), by label:
+    # what the geographic twin lays its tracks with, so it pairs with these.
+    strokes: dict[str, LineStroke] = field(default_factory=dict)
 
     def track(self, label: str, src: str, dst: str) -> TrackPath | None:
         """Look up a track path in either direction."""
@@ -863,7 +866,7 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
 
     return RenderResult(svg="\n".join(out), width=w, height=h, projection=proj,
                         tracks=tracks, node_xy=node_xy, dropped_labels=dropped,
-                        colors=colors)
+                        colors=colors, strokes=strokes)
 
 
 def octilinearity(graph: LineGraph, tol_deg: float = 1.0,

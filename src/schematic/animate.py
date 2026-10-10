@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime as dt
 import heapq
 import json
+import math
 from base64 import b64encode
 from html import escape as html_escape
 from dataclasses import dataclass, field
@@ -143,12 +144,14 @@ def geographic_tracks(geo_graph: LineGraph, ref_graph: LineGraph,
 
     Returned keyed by the finished map's element id, resampled to that track's
     vertex count, so the browser can lerp one against the other without doing
-    any geometry of its own.
+    any geometry of its own. The tracks are laid with the lines' own widths
+    and casings the map was drawn with (``ref.strokes``), so a widened line's
+    neighbours make room for it here as they do there.
     """
     from .render import Projection    # local: render imports nothing from here
 
     style = style or Style()
-    geo = build_tracks(geo_graph, Projection.fit(geo_graph, ref.width), style)
+    geo = build_tracks(geo_graph, Projection.fit(geo_graph, ref.width), style, ref.strokes)
     geo_result = RenderResult(svg="", width=ref.width, height=ref.height,
                               projection=Projection.fit(geo_graph, ref.width),
                               tracks=geo)
@@ -234,6 +237,31 @@ def _geo_oriented(tp: TrackPath, from_node: str, geo: GeoLayer) -> list[Coord]:
     return list(pts) if tp.src == from_node else list(reversed(pts))
 
 
+# Two tracks' ends closer than this, in user units, are one point: what is left
+# of a hop is the rounding of two offsets that agree.
+HOP = 1e-6
+
+
+def _ride(points: list[Coord], seg: list[Coord], hops: bool) -> float:
+    """Add a track to a trip's points, the train running from the end of the
+    last one, and answer how far that takes it.
+
+    The map joins no two tracks at a node: each is its own round-capped path,
+    and a line's two ends there differ wherever its neighbours change, LOOM
+    reorders it or it turns. With ``hops`` the trip keeps that hop, a straight
+    step from the last track's end to this one's start that the round caps
+    bridge, counted in the distance (the note in ``offsets.py``). Without it
+    the trip runs from the last end straight to this track's second point, a
+    chord that can leave the painted line (engine issue 70): what every map
+    drawn without a stroke of its own still does, so its data does not move."""
+    run = polyline_length(seg)
+    if hops and math.dist(points[-1], seg[0]) > HOP:
+        run += math.dist(points[-1], seg[0])
+        points.append(seg[0])
+    points.extend(seg[1:])
+    return run
+
+
 @dataclass
 class TripPath:
     """A trip's geometry through the map, with distance marked at each stop."""
@@ -256,14 +284,16 @@ class TripPath:
 
 
 def build_trip_path(net: RouteNetwork, nodes: list[str], label: str,
-                    geo: GeoLayer | None = None) -> TripPath | None:
+                    geo: GeoLayer | None = None, hops: bool = False) -> TripPath | None:
     """Walk a node sequence across the drawn network. None if it cannot be routed.
 
     One walk, two geometries: when ``geo`` is given the same hop sequence is
     accumulated over the pre-octilinear track shapes as well, so a train is at
     the same fraction of the same hop in both and the morph cannot desynchronise
     it. A track with no geographic twin falls back to its drawn shape, which
-    simply holds still while the rest of the network moves.
+    simply holds still while the rest of the network moves. ``hops`` keeps the
+    step between two tracks' ends at a node instead of cutting across it
+    (``_ride``).
     """
     if not nodes or any(n is None for n in nodes):
         return None
@@ -297,14 +327,9 @@ def build_trip_path(net: RouteNetwork, nodes: list[str], label: str,
                 gpoints.append(gfirst[0] if gfirst else (0.0, 0.0))
                 gstop_lengths.append(0.0)
         for nxt, tp in hop:
-            seg = _oriented(tp, cursor)
-            # The previous segment already ended on this point.
-            run += polyline_length(seg)
-            points.extend(seg[1:])
+            run += _ride(points, _oriented(tp, cursor), hops)
             if geo:
-                gseg = _geo_oriented(tp, cursor, geo)
-                grun += polyline_length(gseg)
-                gpoints.extend(gseg[1:])
+                grun += _ride(gpoints, _geo_oriented(tp, cursor, geo), hops)
             cursor = nxt
         stop_lengths.append(run)
         if geo:
@@ -422,12 +447,15 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
           date: dt.date, geo: GeoLayer | None = None,
           line_order: list[str] | None = None,
           names: dict[str, str] | None = None,
-          dot_radius: float = DOT_RADIUS, trail: float = TRAIL) -> Animation:
+          dot_radius: float = DOT_RADIUS, trail: float = TRAIL,
+          hops: bool = False) -> Animation:
     """Route every trip and collect the deduplicated paths. ``names`` is a
     display name per line label, which the page writes in the line's chip,
     row, band and train titles; the caller gives names for drawn lines only.
     ``dot_radius`` and ``trail`` are how the page draws a train (see
     ``DOT_RADIUS``); the caller has judged them against their ranges.
+    ``hops`` keeps a node's hop in every trip's path (``_ride``), which the
+    pipeline asks for on a map drawn with a line's own width, casing or dash.
 
     The layout the page draws its rows from is in ``line_order`` first and
     the rest after. When the order names a line the layout carries, the
@@ -481,7 +509,7 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
         key = (trip.route_label, tuple(nodes))
         idx = path_index.get(key)
         if idx is None:
-            tp = build_trip_path(net, nodes, trip.route_label, geo)
+            tp = build_trip_path(net, nodes, trip.route_label, geo, hops=hops)
             if tp is None:
                 unrouted.append(trip.trip_id)
                 continue

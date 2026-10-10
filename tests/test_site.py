@@ -27,7 +27,7 @@ from schematic import animate, config, export, feeds, pipeline, site, theme_thum
 from schematic.linear import adjacency_for, build as linear_layout
 from schematic.linegraph import Edge, Line, LineGraph, Node
 from schematic.names import display_name
-from schematic.render import Style, render
+from schematic.render import Style, line_strokes, render
 from schematic.schedule import Call, Trip, service_day_text
 
 SITE_JSON = site.SRC_DIR / "_data" / "site.json"
@@ -4311,3 +4311,391 @@ def test_the_copies_fade_with_the_time_views_tween_and_with_the_lines_a_trip_fad
     for c in off["copies"]:
         want = OPACITIES[c["step"] - 1] * (1 if by_line[c["trip"]] else 0.16)
         assert c["opacity"] == pytest.approx(want, abs=1e-3), c
+
+
+# ------------------------------------- a line's width, casing and dash (issue 55)
+
+# Hopton: X runs n0 -> n1 -> n2 west to east, Y beside it from n0 and turning
+# south at n1, Z dotted off n1 to the north-east in a colour under 3:1 on the
+# warm dark ground. X and Y are widened and cased, so beside Y X sits 9.1 off
+# the centre and alone it sits on it: at n1 X steps 9.1 across the node, which
+# its caps (10.5 wide) bridge and a chord to the next track's far end would not.
+HOPTON = {"n0": (0, 0), "n1": (10, 0), "n2": (20, 0), "n3": (10, -8), "n4": (20, 8)}
+HOPTON_LINES = {"X": "#0072bc", "Y": "#d6322f", "Z": "#2a2a2a"}
+HOPTON_STROKES = {
+    "X": {"width": 1.5, "casing": {"width": 0.5, "color": "#101010"}, "dash": "dashed"},
+    "Y": {"width": 1.5, "casing": {"width": 0.25, "color": "#f0e0c0"}},
+    "Z": {"dash": "dotted"}}
+
+
+def _hopton(at: dict[str, tuple[float, float]]) -> LineGraph:
+    line = {label: Line(id=label, label=label, color=colour)
+            for label, colour in HOPTON_LINES.items()}
+    nodes = {n: Node(id=n, coord=(float(x), float(y)), station_id=n, station_label=f"Stop {n[1:]}")
+             for n, (x, y) in at.items()}
+    runs = [("n0", "n1", ["X", "Y"]), ("n1", "n2", ["X"]), ("n1", "n3", ["Y"]),
+            ("n1", "n4", ["Z"])]
+    return LineGraph(nodes=nodes, edges=[
+        Edge(a, b, [nodes[a].coord, nodes[b].coord], [line[label] for label in labels])
+        for a, b, labels in runs])
+
+
+def _hopton_page(into: Path, strokes: dict | None = HOPTON_STROKES, **drawn_as) -> str:
+    """Hopton drawn with ``strokes`` (none for the plain map), a geographic twin
+    with every station moved a little, and trains: X twice and Y and Z once
+    from seven, one more X at ten to make the day. The trips keep their hops,
+    as the pipeline has them on a map with a stroke."""
+    graph = _hopton(HOPTON)
+    chosen = line_strokes(strokes)
+    drawn = render(graph, style=Style(themed=True), title="Hopton", strokes=chosen)
+    twin = _hopton({n: (x + 0.3 * math.sin(i), y + 0.3 * math.cos(i))
+                    for i, (n, (x, y)) in enumerate(sorted(HOPTON.items()))})
+    geo = animate.geographic_tracks(twin, graph, drawn, Style(themed=True))
+
+    def trip(name: str, label: str, nodes: list[str], start: int) -> Trip:
+        return Trip(name, label, "end", [Call(n, n, start + k * 120, start + k * 120 + 20)
+                                         for k, n in enumerate(nodes)])
+
+    trips = [trip("x1", "X", ["n0", "n1", "n2"], SEVEN), trip("x2", "X", ["n2", "n1", "n0"], SEVEN),
+             trip("y1", "Y", ["n0", "n1", "n3"], SEVEN), trip("z1", "Z", ["n1", "n4"], SEVEN),
+             trip("late", "X", ["n0", "n1", "n2"], SEVEN + 3 * 3600)]
+    animation = animate.build(drawn, graph, trips, dt.date.fromisoformat(CARD_DATE), geo=geo,
+                              hops=bool(chosen), **drawn_as)
+    assert len(animation.trips) == len(trips) and animation.geo
+    _, html = animate.write(animation, drawn.svg, into, stem="hopton", name="Hopton")
+    return html.as_uri()
+
+
+def _segments(d: str) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    pts = [tuple(map(float, xy.split())) for xy in re.findall(r"[ML]\s*([-\d.]+\s+[-\d.]+)", d)]
+    return list(zip(pts, pts[1:]))
+
+
+def _off(point: tuple[float, float], segments) -> float:
+    """How far a point is from the nearest of a line's drawn tracks."""
+    best = math.inf
+    for (ax, ay), (bx, by) in segments:
+        dx, dy = bx - ax, by - ay
+        length = dx * dx + dy * dy
+        k = 0.0 if length == 0 else max(0.0, min(1.0, ((point[0] - ax) * dx
+                                                        + (point[1] - ay) * dy) / length))
+        best = min(best, math.hypot(point[0] - ax - k * dx, point[1] - ay - k * dy))
+    return best
+
+
+ON_LINES = BROWSER + r"""
+main(async browser => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 },
+                                         reducedMotion: "no-preference" });
+  const page = await ctx.newPage();
+  const seen = { problems: [], trains: [] };
+  page.on("pageerror", e => seen.problems.push(e.message));
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  await page.evaluate(() => { const P = window.__present; P.setCapture(true); P.settle();
+                              P.setSpeed(60); });
+  Object.assign(seen, await page.evaluate(() => {
+    const svg = document.querySelector("#stage svg");
+    const data = JSON.parse(document.getElementById("data").textContent);
+    // The page's own trip paths, the ones it places a train on, every unit along.
+    const defs = [...svg.querySelectorAll("defs > path")];
+    const paths = data.paths.map((p, i) => {
+      const el = defs[i], len = el.getTotalLength(), pts = [];
+      for (let s = 0; s < len; s += 1) { const q = el.getPointAtLength(s); pts.push([q.x, q.y]); }
+      const q = el.getPointAtLength(len);
+      pts.push([q.x, q.y]);
+      return { route: p.route, d: p.d, own: el.getAttribute("d") === p.d, pts: pts };
+    });
+    const lines = {};
+    svg.querySelectorAll("#lines g.line").forEach(g => {
+      lines[g.getAttribute("data-line")] = { width: +g.getAttribute("stroke-width"),
+        tracks: [...g.querySelectorAll("path[data-src]")].map(p => p.getAttribute("d")) };
+    });
+    return { paths: paths, lines: lines, trips: data.trips.map(t => t.r) };
+  }));
+  for (const t of job.times) {
+    seen.trains.push(await page.evaluate(t => {
+      window.__present.seek(t);
+      const at = el => [+el.getAttribute("cx"), +el.getAttribute("cy")];
+      return {
+        dots: [...document.querySelectorAll("#trains circle.train")].map(c => ({
+          line: c.querySelector("title").textContent.split(" to ")[0], at: at(c) })),
+        copies: [...document.querySelectorAll("#trail circle")]
+          .filter(c => +c.getAttribute("opacity") > 0)
+          .map(c => ({ trip: +c.getAttribute("data-trip"), at: at(c) })),
+      };
+    }, t));
+  }
+  return seen;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_a_train_on_a_widened_cased_dashed_line_lies_on_its_drawn_path_across_a_node_hop(
+        tmp_path):
+    """The issue's criterion: every point of every trip path the page places a
+    train on, a unit apart, lies on its own line's painted stroke, within half
+    the line's width of one of its drawn tracks; so does every train and every
+    copy of its trail at each second through the trips, and at tenths across
+    X's step at n1. X's path keeps that step (9.1, which its caps bridge) and
+    a train is caught on it."""
+    seen = _run(ON_LINES, {"url": _hopton_page(tmp_path, trail=1),
+                           "times": [SEVEN + s for s in range(0, 241)]
+                                    + [SEVEN + 140 + k / 10 for k in range(11)]})
+    assert not seen["problems"], seen["problems"]
+    tracks = {label: [seg for d in line["tracks"] for seg in _segments(d)]
+              for label, line in seen["lines"].items()}
+    half = {label: line["width"] / 2 for label, line in seen["lines"].items()}
+    assert half == {"X": 5.25, "Y": 5.25, "Z": 3.5}
+    worst: dict[str, float] = {}
+    for path in seen["paths"]:
+        assert path["own"]
+        for point in path["pts"]:
+            off = _off(point, tracks[path["route"]])
+            worst[path["route"]] = max(worst.get(path["route"], 0.0), off)
+            assert off <= half[path["route"]], (path["route"], point, off)
+    print(f"\nthe farthest a trip path runs from its line's drawn track: {worst}")
+    # X's way east steps across n1 from beside Y (9.1 off the centre) onto it.
+    east = next(p for p in seen["paths"] if p["route"] == "X" and p["pts"][0][0] < 1)
+    vertices = [a for a, _ in _segments(east["d"])] + [_segments(east["d"])[-1][1]]
+    assert ((900.0, 710.9), (900.0, 720.0)) in list(zip(vertices, vertices[1:])), east["d"]
+    on_the_step = 0
+    for look in seen["trains"]:
+        for dot in look["dots"]:
+            # Written to tenths, so a twentieth either way.
+            assert _off(dot["at"], tracks[dot["line"]]) <= half[dot["line"]] + 0.05, dot
+            on_the_step += dot["line"] == "X" and dot["at"][0] == 900 and 711 < dot["at"][1] < 719
+        for copy in look["copies"]:
+            line = seen["trips"][copy["trip"]]
+            assert _off(copy["at"], tracks[line]) <= half[line] + 0.05, copy
+    assert on_the_step, "no train was caught on X's step at n1"
+    assert any(look["copies"] for look in seen["trains"])
+
+
+CHIPS = BROWSER + r"""
+main(async browser => {
+  const out = { problems: [], themes: {} };
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 },
+                                         reducedMotion: "no-preference" });
+  const page = await ctx.newPage();
+  page.on("pageerror", e => out.problems.push(e.message));
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  await page.evaluate(() => { window.__present.setCapture(true); window.__present.settle(); });
+  for (const theme of ["warm-dark", "sepia"]) {
+    out.themes[theme] = await page.evaluate(theme => {
+      window.__present.setTheme(theme);
+      const chips = {};
+      document.querySelectorAll("#line-toggles .chip").forEach(chip => {
+        const dot = chip.querySelector(".dot");
+        const label = chip.textContent.trim();
+        const marks = [...dot.querySelectorAll("line")].map(l => ({
+          cls: l.getAttribute("class"), stroke: l.getAttribute("stroke"),
+          width: l.getAttribute("stroke-width"), dash: l.getAttribute("stroke-dasharray"),
+          cap: l.getAttribute("stroke-linecap"), shown: getComputedStyle(l).display }));
+        const box = dot.getBoundingClientRect();
+        chips[label] = { tag: dot.tagName.toLowerCase(), marks: marks,
+                         size: [Math.round(box.width), Math.round(box.height)],
+                         ring: getComputedStyle(dot).boxShadow,
+                         background: dot.style ? dot.style.background : null };
+      });
+      return chips;
+    }, theme);
+  }
+  // The Time view's swatches, each after its row's name.
+  await page.evaluate(() => { window.__present.showView("time", 1); window.__present.advance(1);
+                              window.__present.advance(0.1); });
+  out.swatches = await page.evaluate(() => {
+    const kids = [...document.querySelectorAll("#linear-names > *")];
+    const out = {};
+    for (let i = 0; i < kids.length; i += 2) {
+      const sw = kids[i + 1], box = sw.getBBox();
+      out[kids[i].textContent] = {
+        tag: sw.tagName, fill: sw.getAttribute("fill"), stroke: sw.getAttribute("stroke"),
+        height: sw.getAttribute("height"), width: sw.getAttribute("stroke-width"),
+        dash: sw.getAttribute("stroke-dasharray"), cap: sw.getAttribute("stroke-linecap"),
+        box: [box.x, box.width], opacity: +sw.getAttribute("opacity") };
+    }
+    return out;
+  });
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_a_dash_reaches_the_chips_and_the_row_swatches(tmp_path):
+    """Read off the drawn groups: a dashed line's chip is a run of its own
+    dash scaled to the chip's 3px stroke (3 6), a dotted one's of its dots
+    (0 4.8), each over a ring of the same marks in the label colour that shows
+    only in the theme the colour is weak in; a solid line's chip is the dot it
+    always was. In the Time view a dashed line's swatch is two dashes as tall
+    as its stroke, two on to one off, a dotted one's two dots, and a solid
+    one's the bar as tall as its stroke."""
+    seen = _run(CHIPS, {"url": _hopton_page(tmp_path)})
+    assert not seen["problems"], seen["problems"]
+    for theme, chips in seen["themes"].items():
+        x, y, z = chips["X"], chips["Y"], chips["Z"]
+        assert (x["tag"], z["tag"], y["tag"]) == ("svg", "svg", "span"), theme
+        assert [(m["cls"], m["stroke"], m["width"], m["dash"], m["cap"]) for m in x["marks"]] == [
+            ("ring", "var(--text)", "5", "3 6", "round"), ("mark", "#0072bc", "3", "3 6", "round")]
+        assert [(m["cls"], m["dash"]) for m in z["marks"]] == [("ring", "0 4.8"), ("mark", "0 4.8")]
+        assert x["size"] == z["size"] == [18, 9] and y["size"] == [9, 9]
+        # Neither run takes the dot's ring; Z's own ring is its marks' and shows
+        # in the warm dark theme, where #2a2a2a is under 3:1, and not in sepia.
+        assert x["ring"] == z["ring"] == "none"
+        assert x["marks"][0]["shown"] == "none"
+        assert z["marks"][0]["shown"] == ("inline" if theme == "warm-dark" else "none")
+        assert z["marks"][1]["shown"] == "inline"
+    swatches = seen["swatches"]
+    assert swatches["Y"] == {**swatches["Y"], "tag": "rect", "fill": "#d6322f", "height": "10.5"}
+    assert (swatches["X"]["tag"], swatches["X"]["stroke"], swatches["X"]["width"],
+            swatches["X"]["dash"], swatches["X"]["cap"]) == ("line", "#0072bc", "10.5", "3.2 1.6",
+                                                             "butt")
+    assert (swatches["Z"]["tag"], swatches["Z"]["width"], swatches["Z"]["dash"],
+            swatches["Z"]["cap"]) == ("line", "3.08", "0 4.92", "round")
+    for label, swatch in swatches.items():
+        assert swatch["opacity"] == 1, label
+    # Each in the same eight units beside its name, a dot's caps inside them.
+    assert swatches["X"]["box"][1] == pytest.approx(8, abs=0.01)
+    assert swatches["X"]["box"][0] == pytest.approx(swatches["Y"]["box"][0], abs=0.01)
+    assert swatches["Z"]["box"][0] - 3.08 / 2 == pytest.approx(swatches["Y"]["box"][0], abs=0.02)
+
+
+DRAWN_IN = BROWSER + r"""
+main(async browser => {
+  const out = { problems: [], shots: {}, html: {}, at: {} };
+  const ctx = await browser.newContext({ viewport: { width: 1080, height: 1350 },
+                                         reducedMotion: "no-preference" });
+  const page = await ctx.newPage();
+  page.on("pageerror", e => out.problems.push(e.message));
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  const stage = page.locator("#stage");
+  const shoot = async name => {
+    await frames(page, 2);
+    out.shots[name] = (await stage.screenshot()).toString("base64");
+    out.html[name] = await page.evaluate(() => document.querySelector("#stage svg").outerHTML);
+  };
+  await page.evaluate(() => { const P = window.__present; P.setCapture(true); P.settle();
+                              P.seek(7 * 3600 + 60); });
+  await shoot("plain");
+  await page.evaluate(() => window.__present.setDrawn(0));
+  await shoot("bare");
+  for (const f of job.fractions) {
+    out.at[f] = await page.evaluate(f => {
+      window.__present.setDrawn(f);
+      const g = document.querySelector('#lines g.line[data-line="X"]');
+      return { group: g.getAttribute("stroke-dasharray"),
+               tracks: [...g.querySelectorAll("path[data-src]")].map(p => ({
+                 marks: p.getAttribute("stroke-dasharray"), undrawn: p.classList.contains("undrawn"),
+                 dash: getComputedStyle(p).strokeDasharray })) };
+    }, f);
+  }
+  await shoot("drawn");
+  await page.evaluate(() => window.__present.setRoutes([]));
+  await shoot("none");
+  return out;
+}).catch(fail);
+"""
+
+
+def _png(b64: str):
+    import base64
+    import io as _io
+
+    from PIL import Image
+    return Image.open(_io.BytesIO(base64.b64decode(b64))).convert("RGB")
+
+
+@needs_browser
+def test_a_dashed_cased_map_draws_in_and_ends_on_its_own_dash(tmp_path):
+    """The draw-in's marks are on a track and the line's dash on its group, so
+    the pen wins on the track it is drawing (one solid stroke growing), the
+    line's own dash is back on a track the moment the pen is past it, and at 1
+    the network is the plain map's frame and markup. At 0 nothing shows, the
+    casings (uses of their tracks) included."""
+    # X is the first of three lines, so its pen runs over the first half: at a
+    # quarter it is on X's tracks, and from a half X is whole.
+    fractions = [0.125, 0.25, 0.375, 0.5, 0.75, 1]
+    seen = _run(DRAWN_IN, {"url": _present(_hopton_page(tmp_path), at="07:01"),
+                           "fractions": fractions})
+    assert not seen["problems"], seen["problems"]
+    shots = {name: _png(b64) for name, b64 in seen["shots"].items()}
+    pen = whole = 0
+    for f in fractions:
+        look = seen["at"][str(f)]
+        assert look["group"] == "10.50 21.00", f
+        for track in look["tracks"]:
+            if track["undrawn"]:
+                continue
+            if track["marks"] is None:
+                assert track["dash"] == "10.5px, 21px", (f, track)
+                whole += 1
+            else:
+                assert (track["marks"], track["dash"]) == ("1 1", "1px, 1px"), (f, track)
+                pen += 1
+    assert pen and whole
+    assert all(t["marks"] is None and not t["undrawn"] for t in seen["at"]["0.5"]["tracks"])
+    worst = _apart(shots["drawn"], shots["plain"])
+    print(f"\ndrawn in to 1 against the plain frame: {worst}; bare against no lines: "
+          f"{_apart(shots['bare'], shots['none'])}; plain against bare: "
+          f"{_apart(shots['plain'], shots['bare'])}")
+    assert seen["html"]["drawn"] == seen["html"]["plain"]
+    assert worst <= DRIFT
+    assert _apart(shots["bare"], shots["none"]) <= DRIFT
+    assert _apart(shots["plain"], shots["bare"]) > 4 * DRIFT
+
+
+MORPHED = BROWSER + r"""
+main(async browser => {
+  const out = { problems: [], looks: [] };
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 },
+                                         reducedMotion: "no-preference" });
+  const page = await ctx.newPage();
+  page.on("pageerror", e => out.problems.push(e.message));
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  await page.evaluate(() => { window.__present.setCapture(true); window.__present.settle(); });
+  const look = () => page.evaluate(() => {
+    const box = el => { const b = el.getBBox(); return [b.x, b.y, b.width, b.height]; };
+    return { geo: window.__present.state().geo, view: window.__present.state().viewName,
+             uses: [...document.querySelectorAll("#lines use")].map(u => {
+               const track = document.getElementById(u.getAttribute("href").slice(1));
+               const r = u.getBoundingClientRect();
+               return { line: u.parentNode.getAttribute("data-line"), use: box(u),
+                        track: box(track), shown: r.width > 0 || r.height > 0 };
+             }) };
+  });
+  for (const step of job.steps) {
+    if (step === "look") out.looks.push(await look());
+    else await page.evaluate(step);
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_a_casing_follows_its_track_through_every_morph_and_hides_with_its_line(tmp_path):
+    """A casing is a use of its track, so wherever the morph puts the track,
+    on the ground or in the rows, its casing is there; and hiding the line
+    hides it."""
+    seen = _run(MORPHED, {"url": _hopton_page(tmp_path), "steps": [
+        "look", "window.__present.setGeo(true, 1)", "window.__present.advance(1)",
+        "window.__present.advance(0.1)", "look", "window.__present.setGeo(false, 1)",
+        "window.__present.advance(1.1)", 'window.__present.showView("linear", 1)',
+        "window.__present.advance(1)", "window.__present.advance(0.1)", "look",
+        'window.__present.setRoutes(["Y", "Z"])', "look"]})
+    assert not seen["problems"], seen["problems"]
+    plain, ground, rows, hidden = seen["looks"]
+    assert ground["geo"] == 1 and rows["view"] == "linear"
+    assert len(plain["uses"]) == 4
+    for look in (plain, ground, rows):
+        for use in look["uses"]:
+            assert use["use"] == pytest.approx(use["track"], abs=1e-3), use
+            assert use["shown"], use
+    assert [u["use"] for u in ground["uses"]] != [u["use"] for u in plain["uses"]]
+    assert [u["use"] for u in rows["uses"]] != [u["use"] for u in plain["uses"]]
+    assert [u["shown"] for u in hidden["uses"]] == [u["line"] != "X" for u in hidden["uses"]]

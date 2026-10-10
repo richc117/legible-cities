@@ -168,6 +168,14 @@ __SOCIAL__
   :root[data-theme="sepia"] .chip .dot[data-weak~="sepia"] {
     box-shadow: 0 0 0 1px var(--text);
   }
+  /* A dashed or dotted line's chip is a short run of its own pattern rather than
+     a dot (engine issue 55). Where its colour is weak it is ringed by the same
+     marks a pixel wider in the label colour, drawn under it, in the theme it
+     fails in only: data-ring lists those themes, as data-weak does a dot's. */
+  .chip svg.dot { width: 18px; height: 9px; border-radius: 0; overflow: visible; }
+  .chip svg.dot .ring { display: none; }
+  :root:not([data-theme="sepia"]) .chip svg.dot[data-ring~="warm-dark"] .ring,
+  :root[data-theme="sepia"] .chip svg.dot[data-ring~="sepia"] .ring { display: inline; }
   .chip[aria-pressed="true"] { color: var(--text); }
   .chip[aria-pressed="false"] .dot { opacity: 0.3; }
   .sort { color: var(--muted); font-size: 0.86rem; display: inline-flex;
@@ -940,11 +948,68 @@ __SOCIAL__
   const texts = [];     // {el, label, node, spec, primary}
   const names = [];     // {el, label, swatch}
   const seenLabel = new Set();
-  // Each line's stroke on the map, which is how tall its swatch is drawn.
+  // Each line's stroke on the map, which is how tall its swatch is drawn, and
+  // its dash where it has one (engine issue 55), which its chip and its swatch
+  // show: both read off the line's drawn group, so neither can disagree with
+  // the map. A dash is the group's two numbers, in the map's units.
   const strokeOf = new Map();
+  const dashOf = new Map();
   svg.querySelectorAll("#lines g.line").forEach(g => {
     strokeOf.set(g.getAttribute("data-line"), +g.getAttribute("stroke-width") || 7);
+    const dash = (g.getAttribute("stroke-dasharray") || "").trim();
+    if (dash && dash !== "none") {
+      dashOf.set(g.getAttribute("data-line"), dash.split(/[\s,]+/).map(Number));
+    }
   });
+  // A dash of nothing on is a dotted line's: its round caps paint the dots.
+  const dottedOf = label => dashOf.get(label)[0] === 0;
+  // The swatch beside a row's name in the Time view: a bar SWATCH long and as
+  // tall as the line's stroke. A dashed line's is two dashes as tall, two on to
+  // one off as the map's show with their caps; a dotted line's is two dots 1.6
+  // of a dot apart, as big as two fit. placeSwatch puts any of them by the
+  // middle of its left end.
+  const SWATCH = 8;
+  function makeSwatch(label) {
+    const colour = data.lines[label] || "#888";
+    const t = strokeOf.get(label) || 7;
+    if (!dashOf.has(label)) {
+      const bar = document.createElementNS(NS, "rect");
+      bar.setAttribute("class", "rowswatch");
+      bar.setAttribute("fill", colour);
+      bar.setAttribute("width", String(SWATCH));
+      bar.setAttribute("height", t);
+      return bar;
+    }
+    const run = document.createElementNS(NS, "line");
+    run.setAttribute("class", "rowswatch");
+    run.setAttribute("stroke", colour);
+    if (dottedOf(label)) {
+      const d = Math.min(t, SWATCH / 2.6);
+      run.setAttribute("stroke-width", d.toFixed(2));
+      run.setAttribute("stroke-linecap", "round");
+      run.setAttribute("stroke-dasharray", "0 " + (1.6 * d).toFixed(2));
+      run.dataset.inset = (d / 2).toFixed(2);
+    } else {
+      run.setAttribute("stroke-width", t);
+      run.setAttribute("stroke-linecap", "butt");
+      run.setAttribute("stroke-dasharray", (SWATCH * 2 / 5) + " " + (SWATCH / 5));
+      run.dataset.inset = "0";
+    }
+    return run;
+  }
+  function placeSwatch(sw, x, y) {
+    if (sw.tagName === "rect") {
+      sw.setAttribute("x", x.toFixed(1));
+      sw.setAttribute("y", (y - sw.getAttribute("height") / 2).toFixed(1));
+      return;
+    }
+    // From the bar's own left end, written to the tenth as the bar's is.
+    const left = +x.toFixed(1), inset = +sw.dataset.inset;
+    sw.setAttribute("x1", (left + inset).toFixed(2));
+    sw.setAttribute("x2", (left + SWATCH - inset).toFixed(2));
+    sw.setAttribute("y1", y.toFixed(1));
+    sw.setAttribute("y2", y.toFixed(1));
+  }
 
   for (const line of layout.lines) {
     for (const st of lineStations.get(line.label) || []) {
@@ -1007,11 +1072,7 @@ __SOCIAL__
     // as the line's stroke, in the gap between the name and the band. In the
     // Linear view the row itself starts there, so the bar comes in only with
     // the chart. Decoration, not text: it is not measured for contrast.
-    const swatch = document.createElementNS(NS, "rect");
-    swatch.setAttribute("class", "rowswatch");
-    swatch.setAttribute("fill", data.lines[line.label] || "#888");
-    swatch.setAttribute("width", "8");
-    swatch.setAttribute("height", strokeOf.get(line.label) || 7);
+    const swatch = makeSwatch(line.label);
     swatch.setAttribute("opacity", "0");
     nameLayer.appendChild(swatch);
     names.push({ el: name, label: line.label, swatch: swatch });
@@ -1045,6 +1106,16 @@ __SOCIAL__
   axisLayer.setAttribute("id", "stringline-axis");
 
   // ------------------------------------------------------------ track morph
+  // A casing (engine issue 55) is a use of its track, first in the line's
+  // group: it follows whatever d the track is given by itself, and hides with
+  // its group. A stylesheet's rule does not reach into a use's copy of the
+  // track, so the draw-in's class goes on the casing as well as the track.
+  const casingsOf = new Map();
+  svg.querySelectorAll("#lines use").forEach(u => {
+    const id = (u.getAttribute("href") || "").slice(1);
+    if (!casingsOf.has(id)) casingsOf.set(id, []);
+    casingsOf.get(id).push(u);
+  });
   const tracks = [];
   svg.querySelectorAll("#lines path[data-src]").forEach(el => {
     const label = el.parentNode.getAttribute("data-line");
@@ -1059,6 +1130,7 @@ __SOCIAL__
     const g = geoData && geoData.tracks[el.getAttribute("id")];
     tracks.push({
       el: el, label: label, pts: pts, d0: el.getAttribute("d"),
+      casings: casingsOf.get(el.getAttribute("id")) || [],
       gpts: g && g.length === pts.length ? g.map(c => ({ x: c[0], y: c[1] })) : null,
       src: el.getAttribute("data-src"), dst: el.getAttribute("data-dst"),
     });
@@ -1383,8 +1455,7 @@ __SOCIAL__
       // Times the line's fade, which is exactly 1 while no trip is shown.
       n.el.setAttribute("opacity", (Math.max(m, sf) * fadeOf(n.label)).toFixed(2));
       // From 3 past the name's end to 3 short of the band, on the name's middle.
-      n.swatch.setAttribute("x", (vbX + GUTTER - 11).toFixed(1));
-      n.swatch.setAttribute("y", (y - n.swatch.getAttribute("height") / 2).toFixed(1));
+      placeSwatch(n.swatch, vbX + GUTTER - 11, y);
       n.swatch.setAttribute("opacity", (sf * fadeOf(n.label)).toFixed(2));
     }
   }
@@ -1875,6 +1946,38 @@ __SOCIAL__
   const weakIn = colour => Object.keys(GROUNDS).filter(theme =>
     !/^#[0-9a-f]{6}$/i.test(colour) || contrast(colour, GROUNDS[theme]) < 3).join(" ");
 
+  // A dashed or dotted line's chip (engine issue 55): a run of its own stroke
+  // CHIP_STROKE thick, its group's dash scaled from the map's stroke to that,
+  // with the map's round caps, so the chip shows what the map draws. Under it a
+  // ring of the same marks two pixels thicker in the label colour, shown in the
+  // themes the colour is weak in (data-ring, as a dot's data-weak).
+  const CHIP_STROKE = 3;
+  function chipRun(r, weak) {
+    const run = document.createElementNS(NS, "svg");
+    run.setAttribute("class", "dot");
+    run.setAttribute("viewBox", "0 0 18 9");
+    run.setAttribute("aria-hidden", "true");
+    run.setAttribute("focusable", "false");
+    if (weak) run.setAttribute("data-ring", weak);
+    const scale = CHIP_STROKE / (strokeOf.get(r) || 7);
+    const dash = dashOf.get(r).map(v => +(v * scale).toFixed(3)).join(" ");
+    for (const [cls, colour, width] of [["ring", "var(--text)", CHIP_STROKE + 2],
+                                        ["mark", data.lines[r] || "#333", CHIP_STROKE]]) {
+      const mark = document.createElementNS(NS, "line");
+      mark.setAttribute("class", cls);
+      mark.setAttribute("x1", String(CHIP_STROKE / 2));
+      mark.setAttribute("x2", String(18 - CHIP_STROKE / 2));
+      mark.setAttribute("y1", "4.5");
+      mark.setAttribute("y2", "4.5");
+      mark.setAttribute("stroke", colour);
+      mark.setAttribute("stroke-width", String(width));
+      mark.setAttribute("stroke-linecap", "round");
+      mark.setAttribute("stroke-dasharray", dash);
+      run.appendChild(mark);
+    }
+    return run;
+  }
+
   for (const r of routes) {
     const chip = document.createElement("span");
     chip.className = "chip";
@@ -1883,11 +1986,13 @@ __SOCIAL__
     chip.setAttribute("aria-pressed", "true");
     // Built as nodes, not markup: both halves come from an agency's feed --
     // the label and the colour -- and a line named with a tag would run here.
-    const dot = document.createElement("span");
-    dot.className = "dot";
     const weak = weakIn(data.lines[r] || "#333");
-    if (weak) dot.setAttribute("data-weak", weak);
-    dot.style.background = data.lines[r] || "#333";
+    const dot = dashOf.has(r) ? chipRun(r, weak) : document.createElement("span");
+    if (!dashOf.has(r)) {
+      dot.className = "dot";
+      if (weak) dot.setAttribute("data-weak", weak);
+      dot.style.background = data.lines[r] || "#333";
+    }
     chip.append(dot, display(r));
     const toggle = () => {
       setLineShown(r, chip.getAttribute("aria-pressed") !== "true");
@@ -2515,6 +2620,15 @@ __SOCIAL__
   //   and its names appear whole at the first pen that reaches it. The trains
   //   and the clock hold until the network is whole.
   //
+  //   A dashed or dotted line (engine issue 55) carries its dash on its group,
+  //   and the pen's marks are on the track, so the pen wins on the track it is
+  //   drawing, which shows as one solid stroke growing, and the line's own dash
+  //   is back on each track the moment the pen is past its end, when the marks
+  //   come off. A casing is a use of its track, so it copies the track's marks
+  //   and draws in under the pen, whole and undashed after; the class that
+  //   hides a track the pen has not reached is set on its casings as well,
+  //   since the rule that reads it cannot reach into a use's copy.
+  //
   // The distances are measured once, when a draw-in starts, in the view then
   // showing. At 1 every dash and every mark goes, so the network is the map it
   // was. The rows and the chart do not draw in, so there the network shows whole
@@ -2602,7 +2716,8 @@ __SOCIAL__
         const ds = dist.get(t.src), dd = dist.get(t.dst);
         const start = Math.min(ds, dd);
         const fromSrc = ds <= dd;
-        line.tracks.push({ el: t.el, len: lens[i], start: start, fromSrc: fromSrc, q: null,
+        line.tracks.push({ el: t.el, casings: t.casings, len: lens[i], start: start,
+                           fromSrc: fromSrc, q: null,
                            near: fromSrc ? t.src : t.dst, far: fromSrc ? t.dst : t.src });
         line.reach = Math.max(line.reach, start + lens[i]);
       });
@@ -2627,12 +2742,12 @@ __SOCIAL__
         const el = tr.el;
         if (q === 0 || q === 1) {
           if (q !== tr.q) {
-            if (q === 0) hide(el); else unhide(el);
+            for (const part of [el, ...tr.casings]) if (q === 0) hide(part); else unhide(part);
             for (const name of DASH) el.removeAttribute(name);
           }
         } else {
           if (!(tr.q > 0 && tr.q < 1)) {
-            unhide(el);
+            for (const part of [el, ...tr.casings]) unhide(part);
             el.setAttribute("pathLength", "1");
             el.setAttribute("stroke-dasharray", "1 1");
           }
@@ -2656,7 +2771,7 @@ __SOCIAL__
 
   function unmarkDrawn() {
     for (const t of tracks) {
-      unhide(t.el);
+      for (const part of [t.el, ...t.casings]) unhide(part);
       for (const name of DASH) t.el.removeAttribute(name);
     }
     for (const els of stationEls.values()) for (const el of els) unhide(el);
