@@ -5,6 +5,7 @@ by running ``bin/export`` -- what is worth asserting here is the arithmetic and
 the agreement between the three places the palette is written down.
 """
 
+import datetime as dt
 import json
 import os
 import random
@@ -14,10 +15,14 @@ import subprocess
 from dataclasses import replace
 from pathlib import Path
 from unittest import mock
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from pylsp_jsonrpc.exceptions import JsonRpcInvalidParams
 
-from schematic import config, export, feeds
+from schematic import config, export, feeds, serve
+from schematic.schedule import service_day_text
+from test_serve import check, invalid
 
 PAGE = Path(export.__file__).parent / "page" / "page.html"
 SITE_CSS = config.REPO_ROOT / "site" / "src" / "assets" / "style.css"
@@ -629,3 +634,187 @@ def test_the_sidecar_names_a_presets_source_as_the_registry_has_it(tmp_path):
                           theme="dark", view="schematic")
     meta = json.loads(export.sidecar_path(written).read_text(encoding="utf-8"))
     assert meta["source"] == feeds.FEEDS["cdmx-metro"].url
+
+
+# ------------------------------------------------- a title card and a draw-in
+#
+# Issue 44, as settled on 9 Oct 2026: a beat takes `card` and `draw_in`,
+# booleans false when left out. A card lasts a second at least and a draw-in
+# two; a list draws in once, on the geographic or the map view, with no row or
+# chart before it and no sweep in it, and every refusal names the beat and the
+# field. The flags are written only where true, so nothing a list without them
+# plans moves (tests/test_beats.py pins the eight names' plans), and a card puts
+# the city, the network and the day on the address whether or not the title is
+# on, with a note when its words need longer to read than its beat lasts.
+
+KEY = "la-metro-rail"
+APP_PAGE = "app://local/projects/p1/la-metro-rail.html"
+DATE = "2026-09-05"
+CAPTION = "Trains every few minutes from first light, and long gaps between them after ten."
+OPENING = {"secs": 2, "view": "map", "at": "07:00"}
+# The issue's own list: a card, the network drawing in on the map, the morning.
+CARDED = [{**OPENING, "speed": 0, "card": True}, {"secs": 6, "draw_in": True},
+          {"secs": 10, "sweep": True, "hours": 2}]
+
+
+def _url_query(job: export.CaptureJob) -> dict[str, str]:
+    return {k: v[0] for k, v in parse_qs(urlsplit(job.url).query).items()}
+
+
+def test_a_beat_takes_a_card_and_a_draw_in_false_when_left_out():
+    beats = export.authored_beats(CARDED)
+    assert [(b.card, b.draw_in) for b in beats] == [(True, False), (False, True), (False, False)]
+    assert (export.Beat(1).card, export.Beat(1).draw_in) == (False, False)
+    assert {"card", "draw_in"} <= set(export.BEAT_FIELDS)
+    # Given as Beats, checked the same.
+    assert export.authored_beats(beats) == beats
+
+
+def test_the_flags_are_written_only_where_they_are_true():
+    """A beat's payload and export.storyboards' row carry `card` and `draw_in`
+    only where true, so a beat without them is the payload it always was."""
+    payload = export.beat_payload(export.authored_beats(CARDED))
+    assert [{k: b[k] for k in ("card", "draw_in") if k in b} for b in payload] == [
+        {"card": True}, {"draw_in": True}, {}]
+    unflagged = export.beat_payload((export.Beat(2, view="map", at="07:00"),))
+    flagged_off = export.beat_payload((export.Beat(2, view="map", at="07:00", card=False,
+                                                   draw_in=False),))
+    assert flagged_off == unflagged and set(unflagged[0]) == {
+        "secs", "view", "labels", "at", "speed", "sweep", "hours", "lo", "hi", "tween"}
+    for name, beats in export.STORYBOARDS.items():
+        for beat in export.beat_payload(beats):
+            assert not {"card", "draw_in"} & set(beat), name
+    for row in export.storyboard_table():
+        for beat in row["beats"]:
+            assert not {"card", "draw_in"} & set(beat), row["name"]
+
+
+def _refusal(beats) -> str:
+    """The sentence export.plan's options refuse a list with, as params, which
+    is authored_beats' own."""
+    with pytest.raises(ValueError) as direct:
+        export.authored_beats(beats)
+    with pytest.raises(JsonRpcInvalidParams) as caught:
+        serve._export_options({"storyboard": beats})
+    assert caught.value.data["kind"] == "params"
+    assert caught.value.data["hint"] == str(direct.value)
+    return str(direct.value)
+
+
+# Each hint names the beat and the field as one path, `storyboard[1].secs`.
+REFUSED = [
+    pytest.param([OPENING, {"secs": 0.9, "card": True}], "storyboard[1].secs", "1 second",
+                 id="card-0.9s"),
+    pytest.param([OPENING, {"secs": 1.9, "draw_in": True}], "storyboard[1].secs", "2 seconds",
+                 id="draw-in-1.9s"),
+    pytest.param([{**OPENING, "draw_in": True}, {"secs": 2}, {"secs": 2, "draw_in": True}],
+                 "storyboard[2].draw_in", "storyboard[0]", id="two-draw-ins"),
+    pytest.param([OPENING, {"secs": 2, "view": "linear", "draw_in": True}],
+                 "storyboard[1].view", "linear", id="draw-in-on-the-rows"),
+    pytest.param([OPENING, {"secs": 2, "view": "time", "draw_in": True}],
+                 "storyboard[1].view", "time", id="draw-in-on-the-chart"),
+    pytest.param([{**OPENING, "view": "linear"}, {"secs": 2, "draw_in": True}],
+                 "storyboard[1].draw_in", "linear", id="draw-in-keeps-the-rows"),
+    pytest.param([{**OPENING, "view": "time"}, {"secs": 2, "view": "map", "draw_in": True}],
+                 "storyboard[0].view", "undrawn", id="the-chart-before-a-draw-in"),
+    pytest.param([OPENING, {"secs": 2, "view": "linear"},
+                  {"secs": 2, "view": "map", "draw_in": True}],
+                 "storyboard[1].view", "undrawn", id="the-rows-before-a-draw-in"),
+    pytest.param([OPENING, {"secs": 2, "draw_in": True, "sweep": True}],
+                 "storyboard[1].sweep", "holds", id="a-draw-in-that-sweeps"),
+    pytest.param([OPENING, {"secs": 2, "card": "yes"}], "storyboard[1].card", "true or false",
+                 id="card-yes"),
+    pytest.param([OPENING, {"secs": 2, "draw_in": None}], "storyboard[1].draw_in",
+                 "true or false", id="draw-in-null"),
+]
+
+
+@pytest.mark.parametrize("beats,path,also", REFUSED)
+def test_a_card_and_a_draw_in_are_refused_by_beat_and_field(beats, path, also):
+    hint = _refusal(beats)
+    assert path in hint and also in hint, hint
+
+
+def test_each_new_bound_on_its_edge_is_taken():
+    export.authored_beats([{**OPENING, "secs": 1, "view": "geographic", "card": True},
+                           {"secs": 2, "draw_in": True}, {"secs": 2, "view": "linear"},
+                           {"secs": 1, "view": "time", "card": True}, {"secs": 2, "card": True}])
+    # A list may open drawing in, the card over it, and the rows may follow.
+    export.authored_beats([{**OPENING, "draw_in": True, "card": True}, {"secs": 1, "view": "time"}])
+    # A list with no draw-in may visit any view, as it always could.
+    export.authored_beats([{**OPENING, "view": "time", "card": True},
+                           {"secs": 1, "view": "linear"}])
+
+
+def test_a_card_puts_the_city_the_network_and_the_day_on_the_address_title_or_not():
+    plain = export.plan(KEY, "instagram-reel", page=APP_PAGE, date=DATE, title=False,
+                        storyboard=[OPENING])
+    assert not {"city", "network", "date"} & set(_url_query(plain))
+    carded = export.plan(KEY, "instagram-reel", page=APP_PAGE, date=DATE, title=False,
+                         storyboard=[{**OPENING, "card": True}])
+    query = _url_query(carded)
+    assert (query["title"], query["city"], query["network"], query["date"]) == (
+        "0", "Los Angeles", "Metro Rail", service_day_text(dt.date(2026, 9, 5)))
+    # The address is the title's, key for key: the card adds no key of its own.
+    titled = export.plan(KEY, "instagram-reel", page=APP_PAGE, date=DATE, storyboard=[OPENING])
+    titled_card = export.plan(KEY, "instagram-reel", page=APP_PAGE, date=DATE,
+                              storyboard=[{**OPENING, "card": True}])
+    assert titled_card.url == titled.url
+    assert list(_url_query(carded)) == list(_url_query(titled))
+    # url_for itself: a card writes them, and without one nothing moves.
+    reel = export.PRESETS["instagram-reel"]
+    assert export.url_for(KEY, reel, title=False, date=DATE) == export.url_for(
+        KEY, reel, title=False, date=DATE, card=False)
+    assert "city=Los+Angeles" in export.url_for(KEY, reel, title=False, date=DATE, card=True)
+
+
+def test_a_card_too_short_to_read_comes_with_a_note_and_one_long_enough_does_not():
+    """The BBC's reading floor, 0.3 s a word: the city, the network and the day
+    are eight words, 2.4 s, and an 80-character caption is 14 more."""
+    assert export.card_words(KEY, date=DATE) == 8
+    assert export.card_words(KEY, date=DATE, caption=CAPTION) == 22
+
+    def notes(secs: float, caption: str | None = None) -> tuple[str, ...]:
+        return export.plan(KEY, "instagram-reel", page=APP_PAGE, date=DATE, caption=caption,
+                           storyboard=[{**OPENING, "secs": secs, "card": True},
+                                       {"secs": 2, "draw_in": True}]).notes
+
+    short = notes(2)
+    assert len(short) == 1, short
+    assert short[0].startswith("the title card at storyboard[0] says 8 words, about 2.4 seconds")
+    assert short[0].endswith("Lengthen the beat.")
+    assert notes(2.4) == () and notes(3) == ()
+    captioned = notes(6, CAPTION)
+    assert len(captioned) == 1 and "22 words, about 6.6 seconds" in captioned[0]
+    assert captioned[0].endswith("or shorten the caption.")
+    assert notes(6.6, CAPTION) == ()
+    # A list without a card, and a still, say nothing of reading.
+    assert export.plan(KEY, "instagram-reel", page=APP_PAGE, date=DATE,
+                       storyboard=[OPENING]).notes == ()
+    assert export.plan(KEY, "instagram-post", page=APP_PAGE, date=DATE,
+                       storyboard=[{**OPENING, "secs": 1, "card": True}]).notes == ()
+
+
+def test_a_plan_with_the_flags_comes_back_through_encode_as_it_went():
+    """export.encode reads a plan back field by field: the flags are read as
+    the plan writes them, and anything but true or false is refused."""
+    job = export.plan(KEY, "instagram-reel", page=APP_PAGE, date=DATE, storyboard=CARDED)
+    assert serve._capture_job(job.to_dict()).beats == job.beats
+    sent = job.to_dict()
+    sent["beats"] = [{**job.beats[0], "card": "yes"}] + list(job.beats[1:])
+    with pytest.raises(JsonRpcInvalidParams):
+        serve._capture_job(sent)
+    # A client that sends a flag as false is read as sending none.
+    sent["beats"] = [{**b, "card": False, "draw_in": False} for b in export.beat_payload(
+        export.authored_beats([OPENING]))]
+    assert serve._capture_job(sent).beats == tuple(export.beat_payload(
+        export.authored_beats([OPENING])))
+
+
+def test_the_schema_takes_the_flags_on_a_beat_and_on_a_plan_and_stays_at_protocol_1():
+    check({"storyboard": CARDED}, "ExportOptions")
+    assert invalid({"storyboard": [{**OPENING, "card": "yes"}]}, "ExportOptions")
+    assert invalid({"storyboard": [{**OPENING, "draw_in": None}]}, "ExportOptions")
+    job = export.plan(KEY, "instagram-reel", page=APP_PAGE, date=DATE, storyboard=CARDED)
+    check({**job.to_dict(), "filename": job.filename}, "CaptureJob")
+    assert serve.PROTOCOL == 1

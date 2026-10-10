@@ -916,7 +916,7 @@
       "additionalProperties": false
     },
     "StoryboardBeat": {
-      "description": "A stretch of video with one set of state, as the storyboard is written; export.storyboards answers every field, and a client writing a list gives only secs and what changes. A field left out or null carries over from the beat before. The server also checks what this cannot say: the beats last 90 seconds in all at most, a span's first clock is before its second, the first beat names a view and has tween 0 or none, since frame 0 must already be in a view, and the first beat names at unless it sweeps without hours, since frame 0 is not reproducible without a clock.",
+      "description": "A stretch of video with one set of state, as the storyboard is written; export.storyboards answers every field but card and draw_in, which it writes only where true, and a client writing a list gives only secs and what changes. A field left out or null carries over from the beat before, except card and draw_in, which are the beat's own and false when left out. The server also checks what this cannot say: the beats last 90 seconds in all at most, a span's first clock is before its second, the first beat names a view and has tween 0 or none, since frame 0 must already be in a view, and the first beat names at unless it sweeps without hours, since frame 0 is not reproducible without a clock; a card beat lasts 1 second at least and a draw_in beat 2, a list has one draw_in at most, which does not sweep, and it and every beat before it are on the geographic or map view, named or carried over.",
       "type": "object",
       "properties": {
         "secs": {
@@ -989,7 +989,9 @@
             "null"
           ],
           "minimum": 0
-        }
+        },
+        "card": { "type": "boolean", "description": "The title card over the whole beat: the city, the network, the service day and the caption on a scrim of the page's ground, the overlay's name and clock hidden under it. It cuts in at the beat's first frame and out after its last. Over the map in place, or over bare ground when a draw_in follows it. A plan with a card carries the city, the network and the day on its address, title or not, and a note when the card's words need longer to read than the beat lasts." },
+        "draw_in": { "type": "boolean", "description": "The network draws itself in over the beat, the shown lines in their stacking order from each one's spine's first end; the network is undrawn on every beat before it, and the trains and the clock hold until it is whole." }
       },
       "required": [
         "secs"
@@ -1211,7 +1213,9 @@
             "number",
             "null"
           ]
-        }
+        },
+        "card": { "type": "boolean", "description": "Written only where true: put the title card up for this beat (__present.setCard), and take it down at the next beat that has none." },
+        "draw_in": { "type": "boolean", "description": "Written only where true. The capture calls __present.setDrawn(0) after its settle when any beat has one, and on frame i of n of this beat, after the frame's advance, setDrawn(i / (n - 1)), the sweep's step. The page holds the clock while the network is not whole, so the beat's last frame is the plain map at the clock the draw-in began at." }
       },
       "required": [
         "secs",

@@ -309,6 +309,10 @@ class Beat:
     hours: float | None = None
     span: tuple[str, str] | None = None
     tween: float | None = None     # transition length; defaults to min(secs, 1.2)
+    # The title card over the whole beat, and the network drawing itself in
+    # over it (issue 44). Neither is inherited: a beat has them or does not.
+    card: bool = False
+    draw_in: bool = False
 
 
 # Views that need the pre-octilinear geometry, which only feeds with
@@ -449,7 +453,20 @@ MAX_SECONDS = 90.0
 MAX_HOURS = 24.0
 
 # A beat's fields as the protocol's StoryboardBeat names them.
-BEAT_FIELDS = ("secs", "view", "labels", "at", "speed", "sweep", "hours", "span", "tween")
+BEAT_FIELDS = ("secs", "view", "labels", "at", "speed", "sweep", "hours", "span", "tween",
+               "card", "draw_in")
+
+# A title card's beat lasts long enough to be seen, and a draw-in's long enough
+# to be followed (issue 44): a second and two.
+CARD_SECS = 1.0
+DRAW_IN_SECS = 2.0
+# The views a network can draw in on. The time chart fades the network out, and
+# on the rows an interchange is a dot a line, so stations revealed one by one
+# would float on rows not yet drawn.
+DRAW_IN_VIEWS = (GEO_VIEW, "map")
+# A word of the card's takes about this long to read: the BBC's reading floor
+# for a subtitle. A card whose words need longer than its beat gets a note.
+READING_SECS = 0.3
 
 # A list's first beat says where it opens, so nothing beside the list may.
 BESIDE_A_LIST = "view and at go on a list's first beat (storyboard[0]), not beside the list"
@@ -479,6 +496,14 @@ def authored_beats(beats: Sequence[Beat | dict]) -> tuple[Beat, ...]:
     itself: the desktop app's capture refuses any other first beat, and this
     is its rule. Later beats are kept as written, so a null ``tween`` stays
     null and ``beat_payload`` gives it its default.
+
+    ``card`` and ``draw_in`` are true or false, false when left out (issue
+    44). A card's beat lasts ``CARD_SECS`` at least and a draw-in's
+    ``DRAW_IN_SECS``. A list draws the network in once, and the network is
+    undrawn on every beat before that one, so the draw-in and every beat
+    before it are on a view it can be drawn on (``DRAW_IN_VIEWS``), its own or
+    the one it keeps from the beat before; and the clock holds while the
+    network draws in, so a draw-in does not sweep.
     """
     if not isinstance(beats, (list, tuple)):
         raise ValueError("storyboard must be a storyboard's name or a list of beats")
@@ -490,6 +515,8 @@ def authored_beats(beats: Sequence[Beat | dict]) -> tuple[Beat, ...]:
     low, high = BEAT_SECS
     out: list[Beat] = []
     total = 0.0
+    shows: list[str] = []          # the view each beat is on, named or kept
+    drawn_at: int | None = None    # the draw-in's beat
     for i, raw in enumerate(beats):
         where = f"storyboard[{i}]"
         if isinstance(raw, Beat):
@@ -558,8 +585,43 @@ def authored_beats(beats: Sequence[Beat | dict]) -> tuple[Beat, ...]:
                 raise ValueError(f"{where}.at is missing: frame 0 is not reproducible "
                                  f"without a clock, so the first beat names one, unless "
                                  f"it sweeps a span rather than a number of hours")
+        shows.append(view if view is not None else shows[-1])
+        card = fields.get("card", False)
+        if not isinstance(card, bool):
+            raise ValueError(f"{where}.card must be true or false")
+        if card and secs < CARD_SECS:
+            raise ValueError(f"{where}.secs must be at least {CARD_SECS:g} second on a "
+                             f"title card")
+        draw_in = fields.get("draw_in", False)
+        if not isinstance(draw_in, bool):
+            raise ValueError(f"{where}.draw_in must be true or false")
+        if draw_in:
+            if secs < DRAW_IN_SECS:
+                raise ValueError(f"{where}.secs must be at least {DRAW_IN_SECS:g} seconds "
+                                 f"on a draw-in")
+            if drawn_at is not None:
+                raise ValueError(f"{where}.draw_in is a second draw-in: a storyboard draws "
+                                 f"the network in once, and storyboard[{drawn_at}] does")
+            if sweep:
+                raise ValueError(f"{where}.sweep must be false on a draw-in: the clock "
+                                 f"holds while the network draws in")
+            if shows[i] not in DRAW_IN_VIEWS:
+                if view is not None:
+                    raise ValueError(f"{where}.view must be geographic or map on a "
+                                     f"draw-in, not {view}")
+                raise ValueError(f"{where}.draw_in is on the {shows[i]} view, which it keeps "
+                                 f"from the beat before: a draw-in is on the geographic or "
+                                 f"map view")
+            drawn_at = i
         out.append(Beat(secs, view=view, labels=labels, at=at, speed=speed, sweep=sweep,
-                        hours=hours, span=span, tween=tween))
+                        hours=hours, span=span, tween=tween, card=card, draw_in=draw_in))
+    # The network is undrawn until its draw-in, and the rows and the chart
+    # cannot show it undrawn: they show it whole.
+    for j in range(drawn_at or 0):
+        if out[j].view is not None and out[j].view not in DRAW_IN_VIEWS:
+            raise ValueError(f"storyboard[{j}].view must be geographic or map: the network "
+                             f"is undrawn until the draw-in at storyboard[{drawn_at}], and "
+                             f"the {out[j].view} view shows it whole")
     return tuple(out)
 
 
@@ -572,13 +634,15 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
             lines: tuple[str, ...] = (), safe: bool = False,
             page: str | None = None, date: str | None = None,
             caption: str | None = None, clock_corner: str = DEFAULT_CORNER,
-            zones: Zones | None = None) -> str:
+            zones: Zones | None = None, card: bool = False) -> str:
     """The presentation-mode URL for a preset. Also what you paste into a browser.
 
     ``page`` is the page's own address when it is not the site's file: the
     desktop app serves a project's page on its own origin and passes it here.
     ``date`` (YYYY-MM-DD) is the service day the title names when the caller
-    knows it; otherwise it is the atlas's.
+    knows it; otherwise it is the atlas's. ``card`` says a beat shows the
+    title card, which says the city, the network and the day whether or not
+    the title does, so they are written for either (issue 44).
 
     ``caption``, ``clock_corner`` and ``zones`` are written after everything
     else, and only where they say something, so an address that uses none of
@@ -604,15 +668,15 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
     if preset.width and preset.height:
         q["frame"] = f"{preset.width}:{preset.height}"
         q["frametop"] = f"{preset.frame_top}"
-    if title:
+    if title or card:
         q["city"] = feed.city
         q["network"] = feed.network
         # The service day, from the same networks.json the atlas prints. A
         # clock reading 07:14 does not say *when*, and these feeds are
         # snapshots -- an image outlives the page that explains it.
-        when = date or _provenance(key).get("service_date")
+        when = _day_text(key, date)
         if when:
-            q["date"] = service_day_text(dt.date.fromisoformat(when))
+            q["date"] = when
     if at:
         q["at"] = at
     if speed is not None:
@@ -634,6 +698,14 @@ def url_for(key: str, preset: Preset, *, view: str | None = None,
     from urllib.parse import urlencode
     base = page or (MAPS_DIR / f"{key}.html").as_uri()
     return base + "?" + urlencode(q)
+
+
+def _day_text(key: str, date: str | None) -> str:
+    """The service day as the page writes it ("Saturday 5 September 2026"):
+    ``date`` (YYYY-MM-DD) when the caller knows it, else the atlas's, else
+    empty."""
+    when = date or _provenance(key).get("service_date")
+    return service_day_text(dt.date.fromisoformat(when)) if when else ""
 
 
 def _beats_of(storyboard: str | Sequence[Beat | dict] | None) -> tuple[Beat | dict, ...]:
@@ -828,7 +900,8 @@ def beat_payload(beats: tuple[Beat, ...],
     drives the recorder through exactly the shape a real export does, rather
     than through a hand-built copy that can drift from it. ``bounds`` is the
     clock's range, so a sweep with no explicit span covers whatever service day
-    the network actually has.
+    the network actually has. ``card`` and ``draw_in`` are written only where
+    they are true, so a beat without either is the payload it always was.
     """
     out = []
     for b in beats:
@@ -840,8 +913,14 @@ def beat_payload(beats: tuple[Beat, ...],
             "lo": None if b.hours else lo,
             "hi": None if b.hours else hi,
             "tween": b.tween if b.tween is not None else min(b.secs, 1.2),
+            **_flags(b),
         })
     return out
+
+
+def _flags(beat: Beat) -> dict[str, bool]:
+    """A beat's card and draw-in, each only where it is true."""
+    return {name: True for name in ("card", "draw_in") if getattr(beat, name)}
 
 
 def _ffmpeg(args: list[str], *, progress: Progress | None = None,
@@ -1084,6 +1163,10 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
     the platform's own interface covers the bottom right, so that corner is
     refused and the bottom left comes with a note. A preset with safe zones
     carries its row on every address (issue 40).
+
+    A storyboard with a title card carries the city, the network and the day
+    on its address, title or not, and a card whose words need longer to read
+    than its beat lasts comes with a note (issue 44).
     """
     if key not in feeds.all():
         raise KeyError(f"unknown feed {key!r}")
@@ -1127,7 +1210,8 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
             + (f"-{tag}" if tag else ""))
     url = url_for(key, preset, view=view, labels=labels, title=title, clock=clock,
                   theme=theme, at=at, lines=lines, safe=safe, page=page, date=date,
-                  caption=caption, clock_corner=corner, zones=zones)
+                  caption=caption, clock_corner=corner, zones=zones,
+                  card=any(b.card for b in planned))
     beats: tuple[dict, ...] = ()
     notes: list[str] = []
     if preset.kind == "video":
@@ -1141,6 +1225,7 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
                     notes.append(f"this sweep advances {rate:.0f} simulated seconds per "
                                  f"frame, so trains will jump rather than move. Narrow "
                                  f"the beat's span, or lengthen it.")
+        notes += _reading_notes(key, planned, date=date, caption=caption)
         # The clock bounds are the feed's, so a sweep with no explicit span
         # covers whatever service day this network actually has.
         beats = tuple(beat_payload(planned))
@@ -1154,6 +1239,33 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
                       keep=keep, crf=crf, fade=fade, stem=stem, theme=theme,
                       view=view or preset.view, storyboard=board, at=pinned,
                       notes=tuple(notes), caption=caption, clock_corner=corner)
+
+
+def card_words(key: str, *, date: str | None = None, caption: str | None = None) -> int:
+    """How many words the title card says: the city, the network and the day
+    as the address carries them, and the caption."""
+    feed = feeds.get(key)
+    said = [feed.city, feed.network, _day_text(key, date), caption or ""]
+    return sum(len(part.split()) for part in said)
+
+
+def _reading_notes(key: str, beats: Sequence[Beat], *, date: str | None,
+                   caption: str | None) -> list[str]:
+    """A note for each title card whose words need longer to read than its
+    beat lasts, at ``READING_SECS`` a word, as a fast sweep gets one: said
+    before the capture, and never a refusal."""
+    notes = []
+    for i, beat in enumerate(beats):
+        if not beat.card:
+            continue
+        words = card_words(key, date=date, caption=caption)
+        needed = round(words * READING_SECS, 6)     # 8 words are 2.4 s, not 2.4000000000000004
+        if needed > beat.secs:
+            notes.append(f"the title card at storyboard[{i}] says {words} words, about "
+                         f"{needed:.1f} seconds of reading at {READING_SECS:g} seconds a "
+                         f"word, and lasts {beat.secs:g}. Lengthen the beat"
+                         + (", or shorten the caption." if caption else "."))
+    return notes
 
 
 def check_caption(caption: object) -> str:
@@ -1285,7 +1397,8 @@ def storyboard_table() -> list[dict]:
              "geographic": wants_geographic(storyboard=name),
              "beats": [{"secs": b.secs, "view": b.view, "labels": b.labels, "at": b.at,
                         "speed": b.speed, "sweep": b.sweep, "hours": b.hours,
-                        "span": list(b.span) if b.span else None, "tween": b.tween}
+                        "span": list(b.span) if b.span else None, "tween": b.tween,
+                        **_flags(b)}
                        for b in beats]}
             for name, beats in STORYBOARDS.items()]
 

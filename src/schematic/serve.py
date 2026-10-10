@@ -569,6 +569,14 @@ def _beat_payload(value: Any, where: str) -> dict[str, Any]:
     if not isinstance(sweep, bool):
         raise invalid_params(f"{where} has a sweep that is not true or false")
     out["sweep"] = sweep
+    # The title card and the draw-in (issue 44), kept as the plan writes them:
+    # only where true.
+    for flag in ("card", "draw_in"):
+        on = left.pop(flag, False)
+        if not isinstance(on, bool):
+            raise invalid_params(f"{where} has a {flag} that is not true or false")
+        if on:
+            out[flag] = True
     _no_extra(where, left)
     return out
 
