@@ -4699,3 +4699,28 @@ def test_a_casing_follows_its_track_through_every_morph_and_hides_with_its_line(
     assert [u["use"] for u in ground["uses"]] != [u["use"] for u in plain["uses"]]
     assert [u["use"] for u in rows["uses"]] != [u["use"] for u in plain["uses"]]
     assert [u["shown"] for u in hidden["uses"]] == [u["line"] != "X" for u in hidden["uses"]]
+
+
+@needs_browser
+def test_two_captures_of_a_widened_cased_dashed_map_agree(tmp_path):
+    """The map beat and a rows beat at 60x through the engine's own recorder,
+    twice, over Hopton with its strokes: the two agree within the determinism
+    tolerance frame for frame, and are not the plain Hopton's frames."""
+    beats = [{"secs": 2, "view": "map", "at": "07:00", "speed": 60},
+             {"secs": 2, "view": "linear", "speed": 60}]
+    styled = _hopton_page(tmp_path / "styled")
+    plain = _hopton_page(tmp_path / "plain", strokes=None)
+    runs = {}
+    for name, page in (("first", styled), ("second", styled), ("plain", plain)):
+        job = export.plan(CARD_KEY, "instagram-reel", page=page, date=CARD_DATE, quality="draft",
+                          storyboard=beats)
+        frames = tmp_path / name
+        export._run_recorder({**job.recorder_job(frames=frames), "width": job.width // 4,
+                              "height": job.height // 4})
+        runs[name] = _frames(frames)
+    assert len(runs["first"]) == len(runs["second"]) == 120
+    worst = max(_apart(a, b) for a, b in zip(runs["first"], runs["second"]))
+    styled_in = max(_apart(a, b) for a, b in zip(runs["first"], runs["plain"]))
+    print(f"\nstrokes: two runs apart by {worst}; against the plain map by {styled_in}")
+    assert worst <= DRIFT
+    assert styled_in > 4 * DRIFT
