@@ -2447,10 +2447,10 @@ def _lines_graph(lines: dict[str, tuple[str, list[tuple[str, str, float, float]]
     return LineGraph(nodes=nodes, edges=edges)
 
 
-def _trip_page(into: Path, stem: str, graph: LineGraph) -> str:
-    """The page of ``graph`` as drawn, with a trip a line over the first edge
-    that carries it, so every line has a chip and a train at seven."""
-    drawn = render(graph, title=stem)
+def _trip_page(into: Path, stem: str, graph: LineGraph, style: Style | None = None) -> str:
+    """The page of ``graph`` as drawn in ``style``, with a trip a line over the
+    first edge that carries it, so every line has a chip and a train at seven."""
+    drawn = render(graph, title=stem, style=style)
     first: dict[str, Edge] = {}
     for edge in graph.edges:
         for line in edge.lines:
@@ -3006,3 +3006,56 @@ def test_the_criterion_trips_on_the_stored_layouts(key, tmp_path):
     [trip] = run["results"]
     print(key, trip)
     assert trip["changes"] == changes and sum(leg["stops"] for leg in trip["legs"]) == stops, trip
+
+
+# The page redraws the map's stations as circles of its own, the layer the views
+# move, and takes each one's radius and outline from the map's marker (issue 72).
+# The first frame is the map's pose, where a dot sits on its marker. Issue 53's
+# twelve stations draw fifteen dots: two interchanges, on two lines and on three,
+# each with a dot for every line it serves.
+STATION_DOTS = BROWSER + r"""
+main(async browser => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                         reducedMotion: "reduce" });
+  const page = await ctx.newPage();
+  const problems = [];
+  page.on("pageerror", e => problems.push(e.message));
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  const shapes = await page.evaluate(() => {
+    const read = el => ({ at: [+el.getAttribute("cx"), +el.getAttribute("cy")],
+                          r: +el.getAttribute("r"), width: +el.getAttribute("stroke-width"),
+                          drawn: parseFloat(getComputedStyle(el).strokeWidth) });
+    return {
+      markers: [...document.querySelectorAll("#stations circle[data-node]")].map(read),
+      dots: [...document.querySelectorAll("#linear-stations circle")].map(read),
+    };
+  });
+  return { problems, ...shapes };
+}).catch(fail);
+"""
+
+
+@needs_browser
+@pytest.mark.parametrize("style, stroke, station, interchange", [
+    (Style(), 2.2, 4.2, 6.0),                       # the defaults are what the page used to say
+    (Style(station_stroke=6, station_radius=5, interchange_radius=8), 6, 5, 8),
+    (Style(station_stroke=0), 0, 4.2, 6.0),        # no outline is an outline, not a missing one
+])
+def test_the_pages_station_circles_take_their_outline_and_radius_from_the_maps_markers(
+        tmp_path, style, stroke, station, interchange):
+    url = _trip_page(tmp_path, "Twelve", theme_thumbnails.fixture(), style)
+    seen = _run(STATION_DOTS, {"url": url})
+    assert not seen["problems"], seen["problems"]
+    markers, dots = seen["markers"], seen["dots"]
+    # The style reached the map itself: twelve markers, the two interchanges larger.
+    assert len(markers) == 12
+    assert sorted(m["r"] for m in markers) == [station] * 10 + [interchange] * 2
+    assert {m["width"] for m in markers} == {stroke}
+    # And the page's own circles draw it, as the attribute and as the browser has it.
+    assert len(dots) == 15
+    assert {d["width"] for d in dots} == {stroke} and {d["drawn"] for d in dots} == {stroke}
+    big = {(round(m["at"][0]), round(m["at"][1])) for m in markers if m["r"] == interchange}
+    assert {d["r"] for d in dots} == {station, interchange}
+    assert {(round(d["at"][0]), round(d["at"][1])) for d in dots if d["r"] == interchange} == big
+    assert sum(d["r"] == interchange for d in dots) == 5

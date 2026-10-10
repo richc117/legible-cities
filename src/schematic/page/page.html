@@ -504,6 +504,9 @@ __SOCIAL__
   svg.querySelectorAll("#stations circle[data-node]").forEach(c => {
     mapXY.set(c.getAttribute("data-node"), {
       x: +c.getAttribute("cx"), y: +c.getAttribute("cy"), r: +c.getAttribute("r"),
+      // The marker's own outline, kept as the SVG wrote it: a style may set it
+      // to nothing, and a number read back would make that falsy.
+      w: c.getAttribute("stroke-width"),
     });
   });
 
@@ -849,7 +852,7 @@ __SOCIAL__
       dot.setAttribute("r", pt.r);
       dot.setAttribute("fill", "var(--map-station-fill, #fff)");
       dot.setAttribute("stroke", "var(--map-station-stroke, #111)");
-      dot.setAttribute("stroke-width", "2.2");
+      if (pt.w !== null) dot.setAttribute("stroke-width", pt.w);
       dotLayer.appendChild(dot);
       const gn = geoData && geoData.nodes[st.node];
       dots.push({ el: dot, label: line.label, node: st.node, mapPt: pt, r: pt.r,
