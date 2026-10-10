@@ -5,6 +5,14 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.16.0] - 2026-10-10
+
+### Added
+
+- **A line can be drawn wider, cased and dashed** (issue 55). `map.build`'s `lines` takes, per line, `width` (0.75 to 1.5 times `line_width`), `casing` (`{width, color}`: 0 to 1 times `line_width` on each side, colour `#rrggbb`) and `dash` (`solid`, `dashed` or `dotted`), each refused out of range with a sentence naming the field. An edge's lines now sit in slots of their own room, summed with the gaps between them, so a wider or cased line keeps its centre and moves its neighbours out by half its extra room on its own edges only, and an edge of plain lines is placed to the bit as before. The casing is drawn under each of the line's tracks and the dash scales with the line's stroke (dashed `t 2t`, dotted `0 1.6t`, allowing for the round caps), and the geographic view, the thumbnails, the labels' clearance, the page's chips and Time-view swatches and the draw-in all follow. On a map with any of the three, a trip's path keeps the step a line makes across a node instead of cutting a chord, and goes to the foot of the train's last end on the next track where the step would back it up, so a train stays on its painted line there and never moves backwards along the track it joins; a casing over about 0.2 of a line width a side can move a neighbour further at a node than the neighbour's round caps bridge, opening a gap in it where the cased line leaves the bundle, which is a limit of the settled ranges. Two tracks of one edge whose labels differ only in punctuation get ids of their own, so a casing never points at the other's track. A map that chooses none of the three is drawn exactly as before: the Pittsburgh SVG, the page's data and its lines did not move, and the trip paths of a plain map still cut the chord at a node (issue 70).
+
+The schema moved additively at protocol 1: `LineOptions.width`, `casing` and `dash`, and the new `LineCasing`. The Pittsburgh `page_without_data` pin was re-pinned once, for the page's chips, swatches, casings and draw-in; the SVG, the page's data and its lines did not move.
+
 ## [0.15.0] - 2026-10-10
 
 ### Added

@@ -202,7 +202,7 @@ default), TfL's `tick` or `square`, and `interchange_shape` `circle` or
 `square`. `style={"preset": "beck"}` (or `blueprint` or `paper`; the method
 `style.presets` lists them) stands for a named look's fields, alone or beside
 `label_font`. How the trains are drawn is not the map's but the animation's:
-`map.build`'s `dot_radius` and `trail` sit beside `style`. Every line the map draws has an entry
+`map.build`'s `dot_radius` and `trail` sit beside `style`. A line of its own can be drawn wider, cased and dashed: `map.build`'s `lines` takes, per line label, a `width` (0.75 to 1.5 times `line_width`), a `casing` (a width on each side and a colour) and a `dash` (`solid`, `dashed` or `dotted`), alongside its `name` and `hidden`. Every line the map draws has an entry
 in the page's `data.lines` in the colour it was drawn, so the chips, the train
 dots and the time chart never fall back on their own; a colour is written
 `#rrggbb` or refused; an override for a line the layout does not carry is
