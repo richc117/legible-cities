@@ -1,0 +1,334 @@
+#!/usr/bin/env python3
+"""Make the label faces the engine ships, from their pinned releases (issue 76).
+
+    .venv/bin/python -I bin/build-fonts
+
+For each face in ``FACES`` this fetches the release files by URL, each into a
+fresh scratch directory outside the repository, refuses unless every file's
+sha256 is the pin written below, and only then reads them. It subsets the
+face's weight-400 font with fontTools to the Latin station names are written
+in (``RANGES``), as WOFF2, and writes under ``src/schematic/fonts/<name>/``:
+
+    regular.woff2    the subset
+    advances.json    each code point's advance in font units, read back from
+                     the subset's cmap and hmtx, with unitsPerEm, the average
+                     advance and the ranges
+    OFL.txt          the face's licence, copied from the release
+    README.md        where it came from, the ranges, the sizes, the tools
+
+Nothing in the package is written until every face has been fetched, checked
+and made, so a pin that does not match leaves the committed files as they
+were, and the scratch directories are removed whatever happens. Run it
+again with the same fontTools and brotli and the outputs are the same bytes.
+
+The subset is unhinted and carries no OpenType layout features (no kerning,
+ligatures or alternates), so a name is drawn exactly as wide as the sum of
+its advances, which is what the placer measures (``labels.text_width``).
+
+The release files are downloaded data. Isolated mode (``-I``) keeps the
+current directory and the environment off the import path while they are
+read, and the script re-runs itself under it if started without. fontTools
+and brotli are development dependencies only: the engine reads the outputs
+with the standard library.
+"""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import io
+import json
+import os
+import shutil
+import sys
+import tempfile
+import textwrap
+import urllib.request
+import zipfile
+from dataclasses import dataclass
+from pathlib import Path
+
+if not sys.flags.isolated:
+    os.execv(sys.executable, [sys.executable, "-I", os.path.abspath(__file__), *sys.argv[1:]])
+
+FONTS = Path(__file__).resolve().parent.parent / "src" / "schematic" / "fonts"
+
+# The Latin that station names are written in: ASCII, Latin-1 and Latin
+# Extended-A, and the dashes, quotes and ellipsis of U+2010 to U+2026. Closed
+# ranges of code points; every character of every stored layout's station
+# names is inside them (tests/test_fonts.py).
+RANGES = ((0x0020, 0x007E), (0x00A0, 0x017F), (0x2010, 0x2026))
+
+# Name records kept in the subset: the defaults (0 to 6) and the licence's
+# description and URL (13 and 14), so an embedded copy says what it is under.
+NAME_IDS = [0, 1, 2, 3, 4, 5, 6, 13, 14]
+
+# The largest download accepted, so a wrong URL cannot fill the disk.
+MAX_BYTES = 64 * 1024 * 1024
+TIMEOUT_S = 120
+
+
+@dataclass(frozen=True)
+class Pinned:
+    """A file of a release: its URL, its sha256, and the member to read when
+    the file is a zip."""
+
+    url: str
+    sha256: str
+    member: str | None = None
+
+
+@dataclass(frozen=True)
+class Face:
+    name: str          # the engine's name for it, Style.label_font
+    family: str        # the family name the font's name table carries
+    release: str       # the release, as its authors number it
+    font: Pinned
+    licence: Pinned
+
+
+ATKINSON_COMMIT = "5d633f80fc654ef5fffa7cfc257528685158dcef"
+ATKINSON_RAW = ("https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible-next/"
+                + ATKINSON_COMMIT)
+INTER_ZIP = "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip"
+INTER_SHA256 = "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e"
+
+FACES = (
+    # Inter's release is one zip; its web build of the regular weight is the
+    # unhinted one, and its LICENSE.txt is the OFL. The pin is the one
+    # Homebrew's font-inter cask carries for the same file.
+    Face("inter", "Inter", "4.1",
+         font=Pinned(INTER_ZIP, INTER_SHA256, "web/Inter-Regular.woff2"),
+         licence=Pinned(INTER_ZIP, INTER_SHA256, "LICENSE.txt")),
+    # Atkinson Hyperlegible Next has no tagged release; its fonts are built
+    # into the repository, so the files are read at the commit that last
+    # built them (font version 2.001), whose git blob ids GitHub reports as
+    # d0982cdc (the font) and 88955733 (the licence).
+    Face("atkinson-hyperlegible-next", "Atkinson Hyperlegible Next", "2.001",
+         font=Pinned(f"{ATKINSON_RAW}/fonts/ttf/AtkinsonHyperlegibleNext-Regular.ttf",
+                     "88ed5c31a71584c7772963b02d04bef1eb7e3d2e9c8b9cb204339b1f82cf432c"),
+         licence=Pinned(f"{ATKINSON_RAW}/OFL.txt",
+                        "aca6a428580965d2297d1b718042dd427c2a9443ece3b0d02d758e161e0c4030")),
+)
+
+
+class Refused(Exception):
+    """A pin, a licence or a font that is not what this script expects."""
+
+
+def fetch(url: str, scratch: Path) -> Path:
+    """``url`` downloaded into a fresh directory of its own under
+    ``scratch``; refused past ``MAX_BYTES``."""
+    folder = Path(tempfile.mkdtemp(dir=scratch))
+    path = folder / "download"
+    with urllib.request.urlopen(url, timeout=TIMEOUT_S) as response, open(path, "wb") as out:
+        total = 0
+        while chunk := response.read(1 << 16):
+            total += len(chunk)
+            if total > MAX_BYTES:
+                raise Refused(f"{url} is larger than {MAX_BYTES} bytes")
+            out.write(chunk)
+    return path
+
+
+def checked(pinned: Pinned, scratch: Path, cache: dict[str, Path]) -> bytes:
+    """The pinned file's bytes, or the member's when it is a zip, read only
+    after the whole download's sha256 matched the pin."""
+    if pinned.url not in cache:
+        path = fetch(pinned.url, scratch)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != pinned.sha256:
+            raise Refused(f"{pinned.url} has sha256 {digest}; the pin is {pinned.sha256}")
+        cache[pinned.url] = path
+    path = cache[pinned.url]
+    if pinned.member is None:
+        return path.read_bytes()
+    with zipfile.ZipFile(path) as archive:
+        if pinned.member not in archive.namelist():
+            raise Refused(f"{pinned.url} has no {pinned.member}")
+        if archive.getinfo(pinned.member).file_size > MAX_BYTES:
+            raise Refused(f"{pinned.member} in {pinned.url} is larger than {MAX_BYTES} bytes")
+        return archive.read(pinned.member)
+
+
+def licence_header(text: str) -> str:
+    """The lines of an OFL file before the licence itself: the copyright
+    statement, and the Reserved Font Names if there are any. Refused if the
+    file is not the OFL 1.1, or if it reserves a name, since a subset is a
+    Modified Version and could not then keep the family name."""
+    if "SIL OPEN FONT LICENSE Version 1.1" not in text:
+        raise Refused("the licence is not the SIL Open Font License 1.1")
+    header = text.split("This Font Software is licensed")[0]
+    if "reserved font name" in header.lower():
+        raise Refused(f"the licence reserves a font name: {header.strip()}")
+    return header.strip()
+
+
+def make(face: Face, scratch: Path, cache: dict[str, Path]) -> dict[str, bytes]:
+    """The four files of one face, by name, in memory."""
+    from fontTools import subset
+    from fontTools.ttLib import TTFont
+
+    source = checked(face.font, scratch, cache)
+    licence = checked(face.licence, scratch, cache)
+    header = licence_header(licence.decode("utf-8"))
+
+    font = TTFont(io.BytesIO(source), recalcTimestamp=False)
+    options = subset.Options()
+    options.flavor = "woff2"
+    options.hinting = False
+    options.layout_features = []
+    options.drop_tables = [*options.drop_tables, "GSUB", "GPOS", "GDEF", "kern"]
+    options.name_IDs = NAME_IDS
+    options.recalc_timestamp = False
+    subsetter = subset.Subsetter(options)
+    subsetter.populate(unicodes=[cp for low, high in RANGES for cp in range(low, high + 1)])
+    subsetter.subset(font)
+    out = io.BytesIO()
+    subset.save_font(font, out, options)
+    woff2 = out.getvalue()
+
+    # Everything below is read back from the subset just written, so the
+    # table describes the file that ships and not the one it came from.
+    made = TTFont(io.BytesIO(woff2))
+    names = made["name"]
+    family = str(names.getDebugName(16) or names.getDebugName(1))
+    if family != face.family:
+        raise Refused(f"{face.name}'s font calls its family {family!r}, not {face.family!r}")
+    if made["OS/2"].usWeightClass != 400:
+        raise Refused(f"{face.name}'s font is weight {made['OS/2'].usWeightClass}, not 400")
+    leftover = {"GSUB", "GPOS", "GDEF", "kern", "fpgm", "prep", "cvt "} & set(made.keys())
+    if leftover:
+        raise Refused(f"{face.name}'s subset still carries {', '.join(sorted(leftover))}")
+    cmap = made.getBestCmap()
+    hmtx = made["hmtx"]
+    advances = {cp: hmtx[glyph][0] for cp, glyph in sorted(cmap.items())}
+    wanted = [cp for low, high in RANGES for cp in range(low, high + 1)]
+    if set(advances) - set(wanted):
+        raise Refused(f"{face.name}'s subset maps code points outside the ranges")
+    missing = [cp for cp in wanted if cp not in advances]
+    average = round(sum(advances.values()) / len(advances), 2)
+    upem = made["head"].unitsPerEm
+    version = str(names.getDebugName(5))
+
+    table = {
+        "family": family,
+        "release": face.release,
+        "version": version,
+        "unitsPerEm": upem,
+        "average": average,
+        "ranges": [list(r) for r in RANGES],
+        "advances": {str(cp): advance for cp, advance in advances.items()},
+    }
+    return {
+        "regular.woff2": woff2,
+        "advances.json": table_json(table).encode("utf-8"),
+        "OFL.txt": licence,
+        "README.md": readme(face, family, version, header, woff2, len(advances), missing,
+                            upem, average).encode("utf-8"),
+    }
+
+
+def _u(cp: int) -> str:
+    return f"U+{cp:04X}"
+
+
+def _wrap(text: str, first: str = "", rest: str = "") -> str:
+    """``text`` filled to 78 columns, a URL or a code never broken."""
+    return textwrap.fill(" ".join(text.split()), width=78, initial_indent=first,
+                         subsequent_indent=rest, break_long_words=False,
+                         break_on_hyphens=False)
+
+
+def table_json(table: dict) -> str:
+    """The advance table as JSON, one code point to a line so a rebuild's
+    diff reads: the same object ``json.dumps`` would write, laid out by hand."""
+    head = [f" {json.dumps(key)}: {json.dumps(value)}," for key, value in table.items()
+            if key != "advances"]
+    rows = [f'  "{cp}": {advance}' for cp, advance in table["advances"].items()]
+    text = "\n".join(["{", *head, ' "advances": {', ",\n".join(rows), " }", "}"]) + "\n"
+    assert json.loads(text) == table
+    return text
+
+
+def readme(face: Face, family: str, version: str, header: str, woff2: bytes, mapped: int,
+           missing: list[int], upem: int, average: float) -> str:
+    from fontTools import version as fonttools_version
+    import brotli
+
+    ranges = ", ".join(f"{_u(low)}-{_u(high)}" for low, high in RANGES)
+    wanted = sum(high - low + 1 for low, high in RANGES)
+    if face.font.member:
+        source = (f"Source: `{face.font.member}` from the release file <{face.font.url}>, "
+                  f"sha256 `{face.font.sha256}`. `OFL.txt` is its `{face.licence.member}`.")
+    else:
+        source = (f"Source: <{face.font.url}>, sha256 `{face.font.sha256}`. `OFL.txt` is "
+                  f"<{face.licence.url}>, sha256 `{face.licence.sha256}`.")
+    absent = ", ".join(_u(cp) for cp in missing) if missing else "none"
+    quoted = "\n".join(_wrap(line, "> ", "> ") if line else ">" for line in header.splitlines())
+    based = len(base64.b64encode(woff2))
+    paragraphs = [
+        f"# {family}",
+        _wrap(f"The engine's `{face.name}` label face (`Style.label_font`, issue 76): "
+              f"{family} {face.release}, weight 400, whose name table says \"{version}\", "
+              "under the SIL Open Font License 1.1. Made by `bin/build-fonts`; rebuild with "
+              "it, never edit a file here by hand, since `tests/test_fonts.py` holds the "
+              "table to the font."),
+        "| File | What it is |\n|---|---|\n"
+        f"| `regular.woff2` | the subset, as WOFF2: {len(woff2):,} bytes, {based:,} as base64 |\n"
+        f"| `advances.json` | each code point's advance in font units, {upem:,} to the em, "
+        f"with the average ({average:g}) and the ranges |\n"
+        "| `OFL.txt` | the licence, copied from the release |",
+        "\n".join([
+            _wrap(source, "- ", "  "),
+            _wrap(f"Subset: {ranges}. The face maps {mapped} of their {wanted} code points; "
+                  f"not in it: {absent}. A name with one of those is measured at the "
+                  "average, and the browser draws that character in the next face of the "
+                  "stack.", "- ", "  "),
+            _wrap(f"Made with fontTools {fonttools_version} and brotli {brotli.__version__}, "
+                  "unhinted and without OpenType layout features (no kerning, ligatures or "
+                  "alternates), so a name is drawn exactly as wide as the sum of its "
+                  "advances, which is what the placer measures. Name records "
+                  f"{', '.join(str(i) for i in NAME_IDS)} are kept, the licence's "
+                  "description and URL among them.", "- ", "  "),
+        ]),
+        "The licence opens:",
+        quoted,
+        _wrap("It names no Reserved Font Name. Subsetting and a change of format make a "
+              "Modified Version (OFL FAQ 2.2 and 2.6), which the licence allows, and "
+              f"without a reserved name the subset keeps the family name {family}. An SVG "
+              "the engine writes with this face embeds the subset, which the licence "
+              "allows in full or in part (OFL FAQ 1.12)."),
+    ]
+    return "\n\n".join(paragraphs) + "\n"
+
+
+def main() -> int:
+    try:
+        import brotli  # noqa: F401  WOFF2 needs it; fail before downloading anything
+        import fontTools  # noqa: F401
+    except ImportError as missing:
+        print(f"build-fonts needs fontTools and brotli, the dev extra's: {missing}",
+              file=sys.stderr)
+        return 2
+    scratch = Path(tempfile.mkdtemp(prefix="build-fonts-"))
+    try:
+        cache: dict[str, Path] = {}
+        made = {face.name: make(face, scratch, cache) for face in FACES}
+    except Refused as refused:
+        print(f"build-fonts refused, and wrote nothing: {refused}", file=sys.stderr)
+        return 1
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    for name, files in made.items():
+        folder = FONTS / name
+        folder.mkdir(parents=True, exist_ok=True)
+        for filename, data in files.items():
+            (folder / filename).write_bytes(data)
+        woff2 = files["regular.woff2"]
+        print(f"{name}: {len(woff2):,} bytes, {len(base64.b64encode(woff2)):,} as base64")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
