@@ -122,7 +122,9 @@ def test_a_name_the_engine_does_not_ship_is_refused_where_it_is_drawn():
 @pytest.mark.parametrize("name", BUNDLED)
 def test_each_face_ships_its_font_its_table_its_licence_and_a_readme(name):
     folder = FONTS_DIR / name
-    assert {path.name for path in folder.iterdir()} == FILES
+    # A name with a leading dot is a file system's own, such as Finder's
+    # .DS_Store, and never something the build wrote.
+    assert {path.name for path in folder.iterdir() if not path.name.startswith(".")} == FILES
     licence = (folder / "OFL.txt").read_text(encoding="utf-8")
     assert "SIL OPEN FONT LICENSE Version 1.1" in licence
     # A Reserved Font Name is declared before the licence text begins; a
@@ -159,17 +161,20 @@ def test_the_table_is_the_woff2s_own_advances(name):
 
 
 def test_every_character_of_every_stored_station_name_is_in_both_faces():
-    """Over every stored layout of the registry, each name as the map draws
-    it. Skips where none is stored."""
+    """Over every layout stored for a preset of the registry, each name as the
+    map draws it: in each face's subset, or named in its README among the
+    code points it lacks, which the browser draws in the next face of the
+    stack. Only the registry's presets, so a person's own feeds do not decide
+    it, and read with ``stored_layouts``, which never writes, where
+    ``stored`` may migrate an old layout into its folder. Skips where none is
+    stored."""
     names: set[str] = set()
     layouts = 0
-    for key in feeds.all():
-        stored = pipeline.stored(key)
-        if stored is None:
-            continue
-        layouts += 1
-        graph = LineGraph.from_geojson(stored.paths["octi"])
-        names |= {display_name(n.station_label) for n in graph.stations if n.station_label}
+    for key in feeds.FEEDS:
+        for stored in pipeline.stored_layouts(key):
+            layouts += 1
+            graph = LineGraph.from_geojson(stored.paths["octi"])
+            names |= {display_name(n.station_label) for n in graph.stations if n.station_label}
     if not layouts:
         pytest.skip("needs the stored layouts")
     characters = {ch for name in names for ch in name}
@@ -177,8 +182,10 @@ def test_every_character_of_every_stored_station_name_is_in_both_faces():
           f"{len(characters)} characters")
     for face in BUNDLED:
         mapped = {int(cp) for cp in table(face)["advances"]}
-        missing = sorted(ch for ch in characters if ord(ch) not in mapped)
-        assert not missing, f"{face} lacks {missing}"
+        listed = (FONTS_DIR / face / "README.md").read_text(encoding="utf-8")
+        missing = sorted(ch for ch in characters
+                         if ord(ch) not in mapped and f"U+{ord(ch):04X}" not in listed)
+        assert not missing, f"{face} lacks {missing}, and its README does not say so"
 
 
 # ------------------------------------------------------------- the drawing

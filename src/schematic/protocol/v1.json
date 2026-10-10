@@ -453,7 +453,7 @@
       "properties": {
         "preset": {
           "enum": ["beck", "blueprint", "paper"],
-          "description": "A named look over the eight numbers: beck, blueprint or paper. style.presets answers the numbers each resolves to, and a name draws exactly what those numbers sent field by field draw. Sent alone, or with label_font: beside any other field of this object it is refused with the params kind, since the face is not one of the eight numbers and the others are. A preset carries no colour, the page's theme owning them, and no face: alone it draws in system, and beside label_font it draws its numbers in that face. Held equal to the engine's table by a test."
+          "description": "A named look over the eight numbers: beck, blueprint or paper. style.presets answers the numbers each resolves to, and a name draws exactly what those numbers sent field by field draw. Sent alone, or with label_font, since a preset carries no face: beside any other field of this object it is refused with the params kind. A preset carries no colour either, the page's theme owning them; alone it draws in system, and beside label_font it draws its numbers in that face. Held equal to the engine's table by a test."
         },
         "line_width": {
           "type": "number",

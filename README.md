@@ -194,9 +194,12 @@ colour of a line the feed leaves uncoloured, and `line_order=["A", "B"]` is
 the stacking on shared track and the order of the page's rows in the Linear
 and Time views, and `style=Style(line_width=12)` (or `map.build`'s `style`
 object over the sidecar) the widths, radii, label size and padding the map is
-drawn with. Every line the map draws has an entry in the
-page's `data.lines` in the colour it was drawn, so the chips, the train dots
-and the time chart never fall back on their own; a colour is written
+drawn with. Its `label_font` is the face the station names are drawn and
+measured in: `system`, the default and the viewer's own Helvetica Neue stack,
+or `inter` or `atkinson-hyperlegible-next`, which ship with the engine and are
+embedded in the SVG only when chosen. Every line the map draws has an entry
+in the page's `data.lines` in the colour it was drawn, so the chips, the train
+dots and the time chart never fall back on their own; a colour is written
 `#rrggbb` or refused; an override for a line the layout does not carry is
 ignored.
 
