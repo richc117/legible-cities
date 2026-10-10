@@ -45,8 +45,8 @@ from pylsp_jsonrpc.exceptions import (JsonRpcException, JsonRpcInvalidParams,
                                       JsonRpcRequestCancelled)
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 
-from . import (__version__, config, diagnostics, export, feeds, loom, pipeline, schedule,
-               thumbnail)
+from . import (__version__, animate, config, diagnostics, export, feeds, loom, pipeline,
+               schedule, thumbnail)
 from .crs import to_mercator
 from .describe import station_name
 from .linegraph import LineGraph
@@ -421,6 +421,21 @@ def _style(value: Any) -> Style | None:
             f"style.station_radius ({style.station_radius:g}); a field left out counts as its "
             f"default, so send both")
     return style
+
+
+def _animation_number(left: dict[str, Any], name: str, bounds: tuple[float, float],
+                      default: float, unit: str) -> float:
+    """One of the two numbers that say how a train is drawn, ``dot_radius``
+    and ``trail``: the default when it is absent, else a number inside its
+    closed range, as sent. They sit beside ``style`` and not in it because
+    they are the animation's (the page's data), not the map's (the SVG)."""
+    if name not in left:
+        return default
+    number = left.pop(name)
+    low, high = bounds
+    if not _number(number) or not low <= number <= high:
+        raise invalid_params(f"{name} must be from {low:g} to {high:g}, in {unit}")
+    return number
 
 
 def _tuned(path: str, number: Any, tunable: pipeline.Tunable) -> Any:
@@ -889,6 +904,10 @@ class EngineEndpoint(Endpoint):
         default_color = _color(left, "default_color")
         line_order = _strings(left, "line_order")
         style = _style(left.pop("style", None))
+        dot_radius = _animation_number(left, "dot_radius", animate.DOT_RADIUS_RANGE,
+                                       animate.DOT_RADIUS, "SVG user units at the map's width")
+        trail = _animation_number(left, "trail", animate.TRAIL_RANGE, animate.TRAIL,
+                                  "seconds of playback")
         lines = _lines(left)
         _no_extra("map.build", left)
         folder = config.out_dir() / out if out else None
@@ -898,8 +917,8 @@ class EngineEndpoint(Endpoint):
             # that re-laid a network unasked would be a different map.
             result = pipeline.run(key, layout=layout, date=date, width=width,
                                   colors=colors, default_color=default_color, style=style,
-                                  line_order=line_order, lines=lines, out_dir=folder,
-                                  progress=progress)
+                                  line_order=line_order, lines=lines, dot_radius=dot_radius,
+                                  trail=trail, out_dir=folder, progress=progress)
             where = folder or config.out_dir()
             diag = result.diagnostics()
             # The picture the app's front door shows, beside the page, drawn

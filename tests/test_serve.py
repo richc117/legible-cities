@@ -554,6 +554,85 @@ def test_map_build_hands_the_lines_chosen_to_the_pipeline(client, tmp_path, monk
     assert asked["lines"] is None
 
 
+# What issue 75 decided, written out here and not read from the code: a bound
+# loosened in animate.py alone is a failure of the tests and not a change of mind.
+# Name -> (lowest, highest, default).
+DRAWN = {"dot_radius": (2, 12, 5), "trail": (0, 3, 0)}
+
+
+def _pipeline_stood_in(monkeypatch, tmp_path) -> dict:
+    """``pipeline.run`` stood in for by a hand-made graph, as above, keeping
+    what it was asked."""
+    monkeypatch.setenv(config.ENV, str(tmp_path))
+    graph = _graph([[("A", "0072bc")]])
+    diag = diagnostics.Diagnostics(
+        key="p9", name="Nine", date=dt.date.fromisoformat(DATE), stations=2, junctions=0,
+        edges=1, lines=("A",), octilinear=1.0,
+        stops=diagnostics.StopMatching(2, 2, 2, 0, 0, ()), trips_total=0, paths=0, unrouted=0,
+        skipped_calls=0, borrowed_track=0, labels_dropped=0, peak_concurrent=0)
+    asked: dict = {}
+
+    def stood_in(key, **kwargs):
+        asked.clear()
+        asked.update(kwargs)
+        kwargs["out_dir"].mkdir(parents=True, exist_ok=True)
+        return SimpleNamespace(layout=NO_LAYOUT, date=dt.date.fromisoformat(DATE), graph=graph,
+                               diagnostics=lambda: diag)
+
+    monkeypatch.setattr(pipeline, "run", stood_in)
+    return asked
+
+
+def test_map_build_hands_the_dot_and_the_trail_to_the_pipeline(client, tmp_path, monkeypatch):
+    """Issue 75: ``dot_radius`` and ``trail`` reach ``pipeline.run`` as sent,
+    beside ``style`` and not in it; left out, each arrives as its default."""
+    asked = _pipeline_stood_in(monkeypatch, tmp_path)
+    base = {"key": KEY, "layout": NO_LAYOUT, "date": DATE}
+    sent = client.call("map.build", {**base, "out": "p9", "dot_radius": 8, "trail": 1.5})
+    assert "result" in sent, sent
+    check(sent["result"], "MapBuildResult")
+    assert (asked["dot_radius"], asked["trail"], asked["style"]) == (8, 1.5, None)
+    only = client.call("map.build", {**base, "out": "p8", "trail": 3,
+                                     "style": {"line_width": 9}})
+    assert "result" in only, only
+    assert (asked["dot_radius"], asked["trail"]) == (5, 3)
+    assert asked["style"].line_width == 9
+    plain = client.call("map.build", {**base, "out": "p7"})
+    assert "result" in plain, plain
+    assert (asked["dot_radius"], asked["trail"]) == (5, 0)
+
+
+@pytest.mark.parametrize("name", sorted(DRAWN))
+def test_a_dot_or_a_trail_takes_its_bounds_and_the_schema_says_so(
+        name, client, tmp_path, monkeypatch):
+    low, high, default = DRAWN[name]
+    asked = _pipeline_stood_in(monkeypatch, tmp_path)
+    property_ = SCHEMA["$defs"]["MapBuildParams"]["properties"][name]
+    assert (property_["type"], property_["minimum"], property_["maximum"],
+            property_["default"]) == ("number", low, high, default)
+    for i, value in enumerate((low, high, (low + high) / 2)):
+        response = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                             "out": f"b{i}", name: value})
+        assert "result" in response, (value, response)
+        assert asked[name] == value
+
+
+@pytest.mark.parametrize("name, value", [
+    (name, value) for name, (low, high, _) in sorted(DRAWN.items())
+    for value in (low - 0.01, high + 0.01, float("nan"), float("inf"), "1", True, None, [1])])
+def test_a_dot_or_a_trail_out_of_range_is_refused_naming_the_field(
+        name, value, client, tmp_path, monkeypatch):
+    asked = _pipeline_stood_in(monkeypatch, tmp_path)
+    low, high, _ = DRAWN[name]
+    error = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                      "out": "p9", name: value})["error"]
+    assert error["code"] == -32602, error
+    check(error["data"], "ErrorData")
+    assert error["data"]["kind"] == "params"
+    assert error["data"]["hint"].startswith(f"{name} must be from {low:g} to {high:g}"), error
+    assert client.endpoint.jobs == {} and asked == {}
+
+
 def test_map_build_answers_the_maps_stations_sorted_by_name(client, tmp_path, monkeypatch):
     """Issue 49: ``stations``, what a client's trip pickers offer: every station
     the map draws, by the node id the page's setTrip takes and the name the map
@@ -704,6 +783,26 @@ BAD_PARAMS = [
                    "style": {"line_width": "7"}}, "MapBuildParams"),
     ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
                    "style": {"background": "black"}}, "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "dot_radius": 1.9},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "dot_radius": 12.1},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "dot_radius": "5"},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "dot_radius": True},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "dot_radius": None},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "trail": -0.1},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "trail": 3.1},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "trail": "1"},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "trail": True},
+     "MapBuildParams"),
+    ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                   "style": {"dot_radius": 5}}, "MapBuildParams"),
     ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "lines": ["A"]},
      "MapBuildParams"),
     ("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "lines": {"A": "Airport"}},
@@ -898,6 +997,12 @@ GOOD_PARAMS = [
     ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
                         "style": {"background": "#000000", "station_fill": "#FFFFFF",
                                   "station_stroke_color": "#111111", "label_color": "#abcdef"}}),
+    ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "dot_radius": 2,
+                        "trail": 0}),
+    ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "dot_radius": 12,
+                        "trail": 3}),
+    ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "dot_radius": 7.5,
+                        "trail": 1.25, "style": {"preset": "beck"}}),
     ("MapBuildParams", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
                         "lines": {"A": {"name": "Airport Line"}, "B": {"hidden": True},
                                   "Z": {}}}),

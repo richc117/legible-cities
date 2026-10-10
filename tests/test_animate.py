@@ -12,6 +12,7 @@ import re
 
 import pytest
 from test_colors import _graph
+from test_lines import stand  # noqa: F401  (the fixture: the store and the feed stood in)
 
 from schematic import animate
 from schematic.render import render
@@ -83,3 +84,20 @@ def test_the_page_and_the_positions_file_a_map_had_are_as_they_were(tmp_path):
     without = json.loads(written["chosen"][0])
     assert without.pop("dot_radius") == 9 and without.pop("trail") == 1
     assert without == json.loads(written["plain"][0])
+
+
+def test_the_pipeline_hands_the_dot_and_the_trail_to_the_page(stand, tmp_path):  # noqa: F811
+    """Through ``pipeline.run`` over a stored layout stood in: the two numbers
+    reach the page's data and nothing else, and at their defaults, sent or not,
+    the map is the one drawn without them."""
+    plain = stand.run(tmp_path / "plain", date=DAY)
+    result, svg, data, page = stand.run(tmp_path / "drawn", date=DAY,
+                                        dot_radius=8, trail=1.5)
+    assert (result.animation.dot_radius, result.animation.trail) == (8, 1.5)
+    assert (data["dot_radius"], data["trail"]) == (8, 1.5)
+    assert animate._json_for_script(data) in page
+    assert svg == plain[1]
+    assert {k: v for k, v in data.items() if k not in ("dot_radius", "trail")} == plain[2]
+    explicit = stand.run(tmp_path / "explicit", date=DAY, dot_radius=5, trail=0)
+    assert (explicit[1], explicit[2], explicit[3]) == (plain[1], plain[2], plain[3])
+    assert "dot_radius" not in plain[2] and "trail" not in plain[2]

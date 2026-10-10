@@ -438,7 +438,21 @@
           "additionalProperties": { "$ref": "#/$defs/LineOptions" },
           "description": "A display name and a hidden flag per line, keyed by line label. A label the layout does not carry is ignored, so a client can keep its choices for lines a narrower mode dropped. Hiding is a drawing choice: a hidden line comes off the map, its trips, the page and the thumbnails, a station only it served is not drawn, and no stored layout changes; render.stage still shows every line."
         },
-        "style": { "$ref": "#/$defs/MapStyle" }
+        "style": { "$ref": "#/$defs/MapStyle" },
+        "dot_radius": {
+          "type": "number",
+          "minimum": 2,
+          "maximum": 12,
+          "default": 5,
+          "description": "The radius of a train's dot on the animation page, in SVG user units at the map's width, the unit MapStyle's numbers are in; 5 when omitted. The animation's and not the map's, which is why it is a parameter beside style and not a field of it: it reaches the page's data and never the SVG, and no style preset changes it. The dot's halo is the page's and fixed. Written into the page's data only when it is not 5."
+        },
+        "trail": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 0,
+          "description": "How far behind a train its trail reaches, in seconds of playback; 0, no trail, when omitted. The trail is four copies of the train's dot at the places it was a quarter, a half, three quarters and the whole of this many seconds of playback before (so at any playback speed it shows the last `trail` seconds as they were watched), in the line's colour, faded from 0.6 to 0.15 in opacity and drawn under the dots. A train standing at a station has none, nor has the Time view, nor a page under reduced motion that no exporter is capturing. The animation's and not the map's, like dot_radius: it never reaches the SVG. Written into the page's data only when it is not 0."
+        }
       },
       "required": [
         "key",

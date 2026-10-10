@@ -708,6 +708,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         width: float = 1800.0, style: Style | None = None,
         colors: dict[str, str] | None = None, default_color: str | None = None,
         line_order: list[str] | None = None, lines: dict[str, dict] | None = None,
+        dot_radius: float = animate.DOT_RADIUS, trail: float = animate.TRAIL,
         force: bool = False, out_dir: Path | None = None, back: str = "index.html",
         icons: str | None = None, social: str = "",
         progress: Progress | None = None) -> Result:
@@ -729,7 +730,9 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     takes the line off the graph before anything reads it (app ADR-053), so
     it has no track, trips, chip, row or band and a station only it served is
     not drawn; nothing stored changes, and a label the layout does not carry
-    is ignored. ``back`` is the href the animation page's
+    is ignored. ``dot_radius`` and ``trail`` are how the page draws a train,
+    the animation's and not the map's (``animate.DOT_RADIUS``); they reach
+    the page's data and nothing else. ``back`` is the href the animation page's
     back-link points at. The default is the sibling gallery in ``out/``;
     the site passes its own atlas URL, because a relative "index.html"
     resolves to /maps/index.html there.
@@ -821,7 +824,8 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     # A name for a line the map does not draw, hidden or unknown, is dropped.
     names = {label: chosen["name"] for label, chosen in (lines or {}).items()
              if "name" in chosen and label in labels}
-    anim = animate.build(r, graph, trips, date, geo, line_order=line_order, names=names)
+    anim = animate.build(r, graph, trips, date, geo, line_order=line_order, names=names,
+                         dot_radius=dot_radius, trail=trail)
     done("animate", f"{len(anim.paths)} distinct paths"
          + (f", {len(anim.unrouted)} unrouted" if anim.unrouted else ""))
 
