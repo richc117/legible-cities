@@ -8,6 +8,7 @@
     "engine.shutdown": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/Ok" } },
     "graph.build": { "params": { "$ref": "#/$defs/GraphBuildParams" }, "result": { "$ref": "#/$defs/GraphBuildResult" } },
     "map.build": { "params": { "$ref": "#/$defs/MapBuildParams" }, "result": { "$ref": "#/$defs/MapBuildResult" } },
+    "style.presets": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/StylePresets" } },
     "export.presets": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/ExportPresets" } },
     "export.storyboards": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/ExportStoryboards" } },
     "export.plan": { "params": { "$ref": "#/$defs/ExportPlanParams" }, "result": { "$ref": "#/$defs/CaptureJob" } },
@@ -447,9 +448,13 @@
       "additionalProperties": false
     },
     "MapStyle": {
-      "description": "How the map is drawn, in the engine's own numbers. Every field is optional; omitting the object, or any field, draws exactly what is drawn without it. The numbers are in SVG user units at the map's width (the map is fitted to MapBuildParams.width, 1800 by default, so a line width of 7 is seven of 1800), except line_gap, a multiple of line_width. interchange_radius may not be below station_radius, judged on the values the map would be drawn with (a field left out counts as its default): a rule the schema cannot hold and the server does. label_size and label_offset re-place the labels and move the drawing's viewBox, never the stored layout. The four colours are the literals a standalone SVG falls back to; the animation page's theme overrides them, which is why the desktop app does not send them.",
+      "description": "How the map is drawn, in the engine's own numbers. Every field is optional; omitting the object, or any field, draws exactly what is drawn without it. The numbers are in SVG user units at the map's width (the map is fitted to MapBuildParams.width, 1800 by default, so a line width of 7 is seven of 1800), except line_gap, a multiple of line_width. interchange_radius may not be below station_radius, judged on the values the map would be drawn with (a field left out counts as its default): a rule the schema cannot hold and the server does. label_size and label_offset re-place the labels and move the drawing's viewBox, never the stored layout. The four colours are the literals a standalone SVG falls back to; the animation page's theme overrides them, which is why the desktop app does not send them. Instead of the fields, preset names a look (style.presets answers the numbers each resolves to) and is sent alone: beside any other field it is refused with the params kind, and the map is drawn exactly as when those numbers are sent field by field.",
       "type": "object",
       "properties": {
+        "preset": {
+          "enum": ["beck", "blueprint", "paper"],
+          "description": "A named look over the eight numbers: beck, blueprint or paper. style.presets answers the numbers each resolves to, and a name draws exactly what those numbers sent field by field draw. Sent alone: beside any other field of this object it is refused with the params kind. A preset carries no colour; the page's theme owns them. Held equal to the engine's table by a test."
+        },
         "line_width": {
           "type": "number",
           "minimum": 1,
@@ -515,6 +520,45 @@
           "description": "The station names, as the literal a standalone SVG falls back to; the page's theme overrides it. #111111 when omitted."
         }
       },
+      "additionalProperties": false
+    },
+    "StylePreset": {
+      "description": "One named look: its name and the eight numbers it resolves to, in MapStyle's units and ranges and complete, so a client could send them field by field as map.build's style. No colour: the theme owns them.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "enum": ["beck", "blueprint", "paper"],
+          "description": "What MapStyle.preset takes. Held equal to the engine's table by a test."
+        },
+        "style": {
+          "type": "object",
+          "properties": {
+            "line_width": { "type": "number", "minimum": 1, "maximum": 24 },
+            "line_gap": { "type": "number", "minimum": 1, "maximum": 3 },
+            "station_radius": { "type": "number", "minimum": 1, "maximum": 20 },
+            "interchange_radius": { "type": "number", "minimum": 1, "maximum": 30 },
+            "station_stroke": { "type": "number", "minimum": 0, "maximum": 8 },
+            "label_size": { "type": "number", "minimum": 6, "maximum": 32 },
+            "label_offset": { "type": "number", "minimum": 0, "maximum": 40 },
+            "padding": { "type": "number", "minimum": 0, "maximum": 200 }
+          },
+          "required": ["line_width", "line_gap", "station_radius", "interchange_radius", "station_stroke", "label_size", "label_offset", "padding"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["name", "style"],
+      "additionalProperties": false
+    },
+    "StylePresets": {
+      "description": "The named looks map.build's style takes in place of its fields, beck, blueprint and paper in that order. Nothing is stored: the table is the engine's, and a name resolves to exactly the numbers listed here.",
+      "type": "object",
+      "properties": {
+        "presets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/StylePreset" }
+        }
+      },
+      "required": ["presets"],
       "additionalProperties": false
     },
     "LineOptions": {

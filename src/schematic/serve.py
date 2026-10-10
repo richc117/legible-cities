@@ -52,7 +52,7 @@ from .describe import station_name
 from .linegraph import LineGraph
 from .render import (HEX_COLOR_PATTERN, draw_stage, octilinearity, stage as render_stage,
                      summary as render_summary)
-from .render import STYLE_RANGES, Style
+from .render import PRESETS, STYLE_RANGES, Style, preset_style
 
 log = logging.getLogger(__name__)
 
@@ -327,6 +327,12 @@ def _lines(left: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
     return value
 
 
+def _or(names: Any) -> str:
+    """``a, b or c``: the names a refusal offers, in the table's order."""
+    names = list(names)
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} or {names[-1]}"
+
+
 # The four colours of a style the wire accepts. The app never sends them (the
 # page's theme owns the furniture); the command line and the site do.
 STYLE_COLORS = ("background", "station_fill", "station_stroke_color", "label_color")
@@ -344,6 +350,13 @@ def _style(value: Any) -> Style | None:
     among them: they are the engine's, not a client's (``default_color`` is
     a parameter of ``map.build`` itself).
 
+    Or the name of a look instead of the fields: ``{"preset": "beck"}``
+    resolves to exactly the eight numbers of ``render.PRESETS`` (issue 73),
+    so it draws what the same numbers sent one by one draw. The name is
+    exclusive: beside any other key it is refused, because which of the two
+    won would be a guess, and a name that is not in the table is refused
+    naming the ones that are. A preset carries no colour; the theme owns them.
+
     One rule the schema cannot hold: ``interchange_radius`` may not be below
     ``station_radius``, judged on the values the map would be drawn with,
     each field as given or else ``Style``'s default. So ``station_radius``
@@ -358,6 +371,15 @@ def _style(value: Any) -> Style | None:
     if not isinstance(value, dict):
         raise invalid_params("style must be an object")
     left = dict(value)
+    if "preset" in left:
+        name = left.pop("preset")
+        if left:
+            raise invalid_params("style.preset cannot be sent with the fields it resolves to; "
+                                 "send one or the other")
+        if not isinstance(name, str) or name not in PRESETS:
+            raise invalid_params(f"style.preset must be {_or(PRESETS)}; style.presets "
+                                 f"describes each")
+        return Style(themed=True, **preset_style(name))
     fields: dict[str, Any] = {}
     for name, (low, high, unit) in STYLE_RANGES.items():
         if name not in left:
@@ -685,6 +707,7 @@ class EngineEndpoint(Endpoint):
             "engine.shutdown": self.engine_shutdown,
             "graph.build": self.graph_build,
             "map.build": self.map_build,
+            "style.presets": self.style_presets,
             "export.presets": self.export_presets,
             "export.storyboards": self.export_storyboards,
             "export.plan": self.export_plan,
@@ -1019,6 +1042,13 @@ class EngineEndpoint(Endpoint):
                     "description": description}
 
         return self._job(work)
+
+    def style_presets(self, params: Any = None) -> dict[str, Any]:
+        """The named looks ``map.build``'s ``style`` takes in place of its
+        fields: each a name and the eight numbers it resolves to, as an
+        object a client could send field by field, in the table's order."""
+        _no_params("style.presets", params)
+        return {"presets": [{"name": name, "style": preset_style(name)} for name in PRESETS]}
 
     # -- export: the two halves the desktop app cannot do itself. It captures
     # for itself (its ADR-024); there is no export.capture here.

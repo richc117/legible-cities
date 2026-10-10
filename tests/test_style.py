@@ -106,7 +106,7 @@ def test_the_table_and_the_schema_agree():
     assert defs["MapBuildParams"]["properties"]["style"] == {"$ref": "#/$defs/MapStyle"}
     assert style["type"] == "object" and style["additionalProperties"] is False
     assert "required" not in style
-    assert set(props) == set(RANGES) | set(COLORS)
+    assert set(props) == set(RANGES) | set(COLORS) | {"preset"}
     # The server's own list of colour fields is held to the schema too, so a
     # fifth colour added to the server alone cannot be accepted where the
     # schema refuses it, the one direction the hand-validation test cannot see.
@@ -209,10 +209,9 @@ def test_omitted_and_empty_draw_today():
 
 # ---------------------------------------------------- the request reaches the pipeline
 
-def test_the_style_reaches_the_pipeline_and_its_absence_does_too(client, tmp_path, monkeypatch):
-    """With ``pipeline.run`` stood in for by a hand-made graph, so it runs
-    without a feed or LOOM: what ``map.build`` hands it is the style asked
-    for, built themed, and nothing when none was asked for."""
+def stand_in_pipeline(monkeypatch, tmp_path) -> list[dict]:
+    """``pipeline.run`` stood in for by a hand-made graph, so ``map.build``
+    runs without a feed or LOOM; the list is what each call was handed."""
     monkeypatch.setenv(config.ENV, str(tmp_path))
     graph = _graph([[("A", "0072bc"), ("B", None)], [("B", None), ("C", "ff0000")]])
     diag = diagnostics.Diagnostics(
@@ -229,6 +228,14 @@ def test_the_style_reaches_the_pipeline_and_its_absence_does_too(client, tmp_pat
                                diagnostics=lambda: diag)
 
     monkeypatch.setattr(pipeline, "run", stood_in)
+    return asked
+
+
+def test_the_style_reaches_the_pipeline_and_its_absence_does_too(client, tmp_path, monkeypatch):
+    """With ``pipeline.run`` stood in for by a hand-made graph, so it runs
+    without a feed or LOOM: what ``map.build`` hands it is the style asked
+    for, built themed, and nothing when none was asked for."""
+    asked = stand_in_pipeline(monkeypatch, tmp_path)
     styled = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "out": "s1",
                                        "style": {"line_width": 12, "background": "#000000"}})
     plain = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
@@ -355,3 +362,121 @@ def test_preset_style_answers_a_copy_and_refuses_what_is_not_a_name():
     assert preset_style("beck") == PRESETS["beck"]
     with pytest.raises(KeyError):
         preset_style("night")
+
+
+# The sentences a client reads, written out here and not built from the table.
+BOTH = "style.preset cannot be sent with the fields it resolves to; send one or the other"
+UNKNOWN = "style.preset must be beck, blueprint or paper; style.presets describes each"
+
+
+def numbers(name: str) -> dict:
+    """The preset's numbers as the issue wrote them, never read from the table."""
+    return dict(zip(RANGES, PRESET_NUMBERS[name]))
+
+
+def test_the_schema_knows_the_presets_by_name_and_by_their_numbers():
+    defs = SCHEMA["$defs"]
+    assert defs["MapStyle"]["properties"]["preset"]["enum"] == list(PRESETS)
+    assert defs["StylePreset"]["properties"]["name"]["enum"] == list(PRESETS)
+    assert SCHEMA["methods"]["style.presets"] == {
+        "params": {"$ref": "#/$defs/NoParams"}, "result": {"$ref": "#/$defs/StylePresets"}}
+    assert defs["StylePresets"]["properties"]["presets"]["items"] == {"$ref": "#/$defs/StylePreset"}
+    # The eight, complete and closed, inside the bounds MapStyle sends them with.
+    style = defs["StylePreset"]["properties"]["style"]
+    assert style["additionalProperties"] is False
+    assert list(style["properties"]) == list(RANGES) == style["required"]
+    for field, (low, high) in RANGES.items():
+        assert style["properties"][field] == {"type": "number", "minimum": low, "maximum": high}
+        mapped = defs["MapStyle"]["properties"][field]
+        assert (mapped["minimum"], mapped["maximum"]) == (low, high)
+    # A preset says it is sent alone, where a client reads.
+    assert "refused" in defs["MapStyle"]["properties"]["preset"]["description"]
+
+
+def test_a_name_resolves_to_exactly_its_numbers_built_themed():
+    for name in PRESET_NUMBERS:
+        style = serve._style({"preset": name})
+        assert style == Style(themed=True, **numbers(name)), name
+        assert style.themed
+        # Nothing the preset does not name moves: colours and the engine's own fields.
+        assert style.background == Style().background
+        assert style.label_char_width == Style().label_char_width
+        # The same numbers sent one by one are the same style.
+        assert style == serve._style(numbers(name))
+
+
+def test_a_name_and_its_numbers_draw_the_same_bytes_and_the_three_differ():
+    """On the invented network, so it runs anywhere; the stored layout's
+    version of this is the last test."""
+    by_name = {name: draw(serve._style({"preset": name})) for name in PRESET_NUMBERS}
+    by_numbers = {name: draw(serve._style(numbers(name))) for name in PRESET_NUMBERS}
+    assert by_name == by_numbers
+    assert len({*by_name.values(), draw()}) == 4, "the three differ, and from the default"
+
+
+@pytest.mark.parametrize("beside", [
+    {"line_width": 6}, {"padding": 24, "label_size": 11}, {"background": "#000000"},
+    {"themed": True}, {"unheard_of": 1}, {"line_width": 99},
+])
+def test_a_preset_beside_any_other_field_is_refused(beside):
+    """Whatever the other field is, valid or not, known or not: the name is
+    sent alone, so which of the two would win is never left to a guess."""
+    assert refusal({"preset": "beck", **beside})["hint"] == BOTH
+
+
+def test_a_preset_beside_a_field_is_refused_before_its_name_is_read():
+    assert refusal({"preset": "night", "padding": 24})["hint"] == BOTH
+
+
+@pytest.mark.parametrize("name", [
+    "night", "Beck", "beck ", "", "default", None, 3, True, ["beck"], {"beck": 1},
+])
+def test_an_unknown_preset_is_refused_naming_the_three(name):
+    assert refusal({"preset": name})["hint"] == UNKNOWN
+
+
+def test_the_schema_refuses_an_unknown_name_and_takes_each_known_one():
+    for name in PRESET_NUMBERS:
+        check({"key": KEY, "layout": NO_LAYOUT, "date": DATE, "style": {"preset": name}},
+              "MapBuildParams")
+    for name in ("night", "Beck", "", None, 3):
+        assert invalid({"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                        "style": {"preset": name}}, "MapBuildParams"), name
+
+
+def test_map_build_resolves_the_name_before_the_pipeline_and_refuses_both(
+        client, tmp_path, monkeypatch):
+    """A name reaches ``pipeline.run`` as the style its numbers make, the
+    same as the numbers sent one by one; the refusals are the wire's own."""
+    asked = stand_in_pipeline(monkeypatch, tmp_path)
+    for i, name in enumerate(PRESET_NUMBERS):
+        for style in ({"preset": name}, numbers(name)):
+            sent = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                             "out": f"p{i}-{len(asked)}", "style": style})
+            assert "result" in sent, sent
+            check(sent["result"], "MapBuildResult")
+            assert asked[-1]["style"] == Style(themed=True, **numbers(name))
+    assert len(asked) == 6
+    for style, hint in (({"preset": "beck", "line_width": 6}, BOTH),
+                        ({"preset": "night"}, UNKNOWN)):
+        error = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+                                          "style": style})["error"]
+        assert error["code"] == -32602 and error["data"]["kind"] == "params"
+        assert error["data"]["hint"] == hint
+    assert len(asked) == 6, "a refused request never reaches the pipeline"
+
+
+def test_style_presets_answers_each_name_with_numbers_a_client_can_send(client):
+    result = client.call("style.presets")["result"]
+    check(result, "StylePresets")
+    assert [p["name"] for p in result["presets"]] == ["beck", "blueprint", "paper"]
+    for answered in result["presets"]:
+        name, style = answered["name"], answered["style"]
+        assert style == numbers(name), name
+        # Sent field by field, it is accepted and is the style the name makes.
+        check({"key": KEY, "layout": NO_LAYOUT, "date": DATE, "style": style}, "MapBuildParams")
+        assert serve._style(style) == serve._style({"preset": name})
+    # No params, as the schema says: nothing, or an empty object.
+    assert client.call("style.presets", {})["result"] == result
+    assert client.call("style.presets", {"preset": "beck"})["error"]["code"] == -32602
+    assert client.call("style.presets", ["beck"])["error"]["code"] == -32602
