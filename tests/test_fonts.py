@@ -11,7 +11,10 @@ The tables are held to the WOFF2 files with fontTools, a development
 dependency, and those tests skip without it. The drawing tests use the
 invented twelve-station network the theme pictures are made from, so they run
 anywhere; the tests over the stored layouts skip without them, and the one
-over New York prints the names placed in each face under ``-s``.
+over New York prints the names placed in each face under ``-s``. The last two
+open that network's page in the full Chromium, as tests/test_site.py does, and
+skip without it: the rows' bold names stay on the system stack, and the
+page's ``settle()`` answers once the face has loaded.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ import pytest
 from pylsp_jsonrpc.exceptions import JsonRpcInvalidParams
 from test_colors import _stored
 from test_serve import DATE, KEY, NO_LAYOUT, SCHEMA, Client, check, invalid
+from test_site import BROWSER, _run, _trip_page, needs_browser
 from test_style import (BOTH, PRESET_NUMBERS, box, circles, line_widths, nolabels, numbers,
                         stand_in_pipeline)
 
@@ -384,3 +388,151 @@ def test_on_new_york_no_label_overlaps_a_label_or_a_marker_in_any_bundled_face()
         assert not covered, f"{name}: names over a station: {covered[:5]}"
     print("\nNew York, names placed: "
           + ", ".join(f"{name} {count}" for name, count in placed.items()))
+
+
+# ------------------------------------------------------------- in the page
+#
+# The page inlines the SVG, so its own names and the time chart's text take the
+# face from the SVG's font-family. The rows' names are bold and the face is its
+# regular weight alone, so they keep the system stack. The face is a data URI
+# the browser decodes after the page's first pass: settle() answers once it is
+# in, and fits the showing lines' box again if it was measured before.
+
+def _pages(tmp_path) -> dict[str, str]:
+    return {face: _trip_page(tmp_path / face, "Twelve", fixture(),
+                             Style(themed=True, label_font=face))
+            for face in ("inter", "system")}
+
+
+FACES_ON_THE_PAGE = BROWSER + r"""
+main(async browser => {
+  const out = { problems: [], pages: {} };
+  for (const [face, url] of Object.entries(job.urls)) {
+    const page = await browser.newPage();
+    page.on("pageerror", e => out.problems.push(e.message));
+    await page.goto(url, { waitUntil: "load" });
+    await ready(page);
+    await page.evaluate(() => window.__present.settle());
+    // The fonts the browser drew each element's text with, which a computed
+    // font-family alone does not say: a faked bold is the face, not a system font.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("DOM.enable");
+    await cdp.send("CSS.enable");
+    const { root } = await cdp.send("DOM.getDocument", { depth: -1 });
+    const seen = {};
+    const what = { rows: ".rowname", names: "#linear-labels text", map: "#labels text" };
+    for (const [name, selector] of Object.entries(what)) {
+      const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector });
+      const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
+      seen[name] = {
+        family: await page.evaluate(s => getComputedStyle(document.querySelector(s)).fontFamily,
+                                    selector),
+        fonts: fonts.map(f => ({ name: f.familyName, custom: f.isCustomFont })),
+      };
+    }
+    out.pages[face] = seen;
+    await page.close();
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_the_rows_names_stay_on_the_system_stack_and_the_maps_names_take_the_face(tmp_path):
+    seen = _run(FACES_ON_THE_PAGE, {"urls": _pages(tmp_path)})
+    assert not seen["problems"], seen["problems"]
+    stack = '"Helvetica Neue", Helvetica, Arial, sans-serif'
+    for face, page in seen["pages"].items():
+        assert page["rows"]["family"] == stack, face
+        assert page["rows"]["fonts"] and not any(f["custom"] for f in page["rows"]["fonts"]), \
+            f"{face}: the rows' names are drawn in {page['rows']['fonts']}"
+    inter = seen["pages"]["inter"]
+    for what in ("names", "map"):
+        assert inter[what]["family"] == f"Inter, {stack}", what
+        assert inter[what]["fonts"] == [{"name": "Inter", "custom": True}], what
+    system = seen["pages"]["system"]
+    for what in ("names", "map"):
+        assert system[what]["family"] == stack, what
+        assert not any(f["custom"] for f in system[what]["fonts"]), what
+
+
+SETTLE = BROWSER + r"""
+// Run in the page before its own script: when the seam is assigned, which is
+// before the page's first frame and while the map's face is still loading.
+function settleAtTheSeam() {
+  Object.defineProperty(window, "__present", { configurable: true, get() { return undefined; },
+    set(seam) {
+      Object.defineProperty(window, "__present", { value: seam, writable: true,
+                                                   configurable: true });
+      const loading = Array.from(document.fonts, f => f.status);
+      const answer = seam.settle();
+      const promised = !!answer && typeof answer.then === "function";
+      window.__settled = Promise.resolve(answer).then(() => ({
+        loading, promised, status: document.fonts.status,
+        faces: Array.from(document.fonts, f => f.status) }));
+    } });
+}
+function fitAtTheSeam() {
+  Object.defineProperty(window, "__present", { configurable: true, get() { return undefined; },
+    set(seam) {
+      Object.defineProperty(window, "__present", { value: seam, writable: true,
+                                                   configurable: true });
+      seam.setRoutes(["A"]);
+    } });
+}
+main(async browser => {
+  const out = { problems: [], pages: {} };
+  for (const [face, url] of Object.entries(job.urls)) {
+    const seen = {};
+    let page = await browser.newPage();
+    page.on("pageerror", e => out.problems.push(e.message));
+    await page.addInitScript(settleAtTheSeam);
+    await page.goto(url, { waitUntil: "load" });
+    seen.settled = await page.evaluate(() => window.__settled);
+    await page.close();
+
+    // One line fitted while the face loads, as an address's lines= is; then a
+    // settle once it has loaded, as a driver asks after its own wait.
+    page = await browser.newPage();
+    page.on("pageerror", e => out.problems.push(e.message));
+    await page.addInitScript(fitAtTheSeam);
+    await page.goto(url, { waitUntil: "load" });
+    await ready(page);
+    await page.evaluate(() => document.fonts.ready);
+    seen.fit = await page.evaluate(async () => {
+      const P = window.__present, early = P.state().box;
+      const answer = P.settle();
+      const sync = P.state().box;
+      await answer;
+      P.setRoutes(["A"]);
+      return { early, sync, fresh: P.state().box };
+    });
+    await page.close();
+    out.pages[face] = seen;
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_settle_answers_once_the_face_has_loaded_and_fits_what_was_measured_before(tmp_path):
+    """Both drivers get the face by construction: a settle asked while it
+    loads resolves only once it is in, and a box fitted to one line in the
+    fallback face is fitted again at the settle, before it returns. The system
+    face has nothing to wait for and nothing to fit again."""
+    seen = _run(SETTLE, {"urls": _pages(tmp_path)})
+    assert not seen["problems"], seen["problems"]
+    inter, system = seen["pages"]["inter"], seen["pages"]["system"]
+
+    assert inter["settled"]["loading"] != ["loaded"], "the face had loaded before the seam"
+    assert inter["settled"]["promised"] and system["settled"]["promised"]
+    assert inter["settled"]["status"] == "loaded" and inter["settled"]["faces"] == ["loaded"]
+    assert system["settled"]["status"] == "loaded" and system["settled"]["faces"] == []
+
+    fit = inter["fit"]
+    assert fit["early"] != fit["fresh"], "the box was not fitted in the fallback face"
+    assert fit["sync"] == fit["fresh"]
+    fit = system["fit"]
+    assert fit["early"] == fit["sync"] == fit["fresh"]

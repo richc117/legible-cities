@@ -205,8 +205,11 @@ __SOCIAL__
      keyboard's focus the ring is drawn whole and the hint gives way to it. */
   #stage.scrollable-right:focus-visible { -webkit-mask-image: none; mask-image: none; }
   /* The rows' names in the Linear and Time views' gutter, in the map's label
-     colour, which the script sets. */
-  .rowname { font-weight: 700; font-size: 13px; dominant-baseline: middle; }
+     colour, which the script sets. Bold, so on the system stack whatever face
+     the map's names are drawn in: a face the SVG embeds (engine issue 76) is
+     its regular weight alone, and the browser would fake a bold from it. */
+  .rowname { font-weight: 700; font-size: 13px; dominant-baseline: middle;
+             font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
   /* Width is set by the script, which is the only thing that knows the view:
      the map wants to fill the height and pan, while the rows want a legible
      column width and let the page scroll. A CSS rule cannot tell them apart,
@@ -797,6 +800,13 @@ __SOCIAL__
   // spanning both leaves each of them floating in the other's space. Lerped by
   // m, exactly as the height already was. See fitVisible().
   let subsetBox = null, subsetLinBox = null;
+  // Whether those boxes were measured while a face the map embeds was still
+  // loading (engine issue 76): a data URI the browser decodes after the page's
+  // first pass, so the names were then measured in the fallback face, and
+  // settle() measures them again once it is in.
+  let fittedEarly = false;
+  const fontsPending = () => !!document.fonts &&
+    Array.from(document.fonts).some(f => f.status === "loading" || f.status === "unloaded");
 
   function setBox(m) {
     // Tightening onto the network only makes sense for the map: elsewhere the
@@ -2534,6 +2544,7 @@ __SOCIAL__
   // frame would work, but the box would then drift the whole way through a
   // morph, which reads as an unasked-for camera move.
   function fitVisible() {
+    fittedEarly = fontsPending();
     const els = [];
     svg.querySelectorAll("#lines g.line").forEach(g => els.push(g));
     for (const d of dots) els.push(d.el);
@@ -2641,13 +2652,25 @@ __SOCIAL__
       return true;
     },
     // Snap every tween to its target: a still should never catch a transition
-    // halfway through.
+    // halfway through. Answers a promise that resolves once every face the
+    // page declares has loaded: the map's embedded face (engine issue 76) is a
+    // data URI decoded after the first pass, and a frame taken before it draws
+    // the names in the fallback face. A box fitted to the showing lines while
+    // the face was loading is fitted again once it is in, at once when it
+    // already is. The snap itself happens before this returns, as it always
+    // did, and a page that embeds no face is never fitted again.
     settle() {
       view = viewTarget; str = strTarget; geo = geoTarget;
       viewTween = strTween = geoTween = null;
       for (const entry of rowTarget) rowPos.set(entry[0], entry[1]);
       stepFade(0, true);
       dirty = true; draw();
+      const refit = () => { if (fittedEarly && hidden.size && !fontsPending()) fitVisible(); };
+      refit();
+      if (!document.fonts) return Promise.resolve();
+      return Promise.all(Array.from(document.fonts, f => f.load().catch(() => null)))
+        .then(() => document.fonts.ready)
+        .then(refit);
     },
     bounds() { return { t0: t0, t1: t1 }; },
     onDraw(fn) { onDraw = fn; },
