@@ -5,6 +5,16 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.16.1] - 2026-10-10
+
+### Fixed
+
+- **A feed's text can no longer break the page it is written into** (issues 65 and 66). `animate.write` filled the page's placeholders one after another, so a line or station named `__DATA__` was replaced inside the map by the page's data, and a title that was a placeholder by the whole SVG; it now fills them all in one pass that never reads what it has written. The page's chip handler built a CSS selector out of the line's label, so a label holding a quote threw and one that closed the selector toggled another line; it now finds the line's group by comparing its `data-line` attribute. No feed in the registry has such a name, and a page for ordinary text is byte for byte the page it was apart from that one handler, so the Pittsburgh `page_without_data` pin was re-pinned once; the SVG, the page's data and its lines did not move.
+
+- **A layout's lock and its cache of minutes no longer fail a re-layout or answer an old one** (issues 67, 68 and 69). The first `graph.build` of a feed whose home held its four stage files flat, from before layouts had names, waited on itself for ever, because the migration took a lock the layout's decision already held; it now migrates inside that one hold. `render.stage` reads a stored stage, its meta and the octi stage a date's minutes come from under the lock a forced re-layout's swap takes, parsing and drawing outside it, so on Windows a draw can no longer hold a file open as the stored set is moved aside and fail the re-layout; the handler's own read of the meta while a re-layout runs does the same. The swap forgets the minutes kept under the layout's id, and neither a day read that straddles it nor a build still in flight keeps any, so a description after a forced re-layout times each line by the new octi stage. `map.build`, `graph.build`'s replay and one more handler still read a stored set without the lock (engine issue 77).
+
+No schema, method or page behaviour changed, and `render.stage` of a stored layout answers byte for byte as before.
+
 ## [0.16.0] - 2026-10-10
 
 ### Added
