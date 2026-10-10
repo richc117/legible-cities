@@ -202,8 +202,10 @@ def label_face(name: str) -> LabelFace | None:
 # How one line is stroked (issue 55; the note at the top of ``offsets.py``):
 # its width, a casing either side of it and a dash, which ``map.build`` takes
 # per line in ``lines`` and ``serve._lines`` judges against these. ``width`` is
-# a multiple of ``line_width``, the band of emphasis in which a line's round
-# caps still bridge the hop its neighbours make at a node; the casing's
+# a multiple of ``line_width``, the band of emphasis the issue settled on: much
+# outside it a line's round caps no longer bridge the hop its neighbours make
+# at a node. A casing widens its line's slot as well, so a wide one can open
+# such a gap in a neighbour where its line leaves the bundle. The casing's
 # ``width`` is on each side, in the same unit, and its colour is ``#rrggbb``.
 LINE_WIDTH_RANGE = (0.75, 1.5)
 CASING_WIDTH_RANGE = (0.0, 1.0)

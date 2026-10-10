@@ -4554,7 +4554,7 @@ def test_a_dash_reaches_the_chips_and_the_row_swatches(tmp_path):
             swatches["X"]["dash"], swatches["X"]["cap"]) == ("line", "#0072bc", "10.5", "3.2 1.6",
                                                              "butt")
     assert (swatches["Z"]["tag"], swatches["Z"]["width"], swatches["Z"]["dash"],
-            swatches["Z"]["cap"]) == ("line", "3.08", "0 4.92", "round")
+            swatches["Z"]["cap"]) == ("line", "3.08", "0 4.91", "round")
     for label, swatch in swatches.items():
         assert swatch["opacity"] == 1, label
     # Each in the same eight units beside its name, a dot's caps inside them.
@@ -4589,7 +4589,8 @@ main(async browser => {
       const g = document.querySelector('#lines g.line[data-line="X"]');
       return { group: g.getAttribute("stroke-dasharray"),
                tracks: [...g.querySelectorAll("path[data-src]")].map(p => ({
-                 marks: p.getAttribute("stroke-dasharray"), undrawn: p.classList.contains("undrawn"),
+                 marks: p.getAttribute("stroke-dasharray"),
+                 undrawn: p.classList.contains("undrawn"),
                  dash: getComputedStyle(p).strokeDasharray })) };
     }, f);
   }

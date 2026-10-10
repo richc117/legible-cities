@@ -31,8 +31,8 @@ def test_the_criterion_edge_places_its_lines_at_minus_9_1_and_plus_5_6():
 
 def test_three_lines_sum_their_slots_and_the_gaps_between_them():
     """Slots of 7, 14 and 10.5 with gaps of 4.2 between them, centred: the
-    bundle runs from -22.4 to 22.4 and each line sits in the middle of its own
-    slot."""
+    bundle runs from -19.95 to 19.95 and each line sits in the middle of its
+    own slot."""
     line_width, spacing = 7.0, 11.2
     offsets = slot_offsets([7.0, 14.0, 10.5], line_width, spacing)
     total = 7.0 + 14.0 + 10.5 + 2 * (spacing - line_width)
@@ -41,6 +41,7 @@ def test_three_lines_sum_their_slots_and_the_gaps_between_them():
         edges.append(edges[-1] + b + (spacing - line_width))
     middles = [lo + b / 2 for lo, b in zip(edges, (7.0, 14.0, 10.5))]
     assert offsets == pytest.approx(middles, abs=1e-9)
+    assert total / 2 == pytest.approx(19.95)
     assert middles[-1] + 10.5 / 2 == pytest.approx(total / 2)
 
 

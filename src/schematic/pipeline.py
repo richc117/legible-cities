@@ -733,9 +733,10 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     is ignored. ``width``, ``casing`` and ``dash`` are how the line is stroked
     (issue 55, ``render.line_strokes``): the map, the geographic twin and the
     page draw a drawn line's, and a map whose lines choose none of them, or
-    only their defaults, is the map it was, byte for byte. ``dot_radius`` and ``trail`` are how the page draws a train,
-    the animation's and not the map's (``animate.DOT_RADIUS``); they reach
-    the page's data and nothing else. ``back`` is the href the animation page's
+    only their defaults, is the map it was, byte for byte. ``dot_radius`` and
+    ``trail`` are how the page draws a train, the animation's and not the
+    map's (``animate.DOT_RADIUS``); they reach the page's data and nothing
+    else. ``back`` is the href the animation page's
     back-link points at. The default is the sibling gallery in ``out/``;
     the site passes its own atlas URL, because a relative "index.html"
     resolves to /maps/index.html there.

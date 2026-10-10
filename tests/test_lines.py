@@ -268,7 +268,9 @@ def test_hiding_every_line_is_refused_with_its_own_sentence(stand, tmp_path):
 
 @pytest.mark.parametrize("lines", [
     {}, {"Z": {"hidden": True, "name": "Zed"}}, {"A": {}, "B": {"hidden": False}},
-], ids=["empty", "unknown-label", "nothing-chosen"])
+    {"A": {"width": 1, "casing": {"width": 0, "color": "#101010"}, "dash": "solid"},
+     "Z": {"width": 1.5, "dash": "dotted"}},
+], ids=["empty", "unknown-label", "nothing-chosen", "stroke-defaults"])
 def test_choosing_nothing_draws_what_no_choice_draws_byte_for_byte(stand, tmp_path, lines):
     _, svg, _, page = stand.run(tmp_path / "plain", date=DAY)
     plain = (tmp_path / "plain" / f"{KEY}.positions.json").read_bytes()

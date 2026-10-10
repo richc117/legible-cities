@@ -185,8 +185,8 @@ def test_the_geographic_twin_makes_room_for_a_widened_line_as_the_map_does():
     plain_geo = animate.geographic_tracks(twin, graph, plain, Style())
     gap = lambda tracks, a, b: math.dist(tracks[a][0], tracks[b][0])
     x_a, y_a = drawn.track("X", "n0", "n1").element_id, drawn.track("Y", "n0", "n1").element_id
-    on_map = [math.dist(r.tracks[("X", "n0", "n1")].points[0], r.tracks[("Y", "n0", "n1")].points[0])
-              for r in (drawn, plain)]
+    on_map = [math.dist(r.tracks[("X", "n0", "n1")].points[0],
+                        r.tracks[("Y", "n0", "n1")].points[0]) for r in (drawn, plain)]
     assert on_map == pytest.approx([19.95, 11.2])
     assert gap(wide_geo.tracks, x_a, y_a) / gap(plain_geo.tracks, x_a, y_a) == pytest.approx(
         on_map[0] / on_map[1], rel=0.03)

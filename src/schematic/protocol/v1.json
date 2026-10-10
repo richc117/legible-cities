@@ -609,20 +609,20 @@
           "minimum": 0.75,
           "maximum": 1.5,
           "default": 1,
-          "description": "The line's stroke as a multiple of MapStyle.line_width; 1 when omitted. A wider line keeps its place on each edge it runs on and moves the lines beside it there out by half its extra width, on its own edges only, so the bundle sums each line's room. From 0.75 to 1.5, the band in which the round caps still bridge the hop a line makes at a node where its neighbours change. The map, the geographic view, the thumbnails, the page's row swatches and the moving dots all follow it."
+          "description": "The line's stroke as a multiple of MapStyle.line_width; 1 when omitted. A wider line keeps its place on each edge it runs on and moves the lines beside it there out by half its extra width, on its own edges only, so the bundle sums each line's room. From 0.75 to 1.5, the band of emphasis: much outside it the round caps no longer bridge the step a line makes at a node where its neighbours change. The map, the geographic view, the thumbnails, the page's row swatches and the moving dots all follow it."
         },
         "casing": { "$ref": "#/$defs/LineCasing" },
         "dash": {
           "type": "string",
           "enum": ["solid", "dashed", "dotted"],
           "default": "solid",
-          "description": "How the line's stroke is painted; solid when omitted. Dashed shows twice the stroke on and the stroke off, dotted dots of the stroke's diameter 1.6 strokes apart, each scaled to the line's own width. Paint only: the line takes the room a solid one does and the trains ride it as on a solid one. The page's chips and row swatches show it too."
+          "description": "How the line's stroke is painted; solid when omitted. Dashed shows twice the stroke on and the stroke off, dotted dots of the stroke's diameter 1.6 strokes apart, each scaled to the line's own width. Paint only: the line takes the room a solid one does, and the trains ride under the dash on the whole track. The page's chips and row swatches show it too."
         }
       },
       "additionalProperties": false
     },
     "LineCasing": {
-      "description": "A stroke of another colour either side of a line, drawn under it along every track the line has. The line takes the room of its width and both sides of its casing on each edge, and the lines beside it move out to make it.",
+      "description": "A stroke of another colour either side of a line, drawn under it along every track the line has. The line takes the room of its width and both sides of its casing on each edge, and the lines beside it move out to make it, so a wide casing can open a gap in a neighbour where the cased line leaves its bundle.",
       "type": "object",
       "properties": {
         "width": {

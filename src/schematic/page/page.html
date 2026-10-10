@@ -984,10 +984,12 @@ __SOCIAL__
     run.setAttribute("class", "rowswatch");
     run.setAttribute("stroke", colour);
     if (dottedOf(label)) {
+      // The second dot is a hundredth inside the run's end, so the dasher
+      // draws it whatever the rounding of the run's length.
       const d = Math.min(t, SWATCH / 2.6);
       run.setAttribute("stroke-width", d.toFixed(2));
       run.setAttribute("stroke-linecap", "round");
-      run.setAttribute("stroke-dasharray", "0 " + (1.6 * d).toFixed(2));
+      run.setAttribute("stroke-dasharray", "0 " + (1.6 * d - 0.01).toFixed(2));
       run.dataset.inset = (d / 2).toFixed(2);
     } else {
       run.setAttribute("stroke-width", t);

@@ -313,11 +313,12 @@ def _lines(left: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
     if value is None:
         return None
     if not isinstance(value, dict):
-        raise invalid_params("lines must be an object of line label to the line's name "
-                             "and hidden")
+        raise invalid_params("lines must be an object of line label to the line's name, "
+                             "hidden, width, casing and dash")
     for label, chosen in value.items():
         if not isinstance(chosen, dict):
-            raise invalid_params(f"lines[{label!r}] must be an object of name and hidden")
+            raise invalid_params(f"lines[{label!r}] must be an object of name, hidden, width, "
+                                 f"casing and dash")
         rest = dict(chosen)
         if "name" in rest:
             name = rest.pop("name")
