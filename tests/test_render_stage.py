@@ -121,6 +121,49 @@ def test_every_file_of_the_store_render_stage_opens_is_opened_under_the_lock(
     assert [name for name, held in opened if not held] == []
 
 
+def test_the_handler_reads_a_stored_sets_meta_under_the_lock_while_it_is_rebuilt(
+        tmp_path, monkeypatch):
+    """Engine issue 68 on render.stage's own handler: while a forced re-layout
+    of the layout is running (``in_flight`` says the stage is not yet), the
+    stored set answers, and the meta that says it is whole is opened under the
+    lock a swap takes, not before it."""
+    from schematic import serve
+
+    made = small_layout(tmp_path, monkeypatch)
+    opened: list[tuple[str, bool]] = []
+    real = Path.open
+
+    def watched(self, *args, **kwargs):
+        if self.parent == made.dir:
+            opened.append((self.name, pipeline._lock.locked()))
+        return real(self, *args, **kwargs)
+
+    def not_yet(key, layout, needed):
+        raise pipeline.NotYet(key, layout, "octi")
+
+    monkeypatch.setattr(pipeline, "in_flight", not_yet)
+    monkeypatch.setattr(Path, "open", watched)
+    svg, _counts, _description = serve._drawn_stage(
+        KEY, made.id, "loom", width=600, labels=True, date=None)
+    assert svg.startswith("<svg")
+    names = [name for name, _held in opened]
+    assert pipeline.META_FILE in names
+    assert [name for name, held in opened if not held] == []
+
+
+def test_a_graph_the_caller_read_is_not_kept_as_a_stored_sets_minutes(tmp_path, monkeypatch):
+    """Engine issue 69: ``line_minutes`` of a stored layout reads the octi
+    stage itself, after taking the epoch, and ignores a graph handed in, so
+    one read before a swap cannot be kept as the new set's minutes."""
+    made = small_layout(tmp_path, monkeypatch)
+    wrong = LineGraph.from_geojson(
+        json.loads(made.paths["octi"].read_text(encoding="utf-8")))
+    wrong.edges.clear()
+    on_disk = pipeline.line_minutes(made, DAY)
+    pipeline._MINUTES.clear()
+    assert pipeline.line_minutes(made, DAY, graph=wrong) == on_disk
+
+
 class Watched:
     """The store's lock, saying when anyone has had to wait for it."""
 

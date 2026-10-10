@@ -972,9 +972,10 @@ def line_minutes(found: Layout, date: dt.date, *,
     stage's. The day is read once per layout and day in a process. ``graph``
     is the octi stage when the caller has read it already, as it has for a
     layout still being laid out, whose octi file is not to be read from
-    ``found``'s directory (``in_flight``). Without it, a miss reads the
-    stored octi stage under the lock a swap takes, as ``read_stored`` reads
-    (engine issue 68), and a hit reads no file at all.
+    ``found``'s directory (``in_flight``). For a stored layout it is not
+    used: a miss reads the stored octi stage itself, under the lock a swap
+    takes, as ``read_stored`` reads (engine issue 68), after taking the epoch
+    the answer is kept under, and a hit reads no file at all.
 
     A layout still being laid out -- ``found``'s directory is its build's
     scratch -- is timed from ``graph`` and neither answered from the cache
@@ -988,11 +989,12 @@ def line_minutes(found: Layout, date: dt.date, *,
         epoch = _epochs.get(found.id, 0)
     if known is not None:
         return known
-    if graph is None:
-        with _lock:
-            data = found.paths["octi"].read_bytes()
-        graph = LineGraph.from_geojson(json.loads(data.decode("utf-8")))
-    return _remember_minutes(found.id, schedule_for(found, date, graph=graph), epoch)
+    # Read here, after the epoch, whatever the caller holds: a graph the caller
+    # read before a swap would be kept as the new set's minutes (engine issue 69).
+    with _lock:
+        data = found.paths["octi"].read_bytes()
+    stored = LineGraph.from_geojson(json.loads(data.decode("utf-8")))
+    return _remember_minutes(found.id, schedule_for(found, date, graph=stored), epoch)
 
 
 def _minutes_epoch(layout: str) -> int:

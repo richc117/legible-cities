@@ -1235,7 +1235,9 @@ def _drawn_stage(key: str, layout: str, stage: str, *, width: float, labels: boo
     except pipeline.NotYet as exc:
         # A forced re-layout's stored set answers, as it did before the build
         # began, until the build has finished what the answer needs.
-        if pipeline.read_layout(key, layout) is not None:
+        # Only the meta is wanted, read under the lock a swap takes (engine issue
+        # 68): a read outside it could be open as the swap moves the set aside.
+        if pipeline.read_stored(key, layout, []) is not None:
             building = None
         else:
             hint = str(exc)
