@@ -61,6 +61,11 @@
       below = 1 - zones.top;
     }
     if (zones.side !== null) root.style.setProperty("--zone-side", String(zones.side));
+    // What the title card keeps above: the rail's top where there is a rail, or
+    // the bottom zone, whichever reaches higher. Nothing else reads it.
+    var floor = Math.max(zones.bottom === null ? 0 : zones.bottom,
+                         zones.rail === null || zones.railTop === null ? 0 : 1 - zones.railTop);
+    if (floor > 0) root.style.setProperty("--zone-floor", String(floor));
   }
 
   var frame = q.get("frame");
@@ -196,6 +201,30 @@
 
   if (showClock) {
     P.onDraw(function () { timeEl.textContent = P.state().clock; });
+  }
+
+  // -------------------------------------------------------------- title card
+  // What the title card says, whenever the address carries it, title or not:
+  // export.url_for writes the city, the network and the day for any storyboard
+  // with a card. The card adds no words: these, then the caption, set as text,
+  // and the page's own name when the address names neither city nor network.
+  // Putting the card up is the seam's (setCard), at a beat's start.
+  var card = document.getElementById("present-card");
+  if (card) {
+    var said = {
+      city: q.get("city") || "",
+      network: q.get("network") || "",
+      day: q.get("date") || "",
+      caption: caption,
+    };
+    if (!said.city && !said.network) {
+      said.city = (document.querySelector("h1") || {}).textContent || "";
+    }
+    Object.keys(said).forEach(function (part) {
+      var el = card.querySelector("." + part);
+      el.textContent = said[part];
+      el.hidden = !said[part];
+    });
   }
 
   // --------------------------------------------------------------- safe area

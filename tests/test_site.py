@@ -1352,7 +1352,7 @@ def test_the_stage_ring_clears_three_to_one_on_the_page_and_on_the_maps_card():
 # these names, in this order. A new method goes at the end, and into this list.
 SEAM = ["advance", "seek", "setCapture", "setPlaying", "setSpeed", "setView", "setGeo",
         "showView", "hasGeo", "setLabels", "setRoutes", "setFrame", "setTheme", "settle",
-        "bounds", "onDraw", "state", "setTrip"]
+        "bounds", "onDraw", "state", "setTrip", "setCard", "setDrawn"]
 
 PLAYING = BROWSER + r"""
 main(async browser => {
