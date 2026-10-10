@@ -11,6 +11,7 @@ import csv
 import datetime as dt
 import io
 import json
+import math
 import re
 import shutil
 import struct
@@ -22,11 +23,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from schematic import animate, config, feeds, pipeline, site, theme_thumbnails
+from schematic import animate, config, export, feeds, pipeline, site, theme_thumbnails
+from schematic.linear import adjacency_for, build as linear_layout
 from schematic.linegraph import Edge, Line, LineGraph, Node
 from schematic.names import display_name
 from schematic.render import Style, render
-from schematic.schedule import Call, Trip
+from schematic.schedule import Call, Trip, service_day_text
 
 SITE_JSON = site.SRC_DIR / "_data" / "site.json"
 BASE_NJK = site.SRC_DIR / "_includes" / "layouts" / "base.njk"
@@ -3059,3 +3061,643 @@ def test_the_pages_station_circles_take_their_outline_and_radius_from_the_maps_m
     assert {d["r"] for d in dots} == {station, interchange}
     assert {(round(d["at"][0]), round(d["at"][1])) for d in dots if d["r"] == interchange} == big
     assert sum(d["r"] == interchange for d in dots) == 5
+
+
+# ------------------------------------------------ the title card and the draw-in
+#
+# Engine issue 44, as settled on 9 Oct 2026: the seam gained setCard(on), a title
+# card over the frame, and setDrawn(fraction), the network drawing itself in, and
+# state() says `card` and `drawn`. Drawn on issue 53's fixture network
+# (theme_thumbnails.fixture: four lines meeting at two interchanges, one of them
+# on three lines) with a geographic twin, and the draw-in again on Los Angeles
+# where its stored layout is on this machine. A fork and a line in two pieces are
+# added to the fixture where they are what is asked about.
+
+CARD_KEY = "la-metro-rail"       # whose city and network the address names
+CARD_DATE = "2026-09-05"         # a Saturday
+CARD_CAPTION = "Trains every few minutes from first light, and long gaps between them after ten."
+# E runs six stations west to east above the grid and forks at its third, a spur
+# of one station north; S is two pieces that never meet, as NYC's three shuttles
+# share one label.
+SPURS = {
+    "E": ("#7a3fb0", [((1, 12), (3, 12)), ((3, 12), (5, 12)), ((5, 12), (7, 12)),
+                      ((7, 12), (9, 12)), ((9, 12), (11, 12)), ((5, 12), (5, 14))]),
+    "S": ("#5a5a5a", [((13, 12), (15, 12)), ((13, 14), (15, 14))]),
+}
+
+
+def _fixture_graph(spurs: bool = False) -> LineGraph:
+    graph = theme_thumbnails.fixture()
+    if spurs:
+        for label, (colour, runs) in SPURS.items():
+            for ends in runs:
+                ids = [f"x{x}y{y}" for x, y in ends]
+                for nid, (x, y) in zip(ids, ends):
+                    graph.nodes.setdefault(nid, Node(id=nid, coord=(float(x), float(y)),
+                                                     station_id=nid, station_label=f"Stop {x},{y}"))
+                graph.edges.append(Edge(src=ids[0], dst=ids[1],
+                                        geometry=[graph.nodes[i].coord for i in ids],
+                                        lines=[Line(id=label, label=label, color=colour)]))
+    return graph
+
+
+def _fixture_page(into: Path, spurs: bool = False) -> str:
+    """Issue 53's network drawn with its names, with a geographic twin in which
+    every station has moved a little, and a train on every edge either side of
+    seven, so a capture at seven has trains; one more at ten makes the day."""
+    graph = _fixture_graph(spurs)
+    drawn = render(graph, style=Style(themed=True), title="Fixture")
+    moved = {nid: Node(id=nid, station_id=n.station_id, station_label=n.station_label,
+                       coord=(n.coord[0] + 0.4 * math.sin(i), n.coord[1] + 0.4 * math.cos(i)))
+             for i, (nid, n) in enumerate(sorted(graph.nodes.items()))}
+    twin = LineGraph(nodes=moved, edges=[
+        Edge(src=e.src, dst=e.dst, geometry=[moved[e.src].coord, moved[e.dst].coord], lines=e.lines)
+        for e in graph.edges])
+    geo = animate.geographic_tracks(twin, graph, drawn)
+    seven = 7 * 3600
+
+    def trip(name: str, edge: Edge, start: int, backwards: bool) -> Trip:
+        a, b = (edge.dst, edge.src) if backwards else (edge.src, edge.dst)
+        return Trip(name, edge.lines[0].label, "end",
+                    [Call(a, a, start, start + 10), Call(b, b, start + 200, start + 210)])
+
+    trips = [trip(f"t{i}", e, seven - 100 + 7 * i, i % 2 == 1) for i, e in enumerate(graph.edges)]
+    trips.append(trip("late", graph.edges[0], seven + 3 * 3600, False))
+    animation = animate.build(drawn, graph, trips, dt.date.fromisoformat(CARD_DATE), geo=geo)
+    assert animation.geo and len(animation.trips) == len(trips)
+    _, html = animate.write(animation, drawn.svg, into, stem="spurs" if spurs else "fixture",
+                            name="Fixture")
+    return html.as_uri()
+
+
+def _la_page(into: Path) -> str:
+    """Los Angeles's page from its stored layout, on its stored service day."""
+    found = pipeline.stored(CARD_KEY)
+    if found is None:
+        pytest.skip(f"needs the stored layout for {CARD_KEY}")
+    days = json.loads((site.SRC_DIR / "_data" / "service-days.json").read_text())
+    pipeline.run(CARD_KEY, layout=found.id, date=dt.date.fromisoformat(days[CARD_KEY]),
+                 out_dir=into)
+    return (into / f"{CARD_KEY}.html").as_uri()
+
+
+def _present(url: str, **query: str) -> str:
+    """A page's present-mode address, as the essay's figures open it."""
+    return url + "?" + "&".join(f"{k}={v}" for k, v in {"present": "1", **query}.items())
+
+
+# ---------------------------------------------------------------- the card
+
+# Each run opens an address at a preset's size, holds the clock, and reads the
+# card and the overlay before the card is put up, in the same task as setCard(true),
+# so a transition or an animation would still be under way, and after setCard(false).
+CARDED = BROWSER + r"""
+const read = () => {
+  const card = document.getElementById("present-card");
+  const style = el => {
+    const cs = getComputedStyle(el);
+    return { display: cs.display, visibility: cs.visibility, opacity: cs.opacity,
+             color: cs.color, background: cs.backgroundColor, family: cs.fontFamily,
+             size: parseFloat(cs.fontSize), weight: cs.fontWeight,
+             lineHeight: parseFloat(cs.lineHeight), marginTop: parseFloat(cs.marginTop),
+             wrap: cs.textWrapStyle || cs.textWrap, align: cs.textAlign };
+  };
+  const rects = list => [...list].map(r => ({ left: r.left, right: r.right, top: r.top, bottom: r.bottom }));
+  const lines = [...card.querySelectorAll(".words > *")].filter(el => !el.hidden).map(el => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    return { part: el.className, text: el.textContent, ...style(el), boxes: rects(range.getClientRects()) };
+  });
+  return {
+    card: style(card), scrim: style(card.querySelector(".scrim")),
+    words: style(card.querySelector(".words")), body: style(document.body), lines: lines,
+    motion: [card, ...card.querySelectorAll("*")].map(el => {
+      const cs = getComputedStyle(el);
+      return [cs.transitionDuration, cs.animationName];
+    }),
+    running: document.getAnimations().length,
+    overlay: [...document.querySelectorAll("#present-overlay .name, #present-overlay .time")]
+      .map(el => ({ hidden: el.hidden, visibility: getComputedStyle(el).visibility })),
+    state: window.__present.state().card,
+    attribute: document.documentElement.hasAttribute("data-card"),
+  };
+};
+main(async browser => {
+  const out = [];
+  for (const run of job.runs) {
+    const ctx = await browser.newContext({ viewport: run.viewport, reducedMotion: "no-preference" });
+    const page = await ctx.newPage();
+    const seen = { problems: [] };
+    page.on("pageerror", e => seen.problems.push(e.message));
+    await page.goto(run.url, { waitUntil: "load" });
+    await ready(page);
+    await page.evaluate(() => { window.__present.setCapture(true); window.__present.settle(); });
+    await page.evaluate(() => document.fonts && document.fonts.ready);
+    await page.evaluate("window.__read = " + read.toString());
+    seen.before = await page.evaluate(() => window.__read());
+    seen.on = await page.evaluate(() => { window.__present.setCard(true); return window.__read(); });
+    seen.off = await page.evaluate(() => { window.__present.setCard(false); return window.__read(); });
+    out.push(seen);
+    await ctx.close();
+  }
+  return out;
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_the_title_card_says_its_four_lines_inside_the_zones_and_cuts_in_and_out(tmp_path):
+    """The card adds no words: the city, the network, the service day as
+    service_day_text writes it and the caption, in that order, in --text and the
+    page's serif, at 11, 7, 5.6 and 5.6vmin, the city bold, the day and the
+    caption on a 1.3 line and the caption a line below the day. Every line of it
+    sits inside what the zones leave on the reel and the story. The overlay's
+    name and clock hide under it. It is whole the moment it is asked for and gone
+    the moment it is not: no transition, no animation."""
+    page = _fixture_page(tmp_path)
+    tokens = _tokens(PAGE.read_text(encoding="utf-8"))
+    runs, wanted = [], []
+    for name in ("instagram-reel", "instagram-story"):
+        preset = export.PRESETS[name]
+        zones = export.SAFE_ZONES[preset.zones]
+        for theme in ("dark", "light"):
+            url = export.url_for(CARD_KEY, preset, page=page, date=CARD_DATE, caption=CARD_CAPTION,
+                                 theme=theme, clock_corner="top-right", zones=zones, card=True)
+            runs.append({"url": url, "viewport": {"width": preset.width, "height": preset.height}})
+            wanted.append((preset, zones, "warm-dark" if theme == "dark" else "sepia"))
+    seen = _run(CARDED, {"runs": runs})
+    day = service_day_text(dt.date.fromisoformat(CARD_DATE))
+    assert day == "Saturday 5 September 2026"
+    for run, (preset, zones, theme) in zip(seen, wanted):
+        where = (preset.name, theme)
+        assert not run["problems"], (where, run["problems"])
+        before, on, off = run["before"], run["on"], run["off"]
+        # Down, then up, then down, each at once.
+        assert (before["card"]["display"], on["card"]["display"], off["card"]["display"]) == (
+            "none", "block", "none"), where
+        assert (before["state"], on["state"], off["state"]) == (False, True, False), where
+        assert (before["attribute"], on["attribute"], off["attribute"]) == (False, True, False)
+        assert on["running"] == 0, where
+        assert set(map(tuple, on["motion"])) == {("0s", "none")}, (where, on["motion"])
+        assert on["card"]["opacity"] == "1"
+        # The overlay's name and clock are drawn, hide under the card, and come back.
+        assert [o["visibility"] for o in before["overlay"]] == ["visible", "visible"], where
+        assert [o["visibility"] for o in on["overlay"]] == ["hidden", "hidden"], where
+        assert [o["visibility"] for o in off["overlay"]] == ["visible", "visible"], where
+
+        # The scrim: the ground at 0.75, over the whole frame.
+        assert on["scrim"]["background"] == _rgb(tokens[theme]["bg"]), where
+        assert on["scrim"]["opacity"] == "0.75", where
+        # Four lines, in order, saying what the address says and nothing more.
+        lines = on["lines"]
+        assert [(l["part"], l["text"]) for l in lines] == [
+            ("city", "Los Angeles"), ("network", "Metro Rail"), ("day", day),
+            ("caption", CARD_CAPTION)], where
+        vmin = min(preset.width, preset.height) / 100
+        for line, size in zip(lines, (11, 7, 5.6, 5.6)):
+            assert line["size"] == pytest.approx(size * vmin, abs=0.05), (where, line["part"])
+            assert line["color"] == _rgb(tokens[theme]["text"]), (where, line["part"])
+            assert line["family"] == on["body"]["family"], (where, line["family"])
+            assert line["weight"] == ("700" if line["part"] == "city" else "400"), where
+        for line in lines[2:]:
+            assert line["lineHeight"] == pytest.approx(1.3 * line["size"], abs=0.05), where
+        # One line's gap before the caption, at the caption's own line.
+        assert lines[3]["marginTop"] == pytest.approx(lines[3]["lineHeight"], abs=0.05)
+        assert on["words"]["wrap"] == "balance" and on["words"]["align"] == "center"
+        # Inside what the zones leave: off the sides, below the top zone, above
+        # the rail's top or the bottom zone, whichever is higher.
+        width, height = preset.width, preset.height
+        side = (zones.side or 0) * width
+        floor = min(1 - (zones.bottom or 0),
+                    zones.rail_top if zones.rail_width is not None else 1) * height
+        for line in lines:
+            assert line["boxes"], (where, line["part"])
+            for box in line["boxes"]:
+                assert box["left"] >= side - 0.5 and box["right"] <= width - side + 0.5, (
+                    where, line["part"], box)
+                assert box["top"] >= zones.top * height - 0.5, (where, line["part"], box)
+                assert box["bottom"] <= floor + 0.5, (where, line["part"], box, floor)
+
+
+def test_the_cards_colours_read_at_seven_to_one_on_its_scrim_over_white_and_black():
+    """Every colour on the card is --text, and on the scrim (--bg at its
+    opacity) over the brightest and the darkest map under it, it clears 7:1 in
+    both themes: the criterion names white under warm dark and black under
+    sepia, the two that are hardest; the other two are checked as well. Worked
+    out from the page's own stylesheet, so a colour or an opacity that moves
+    moves this."""
+    page = PAGE.read_text(encoding="utf-8")
+    tokens = _tokens(page)
+    rules = re.findall(r"\n  [^\n{]*#present-card[^{]*\{([^}]*)\}", page)
+    assert rules, "the card has no rules"
+    colours = set(re.findall(r"(?<![-\w])color:\s*([^;]+);", "".join(rules)))
+    assert colours == {"var(--text)"}, colours
+    scrim = re.search(r"#present-card \.scrim \{([^}]*)\}", page).group(1)
+    assert "background: var(--bg)" in scrim, scrim
+    opacity = float(re.search(r"opacity:\s*([\d.]+)", scrim).group(1))
+    assert opacity == 0.75
+    worst = {}
+    for theme, token in tokens.items():
+        for under in ("#ffffff", "#000000"):
+            ratio = _contrast(token["text"], _blend(token["bg"], under, opacity))
+            worst[(theme, under)] = round(ratio, 2)
+    print(worst)
+    assert worst[("warm-dark", "#ffffff")] >= 7 and worst[("sepia", "#000000")] >= 7, worst
+    assert min(worst.values()) >= 7, worst
+
+
+# --------------------------------------------------------------- the draw-in
+
+# Each run opens an address with or without reduced motion and takes its steps:
+# a script for the page, "look" or "html". A look reads every track of a shown
+# line (its marks, its length and its path), whether each dot and name of each
+# station shows, the trains, the seam's state, and how many marks of the draw-in
+# are anywhere in the drawing; "html" keeps the drawing's markup.
+DRAWING = BROWSER + r"""
+const look = page => page.evaluate(() => {
+  const P = window.__present, svg = document.querySelector("#stage svg");
+  const shows = el => getComputedStyle(el).visibility === "visible";
+  const names = JSON.parse(document.getElementById("data").textContent).linear.names || {};
+  const named = {};
+  for (const node of Object.keys(names)) named[names[node]] = node;
+  const place = el => (+el.getAttribute("cx")).toFixed(1) + " " + (+el.getAttribute("cy")).toFixed(1);
+  const nodeAt = {};
+  svg.querySelectorAll("#stations circle[data-node]")
+    .forEach(c => { nodeAt[place(c)] = c.getAttribute("data-node"); });
+  const stations = {};
+  const note = (node, kind, el) => {
+    if (!node || el.style.display === "none") return;
+    if (!stations[node]) stations[node] = { dots: [], names: [] };
+    stations[node][kind].push(shows(el));
+  };
+  svg.querySelectorAll("#linear-stations circle").forEach(c => note(nodeAt[place(c)], "dots", c));
+  svg.querySelectorAll("#linear-labels text").forEach(t => note(named[t.textContent], "names", t));
+  const tracks = [...svg.querySelectorAll("#lines path[data-src]")]
+    .filter(p => p.parentNode.style.display !== "none")
+    .map(p => ({ line: p.parentNode.getAttribute("data-line"), src: p.getAttribute("data-src"),
+                 dst: p.getAttribute("data-dst"), d: p.getAttribute("d"), shows: shows(p),
+                 undrawn: p.classList.contains("undrawn"), len: p.getTotalLength(),
+                 pathLength: p.getAttribute("pathLength"), dash: p.getAttribute("stroke-dasharray"),
+                 offset: p.hasAttribute("stroke-dashoffset") ? +p.getAttribute("stroke-dashoffset") : null }));
+  const s = P.state();
+  return { drawn: s.drawn, now: s.now, geo: s.geo, tracks: tracks, stations: stations,
+           trains: getComputedStyle(svg.querySelector("#trains")).visibility,
+           marks: svg.querySelectorAll(".undrawn, [pathLength], [stroke-dasharray], [stroke-dashoffset]").length
+                  + (svg.hasAttribute("class") ? 1 : 0) };
+});
+main(async browser => {
+  const out = [];
+  for (const run of job.runs) {
+    const ctx = await browser.newContext({ viewport: { width: 1080, height: 1350 },
+                                           reducedMotion: run.reduce ? "reduce" : "no-preference" });
+    const page = await ctx.newPage();
+    const seen = { problems: [], looks: [], html: [] };
+    page.on("pageerror", e => seen.problems.push(e.message));
+    await page.goto(run.url, { waitUntil: "load" });
+    await ready(page);
+    for (const step of run.steps) {
+      if (step === "look") seen.looks.push(await look(page));
+      else if (step === "html") {
+        seen.html.push(await page.evaluate(() => document.querySelector("#stage svg").outerHTML));
+      }
+      else await page.evaluate(step);
+    }
+    out.push(seen);
+    await ctx.close();
+  }
+  return out;
+}).catch(fail);
+"""
+
+HOLD = "window.__present.setCapture(true); window.__present.settle()"
+
+
+def _drawing(runs: list[dict]) -> list[dict]:
+    seen = _run(DRAWING, {"runs": runs})
+    for run in seen:
+        assert not run["problems"], run["problems"]
+    return seen
+
+
+def _steps_through(fractions: list[float]) -> list[str]:
+    return [step for f in fractions for step in (f"window.__present.setDrawn({f!r})", "look")]
+
+
+def _shown_of(track: dict) -> float:
+    """How much of a track shows, read off its marks: 0 hidden by the class and
+    nothing else, 1 with no mark at all, and between them one dash of pathLength
+    1, whose offset says which end it is drawn from."""
+    if track["undrawn"]:
+        assert not track["shows"] and track["dash"] is None and track["offset"] is None, track
+        return 0.0
+    assert track["shows"], track
+    if track["offset"] is None:
+        assert track["dash"] is None and track["pathLength"] is None, track
+        return 1.0
+    assert (track["pathLength"], track["dash"]) == ("1", "1 1"), track
+    offset = track["offset"]
+    shown = 1 - offset if offset > 0 else 1 + offset
+    # Never a dash of nothing, which a round cap paints as a dot, nor one of all.
+    assert 0 < shown < 1, track
+    return shown
+
+
+def _from(track: dict) -> str:
+    """The end a dashed track is drawn from: its src for an offset of 1 - q."""
+    return track["src"] if track["offset"] > 0 else track["dst"]
+
+
+def _due(f: float, k: int, n: int) -> float:
+    """Where line k of n should be at fraction f: half the beat each, the starts
+    spread evenly over the other half, linear."""
+    return f if n == 1 else min(1.0, max(0.0, (f - k * 0.5 / (n - 1)) / 0.5))
+
+
+def _hops(graph: LineGraph) -> dict[str, dict[str, int]]:
+    """Each line's nodes by their count of edges from where it starts drawing:
+    its spine's first end, then the first node of any row no earlier start
+    reached (a piece of its own). On a tree the nearer end of an edge in hops
+    is the nearer in length."""
+    out = {}
+    for line in linear_layout(graph).lines:
+        adj, _ = adjacency_for(graph, line.label)
+        hops: dict[str, int] = {}
+        for row in line.rows:
+            start = row.nodes[0][0]
+            if start in hops:
+                continue
+            hops[start] = 0
+            queue = [start]
+            while queue:
+                here = queue.pop(0)
+                for there in sorted(adj[here]):
+                    if there not in hops:
+                        hops[there] = hops[here] + 1
+                        queue.append(there)
+        out[line.label] = hops
+    return out
+
+
+def _check_drawing(looks: list[dict], fractions: list[float], *, hops=None,
+                   chains: tuple[str, ...] = (), names: bool = True) -> None:
+    """What each look at each fraction must show: the lines in stacking order,
+    none whole before half way, each line's drawn share of its length at its due
+    where it is a simple chain, every dashed track drawn from its nearer end, a
+    station's dots and names shown exactly where a drawn track has reached it,
+    the trains held back, and at 1 nothing of the draw-in left."""
+    order = []
+    for t in looks[0]["tracks"]:
+        if t["line"] not in order:
+            order.append(t["line"])
+    n = len(order)
+    for look, f in zip(looks, fractions):
+        assert look["drawn"] == pytest.approx(f), (f, look["drawn"])
+        if f >= 1:
+            assert look["marks"] == 0 and look["trains"] == "visible", f
+            assert all(t["shows"] for t in look["tracks"])
+            continue
+        assert look["trains"] == "hidden", f
+        reached: set[str] = set()
+        lengths: dict[str, list[float]] = {line: [0.0, 0.0] for line in order}
+        whole = {line: True for line in order}
+        for t in look["tracks"]:
+            shown = _shown_of(t)
+            lengths[t["line"]][0] += shown * t["len"]
+            lengths[t["line"]][1] += t["len"]
+            whole[t["line"]] &= shown == 1
+            if shown == 1:
+                reached |= {t["src"], t["dst"]}
+            elif shown > 0:
+                reached.add(_from(t))
+                if hops is not None:
+                    near = hops[t["line"]]
+                    nearer = t["src"] if near[t["src"]] < near[t["dst"]] else t["dst"]
+                    assert _from(t) == nearer, (f, t["line"], t["src"], t["dst"], t["offset"])
+        for k, line in enumerate(order):
+            if f < 0.5:
+                assert not whole[line], (f, line)
+            if line in chains:
+                got, total = lengths[line]
+                assert got / total == pytest.approx(_due(f, k, n), abs=0.01), (f, line, got / total)
+        for node, station in look["stations"].items():
+            shows = station["dots"] + (station["names"] if names else [])
+            assert shows and all(s == (node in reached) for s in shows), (f, node, station)
+
+
+@needs_browser
+def test_the_network_draws_in_line_by_line_and_ends_on_the_map_it_was(tmp_path):
+    """Issue 53's four lines over sixty steps. At 0 the ground is bare; no line is
+    whole before half way; each line's drawn share moves linearly from its own
+    start, half the beat long, the starts spread over the other half; a track is
+    drawn from its nearer end and a station shows when the first pen reaches it;
+    the trains and the clock hold. At 1 the drawing's markup is what it was
+    before the draw-in began, and the clock runs again."""
+    graph = _fixture_graph()
+    fractions = [i / 60 for i in range(61)]
+    [run] = _drawing([{"url": _present(_fixture_page(tmp_path), at="07:00"), "steps": [
+        HOLD, "html", "look", "window.__present.setDrawn(0)", "look",
+        "window.__present.advance(0.5)", "look", *_steps_through(fractions[1:]),
+        "html", "window.__present.advance(0.5)", "look"]}])
+    plain, bare, held, *steps, after = run["looks"]
+    assert plain["drawn"] == 1 and plain["marks"] == 0
+    assert len(steps) == 60
+    # Bare ground: nothing of the network shows, and the clock does not move.
+    assert bare["drawn"] == 0 and not any(t["shows"] for t in bare["tracks"])
+    assert not any(any(s["dots"] + s["names"]) for s in bare["stations"].values())
+    assert held["now"] == bare["now"] == plain["now"]
+    assert steps[-2]["now"] == plain["now"]
+    _check_drawing([bare] + steps, fractions, hops=_hops(graph), chains=("A", "B", "C", "D"))
+    # The stacking order is the map's: with no order given, its lines A to Z.
+    assert list(dict.fromkeys(t["line"] for t in plain["tracks"])) == ["A", "B", "C", "D"]
+    # At 1 the drawing is the one it was, attribute for attribute.
+    before, finished = run["html"]
+    assert finished == before
+    assert after["now"] > plain["now"], "the clock did not run again once the network was whole"
+
+
+@needs_browser
+def test_a_branch_starts_at_its_junction_and_a_piece_at_its_own_first_station(tmp_path):
+    """E forks at its third station and S is two pieces: each drawn alone, so
+    its pen is the fraction itself. The spur stays hidden until the pen has
+    reached the junction and is then drawn away from it; both of S's pieces
+    start at once, each from the first station of its own row."""
+    graph = _fixture_graph(spurs=True)
+    hops = _hops(graph)
+    url = _present(_fixture_page(tmp_path, spurs=True), at="07:00")
+    fractions = [i / 40 for i in range(41)]
+    runs = _drawing([{"url": url, "steps": [f'window.__present.setRoutes(["{line}"])', HOLD,
+                                             *_steps_through(fractions)]}
+                     for line in ("E", "S")])
+    fork, pieces = (run["looks"] for run in runs)
+    _check_drawing(fork, fractions, hops=hops)
+    _check_drawing(pieces, fractions, hops=hops)
+
+    spur = {"x5y12", "x5y14"}
+    other_end = lambda t: t["src"] if t["dst"] == "x5y12" else t["dst"]
+    trunk_to_junction = [t for t in fork[0]["tracks"] if "x5y12" in (t["src"], t["dst"])
+                         and {t["src"], t["dst"]} != spur
+                         and hops["E"][other_end(t)] < hops["E"]["x5y12"]]
+    assert len(trunk_to_junction) == 1
+    drawn_from_junction = 0
+    for look in fork[:-1]:
+        by_ends = {frozenset((t["src"], t["dst"])): t for t in look["tracks"]}
+        branch = by_ends[frozenset(spur)]
+        into = by_ends[frozenset((trunk_to_junction[0]["src"], trunk_to_junction[0]["dst"]))]
+        if _shown_of(into) < 1:
+            assert _shown_of(branch) == 0, look["drawn"]
+        elif _shown_of(branch) > 0 and _shown_of(branch) < 1:
+            assert _from(branch) == "x5y12"
+            drawn_from_junction += 1
+    assert drawn_from_junction >= 3
+
+    firsts = {row.nodes[0][0] for line in linear_layout(graph).lines if line.label == "S"
+              for row in line.rows}
+    assert len(firsts) == 2
+    for look in pieces[1:-1]:
+        assert len(look["tracks"]) == 2
+        assert all(0 < _shown_of(t) < 1 for t in look["tracks"]), look["drawn"]
+        assert {_from(t) for t in look["tracks"]} == firsts
+
+
+@needs_browser
+def test_a_track_keeps_its_dash_while_the_view_morphs_under_it(tmp_path):
+    """Drawn in on the geographic view and morphed to the schematic one at the
+    same fraction: the paths move and not one mark does, because each dash is a
+    share of its own track (pathLength 1) and the distances were measured once."""
+    url = _present(_fixture_page(tmp_path), at="07:00", view="geographic")
+    marks = lambda look: [(t["undrawn"], t["pathLength"], t["dash"], t["offset"])
+                          for t in look["tracks"]]
+    [run] = _drawing([{"url": url, "steps": [
+        HOLD, "window.__present.setDrawn(0.4)", "look", "window.__present.setGeo(false, 1)",
+        *["window.__present.advance(0.25)", "look"] * 4,
+        "window.__present.setDrawn(0.4)", "look"]}])
+    first, *moving, last = run["looks"]
+    assert first["geo"] == 1 and moving[0]["geo"] < 1 and last["geo"] == 0
+    assert any(0 < _shown_of(t) < 1 for t in first["tracks"])
+    for look in moving + [last]:
+        assert marks(look) == marks(first), look["geo"]
+    assert [t["d"] for t in last["tracks"]] != [t["d"] for t in first["tracks"]]
+
+
+@needs_browser
+def test_reduced_motion_shows_the_network_whole_unless_a_capture_asks(tmp_path):
+    """A page nobody is capturing, present or not, shows the finished network
+    under reduced motion whatever fraction it is given, trains included; the
+    moment a capture runs it draws the fraction asked, and gives it back after.
+    Without the preference the fraction is drawn either way."""
+    page = _fixture_page(tmp_path)
+    steps = ["window.__present.setDrawn(0.3)", "look", "window.__present.setCapture(true)", "look",
+             "window.__present.setDrawn(0.6)", "look", "window.__present.setCapture(false)", "look"]
+    runs = _drawing([{"url": _present(page), "reduce": True, "steps": steps},
+                     {"url": page, "reduce": True, "steps": steps},
+                     {"url": _present(page), "reduce": False, "steps": steps}])
+    for run in runs[:2]:
+        loose, captured, further, released = run["looks"]
+        assert (loose["drawn"], loose["marks"], loose["trains"]) == (1, 0, "visible")
+        assert captured["drawn"] == 0.3 and captured["marks"] > 0 and captured["trains"] == "hidden"
+        assert further["drawn"] == 0.6 and further["marks"] > 0
+        assert (released["drawn"], released["marks"], released["trains"]) == (1, 0, "visible")
+    plain = runs[2]["looks"]
+    assert [look["drawn"] for look in plain] == [0.3, 0.3, 0.6, 0.6]
+    assert all(look["marks"] > 0 for look in plain)
+
+
+@needs_browser
+def test_the_rows_and_the_chart_show_the_network_whole(tmp_path):
+    """A draw-in is the map's and the geographic view's: on the rows and the
+    chart the page shows the network whole (and export.plan refuses a draw-in
+    there), and back on the map the fraction asked for is drawn again."""
+    [run] = _drawing([{"url": _present(_fixture_page(tmp_path), at="07:00"), "steps": [
+        HOLD, "window.__present.setDrawn(0.3)", "look",
+        'window.__present.setView("linear", 0.5)', "look",
+        'window.__present.setView("string", 0.5)', "look",
+        'window.__present.setView("map", 0.5)', "look"]}])
+    drawn, rows, chart, back = run["looks"]
+    assert drawn["drawn"] == 0.3 and drawn["marks"] > 0
+    for look in (rows, chart):
+        assert (look["drawn"], look["marks"], look["trains"]) == (1, 0, "visible")
+    assert back["drawn"] == 0.3 and back["marks"] > 0
+
+
+@needs_browser
+def test_los_angeles_draws_in_with_no_line_whole_before_half_and_ends_on_its_map(tmp_path):
+    """The criterion's network, behind the stored layout: its lines over sixty
+    steps, none whole before half way, every station shown where a pen has
+    reached it, and at 1 the drawing's markup as it was."""
+    fractions = [i / 60 for i in range(61)]
+    [run] = _drawing([{"url": _present(_la_page(tmp_path), at="07:00"), "steps": [
+        HOLD, "html", "window.__present.setDrawn(0)", "look",
+        *_steps_through(fractions[1:]), "html"]}])
+    looks = run["looks"]
+    assert len({t["line"] for t in looks[0]["tracks"]}) >= 6
+    # Names are the feed's, and two stations can share one, so dots alone here.
+    _check_drawing(looks, fractions, names=False)
+    before, finished = run["html"]
+    assert finished == before
+
+
+def _frames(folder: Path) -> list:
+    from PIL import Image
+    return [Image.open(p).convert("RGB") for p in sorted(folder.glob("*.png"))]
+
+
+def _apart(a, b) -> int:
+    """The largest difference of any channel of any pixel, in RGB."""
+    from PIL import ImageChops
+    return max(band[1] for band in ImageChops.difference(a, b).getextrema())
+
+
+@needs_browser
+@pytest.mark.parametrize("where, card, draw_in", [("fixture", 1, 2), ("la-metro-rail", 2, 6)])
+def test_a_card_and_a_draw_in_capture_alike_twice_and_end_on_the_plain_map(
+        where, card, draw_in, tmp_path):
+    """[card at 07:00 speed 0, draw-in at 60x, a second of the map] through the
+    engine's own recorder at 30 fps, twice: the two agree within the
+    determinism tolerance frame for frame, every frame of the card agrees with
+    its first, and the draw-in's last frame agrees with a still of the plain map
+    at the same clock. On Los Angeles it is the criterion's own list, a 2 s card
+    and a 6 s draw-in; the fixture's is the shortest the plan allows, so the
+    suite stays quick. The capture is a quarter of the reel's size, which is the
+    same frame at a quarter of the pixels."""
+    page = _fixture_page(tmp_path) if where == "fixture" else _la_page(tmp_path)
+    # The draw-in runs at 60x, so its last frame is the plain map at 07:00 only
+    # because the clock holds while the network draws in.
+    beats = [{"secs": card, "view": "map", "at": "07:00", "speed": 0, "card": True},
+             {"secs": draw_in, "draw_in": True, "speed": 60}, {"secs": 1}]
+    job = export.plan(CARD_KEY, "instagram-reel", page=page, date=CARD_DATE, quality="draft",
+                      storyboard=beats)
+    assert [b.get("card", False) for b in job.beats] == [True, False, False]
+    assert [b.get("draw_in", False) for b in job.beats] == [False, True, False]
+    size = {"width": job.width // 4, "height": job.height // 4}
+    runs = []
+    for name in ("first", "second"):
+        frames = tmp_path / name
+        export._run_recorder({**job.recorder_job(frames=frames), **size})
+        runs.append(_frames(frames))
+    first, second = runs
+    carded, drawing = 30 * card, 30 * draw_in
+    assert len(first) == len(second) == carded + drawing + 30
+    worst = max(_apart(a, b) for a, b in zip(first, second))
+    still_card = max(_apart(first[0], frame) for frame in first[:carded])
+    # The recorder's still of the same address at the same clock: no card and
+    # no draw-in asked, so the plain map with its overlay.
+    still = tmp_path / "plain.png"
+    export._run_recorder({"url": job.url, **size, "scale": job.scale, "fps": job.fps,
+                          "format": "png", "settle": job.settle, "mode": "still",
+                          "at": 7 * 3600, "out": str(still)})
+    from PIL import Image
+    plain = Image.open(still).convert("RGB")
+    end = _apart(first[carded + drawing - 1], plain)
+    bare = first[carded]
+    print(f"\n{where}: two runs apart by {worst}, the card by {still_card}, the draw-in's last "
+          f"frame and the plain map by {end}; bare ground and the map by {_apart(bare, plain)}")
+    assert worst <= DRIFT and still_card <= DRIFT and end <= DRIFT
+    # And something was drawn: the draw-in opens on bare ground, under the card before it.
+    assert _apart(bare, plain) > 4 * DRIFT
+    assert _apart(first[0], bare) > 4 * DRIFT
+    # The same card with no draw-in after it sits over the map in place instead.
+    over = tmp_path / "over"
+    alone = export.plan(CARD_KEY, "instagram-reel", page=page, date=CARD_DATE, quality="draft",
+                        storyboard=beats[:1])
+    export._run_recorder({**alone.recorder_job(frames=over), **size})
+    assert _apart(_frames(over)[0], first[0]) > 4 * DRIFT
