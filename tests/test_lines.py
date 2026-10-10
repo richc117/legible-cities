@@ -392,3 +392,298 @@ def test_los_angeles_with_k_hidden_pairs_every_drawn_track(tmp_path):
     assert "K" not in result.render.colors
     assert len(result.animation.geo.tracks) == len(result.render.tracks)
     assert len(result.animation.geo.nodes) == len(result.graph.stations)
+
+
+# ------------------------------------------- width, casing and dash (issue 55)
+#
+# A line's own stroke: ``width`` (0.75 to 1.5) and a ``casing`` either side
+# (``{width, color}``, 0 to 1 a side), both multiples of ``line_width``, and a
+# ``dash``. A line's slot is ``(w + 2c) * line_width`` and the lines beside it
+# on its own edges move out to make it (``offsets.slot_offsets``).
+
+# n0 -A,C- n1 -A,B- n2 -A,B,C- n3 -B,C- n4 -A,C- n5: B runs on the middle three
+# edges, and the first and last carry two lines B never shares, so a width that
+# leaked onto every edge would move them.
+STROKED = [[("A", "0072bc"), ("C", "00933c")], [("A", "0072bc"), ("B", "ff6319")],
+           [("A", "0072bc"), ("B", "ff6319"), ("C", "00933c")],
+           [("B", "ff6319"), ("C", "00933c")], [("A", "0072bc"), ("C", "00933c")]]
+CASED = {"width": 1.5, "casing": {"width": 0.5, "color": "#101010"}, "dash": "dashed"}
+
+
+def _paths(svg: str) -> dict[str, str]:
+    """Every track's path data, by its element id."""
+    return dict(re.findall(r'<path id="([^"]+)" data-src="[^"]*" data-dst="[^"]*" d="([^"]+)"',
+                           svg))
+
+
+def _group(svg: str, label: str) -> tuple[str, str]:
+    """A line's group: its opening tag and what is inside it."""
+    found = re.search(rf'(<g class="line" data-line="{label}"[^>]*>)(.*?)</g>', svg, re.S)
+    assert found, label
+    return found.group(1), found.group(2)
+
+
+def _offset(track: list[tuple[float, float]], centre: list[tuple[float, float]]) -> float:
+    """How far a straight track lies from its edge's centreline, signed to the
+    left of travel."""
+    (x0, y0), (x1, y1) = centre[0], centre[-1]
+    length = math.hypot(x1 - x0, y1 - y0)
+    px, py = track[0]
+    return ((x1 - x0) * (py - y0) - (y1 - y0) * (px - x0)) / length
+
+
+@pytest.mark.parametrize("chosen", [{"width": 1.5}, {"casing": {"width": 0.5, "color": "#101010"}},
+                                    CASED], ids=["width", "casing", "all-three"])
+def test_a_width_or_casing_moves_tracks_only_on_the_edges_its_line_runs_on(chosen):
+    """B widened or cased: on the two edges B never runs on every path is the
+    one the plain map draws, byte for byte; on B's own edges B keeps its centre
+    and the lines beside it move out by half its extra room."""
+    graph = _graph(STROKED)
+    style = Style()
+    strokes = render_module.line_strokes({"B": chosen})
+    plain = render(graph, style=style, labels=False)
+    wide = render(graph, style=style, labels=False, strokes=strokes)
+    before, after = _paths(plain.svg), _paths(wide.svg)
+    assert set(before) == set(after)
+    extra = (strokes["B"].slot - 1) * style.line_width
+    moved = 0
+    for e in graph.edges:
+        centre = [plain.projection(c) for c in e.geometry]
+        for line in e.lines:
+            key = (line.label, e.src, e.dst)
+            eid = plain.tracks[key].element_id
+            if "B" not in e.line_labels or line.label == "B":
+                # Off B's edges, and B itself, nothing moved.
+                assert after[eid] == before[eid], (key, chosen)
+                continue
+            shift = _offset(wide.tracks[key].points, centre) - _offset(plain.tracks[key].points,
+                                                                       centre)
+            i, j = e.line_labels.index(line.label), e.line_labels.index("B")
+            assert shift == pytest.approx(extra / 2 * (1 if i > j else -1), abs=1e-9), key
+            moved += 1
+    assert moved == 4
+
+
+def test_a_line_is_drawn_at_its_width_and_dash_over_one_casing_per_track():
+    """B at 1.5 with a casing of 0.5 a side, dashed: its group strokes 10.5 and
+    dashes 10.5 on and 21 off (2t on and t off with the round caps); before its
+    tracks it holds one use of each of them, in the casing's colour at the
+    slot's width, 17.5, and undashed. No other group has a use or a dash."""
+    graph = _graph(STROKED)
+    r = render(graph, style=Style(), labels=False,
+               strokes=render_module.line_strokes({"B": CASED}))
+    tag, body = _group(r.svg, "B")
+    assert 'stroke-width="10.50"' in tag and 'stroke-dasharray="10.50 21.00"' in tag
+    tracks = [tp.element_id for tp in r.tracks.values() if tp.label == "B"]
+    assert len(tracks) == 3
+    children = re.findall(r"<(use|path)\b([^>]*)/>", body)
+    assert [kind for kind, _ in children] == ["use"] * 3 + ["path"] * 3
+    for (_, use), eid in zip(children, tracks):
+        assert use == (f' href="#{eid}" stroke="#101010" stroke-width="17.50" '
+                       f'stroke-dasharray="none"')
+    assert [re.search(r'id="([^"]+)"', attrs).group(1) for _, attrs in children[3:]] == tracks
+    for label in ("A", "C"):
+        tag, body = _group(r.svg, label)
+        assert tag == f'<g class="line" data-line="{label}" stroke="{r.colors[label]}" ' \
+                      f'stroke-width="7.00">'
+        assert "<use" not in body
+    assert r.svg.count("<use") == 3 and r.svg.count("stroke-dasharray") == 4
+
+
+@pytest.mark.parametrize("dash, width, wanted", [
+    ("dashed", 1, "7.00 14.00"), ("dotted", 1, "0 11.20"), ("dashed", 0.75, "5.25 10.50"),
+    ("dotted", 1.5, "0 16.80"), ("solid", 1.5, None)])
+def test_a_dash_scales_with_the_lines_own_stroke(dash, width, wanted):
+    """Dashed is t on and 2t off, dotted 0 on and 1.6t off, t the line's own
+    stroke, and solid writes no dash at all."""
+    graph = _graph(STROKED)
+    r = render(graph, labels=False,
+               strokes=render_module.line_strokes({"A": {"width": width, "dash": dash}}))
+    tag, _ = _group(r.svg, "A")
+    assert f'stroke-width="{7 * width:.2f}"' in tag
+    found = re.search(r'stroke-dasharray="([^"]+)"', tag)
+    assert (found.group(1) if found else None) == wanted
+
+
+def test_choosing_the_defaults_draws_what_choosing_nothing_draws():
+    """Width 1, a casing of width 0 and solid are no stroke at all: the map is
+    the plain one byte for byte, with labels, and so are both thumbnails."""
+    graph = _graph(STROKED)
+    defaults = {"width": 1, "casing": {"width": 0, "color": "#101010"}, "dash": "solid"}
+    assert render_module.line_strokes({"A": defaults, "B": {}, "C": {"name": "Sea"}}) == {}
+    plain = render(graph, title="Plain")
+    assert render(graph, title="Plain",
+                  strokes=render_module.line_strokes({"A": defaults})).svg == plain.svg
+    assert thumbnail.draw(graph, strokes=render_module.line_strokes({"A": defaults})) == \
+        thumbnail.draw(graph)
+
+
+def test_labels_markers_and_the_canvas_keep_clear_of_a_widened_slot():
+    """A cased line's room reaches past a plain one's: the drawing's boxes
+    grow to hold it, and a tick on it stands TICK of its slot past the slot's
+    edge, as a tick on a plain line stands past the line's."""
+    graph = _graph([[("A", "0072bc")], [("A", "0072bc")]])
+    style = Style(station_shape="tick")
+    plain = render(graph, style=style)
+    cased = render(graph, style=style, strokes=render_module.line_strokes(
+        {"A": {"width": 1.5, "casing": {"width": 1, "color": "#101010"}}}))
+
+    def box(svg: str, attribute: str) -> list[float]:
+        return [float(v) for v in re.search(rf'{attribute}="([^"]+)"', svg).group(1).split()]
+
+    assert box(cased.svg, "data-viewbox-nolabels")[3] > box(plain.svg, "data-viewbox-nolabels")[3]
+
+    def reach(svg: str) -> float:
+        """How far the tick at n1 reaches across its line (which runs east),
+        from the corners its relative steps walk."""
+        d = re.search(r'<path d="M [-\d.]+ [-\d.]+ ([^"]*) z" fill="[^"]+" data-node="n1"',
+                      svg).group(1)
+        y, far = 0.0, 0.0
+        for _, dy in re.findall(r"[ml] ([-\d.]+) ([-\d.]+)", d):
+            y += float(dy)
+            far = max(far, abs(y))
+        return far
+
+    # A tick reaches from the line's middle to half its size and TICK more.
+    assert reach(plain.svg) == pytest.approx(7 / 2 + 0.66 * 7, abs=0.02)
+    assert reach(cased.svg) == pytest.approx(3.5 * 7 / 2 + 0.66 * 3.5 * 7, abs=0.02)
+
+
+def test_the_thumbnails_draw_a_lines_width_casing_and_dash():
+    """At the thumbnail's own line width (2.8), B at 1.5 is 4.2, dashed 4.2 on
+    and 8.4 off, over its casing at 2.5 lines, 7; A and C are as they were."""
+    graph = _graph(STROKED)
+    plain = thumbnail.draw(graph)
+    drawn = thumbnail.draw(graph, strokes=render_module.line_strokes({"B": CASED}))
+    for theme, picture in drawn.items():
+        group = re.search(r'<g stroke="#ff6319"[^>]*>.*?</g>', picture).group(0)
+        assert group.startswith('<g stroke="#ff6319" stroke-width="4.2" '
+                                'stroke-dasharray="4.2 8.4"><path d="')
+        casing, own = re.findall(r"<path ([^>]*)/>", group)
+        assert casing.endswith(' stroke="#101010" stroke-width="7" stroke-dasharray="none"')
+        assert casing.split(" stroke=")[0] == own
+        for colour in ("#0072bc", "#00933c"):
+            assert re.search(rf'<g stroke="{colour}" stroke-width="2.8"><path d=', picture)
+        assert picture != plain[theme]
+
+
+# The wire: each field's bounds, and a refusal that names it by its path.
+GOOD_STROKES = [{"width": 0.75}, {"width": 1.5}, {"width": 1}, {"dash": "dotted"},
+                {"casing": {"width": 0, "color": "#000000"}},
+                {"casing": {"width": 1, "color": "#ABCDEF"}},
+                {"name": "Bay", "hidden": False, **CASED}]
+BAD_STROKES = [
+    ({"width": 0.74}, "lines['A'].width must be from 0.75 to 1.5, as a multiple of line_width"),
+    ({"width": 1.51}, "lines['A'].width must be from 0.75 to 1.5"),
+    ({"width": float("nan")}, "lines['A'].width must be from"),
+    ({"width": "1"}, "lines['A'].width must be from"),
+    ({"width": True}, "lines['A'].width must be from"),
+    ({"width": None}, "lines['A'].width must be from"),
+    ({"casing": {"width": -0.01, "color": "#000000"}},
+     "lines['A'].casing.width must be from 0 to 1, as a multiple of line_width on each side"),
+    ({"casing": {"width": 1.01, "color": "#000000"}}, "lines['A'].casing.width must be from 0"),
+    ({"casing": {"width": 0.5, "color": "black"}},
+     "lines['A'].casing.color must be a colour written #rrggbb"),
+    ({"casing": {"width": 0.5, "color": "#000000\n"}}, "lines['A'].casing.color must be"),
+    ({"casing": {"width": 0.5}}, "lines['A'].casing must have both width and color"),
+    ({"casing": {"color": "#000000"}}, "lines['A'].casing must have both width and color"),
+    ({"casing": {"width": 0.5, "color": "#000000", "dash": "dotted"}},
+     "lines['A'].casing must be an object of width and color"),
+    ({"casing": 0.5}, "lines['A'].casing must be an object of width and color"),
+    ({"dash": "dash-dot"}, "lines['A'].dash must be solid, dashed or dotted"),
+    ({"dash": None}, "lines['A'].dash must be solid, dashed or dotted"),
+    ({"stroke": 2}, "lines['A'] does not take stroke"),
+]
+
+
+@pytest.mark.parametrize("chosen", GOOD_STROKES)
+def test_a_stroke_inside_its_bounds_is_taken_and_the_schema_agrees(chosen):
+    from test_serve import check
+    assert serve._lines({"lines": {"A": chosen}}) == {"A": chosen}
+    check({"key": KEY, "layout": LAYOUT, "date": DAY.isoformat(), "lines": {"A": chosen}},
+          "MapBuildParams")
+
+
+@pytest.mark.parametrize("chosen, sentence", BAD_STROKES)
+def test_a_stroke_out_of_bounds_is_refused_naming_its_field_and_the_schema_agrees(
+        chosen, sentence):
+    from test_serve import invalid
+    with pytest.raises(JsonRpcInvalidParams) as caught:
+        serve._lines({"lines": {"A": chosen}})
+    assert caught.value.data["kind"] == "params"
+    assert caught.value.data["hint"].startswith(sentence), caught.value.data["hint"]
+    # Two the schema cannot see: JSON has no NaN, and Python's jsonschema reads
+    # a pattern with re.search, which takes a trailing newline (issue 57).
+    if chosen.get("width") == chosen.get("width") and r"\n" not in json.dumps(chosen):
+        assert invalid({"key": KEY, "layout": LAYOUT, "date": DAY.isoformat(),
+                        "lines": {"A": chosen}}, "MapBuildParams")
+
+
+def test_the_bounds_are_one_table_with_the_schemas():
+    from test_serve import SCHEMA
+    options = SCHEMA["$defs"]["LineOptions"]["properties"]
+    casing = SCHEMA["$defs"]["LineCasing"]
+    assert (options["width"]["minimum"], options["width"]["maximum"]) == \
+        render_module.LINE_WIDTH_RANGE
+    assert (casing["properties"]["width"]["minimum"], casing["properties"]["width"]["maximum"]) \
+        == render_module.CASING_WIDTH_RANGE
+    assert options["dash"]["enum"] == list(render_module.LINE_DASHES)
+    assert casing["required"] == ["width", "color"]
+
+
+def test_a_python_caller_is_refused_a_stroke_the_server_would_refuse():
+    for bad in ({"width": 2}, {"dash": "dash-dot"}, {"casing": {"width": 2, "color": "#000000"}},
+                {"casing": {"width": 0.5, "color": "black"}}):
+        with pytest.raises(ValueError):
+            render_module.line_strokes({"A": bad})
+
+
+def test_the_pipeline_draws_a_drawn_lines_stroke_and_drops_a_hidden_ones(stand, tmp_path):
+    """Through ``pipeline.run``: B's stroke reaches its group, and a stroke on
+    a hidden line or a label the layout does not carry changes nothing."""
+    _, plain, _, _ = stand.run(tmp_path / "plain", date=DAY)
+    _, svg, _, _ = stand.run(tmp_path / "out", date=DAY, lines={"B": CASED})
+    assert 'stroke-width="10.50" stroke-dasharray="10.50 21.00"' in _group(svg, "B")[0]
+    assert svg.count("<use ") == 3
+    _, hidden, _, _ = stand.run(tmp_path / "hidden", date=DAY,
+                                lines={"B": {"hidden": True, **CASED}, "Z": CASED})
+    _, without, _, _ = stand.run(tmp_path / "without", date=DAY, lines={"B": {"hidden": True}})
+    assert hidden == without and "<use" not in hidden
+    assert plain != svg
+
+
+def test_map_build_draws_the_strokes_into_the_thumbnails(tmp_path, monkeypatch):
+    """The server hands the lines' strokes to the thumbnails it writes beside
+    the page, drawn from the graph the pipeline answers, as it hands the
+    colours and the order. Stood in as test_serve's thumbnail test is."""
+    from types import SimpleNamespace
+
+    from test_serve import NO_LAYOUT, Client, check
+
+    from schematic import config, diagnostics
+    monkeypatch.setenv(config.ENV, str(tmp_path))
+    graph = _graph(STROKED)
+    diag = diagnostics.Diagnostics(
+        key="p9", name="Nine", date=DAY, stations=6, junctions=0, edges=5, lines=("A", "B", "C"),
+        octilinear=1.0, stops=diagnostics.StopMatching(6, 6, 6, 0, 0, ()), trips_total=0,
+        paths=0, unrouted=0, skipped_calls=0, borrowed_track=0, labels_dropped=0,
+        peak_concurrent=0)
+
+    def stood_in(key, **kwargs):
+        kwargs["out_dir"].mkdir(parents=True)
+        return SimpleNamespace(layout=NO_LAYOUT, date=DAY, graph=graph, diagnostics=lambda: diag)
+
+    monkeypatch.setattr(pipeline, "run", stood_in)
+    client = Client()
+    try:
+        response = client.call("map.build", {"key": "la-metro-rail", "layout": NO_LAYOUT,
+                                             "date": DAY.isoformat(), "out": "p9",
+                                             "lines": {"B": CASED}})
+    finally:
+        client.endpoint.close()
+    assert "result" in response, response
+    check(response["result"], "MapBuildResult")
+    drawn = thumbnail.draw(graph, strokes=render_module.line_strokes({"B": CASED}))
+    for theme in ("dark", "light"):
+        written = Path(response["result"]["files"][f"thumb_{theme}"]).read_text(encoding="utf-8")
+        assert written == drawn[theme] != thumbnail.draw(graph)[theme]

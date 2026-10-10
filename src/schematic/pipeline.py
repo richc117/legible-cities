@@ -37,7 +37,7 @@ from . import __version__, animate, config, feeds, loom
 from . import diagnostics as diagnostics_module
 from .crs import to_mercator
 from .linegraph import LineGraph
-from .render import RenderResult, Style, check_color, render
+from .render import RenderResult, Style, check_color, line_strokes, render
 from .schedule import (StopMatch, Trip, busiest_weekday, match_stops, service_day_text,
                        trips_on)
 
@@ -730,7 +730,10 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     takes the line off the graph before anything reads it (app ADR-053), so
     it has no track, trips, chip, row or band and a station only it served is
     not drawn; nothing stored changes, and a label the layout does not carry
-    is ignored. ``dot_radius`` and ``trail`` are how the page draws a train,
+    is ignored. ``width``, ``casing`` and ``dash`` are how the line is stroked
+    (issue 55, ``render.line_strokes``): the map, the geographic twin and the
+    page draw a drawn line's, and a map whose lines choose none of them, or
+    only their defaults, is the map it was, byte for byte. ``dot_radius`` and ``trail`` are how the page draws a train,
     the animation's and not the map's (``animate.DOT_RADIUS``); they reach
     the page's data and nothing else. ``back`` is the href the animation page's
     back-link points at. The default is the sibling gallery in ``out/``;
@@ -810,8 +813,12 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     style = style or Style(themed=True)
     if default_color is not None:
         style = replace(style, default_line_color=check_color(default_color, "default_color"))
+    # The drawn lines' own strokes; a hidden or unknown line's are dropped
+    # with it, and none at all leaves every output as it was.
+    strokes = {label: stroke for label, stroke in line_strokes(lines).items()
+               if label in labels}
     r = render(graph, width=width, style=style, title=name, line_order=line_order,
-               colors=colors)
+               colors=colors, strokes=strokes)
     done("render", f"{len(r.dropped_labels)} labels dropped")
     # The loom stage, not gtfs2graph: same stations and the same solved line
     # ordering, so only the shape differs. See animate.geographic_tracks. It

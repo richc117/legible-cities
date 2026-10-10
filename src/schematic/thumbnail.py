@@ -42,7 +42,7 @@ from pathlib import Path
 
 from .export import PALETTES, resolve
 from .linegraph import Coord, LineGraph, ordered_labels
-from .render import RenderResult, Style, check_color, render
+from .render import LineStroke, RenderResult, Style, check_color, render
 
 # The picture's width in its own units, padding and half a stroke either side
 # included: the network is drawn to leave that much, and a bundle of parallel
@@ -82,32 +82,37 @@ def style(default_color: str | None = None) -> Style:
 
 def draw(graph: LineGraph, *, colors: dict[str, str] | None = None,
          default_color: str | None = None,
-         line_order: list[str] | None = None) -> dict[str, str]:
+         line_order: list[str] | None = None,
+         strokes: dict[str, LineStroke] | None = None) -> dict[str, str]:
     """The thumbnail of a projected graph in each theme, by theme name.
 
-    ``colors``, ``default_color`` and ``line_order`` are what ``map.build``
-    takes and ``pipeline.run`` hands to ``render``, and mean the same here.
-    The graph is drawn once; the themes differ only in what resolves the
-    furniture's variables."""
+    ``colors``, ``default_color``, ``line_order`` and ``strokes`` are what
+    ``map.build`` takes and ``pipeline.run`` hands to ``render``, and mean
+    the same here: a line's width, casing and dash are multiples of the
+    thumbnail's own line width, so a widened line is as much wider here as on
+    the map. The graph is drawn once; the themes differ only in what resolves
+    the furniture's variables."""
     s = style(default_color)
     # Sized so that the picture, whose box is the network plus the padding and
     # half a stroke either side, comes to about THUMB_WIDTH.
     inner = THUMB_WIDTH - 2 * (s.padding + s.line_width)
     r = render(graph, width=inner, style=s, labels=False,
-               line_order=line_order, colors=colors)
+               line_order=line_order, colors=colors, strokes=strokes)
     box = _BOX.search(r.svg)
     if box is None:
         raise ValueError("render left no data-viewbox-nolabels to size the thumbnail by")
-    picture = _picture(graph, r, s, [float(n) for n in box.groups()], line_order)
+    picture = _picture(graph, r, s, [float(n) for n in box.groups()], line_order, strokes)
     return {theme: resolve(picture, PALETTES[theme]) for theme in THEMES}
 
 
 def write(graph: LineGraph, folder: Path, key: str, *, colors: dict[str, str] | None = None,
           default_color: str | None = None,
-          line_order: list[str] | None = None) -> dict[str, Path]:
+          line_order: list[str] | None = None,
+          strokes: dict[str, LineStroke] | None = None) -> dict[str, Path]:
     """Write both thumbnails of ``key``'s map into ``folder``, beside its
     page, and say where, under the keys ``map.build`` answers them with."""
-    drawn = draw(graph, colors=colors, default_color=default_color, line_order=line_order)
+    drawn = draw(graph, colors=colors, default_color=default_color, line_order=line_order,
+                 strokes=strokes)
     folder.mkdir(parents=True, exist_ok=True)
     written: dict[str, Path] = {}
     for answer, name in files_for(key).items():
@@ -149,10 +154,14 @@ def _path(points: list[Coord]) -> str:
 
 
 def _picture(graph: LineGraph, r: RenderResult, s: Style, box: list[float],
-             line_order: list[str] | None) -> str:
+             line_order: list[str] | None,
+             strokes: dict[str, LineStroke] | None = None) -> str:
     """``r``'s tracks and stations as a picture whose furniture colours are
     still the style's variables: no ground, no ids, a path per line in the
-    page's stacking order, the stations' paint said once."""
+    page's stacking order, the stations' paint said once. A line with a
+    stroke of its own (``strokes``) is drawn at its width and dash, over its
+    casing where it has one: the same path again, under it in the same group,
+    as the map puts every casing first in its line's group."""
     _, _, w, h = box
     view = " ".join(_num(_tenths(v)) for v in box)
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0f}" height="{h:.0f}" '
@@ -164,9 +173,21 @@ def _picture(graph: LineGraph, r: RenderResult, s: Style, box: list[float],
         by_line.setdefault(track.label, []).append(_path(track.points))
     for label in ordered_labels(line_order, sorted(r.colors)):
         d = "".join(by_line.get(label, ()))
-        if d:
+        if not d:
+            continue
+        stroke = (strokes or {}).get(label)
+        if stroke is None:
             out.append(f'<g stroke="{_esc(r.colors[label])}" '
                        f'stroke-width="{_num(_tenths(s.line_width))}"><path d="{d}"/></g>')
+            continue
+        t = _tenths(s.line_width * stroke.width)
+        dash = {"dashed": f' stroke-dasharray="{_num(t)} {_num(2 * t)}"',
+                "dotted": f' stroke-dasharray="0 {_num(round(1.6 * t))}"'}.get(stroke.dash, "")
+        casing = (f'<path d="{d}" stroke="{_esc(stroke.casing_color)}" '
+                  f'stroke-width="{_num(_tenths(s.line_width * stroke.slot))}"'
+                  f' stroke-dasharray="none"/>' if stroke.casing > 0 else "")
+        out.append(f'<g stroke="{_esc(r.colors[label])}" stroke-width="{_num(t)}"{dash}>'
+                   f'{casing}<path d="{d}"/></g>')
     out.append("</g>")
 
     routes_at: dict[str, set[str]] = {}

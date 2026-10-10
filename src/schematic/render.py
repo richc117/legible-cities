@@ -25,8 +25,7 @@ from .labels import (Measure, Placement, Quad, Station, advance_measure, em_meas
                      polyline_quads)
 from .names import display_name
 from .linegraph import Coord, LineGraph, ordered_labels
-from .offsets import (cumulative_lengths, dedupe, offset_polyline, point_at,
-                      track_offset)
+from .offsets import cumulative_lengths, dedupe, offset_polyline, point_at, slot_offsets
 
 @dataclass
 class Style:
@@ -200,6 +199,85 @@ def label_face(name: str) -> LabelFace | None:
         advances={int(cp): advance for cp, advance in table["advances"].items()})
 
 
+# How one line is stroked (issue 55; the note at the top of ``offsets.py``):
+# its width, a casing either side of it and a dash, which ``map.build`` takes
+# per line in ``lines`` and ``serve._lines`` judges against these. ``width`` is
+# a multiple of ``line_width``, the band of emphasis in which a line's round
+# caps still bridge the hop its neighbours make at a node; the casing's
+# ``width`` is on each side, in the same unit, and its colour is ``#rrggbb``.
+LINE_WIDTH_RANGE = (0.75, 1.5)
+CASING_WIDTH_RANGE = (0.0, 1.0)
+LINE_DASHES = ("solid", "dashed", "dotted")
+
+
+@dataclass(frozen=True)
+class LineStroke:
+    """One line's width, casing and dash, each a multiple of the style's
+    ``line_width`` where it is a size. The default is the line every map
+    drew before there was a choice, and a line at the default is left out of
+    ``line_strokes``, so it is drawn as it always was."""
+
+    width: float = 1.0
+    casing: float = 0.0
+    casing_color: str = ""
+    dash: str = "solid"
+
+    def __post_init__(self) -> None:
+        # Judged here as the server judges them, so a Python caller's slip is
+        # refused rather than drawn: a width outside the band breaks the
+        # caps' bridge at a node, and a dash that is not one of the three
+        # names would reach the page unread.
+        low, high = LINE_WIDTH_RANGE
+        if not low <= self.width <= high:
+            raise ValueError(f"a line's width must be from {low:g} to {high:g}, "
+                             f"not {self.width!r}")
+        low, high = CASING_WIDTH_RANGE
+        if not low <= self.casing <= high:
+            raise ValueError(f"a line's casing width must be from {low:g} to {high:g}, "
+                             f"not {self.casing!r}")
+        if self.casing > 0:
+            check_color(self.casing_color, "a line's casing colour")
+        if self.dash not in LINE_DASHES:
+            raise ValueError(f"a line's dash must be {', '.join(LINE_DASHES[:-1])} or "
+                             f"{LINE_DASHES[-1]}, not {self.dash!r}")
+
+    @property
+    def slot(self) -> float:
+        """The room the line takes across an edge, its casing included, as a
+        multiple of ``line_width``: the note's ``w + 2c``."""
+        return self.width + 2 * self.casing
+
+    def dasharray(self, t: float) -> str | None:
+        """The stroke's dash for a stroke ``t`` wide, allowing for the round
+        caps, which add t/2 to each end of every dash: dashed ``t 2t`` shows
+        2t on and t off, dotted ``0 1.6t`` dots of diameter t 1.6t apart, and
+        solid writes nothing."""
+        if self.dash == "dashed":
+            return f"{t:.2f} {2 * t:.2f}"
+        if self.dash == "dotted":
+            return f"0 {1.6 * t:.2f}"
+        return None
+
+
+def line_strokes(lines: dict[str, dict] | None) -> dict[str, LineStroke]:
+    """The strokes a client chose, by label, from ``map.build``'s ``lines``
+    as ``serve._lines`` checked them: ``width``, ``casing`` (``{width,
+    color}``) and ``dash``. A line that chose none of them, or only their
+    defaults (width 1, a casing of width 0, solid), is left out, so a map
+    whose lines are all left out is drawn exactly as it was before there was
+    a choice. A label the map does not draw is kept; nothing reads it."""
+    out: dict[str, LineStroke] = {}
+    for label, chosen in (lines or {}).items():
+        casing = chosen.get("casing") or {}
+        stroke = LineStroke(width=chosen.get("width", 1.0),
+                            casing=casing.get("width", 0.0),
+                            casing_color=casing.get("color", "") if casing.get("width") else "",
+                            dash=chosen.get("dash", "solid"))
+        if stroke != LineStroke():
+            out[label] = stroke
+    return out
+
+
 def label_measure(style: Style) -> Measure:
     """How wide ``style``'s labels are drawn: the chosen face's own
     advances, or the system face's estimate of ``label_char_width`` an em
@@ -334,14 +412,28 @@ class RenderResult:
         return self.tracks.get((label, src, dst)) or self.tracks.get((label, dst, src))
 
 
-def build_tracks(graph: LineGraph, proj: Projection,
-                 style: Style) -> dict[tuple[str, str, str], TrackPath]:
+def slot_width(style: Style, strokes: dict[str, LineStroke] | None, label: str) -> float:
+    """The room line ``label`` takes across an edge in user units, its casing
+    included: ``line_width`` itself for a line with no stroke of its own."""
+    stroke = (strokes or {}).get(label)
+    return style.line_width * stroke.slot if stroke else style.line_width
+
+
+def build_tracks(graph: LineGraph, proj: Projection, style: Style,
+                 strokes: dict[str, LineStroke] | None = None
+                 ) -> dict[tuple[str, str, str], TrackPath]:
+    """Every line's track across every edge, pushed off the edge's centre by
+    its slot (``offsets.slot_offsets``): ``strokes`` are the lines' own widths
+    and casings, by label, and a line without one takes ``line_width``. An
+    edge none of whose lines has a stroke is placed as it always was, to the
+    bit, so a width moves tracks only on the edges its line runs on."""
     tracks: dict[tuple[str, str, str], TrackPath] = {}
     for ei, edge in enumerate(graph.edges):
         centre = [proj(c) for c in edge.geometry]
-        n = len(edge.lines)
+        offsets = slot_offsets([slot_width(style, strokes, line.label) for line in edge.lines],
+                               style.line_width, style.spacing)
         for i, line in enumerate(edge.lines):
-            pts = offset_polyline(centre, track_offset(i, n, style.spacing))
+            pts = offset_polyline(centre, offsets[i])
             tracks[(line.label, edge.src, edge.dst)] = TrackPath(
                 element_id=f"t{ei}_{_safe(line.label)}",
                 label=line.label, src=edge.src, dst=edge.dst, points=pts)
@@ -511,13 +603,16 @@ class _Marker:
 
 
 def _markers(graph: LineGraph, style: Style, proj: Projection, node_xy: dict[str, Coord],
-             routes_at: dict[str, set[str]], colors: dict[str, str]) -> dict[str, _Marker]:
+             routes_at: dict[str, set[str]], colors: dict[str, str],
+             strokes: dict[str, LineStroke] | None = None) -> dict[str, _Marker]:
     """Every station's marker, by node. An interchange is a node more than one
     line runs through, as it always was, and takes ``interchange_shape``;
     every other station takes ``station_shape``. A station no line reaches,
     or whose edges have no length, is a circle whatever the style, since a
     tick or a square has nothing to turn by. The line's direction is only
-    worked out when a shape needs it, so a map of circles costs what it did."""
+    worked out when a shape needs it, so a map of circles costs what it did.
+    A tick is sized by its line's slot (``slot_width``), so it stands TICK of
+    a widened or cased line past that line's edge, as it does a plain one's."""
     adjacency = (graph.adjacency()
                  if (style.station_shape, style.interchange_shape) != ("circle", "circle") else {})
     markers: dict[str, _Marker] = {}
@@ -545,8 +640,9 @@ def _markers(graph: LineGraph, style: Style, proj: Projection, node_xy: dict[str
         elif shape == "tick":
             end = len(legs) == 1
             tangent = (-legs[0][0][0], -legs[0][0][1]) if end else _through(legs)
-            markers[node.id] = _Marker(x, y, "tick", style.line_width, False, tangent,
-                                       terminus=end, color=colors[next(iter(lines))])
+            line = next(iter(lines))
+            markers[node.id] = _Marker(x, y, "tick", slot_width(style, strokes, line), False,
+                                       tangent, terminus=end, color=colors[line])
         else:
             markers[node.id] = _Marker(x, y, "square", radius, interchange, _through(legs))
     return markers
@@ -555,17 +651,22 @@ def _markers(graph: LineGraph, style: Style, proj: Projection, node_xy: dict[str
 def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = None,
            labels: bool = True, title: str | None = None,
            line_order: list[str] | None = None,
-           colors: dict[str, str] | None = None) -> RenderResult:
+           colors: dict[str, str] | None = None,
+           strokes: dict[str, LineStroke] | None = None) -> RenderResult:
     """Draw the graph. ``width`` sizes the network; the canvas grows for labels.
 
     ``colors`` overrides a line's colour by label, over the feed's own and
     before the style's default (``line_colors``); ``line_order`` is the
     stacking on shared track, the lines it leaves out following the ones
-    it names."""
+    it names. ``strokes`` is a line's own width, casing and dash, by label
+    (``line_strokes``): a widened or cased line takes a wider slot on its
+    own edges, and the labels, the markers and the canvas keep clear of it;
+    a line without one is drawn as it always was."""
     style = style or Style()
+    strokes = strokes or {}
     face = label_face(style.label_font)
     proj = Projection.fit(graph, width)
-    tracks = build_tracks(graph, proj, style)
+    tracks = build_tracks(graph, proj, style, strokes)
     node_xy = {nid: proj(n.coord) for nid, n in graph.nodes.items()}
 
     colors = line_colors(graph, default=style.default_line_color, overrides=colors)
@@ -577,7 +678,7 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     # A caller's order is a preference, not a whitelist: a line it leaves
     # out is drawn after the ones it names rather than not drawn at all.
     order = ordered_labels(line_order, sorted(colors))
-    markers = _markers(graph, style, proj, node_xy, routes_at, colors)
+    markers = _markers(graph, style, proj, node_xy, routes_at, colors, strokes)
 
     # --- labels ---------------------------------------------------------
     placements: list[Placement] = []
@@ -585,26 +686,31 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     if labels:
         obstacles: list[Quad] = []
         for tp in tracks.values():
-            obstacles += polyline_quads(tp.points, style.line_width)
-        # How wide the track bundle reaches at each station, so its label can
-        # clear it. An interchange where five lines run together needs a lot
-        # more room than a single-track outer stop.
-        bundle: dict[str, int] = {}
+            obstacles += polyline_quads(tp.points, slot_width(style, strokes, tp.label))
+        # How far the track bundle reaches either side of each station, so its
+        # label can clear it: half its slots and the gaps between them, at the
+        # widest edge there. An interchange where five lines run together needs
+        # a lot more room than a single-track outer stop. With every slot
+        # line_width the extra is 0.0, and this is (n - 1) / 2 spacings and
+        # half a line for the most lines on an edge, as it always was.
+        reach: dict[str, float] = {}
         for e in graph.edges:
+            half = ((len(e.lines) - 1) / 2 * style.spacing + style.line_width / 2
+                    + sum(slot_width(style, strokes, ln.label) - style.line_width
+                          for ln in e.lines) / 2)
             for end in (e.src, e.dst):
-                bundle[end] = max(bundle.get(end, 0), len(e.lines))
+                reach[end] = max(reach.get(end, -math.inf), half)
 
         stations = []
         for node in graph.stations:
             if not node.station_label:
                 continue
             x, y = node_xy[node.id]
-            n = bundle.get(node.id, 1)
             stations.append(Station(
                 text=display_name(node.station_label), x=x, y=y, key=node.id,
                 importance=len(routes_at.get(node.id, ())),
                 on_horizontal_run=_horizontal_run(graph, node.id, proj),
-                clearance=(n - 1) / 2 * style.spacing + style.line_width / 2,
+                clearance=reach.get(node.id, style.line_width / 2),
                 marker=markers[node.id].obstacle(),
             ))
         placements, dropped_stations = place(
@@ -624,9 +730,10 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     net_xs: list[float] = []
     net_ys: list[float] = []
     for tp in tracks.values():
+        room = slot_width(style, strokes, tp.label)
         for x, y in tp.points:
-            net_xs += [x - style.line_width, x + style.line_width]
-            net_ys += [y - style.line_width, y + style.line_width]
+            net_xs += [x - room, x + room]
+            net_ys += [y - room, y + room]
     for x, y in node_xy.values():
         net_xs += [x - style.interchange_radius, x + style.interchange_radius]
         net_ys += [y - style.interchange_radius, y + style.interchange_radius]
@@ -679,9 +786,28 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     for label in order:
         if label not in colors:
             continue
+        # A line's own stroke, when it has one, is its group's: the width and
+        # the dash are read off the group by the page's chips and swatches, as
+        # the width always was, and the draw-in's dash on a track gives way to
+        # the group's when the track is whole.
+        stroke = strokes.get(label)
+        t = style.line_width * stroke.width if stroke else style.line_width
+        dash = stroke.dasharray(t) if stroke else None
         out.append(f'<g class="line" data-line="{html.escape(label)}" '
                    f'stroke="{_attr(colors[label])}" '
-                   f'stroke-width="{style.line_width:.2f}">')
+                   f'stroke-width="{t:.2f}"'
+                   + (f' stroke-dasharray="{dash}"' if dash else "") + ">")
+        if stroke and stroke.casing > 0:
+            # The casing: a stroke of the slot's width under each of the line's
+            # own tracks, all of them first so no track's casing covers another
+            # track's cap, never one per edge, undashed. A use of the track, so
+            # whatever the page does to the track's path its casing follows.
+            b = slot_width(style, strokes, label)
+            for tp in tracks.values():
+                if tp.label == label:
+                    out.append(f'<use href="#{tp.element_id}" '
+                               f'stroke="{_attr(stroke.casing_color)}" '
+                               f'stroke-width="{b:.2f}" stroke-dasharray="none"/>')
         for tp in tracks.values():
             if tp.label == label:
                 # The endpoints let a consumer re-aim this segment at a

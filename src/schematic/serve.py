@@ -53,6 +53,7 @@ from .linegraph import LineGraph
 from .render import (HEX_COLOR_PATTERN, draw_stage, octilinearity, stage as render_stage,
                      summary as render_summary)
 from .render import LABEL_FONTS, PRESETS, STYLE_RANGES, STYLE_SHAPES, Style, preset_style
+from .render import CASING_WIDTH_RANGE, LINE_DASHES, LINE_WIDTH_RANGE, line_strokes
 
 log = logging.getLogger(__name__)
 
@@ -297,12 +298,17 @@ def _colors(left: dict[str, Any], name: str) -> dict[str, str] | None:
 def _lines(left: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
     """Line label to what a client chose for that line, or none.
 
-    Each value is an object of two optional fields and nothing else: ``name``,
+    Each value is an object of optional fields and nothing else: ``name``,
     from 1 to ``LINE_NAME_LENGTH`` characters with no line break, and
-    ``hidden``, true or false. A label the layout does not carry is not
-    refused, as ``colors`` does not refuse one: it cannot be checked without
-    reading the layout, and a project's choices must survive a narrower
-    mode. ``pipeline.run`` ignores it."""
+    ``hidden``, true or false; and how the line is stroked (issue 55):
+    ``width``, a multiple of ``line_width`` inside ``render.LINE_WIDTH_RANGE``,
+    ``casing``, an object of a ``width`` on each side in the same unit inside
+    ``render.CASING_WIDTH_RANGE`` and a ``color`` written ``#rrggbb``, both
+    required, and ``dash``, one of ``render.LINE_DASHES``. Each refusal names
+    the field by its path (``lines['A'].casing.width``). A label the layout
+    does not carry is not refused, as ``colors`` does not refuse one: it
+    cannot be checked without reading the layout, and a project's choices
+    must survive a narrower mode. ``pipeline.run`` ignores it."""
     value = left.pop("lines", None)
     if value is None:
         return None
@@ -322,9 +328,36 @@ def _lines(left: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
         if "hidden" in rest:
             if not isinstance(rest.pop("hidden"), bool):
                 raise invalid_params(f"lines[{label!r}].hidden must be true or false")
+        if "width" in rest:
+            _line_number(f"lines[{label!r}].width", rest.pop("width"), LINE_WIDTH_RANGE,
+                         "as a multiple of line_width")
+        if "casing" in rest:
+            casing = rest.pop("casing")
+            where = f"lines[{label!r}].casing"
+            if not isinstance(casing, dict) or set(casing) - {"width", "color"}:
+                raise invalid_params(f"{where} must be an object of width and color")
+            if set(casing) != {"width", "color"}:
+                raise invalid_params(f"{where} must have both width and color")
+            _line_number(f"{where}.width", casing["width"], CASING_WIDTH_RANGE,
+                         "as a multiple of line_width on each side")
+            color = casing["color"]
+            if not isinstance(color, str) or not COLOR_PATTERN.fullmatch(color):
+                raise invalid_params(f"{where}.color must be a colour written #rrggbb")
+        if "dash" in rest:
+            dash = rest.pop("dash")
+            if not isinstance(dash, str) or dash not in LINE_DASHES:
+                raise invalid_params(f"lines[{label!r}].dash must be {_or(LINE_DASHES)}")
         if rest:
             raise invalid_params(f"lines[{label!r}] does not take {', '.join(sorted(rest))}")
     return value
+
+
+def _line_number(where: str, number: Any, bounds: tuple[float, float], unit: str) -> None:
+    """A size of a line's stroke inside its closed range, or a refusal naming
+    the field by its path and saying what it counts."""
+    low, high = bounds
+    if not _number(number) or not low <= number <= high:
+        raise invalid_params(f"{where} must be from {low:g} to {high:g}, {unit}")
 
 
 def _or(names: Any) -> str:
@@ -931,9 +964,11 @@ class EngineEndpoint(Endpoint):
             where = folder or config.out_dir()
             diag = result.diagnostics()
             # The picture the app's front door shows, beside the page, drawn
-            # from the graph just drawn in the project's colours and order.
+            # from the graph just drawn in the project's colours, order and
+            # strokes (a hidden line is not on the graph, so its are unread).
             thumbs = thumbnail.write(result.graph, where, key, colors=colors,
-                                     default_color=default_color, line_order=line_order)
+                                     default_color=default_color, line_order=line_order,
+                                     strokes=line_strokes(lines))
             return {
                 "layout": result.layout,
                 "date": result.date.isoformat(),
