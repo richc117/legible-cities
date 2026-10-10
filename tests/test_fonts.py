@@ -28,7 +28,8 @@ import pytest
 from pylsp_jsonrpc.exceptions import JsonRpcInvalidParams
 from test_colors import _stored
 from test_serve import DATE, KEY, NO_LAYOUT, SCHEMA, Client, check, invalid
-from test_style import box, circles, nolabels, stand_in_pipeline
+from test_style import (BOTH, PRESET_NUMBERS, box, circles, line_widths, nolabels, numbers,
+                        stand_in_pipeline)
 
 from schematic import feeds, pipeline, serve
 from schematic.crs import to_mercator
@@ -48,8 +49,6 @@ RANGES = [[0x0020, 0x007E], [0x00A0, 0x017F], [0x2010, 0x2026]]
 SYSTEM = "Helvetica Neue, Helvetica, Arial, sans-serif"
 FILES = {"regular.woff2", "advances.json", "OFL.txt", "README.md"}
 UNKNOWN = "style.label_font must be system, inter or atkinson-hyperlegible-next"
-BESIDE_PRESET = ("style.preset is sent alone and draws in the system face; to draw its "
-                 "numbers in another face, send them field by field with label_font")
 
 # The invented network's SVG at width 448 before issue 76, themed as the
 # server draws it and plain as a caller of ``render`` does: the system face
@@ -281,12 +280,28 @@ def test_an_unknown_face_is_refused_naming_the_three(name):
                     "style": {"label_font": name}}, "MapBuildParams")
 
 
-def test_a_preset_beside_a_face_is_refused_saying_how_to_send_both():
+@pytest.mark.parametrize("preset", list(PRESET_NUMBERS))
+@pytest.mark.parametrize("name", BUNDLED)
+def test_a_preset_beside_a_face_draws_the_presets_numbers_in_that_face(preset, name):
+    """The face is not one of the eight numbers a preset resolves to, so the
+    two go together: the preset's numbers drawn and measured in the face, the
+    same bytes as those numbers sent field by field with it. A preset alone
+    still draws in the system face, and beside one of its numbers as well as
+    the face is still refused."""
+    style = serve._style({"preset": preset, "label_font": name})
+    assert style == Style(themed=True, label_font=name, **numbers(preset))
+    check({"key": KEY, "layout": NO_LAYOUT, "date": DATE,
+           "style": {"preset": preset, "label_font": name}}, "MapBuildParams")
+    svg = draw(style)
+    assert svg == draw(serve._style({**numbers(preset), "label_font": name}))
+    assert font_family(svg) == f"{FAMILIES[name]}, {SYSTEM}"
+    assert FONT_FACE.search(svg).group(1) == FAMILIES[name]
+    assert set(line_widths(svg)) == {f"{PRESET_NUMBERS[preset][0]:.2f}"}
+    alone = serve._style({"preset": preset})
+    assert alone.label_font == "system" and draw(alone) != svg
     with pytest.raises(JsonRpcInvalidParams) as refused:
-        serve._style({"preset": "beck", "label_font": "inter"})
-    assert refused.value.data["hint"] == BESIDE_PRESET
-    # A preset alone still draws in the system face.
-    assert serve._style({"preset": "beck"}).label_font == "system"
+        serve._style({"preset": preset, "label_font": name, "padding": 24})
+    assert refused.value.data["hint"] == BOTH
 
 
 def test_map_build_hands_the_face_to_the_pipeline_and_refuses_an_unknown_one(
@@ -297,11 +312,15 @@ def test_map_build_hands_the_face_to_the_pipeline_and_refuses_an_unknown_one(
                                          "out": f"f{i}", "style": {"label_font": name}})
         assert "result" in sent, sent
         assert asked[-1]["style"] == Style(themed=True, label_font=name)
+    sent = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "out": "fp",
+                                     "style": {"preset": "beck", "label_font": "inter"}})
+    assert "result" in sent, sent
+    assert asked[-1]["style"] == Style(themed=True, label_font="inter", **numbers("beck"))
     error = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
                                       "style": {"label_font": "comic-sans"}})["error"]
     assert error["code"] == -32602 and error["data"]["kind"] == "params"
     assert error["data"]["hint"] == UNKNOWN
-    assert len(asked) == len(NAMES), "a refused request never reaches the pipeline"
+    assert len(asked) == len(NAMES) + 1, "a refused request never reaches the pipeline"
 
 
 # ------------------------------------------------------------- stored layouts

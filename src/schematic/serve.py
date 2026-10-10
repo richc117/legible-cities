@@ -338,6 +338,17 @@ def _or(names: Any) -> str:
 STYLE_COLORS = ("background", "station_fill", "station_stroke_color", "label_color")
 
 
+def _label_font(left: dict[str, Any]) -> dict[str, str]:
+    """``{"label_font": name}`` when the style names a face, taken out of
+    ``left`` and judged against ``render.LABEL_FONTS``; else nothing."""
+    if "label_font" not in left:
+        return {}
+    face = left.pop("label_font")
+    if not isinstance(face, str) or face not in LABEL_FONTS:
+        raise invalid_params(f"style.label_font must be {_or(LABEL_FONTS)}")
+    return {"label_font": face}
+
+
 def _style(value: Any) -> Style | None:
     """The style a client asked the map to be drawn with, or none.
 
@@ -354,11 +365,12 @@ def _style(value: Any) -> Style | None:
     Or the name of a look instead of the fields: ``{"preset": "beck"}``
     resolves to exactly the eight numbers of ``render.PRESETS`` (issue 73),
     so it draws what the same numbers sent one by one draw. The name is
-    exclusive: beside any other key it is refused, because which of the two
-    won would be a guess, and a name that is not in the table is refused
-    naming the ones that are. A preset carries no colour, which the theme
-    owns, and no face, so it draws in the system face; a client that wants
-    a preset's numbers in another face sends them field by field with it.
+    exclusive of the fields it could clash with: beside any other key but
+    ``label_font`` it is refused, because which of the two won would be a
+    guess, and a name that is not in the table is refused naming the ones
+    that are. A preset carries no colour, which the theme owns, and no
+    face, which is not one of its numbers: alone it draws in the system
+    face, and beside ``label_font`` it draws its numbers in that face.
 
     One rule the schema cannot hold: ``interchange_radius`` may not be below
     ``station_radius``, judged on the values the map would be drawn with,
@@ -376,17 +388,13 @@ def _style(value: Any) -> Style | None:
     left = dict(value)
     if "preset" in left:
         name = left.pop("preset")
-        if set(left) == {"label_font"}:
-            raise invalid_params("style.preset is sent alone and draws in the system face; to "
-                                 "draw its numbers in another face, send them field by field "
-                                 "with label_font")
-        if left:
+        if set(left) - {"label_font"}:
             raise invalid_params("style.preset cannot be sent with the fields it resolves to; "
                                  "send one or the other")
         if not isinstance(name, str) or name not in PRESETS:
             raise invalid_params(f"style.preset must be {_or(PRESETS)}; style.presets "
                                  f"describes each")
-        return Style(themed=True, **preset_style(name))
+        return Style(themed=True, **preset_style(name), **_label_font(left))
     fields: dict[str, Any] = {}
     for name, (low, high, unit) in STYLE_RANGES.items():
         if name not in left:
@@ -404,11 +412,7 @@ def _style(value: Any) -> Style | None:
         if not isinstance(color, str) or not COLOR_PATTERN.fullmatch(color):
             raise invalid_params(f"style.{name} must be a colour written #rrggbb")
         fields[name] = color
-    if "label_font" in left:
-        face = left.pop("label_font")
-        if not isinstance(face, str) or face not in LABEL_FONTS:
-            raise invalid_params(f"style.label_font must be {_or(LABEL_FONTS)}")
-        fields["label_font"] = face
+    fields.update(_label_font(left))
     _no_extra("style", left)
     style = Style(themed=True, **fields)
     if style.interchange_radius < style.station_radius:
