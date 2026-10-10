@@ -279,17 +279,17 @@ def stored(key: str, **overrides: Any) -> Layout | None:
     """The layout the feed as it is on disk, with these options and this LOOM,
     names -- if it is stored. Never builds and never downloads; None when the
     feed is not on disk or the layout is not there. A set from before layouts
-    had names is migrated on the way (see ``migrate``)."""
+    had names is migrated on the way (see ``migrate``). The meta is read
+    under the lock a swap takes, so a forced re-layout's swap never finds
+    it open (``read_stored``, engine issue 68); the feed's digest, which
+    can take seconds, is taken before."""
     feed = feeds.resolved(key, **overrides)
     source = feeds.get(key).zip_path
     if not source.is_file():
         return None
     inputs, layout = _address(feed, source)
-    found = read_layout(key, layout)
-    if found is None:
-        with _lock:
-            found = _migrated(feed, layout, inputs)
-    return found
+    with _lock:
+        return read_layout(key, layout) or _migrated(feed, layout, inputs)
 
 
 def _migrated(feed: feeds.Feed, layout: str, inputs: dict[str, Any]) -> Layout | None:
@@ -309,8 +309,9 @@ def stage_path(key: str, stage: str, **overrides: Any) -> Path | None:
     return None if found is None else found.paths[stage]
 
 
-# The store's one lock: who builds which layout, the scratches, and every
-# move of a set into, out of and aside from its place. A plain lock, not a
+# The store's one lock: who builds which layout, the scratches, every move
+# of a set into, out of and aside from its place, and the reads that must
+# not overlap a move (``in_flight``, ``read_stored``). A plain lock, not a
 # re-entrant one, so nothing done while it is held takes it again: what
 # needs it from inside and from outside has a body that assumes it held
 # (``_migrate``) and a door that takes it (``migrate``).
@@ -381,6 +382,32 @@ def in_flight(key: str, layout: str, stages: list[str]) -> tuple[Layout, dict[st
         except FileNotFoundError:
             return None
     return Layout(key=key, id=layout, dir=scratch.dir, meta=dict(scratch.inputs)), files
+
+
+def read_stored(key: str, layout: str,
+                stages: list[str]) -> tuple[Layout, dict[str, bytes]] | None:
+    """A stored layout with the files of ``stages`` of it, read whole under
+    the lock and parsed by the caller outside it: what ``render.stage`` draws
+    from the store, as ``in_flight`` is what it draws from a build's scratch.
+    None when the layout is not stored whole.
+
+    A forced re-layout's swap moves the stored set aside under the lock, and
+    Windows will not rename a directory while a file in it is open, so a
+    read of the store outside the lock that landed in the swap's moment
+    failed the swap, and the failure removed the finished build (engine
+    issue 68). Under the lock a read and a swap never overlap: the read finds
+    the old set whole or the new one whole, its meta among it. Only the read
+    is held; parsing and drawing are the caller's, outside it.
+    """
+    with _lock:
+        found = read_layout(key, layout)
+        if found is None:
+            return None
+        try:
+            files = {stage: found.paths[stage].read_bytes() for stage in stages}
+        except FileNotFoundError:
+            return None
+    return found, files
 
 
 def _whole(key: str, layout: str, stage: str) -> None:
@@ -928,11 +955,17 @@ def line_minutes(found: Layout, date: dt.date, *,
     stage's. The day is read once per layout and day in a process. ``graph``
     is the octi stage when the caller has read it already, as it has for a
     layout still being laid out, whose octi file is not to be read from
-    ``found``'s directory (``in_flight``)."""
+    ``found``'s directory (``in_flight``). Without it, a miss reads the
+    stored octi stage under the lock a swap takes, as ``read_stored`` reads
+    (engine issue 68), and a hit reads no file at all."""
     with _minutes_lock:
         known = _MINUTES.get((found.id, date))
     if known is not None:
         return known
+    if graph is None:
+        with _lock:
+            data = found.paths["octi"].read_bytes()
+        graph = LineGraph.from_geojson(json.loads(data.decode("utf-8")))
     return _remember_minutes(found.id, schedule_for(found, date, graph=graph))
 
 

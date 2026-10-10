@@ -967,6 +967,10 @@ def stage(key: str, stage: str, *, layout: str | None = None, width: float = 120
     commonest trip that day (``pipeline.line_minutes``, read once per layout
     and day); without it the minutes are null and no timetable is read, and
     nothing here picks a day.
+
+    The stage's file is read under the store's lock and parsed and drawn
+    outside it (``pipeline.read_stored``), so a forced re-layout's swap never
+    finds it open (engine issue 68).
     """
     from . import pipeline  # here, not at the top: pipeline imports this module
 
@@ -974,19 +978,17 @@ def stage(key: str, stage: str, *, layout: str | None = None, width: float = 120
         raise ValueError(f"{stage!r} is not a stage; the stages are "
                          + ", ".join(pipeline.STAGE_FILES))
     if layout is not None:
-        found = pipeline.read_layout(key, layout)
+        read = pipeline.read_stored(key, layout, [stage])
     else:
-        found = pipeline.stored(key, **overrides)
-    if found is None:
+        named = pipeline.stored(key, **overrides)
+        read = None if named is None else pipeline.read_stored(key, named.id, [stage])
+    if read is None:
         raise pipeline.LayoutMissing(
             f"{key!r} has no stored {stage} graph"
             + (f" under layout {layout[:8]}" if layout else "")
             + "; lay the feed out first (graph.build)")
-    path = found.paths[stage]
-    if not path.is_file():
-        raise pipeline.LayoutMissing(
-            f"{key!r} has no stored {stage} graph; lay the feed out first (graph.build)")
-    graph = LineGraph.from_geojson(path)
+    found, files = read
+    graph = LineGraph.from_geojson(json.loads(files[stage].decode("utf-8")))
     minutes = pipeline.line_minutes(found, date) if date is not None else None
     return draw_stage(graph, stage, width=width, labels=labels, minutes=minutes)
 
