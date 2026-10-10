@@ -36,6 +36,19 @@ class RoutingError(RuntimeError):
     pass
 
 
+# How a train is drawn, which is the animation's and not the map's (engine
+# issue 75): the radius of its dot in SVG user units, and a trail behind it in
+# seconds of playback, 0 for none. The page draws a dot of DOT_RADIUS and no
+# trail when it is told nothing, and ``to_json`` tells it only what differs, so
+# a page built without either carries the data it always did. The ranges are
+# what ``map.build`` accepts; the dot's halo is the page's and fixed, so a
+# preset never changes either.
+DOT_RADIUS = 5.0
+TRAIL = 0.0
+DOT_RADIUS_RANGE = (2.0, 12.0)
+TRAIL_RANGE = (0.0, 3.0)
+
+
 # Adjacency key for "any line", used when a trip runs over a segment the graph
 # does not attribute to that trip's line.
 ANY = "\x00any"
@@ -331,6 +344,10 @@ class Animation:
     # Written into the page beside the data, never into ``to_json``: the
     # positions file and the page's data stay what they were.
     routing: dict = field(default_factory=dict)
+    # How the trains are drawn: the dot's radius and the trail behind it, in
+    # seconds of playback. Each is in the data only when it is not the default.
+    dot_radius: float = DOT_RADIUS
+    trail: float = TRAIL
 
     def to_json(self) -> dict:
         return {
@@ -339,6 +356,10 @@ class Animation:
             # Only when there is a name, so a page without one carries the
             # data it always did.
             **({"names": self.names} if self.names else {}),
+            # The same for the two numbers, which a whole value writes as one
+            # (8, not 8.0).
+            **({"dot_radius": _plain(self.dot_radius)} if self.dot_radius != DOT_RADIUS else {}),
+            **({"trail": _plain(self.trail)} if self.trail != TRAIL else {}),
             "linear": self.linear,
             "paths": self.paths,
             "trips": self.trips,
@@ -349,6 +370,11 @@ class Animation:
                           for nid, c in self.geo.nodes.items()},
             }} if self.geo else {}),
         }
+
+
+def _plain(number: float) -> float | int:
+    """A whole number as an int, so the data reads 8 where it was sent 8.0."""
+    return int(number) if float(number).is_integer() else number
 
 
 def route_rules(graph: LineGraph) -> dict:
@@ -395,10 +421,13 @@ def route_rules(graph: LineGraph) -> dict:
 def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
           date: dt.date, geo: GeoLayer | None = None,
           line_order: list[str] | None = None,
-          names: dict[str, str] | None = None) -> Animation:
+          names: dict[str, str] | None = None,
+          dot_radius: float = DOT_RADIUS, trail: float = TRAIL) -> Animation:
     """Route every trip and collect the deduplicated paths. ``names`` is a
     display name per line label, which the page writes in the line's chip,
     row, band and train titles; the caller gives names for drawn lines only.
+    ``dot_radius`` and ``trail`` are how the page draws a train (see
+    ``DOT_RADIUS``); the caller has judged them against their ranges.
 
     The layout the page draws its rows from is in ``line_order`` first and
     the rest after. When the order names a line the layout carries, the
@@ -507,7 +536,8 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
                      names=dict(names or {}), geo=geo or GeoLayer(),
                      unrouted=unrouted, trips_with_skipped_calls=skipped_calls,
                      trips_with_borrowed_track=borrowed,
-                     linear=layout_json, routing=route_rules(graph))
+                     linear=layout_json, routing=route_rules(graph),
+                     dot_radius=dot_radius, trail=trail)
 
 
 # Emitted only when the caller says where the icons live, so a page written for
