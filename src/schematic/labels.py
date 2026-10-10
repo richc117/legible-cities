@@ -20,6 +20,7 @@ important first, so interchanges get the good positions.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 Point = tuple[float, float]
@@ -102,8 +103,32 @@ class Placement:
     haloed: bool = False
 
 
-def text_width(text: str, size: float, char_width: float) -> float:
-    return len(text) * size * char_width
+# How wide a name is drawn at a font size, in the same units as the size:
+# what the placer reserves for it. One per face (issue 76).
+Measure = Callable[[str, float], float]
+
+
+def em_measure(char_width: float) -> Measure:
+    """Every character the same fraction of an em. The system face's
+    estimate: the engine cannot read the glyphs a viewer's system will
+    choose, so it reserves ``char_width`` of the size for each."""
+    return lambda text, size: len(text) * size * char_width
+
+
+def advance_measure(advances: Mapping[int, int], units_per_em: int,
+                    average: float) -> Measure:
+    """Each character's own advance, read from a face's table, summed and
+    scaled to the size. A code point the table lacks counts as the face's
+    ``average``: the browser draws it in the next face of the stack, whose
+    glyphs the engine cannot read either. An average over the whole name
+    would not do; it left overlaps on New York where the sums leave none."""
+    def measure(text: str, size: float) -> float:
+        return sum(advances.get(ord(ch), average) for ch in text) * size / units_per_em
+    return measure
+
+
+def text_width(text: str, size: float, measure: Measure) -> float:
+    return measure(text, size)
 
 
 def label_quad(x: float, y: float, w: float, h: float, anchor: str, rotate: float) -> Quad:
@@ -176,7 +201,8 @@ def place(
     obstacles: list[Quad],
     *,
     size: float,
-    char_width: float,
+    char_width: float | None = None,
+    measure: Measure | None = None,
     offset: float,
     marker_radius: float,
     canvas: tuple[float, float] | None = None,
@@ -184,9 +210,16 @@ def place(
 ) -> tuple[list[Placement], list[Station]]:
     """Place labels, most important station first.
 
-    Returns the placements and the stations that could not be placed anywhere
-    without a collision.
+    ``measure`` is how wide a name is drawn at ``size``, a bundled face's
+    own advances (``advance_measure``); without one, every character is
+    ``char_width`` of an em, as the placer has always measured
+    (``em_measure``). One of the two. Returns the placements and the
+    stations that could not be placed anywhere without a collision.
     """
+    if (measure is None) == (char_width is None):
+        raise TypeError("place takes a measure or a char_width, one of the two")
+    if measure is None:
+        measure = em_measure(char_width)
     markers: list[Quad] = []
     for s in stations:
         r = marker_radius
@@ -202,7 +235,7 @@ def place(
     dropped: list[Station] = []
 
     def attempt(s: Station, allow_over_lines: bool) -> Placement | None:
-        w = text_width(s.text, size, char_width)
+        w = text_width(s.text, size, measure)
         for c in candidates(offset + s.clearance, s.on_horizontal_run):
             q = label_quad(s.x + c.dx, s.y + c.dy, w, size, c.anchor, c.rotate)
             if canvas and (q.aabb[0] < 0 or q.aabb[1] < 0

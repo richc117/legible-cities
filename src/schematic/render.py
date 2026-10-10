@@ -12,12 +12,17 @@ lon/lat, where its 45-degree edges are not 45 degrees any more.
 
 from __future__ import annotations
 
+import base64
+import functools
 import html
+import json
 import math
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
-from .labels import Placement, Quad, Station, place, polyline_quads
+from .labels import (Measure, Placement, Quad, Station, advance_measure, em_measure, place,
+                     polyline_quads)
 from .names import display_name
 from .linegraph import Coord, LineGraph, ordered_labels
 from .offsets import (cumulative_lengths, dedupe, offset_polyline, point_at,
@@ -36,8 +41,13 @@ class Style:
     station_stroke: float = 2.2
     label_size: float = 11.0
     label_offset: float = 9.0
-    # Rough advance width per character as a fraction of font size.
+    # Rough advance width per character as a fraction of font size: how the
+    # system face is measured. A bundled face is measured from its own table.
     label_char_width: float = 0.56
+    # The face the station names are drawn and measured in, one of
+    # ``LABEL_FONTS``. "system" is the stack the viewer's own fonts answer,
+    # and draws exactly what was drawn before there was a choice.
+    label_font: str = "system"
     background: str = "#ffffff"
     station_fill: str = "#ffffff"
     station_stroke_color: str = "#111111"
@@ -109,6 +119,60 @@ PRESETS: dict[str, dict[str, float]] = {
               "interchange_radius": 5.5, "station_stroke": 1.8, "label_size": 12,
               "label_offset": 10, "padding": 28},
 }
+
+
+# The faces a map's station names can be drawn in (issue 76), in the order a
+# client is offered them. "system" is today's stack and the 0.56 em estimate;
+# the other two ship with the package as Latin subsets under the SIL Open Font
+# License (``fonts/<name>/``, made by ``bin/build-fonts``), each measured name
+# by name from its own advances and embedded in the SVG only when chosen.
+LABEL_FONTS = ("system", "inter", "atkinson-hyperlegible-next")
+SYSTEM_FONTS = "Helvetica Neue, Helvetica, Arial, sans-serif"
+FONTS_DIR = Path(__file__).parent / "fonts"
+
+
+@dataclass(frozen=True)
+class LabelFace:
+    """A bundled face: its family name, the CSS that embeds it, and its
+    advances in font units by code point."""
+
+    name: str
+    family: str
+    font_face: str
+    units_per_em: int
+    average: float
+    advances: dict[int, int] = field(repr=False)
+
+    def measure(self) -> Measure:
+        return advance_measure(self.advances, self.units_per_em, self.average)
+
+
+@functools.lru_cache(maxsize=None)
+def label_face(name: str) -> LabelFace | None:
+    """The bundled face ``name``, read once from the package, or None for
+    "system", which has no file. A ValueError for a name not in
+    ``LABEL_FONTS``: the server refuses one in its own sentence first."""
+    if name not in LABEL_FONTS:
+        raise ValueError(f"label_font must be one of {', '.join(LABEL_FONTS)}, not {name!r}")
+    if name == "system":
+        return None
+    folder = FONTS_DIR / name
+    table = json.loads((folder / "advances.json").read_text(encoding="utf-8"))
+    data = base64.b64encode((folder / "regular.woff2").read_bytes()).decode("ascii")
+    return LabelFace(
+        name=name, family=table["family"],
+        font_face=(f'@font-face{{font-family:"{table["family"]}";'
+                   f'src:url(data:font/woff2;base64,{data}) format("woff2")}}'),
+        units_per_em=table["unitsPerEm"], average=table["average"],
+        advances={int(cp): advance for cp, advance in table["advances"].items()})
+
+
+def label_measure(style: Style) -> Measure:
+    """How wide ``style``'s labels are drawn: the chosen face's own
+    advances, or the system face's estimate of ``label_char_width`` an em
+    a character."""
+    face = label_face(style.label_font)
+    return face.measure() if face else em_measure(style.label_char_width)
 
 
 def preset_style(name: str) -> dict[str, float]:
@@ -281,6 +345,7 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     stacking on shared track, the lines it leaves out following the ones
     it names."""
     style = style or Style()
+    face = label_face(style.label_font)
     proj = Projection.fit(graph, width)
     tracks = build_tracks(graph, proj, style)
     node_xy = {nid: proj(n.coord) for nid, n in graph.nodes.items()}
@@ -324,7 +389,7 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
             ))
         placements, dropped_stations = place(
             stations, obstacles, size=style.label_size,
-            char_width=style.label_char_width, offset=style.label_offset,
+            measure=label_measure(style), offset=style.label_offset,
             marker_radius=style.interchange_radius)
         dropped = [s.text for s in dropped_stations]
 
@@ -364,10 +429,17 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
         # Consumed by the animation's label toggle, inert in a standalone SVG.
         f'data-viewbox-nolabels="{net_box[0]:.2f} {net_box[1]:.2f} '
         f'{net_box[2]:.2f} {net_box[3]:.2f}" '
-        f'font-family="Helvetica Neue, Helvetica, Arial, sans-serif">',
+        # A bundled face goes first, the system stack behind it for any
+        # character the subset lacks; the system face writes the stack alone.
+        f'font-family="{_attr(f"{face.family}, {SYSTEM_FONTS}" if face else SYSTEM_FONTS)}">',
     ]
     if title:
         out.append(f"<title>{html.escape(title)}</title>")
+    if face:
+        # The face itself, before anything is drawn, so the SVG stays one
+        # self-contained file; the system face embeds nothing. Inline in the
+        # animation page, the rule reaches the names the page draws too.
+        out.append(f"<style>{face.font_face}</style>")
     # Identified so a consumer that changes the viewBox can grow it to match.
     out.append(f'<rect id="backdrop" x="{min_x:.2f}" y="{min_y:.2f}" '
                f'width="{w:.2f}" height="{h:.2f}" '
