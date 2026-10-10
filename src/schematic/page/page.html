@@ -1049,6 +1049,36 @@ __SOCIAL__
   svg.appendChild(defs);
   const layer = trainsGroup;
 
+  // How a train is drawn (engine issue 75). The data carries each number only
+  // when it is not the default, so a page built without them reads 5 and none.
+  // The dot is DOT_R, with the halo the stylesheet gives every train: the dot is
+  // its line's colour, and the halo is all that parts the two.
+  //
+  // The trail is TRAIL seconds of playback long, as four copies of the dot at
+  // the places the train was a quarter, a half, three quarters and the whole of
+  // that ago: k * TRAIL * speed / 4 seconds before now on the clock this page
+  // keeps, read from the same keyframes as the dot and placed by the same
+  // function, so the stepped clock of an exporter places them exactly. They
+  // are plain circles in the line's colour, faded from 0.6 to 0.15, with no
+  // halo and no filter, and a pointer goes through them. They are drawn under
+  // every dot, in a group #trains opens with. A train standing at a station has
+  // none, because they would sit on it; the Time view has none, because its
+  // diagonals are the trail; and a page nobody is capturing has none under
+  // reduced motion, as it shows the draw-in whole. Present mode keeps them,
+  // which is how the desktop app runs the page (`reduced` is false there), and a
+  // capture draws what it was asked for.
+  const DOT_R = Number.isFinite(data.dot_radius) ? data.dot_radius : 5;
+  const TRAIL = Number.isFinite(data.trail) && data.trail > 0 ? data.trail : 0;
+  const TRAIL_OPACITY = [0.6, 0.45, 0.3, 0.15];
+  const copies = new Map();     // trip index -> its four copies, nearest the dot first
+  let trailLayer = null;
+  if (TRAIL > 0) {
+    trailLayer = document.createElementNS(NS, "g");
+    trailLayer.setAttribute("id", "trail");
+    trailLayer.setAttribute("pointer-events", "none");
+    layer.insertBefore(trailLayer, layer.firstChild);
+  }
+
   const trips = data.trips;
   const starts = trips.map(t => t.k[0][0]);
   const ends = trips.map(t => t.k[t.k.length - 1][0]);
@@ -1291,6 +1321,106 @@ __SOCIAL__
     }
   }
 
+  // Where a trip's train is at time t in the view now showing (the map, the rows
+  // and the chart blended as the three tweens have them), or null where that
+  // view draws no train for it. The dot and every copy of it are placed here.
+  function placeAt(trip, path, t, m, sf, gf) {
+    const f = stopAt(trip.k, t);
+    const lo = Math.min(Math.floor(f), path.stops.length - 1);
+    const hi = Math.min(lo + 1, path.stops.length - 1);
+    const frac = f - lo;
+
+    let x, y;
+    if (m < 1) {
+      const el = pathEls[trip.p];
+      const len = lerp(path.stops[lo], path.stops[hi], frac);
+      const pt = el.getPointAtLength(Math.min(len, el.getTotalLength()));
+      x = pt.x; y = pt.y;
+      // The same fraction of the same hop, measured along the geographic
+      // route instead. Reading the stop index once and placing it twice is
+      // what stops a train drifting off its own line mid-morph.
+      if (gf > 0 && geoPathEls[trip.p]) {
+        const gel = geoPathEls[trip.p];
+        const glen = lerp(path.gstops[lo], path.gstops[hi], frac);
+        const gp = gel.getPointAtLength(Math.min(glen, gel.getTotalLength()));
+        x = lerp(x, gp.x, gf); y = lerp(y, gp.y, gf);
+      }
+    }
+    if (m > 0) {
+      const a = linXY(trip.r, path.nodes[lo]), b = linXY(trip.r, path.nodes[hi]);
+      if (a && b) {
+        const lx = lerp(a.x, b.x, frac), ly = lerp(a.y, b.y, frac);
+        x = m < 1 ? lerp(x, lx, m) : lx;
+        y = m < 1 ? lerp(y, ly, m) : ly;
+      } else if (m >= 1) {
+        return null;   // no row for this stop; hide rather than draw a lie
+      }
+    }
+    if (sf > 0) {
+      // On the chart a train rides its own diagonal, at the playhead.
+      const ya = stopY(trip.r, path.nodes[lo]), yb = stopY(trip.r, path.nodes[hi]);
+      if (ya === null || yb === null) { if (sf >= 1) return null; }
+      else {
+        const sx = timeX(t);
+        const sy = bandTop(trip.r) + lerp(ya, yb, frac);
+        x = sf < 1 ? lerp(x, sx, sf) : sx;
+        y = sf < 1 ? lerp(y, sy, sf) : sy;
+      }
+    }
+    return { x: x, y: y };
+  }
+
+  // Whether the train is standing at a station at time t: between a stop's
+  // arrival and its departure, which the keyframes hold as two with one stop
+  // index. A train passing a stop with no dwell is not standing at it.
+  function dwellingAt(keys, t) {
+    let lo = 0, hi = keys.length - 1;
+    if (t < keys[0][0] || t >= keys[hi][0]) return false;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (keys[mid][0] <= t) lo = mid; else hi = mid;
+    }
+    return keys[lo][1] === keys[hi][1];
+  }
+
+  // The four copies of one train, made when it first has them and placed at
+  // every draw from the clock the page keeps, so advance() and seek() put them
+  // exactly where the stepped clock says. In the Time view they fade out with
+  // the tween that brings the chart in, and a line route mode has faded takes
+  // its copies with it.
+  function placeCopies(i, trip, path, m, sf, gf) {
+    let els = copies.get(i);
+    if (!els) {
+      els = TRAIL_OPACITY.map((_, n) => {
+        const c = document.createElementNS(NS, "circle");
+        c.setAttribute("r", DOT_R);
+        c.setAttribute("fill", data.lines[trip.r] || "#333");
+        c.setAttribute("data-trip", i);
+        c.setAttribute("data-step", n + 1);
+        trailLayer.appendChild(c);
+        return c;
+      });
+      copies.set(i, els);
+    }
+    const fade = (1 - sf) * fadeOf(trip.r);
+    els.forEach((c, n) => {
+      const at = placeAt(trip, path, now - (n + 1) * TRAIL * speed / TRAIL_OPACITY.length,
+                         m, sf, gf);
+      if (at) {
+        c.setAttribute("cx", at.x.toFixed(1));
+        c.setAttribute("cy", at.y.toFixed(1));
+      }
+      const opacity = at ? (TRAIL_OPACITY[n] * fade).toFixed(3) : "0";
+      if (c.getAttribute("opacity") !== opacity) c.setAttribute("opacity", opacity);
+    });
+  }
+  function dropCopies(i) {
+    const els = copies.get(i);
+    if (!els) return;
+    for (const c of els) c.remove();
+    copies.delete(i);
+  }
+
   function draw() {
     const m = ease(view), sf = ease(str), gf = ease(geo);
     if (fadeDirty) { applyFade(); fadeDirty = false; }
@@ -1308,6 +1438,10 @@ __SOCIAL__
 
     const alive = new Set();
     shown = 0;
+    // Whether the trail shows at all this frame (see TRAIL): the clock must be
+    // moving the trains for it to have a length, the Time view has none, and a
+    // page nobody is capturing has none under reduced motion.
+    const trailing = TRAIL > 0 && speed > 0 && sf < 1 && (!reduced || capture);
     for (let i = lowerBound(now); i < trips.length; i++) {
       if (starts[i] > now) break;
       if (ends[i] < now) continue;
@@ -1315,53 +1449,14 @@ __SOCIAL__
       if (hidden.has(trip.r)) continue;
       const path = data.paths[trip.p];
 
-      const f = stopAt(trip.k, now);
-      const lo = Math.min(Math.floor(f), path.stops.length - 1);
-      const hi = Math.min(lo + 1, path.stops.length - 1);
-      const frac = f - lo;
-
-      let x, y;
-      if (m < 1) {
-        const el = pathEls[trip.p];
-        const len = lerp(path.stops[lo], path.stops[hi], frac);
-        const pt = el.getPointAtLength(Math.min(len, el.getTotalLength()));
-        x = pt.x; y = pt.y;
-        // The same fraction of the same hop, measured along the geographic
-        // route instead. Reading the stop index once and placing it twice is
-        // what stops a train drifting off its own line mid-morph.
-        if (gf > 0 && geoPathEls[trip.p]) {
-          const gel = geoPathEls[trip.p];
-          const glen = lerp(path.gstops[lo], path.gstops[hi], frac);
-          const gp = gel.getPointAtLength(Math.min(glen, gel.getTotalLength()));
-          x = lerp(x, gp.x, gf); y = lerp(y, gp.y, gf);
-        }
-      }
-      if (m > 0) {
-        const a = linXY(trip.r, path.nodes[lo]), b = linXY(trip.r, path.nodes[hi]);
-        if (a && b) {
-          const lx = lerp(a.x, b.x, frac), ly = lerp(a.y, b.y, frac);
-          x = m < 1 ? lerp(x, lx, m) : lx;
-          y = m < 1 ? lerp(y, ly, m) : ly;
-        } else if (m >= 1) {
-          continue;   // no row for this stop; hide rather than draw a lie
-        }
-      }
-      if (sf > 0) {
-        // On the chart a train rides its own diagonal, at the playhead.
-        const ya = stopY(trip.r, path.nodes[lo]), yb = stopY(trip.r, path.nodes[hi]);
-        if (ya === null || yb === null) { if (sf >= 1) continue; }
-        else {
-          const sx = timeX(now);
-          const sy = bandTop(trip.r) + lerp(ya, yb, frac);
-          x = sf < 1 ? lerp(x, sx, sf) : sx;
-          y = sf < 1 ? lerp(y, sy, sf) : sy;
-        }
-      }
+      const at = placeAt(trip, path, now, m, sf, gf);
+      if (!at) continue;
+      const x = at.x, y = at.y;
 
       let dot = nodes.get(i);
       if (!dot) {
         dot = document.createElementNS(NS, "circle");
-        dot.setAttribute("r", 5);
+        dot.setAttribute("r", DOT_R);
         dot.setAttribute("class", "train");
         dot.setAttribute("fill", data.lines[trip.r] || "#333");
         const title = document.createElementNS(NS, "title");
@@ -1377,10 +1472,15 @@ __SOCIAL__
       else if (dot.hasAttribute("opacity")) dot.removeAttribute("opacity");
       alive.add(i);
       shown++;
+      if (trailLayer) {
+        if (trailing && !dwellingAt(trip.k, now)) placeCopies(i, trip, path, m, sf, gf);
+        else dropCopies(i);
+      }
     }
     for (const entry of nodes) {
       if (!alive.has(entry[0])) { entry[1].remove(); nodes.delete(entry[0]); }
     }
+    if (trailLayer) for (const i of [...copies.keys()]) if (!alive.has(i)) dropCopies(i);
     const when = fmt(now);
     clock.textContent = when;
     // A range speaks its value; the scrub's is a time, not a count of seconds.
