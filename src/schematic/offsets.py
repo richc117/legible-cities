@@ -11,6 +11,46 @@ cleanly -- important here because octilinear output turns at 45 degrees, where a
 naive per-segment offset leaves visible notches at every bend.
 """
 
+# Per-line width, casing and dash (issue 55), 9 Oct 2026.
+#
+# Slots. A line's slot on an edge is b = (w + 2c) * line_width, w its width
+# and c its casing per side, both multiples of line_width (1 and 0 when
+# omitted). Slots sit in LOOM's order, G = (line_gap - 1) * line_width apart,
+# centred on the edge; line i sits at half the difference between what lies
+# before and after it:
+#
+#     offset(i) = track_offset(i, N, spacing) + (sum(e[:i]) - sum(e[i+1:])) / 2,  e[k] = b[k] - line_width
+#
+# The correction is exactly 0.0 when every slot is line_width, so an omitted
+# map is today's to the bit; a running sum misses that on 74% of random
+# edges. A wide line keeps its centre and moves its neighbours out by half its
+# extra width, on its own edges only. Uniform widest slots were rejected: one
+# width-2 line spreads a five-line bundle to 86.8 units, against 58.8 summed,
+# 51.8 today. This is LOOM's slot (RenderGraph::linePosOn), made per line.
+# build_tracks takes the widths, so the geographic twin and thumbnails get
+# them; render.py's obstacles, clearance and canvas take the same form.
+#
+# Casing. A stroke of width b under its own track, per line, never one per
+# edge: a <use> of the track, first in the line's group, dasharray none, so
+# the page's morph and show/hide carry it.
+#
+# Dash. Paint only: the dots ride unstroked trip paths. Patterns scale with
+# the stroke t = w * line_width and allow for the round caps (t/2 on each end
+# of every dash): dashed "t 2t" shows 2t on, t off; dotted "0 1.6t" shows
+# dots of diameter t, 1.6t apart; "2t t" would draw solid. The page reads
+# width and dash off the drawn group, as strokeOf does, for chips and row
+# swatches.
+#
+# Joins. A track is one path per line per edge, round-capped; nothing joins
+# two at a node, and the mitre above acts only inside an edge. Where a line's
+# ends at a node differ (its neighbours change, LOOM reorders, it turns), its
+# caps bridge a hop up to t. The trip path keeps the hop (seg[0], counted in
+# run) instead of cutting a chord.
+#
+# Example, line_width 7, line_gap 1.6: edge A carries X(1), Y(2), edge B X(1),
+# Z(1). X sits at -9.1 on A and -5.6 on B, a hop of 3.5 its caps bridge; all
+# width 1, both are -5.6.
+
 from __future__ import annotations
 
 import math
@@ -82,6 +122,19 @@ def offset_polyline(points: list[Coord], distance: float) -> list[Coord]:
 def track_offset(index: int, count: int, spacing: float) -> float:
     """Signed sideways offset for track ``index`` of ``count`` on one edge."""
     return (index - (count - 1) / 2.0) * spacing
+
+
+def slot_offsets(slots: list[float], line_width: float, spacing: float) -> list[float]:
+    """Signed sideways offset of each track on one edge whose lines' slots
+    are ``slots``, in the edge's order (the note above): ``track_offset``
+    plus half the difference between the extra widths before and after the
+    track. Every slot ``line_width`` adds exactly 0.0, so such an edge is
+    ``track_offset`` bit for bit; the form is the note's and not a running
+    sum, which rounds differently."""
+    n = len(slots)
+    extra = [b - line_width for b in slots]
+    return [track_offset(i, n, spacing) + (sum(extra[:i]) - sum(extra[i + 1:])) / 2
+            for i in range(n)]
 
 
 def polyline_length(points: list[Coord]) -> float:
