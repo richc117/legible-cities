@@ -497,6 +497,10 @@
           "maximum": 40,
           "description": "Distance of a name from its station, in SVG user units at the map's width; 9 when omitted. The labels are placed again, so the viewBox moves."
         },
+        "label_font": {
+          "enum": ["system", "inter", "atkinson-hyperlegible-next"],
+          "description": "The face the station names are drawn in, and measured in when they are placed. system is the viewer's own Helvetica Neue, Helvetica, Arial or sans-serif, measured at 0.56 of an em a character; inter and atkinson-hyperlegible-next ship with the engine as Latin subsets under the SIL Open Font License, each name measured from the face's own advances, and the SVG embeds the chosen face as a woff2 data URI and names it first in font-family. system when omitted, which draws exactly what is drawn without the field. The labels are placed again, so the viewBox moves. Not sent beside preset, which draws in system: to draw a preset's numbers in another face, send them field by field with this. Held equal to the engine's table by a test."
+        },
         "padding": {
           "type": "number",
           "minimum": 0,

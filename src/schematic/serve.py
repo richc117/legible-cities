@@ -52,7 +52,7 @@ from .describe import station_name
 from .linegraph import LineGraph
 from .render import (HEX_COLOR_PATTERN, draw_stage, octilinearity, stage as render_stage,
                      summary as render_summary)
-from .render import PRESETS, STYLE_RANGES, Style, preset_style
+from .render import LABEL_FONTS, PRESETS, STYLE_RANGES, Style, preset_style
 
 log = logging.getLogger(__name__)
 
@@ -344,18 +344,21 @@ def _style(value: Any) -> Style | None:
     None when the parameter is absent, so ``pipeline.run`` keeps its own
     default, ``Style(themed=True)``, and every output is what it was.
     Otherwise an object of optional fields: the eight numbers of
-    ``render.STYLE_RANGES``, each inside its closed range, and the four
-    colours of ``STYLE_COLORS``, each written ``#rrggbb``. Any other key is
-    refused, ``themed``, ``label_char_width`` and ``default_line_color``
-    among them: they are the engine's, not a client's (``default_color`` is
-    a parameter of ``map.build`` itself).
+    ``render.STYLE_RANGES``, each inside its closed range, the four
+    colours of ``STYLE_COLORS``, each written ``#rrggbb``, and
+    ``label_font``, one of the names of ``render.LABEL_FONTS`` (issue 76).
+    Any other key is refused, ``themed``, ``label_char_width`` and
+    ``default_line_color`` among them: they are the engine's, not a
+    client's (``default_color`` is a parameter of ``map.build`` itself).
 
     Or the name of a look instead of the fields: ``{"preset": "beck"}``
     resolves to exactly the eight numbers of ``render.PRESETS`` (issue 73),
     so it draws what the same numbers sent one by one draw. The name is
     exclusive: beside any other key it is refused, because which of the two
     won would be a guess, and a name that is not in the table is refused
-    naming the ones that are. A preset carries no colour; the theme owns them.
+    naming the ones that are. A preset carries no colour, which the theme
+    owns, and no face, so it draws in the system face; a client that wants
+    a preset's numbers in another face sends them field by field with it.
 
     One rule the schema cannot hold: ``interchange_radius`` may not be below
     ``station_radius``, judged on the values the map would be drawn with,
@@ -373,6 +376,10 @@ def _style(value: Any) -> Style | None:
     left = dict(value)
     if "preset" in left:
         name = left.pop("preset")
+        if set(left) == {"label_font"}:
+            raise invalid_params("style.preset is sent alone and draws in the system face; to "
+                                 "draw its numbers in another face, send them field by field "
+                                 "with label_font")
         if left:
             raise invalid_params("style.preset cannot be sent with the fields it resolves to; "
                                  "send one or the other")
@@ -397,6 +404,11 @@ def _style(value: Any) -> Style | None:
         if not isinstance(color, str) or not COLOR_PATTERN.fullmatch(color):
             raise invalid_params(f"style.{name} must be a colour written #rrggbb")
         fields[name] = color
+    if "label_font" in left:
+        face = left.pop("label_font")
+        if not isinstance(face, str) or face not in LABEL_FONTS:
+            raise invalid_params(f"style.label_font must be {_or(LABEL_FONTS)}")
+        fields["label_font"] = face
     _no_extra("style", left)
     style = Style(themed=True, **fields)
     if style.interchange_radius < style.station_radius:

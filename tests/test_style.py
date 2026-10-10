@@ -106,7 +106,7 @@ def test_the_table_and_the_schema_agree():
     assert defs["MapBuildParams"]["properties"]["style"] == {"$ref": "#/$defs/MapStyle"}
     assert style["type"] == "object" and style["additionalProperties"] is False
     assert "required" not in style
-    assert set(props) == set(RANGES) | set(COLORS) | {"preset"}
+    assert set(props) == set(RANGES) | set(COLORS) | {"preset", "label_font"}
     # The server's own list of colour fields is held to the schema too, so a
     # fifth colour added to the server alone cannot be accepted where the
     # schema refuses it, the one direction the hand-validation test cannot see.
