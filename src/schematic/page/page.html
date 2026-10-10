@@ -1063,10 +1063,10 @@ __SOCIAL__
   // halo and no filter, and a pointer goes through them. They are drawn under
   // every dot, in a group #trains opens with. A train standing at a station has
   // none, because they would sit on it; the Time view has none, because its
-  // diagonals are the trail; and a page nobody is capturing has none under
-  // reduced motion, as it shows the draw-in whole. Present mode keeps them,
-  // which is how the desktop app runs the page (`reduced` is false there), and a
-  // capture draws what it was asked for.
+  // diagonals are the trail; and a person who asked for reduced motion has none
+  // in any mode, present mode (the desktop app's) included, since a trail is a
+  // moving decoration. A capture draws what it was asked for, as the draw-in
+  // does (`quietFade && !capture`), so an export is the same from any machine.
   const DOT_R = Number.isFinite(data.dot_radius) ? data.dot_radius : 5;
   const TRAIL = Number.isFinite(data.trail) && data.trail > 0 ? data.trail : 0;
   const TRAIL_OPACITY = [0.6, 0.45, 0.3, 0.15];
@@ -1438,10 +1438,12 @@ __SOCIAL__
 
     const alive = new Set();
     shown = 0;
-    // Whether the trail shows at all this frame (see TRAIL): the clock must be
-    // moving the trains for it to have a length, the Time view has none, and a
-    // page nobody is capturing has none under reduced motion.
-    const trailing = TRAIL > 0 && speed > 0 && sf < 1 && (!reduced || capture);
+    // Whether the trail shows at all this frame (see TRAIL). It is as long as
+    // the playback speed makes it, whether the clock is running or a reader
+    // has paused or scrubbed it, so at a speed of 0 it has no length and no
+    // copies; the Time view has none; and reduced motion takes it away from
+    // everything but a capture.
+    const trailing = TRAIL > 0 && speed > 0 && sf < 1 && (!quietFade || capture);
     for (let i = lowerBound(now); i < trips.length; i++) {
       if (starts[i] > now) break;
       if (ends[i] < now) continue;

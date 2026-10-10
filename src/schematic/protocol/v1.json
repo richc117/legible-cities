@@ -451,7 +451,7 @@
           "minimum": 0,
           "maximum": 3,
           "default": 0,
-          "description": "How far behind a train its trail reaches, in seconds of playback; 0, no trail, when omitted. The trail is four copies of the train's dot at the places it was a quarter, a half, three quarters and the whole of this many seconds of playback before (so at any playback speed it shows the last `trail` seconds as they were watched), in the line's colour, faded from 0.6 to 0.15 in opacity and drawn under the dots. A train standing at a station has none, nor has the Time view, nor a page under reduced motion that no exporter is capturing. The animation's and not the map's, like dot_radius: it never reaches the SVG. Written into the page's data only when it is not 0."
+          "description": "How far behind a train its trail reaches, in seconds of playback; 0, no trail, when omitted. The trail is four copies of the train's dot at the places it was a quarter, a half, three quarters and the whole of this many seconds of playback before (a length of playback time, so it reaches back further on the clock at a faster speed; a paused or scrubbed page keeps the trail its speed implies, and at a speed of 0 there is none), in the line's colour, faded from 0.6 to 0.15 in opacity and drawn under the dots. A train standing at a station has none, nor has the Time view, nor a page under reduced motion that no exporter is capturing, in present mode as in any other. The animation's and not the map's, like dot_radius: it never reaches the SVG. Written into the page's data only when it is not 0."
         }
       },
       "required": [

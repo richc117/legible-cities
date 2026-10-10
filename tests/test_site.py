@@ -3738,8 +3738,11 @@ const look = page => page.evaluate(() => {
   const under = copyEls.every(c => dotEls.every(
     d => !!(c.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_FOLLOWING)));
   const s = P.state();
+  const group = svg.querySelector("#trail");
   return { now: s.now, view: s.viewName, str: s.str, shown: s.shown, dots: dots, copies: copies,
-           under: under, group: !!svg.querySelector("#trail"),
+           under: under, group: !!group,
+           shows: { trail: group ? getComputedStyle(group).visibility : null,
+                    trains: getComputedStyle(svg.querySelector("#trains")).visibility },
            ridden: s.trip && s.trip.legs ? s.trip.legs.map(l => l.line) : null,
            data: Object.keys(JSON.parse(document.getElementById("data").textContent)) };
 });
@@ -3783,10 +3786,10 @@ def _looks_around(t: int) -> list[str]:
     return steps
 
 
-def _day(page: str) -> list[dict]:
-    """The page's trips, from the positions file beside it."""
-    folder = Path(page.removeprefix("file://"))
-    return json.loads((folder.parent / "fixture.positions.json").read_text())["trips"]
+def _day(folder: Path) -> list[dict]:
+    """The trips of the fixture page written into ``folder``, from the positions
+    file beside it."""
+    return json.loads((folder / "fixture.positions.json").read_text())["trips"]
 
 
 def _standing(trip: dict, t: float) -> bool:
@@ -3858,7 +3861,7 @@ def test_a_trail_is_four_faded_copies_of_each_moving_train_under_the_dots(tmp_pa
     stood a quarter of a second of playback, then two, three and four quarters,
     earlier: the dots of those clock times are the copies' places."""
     page = _fixture_page(tmp_path, dot_radius=8, trail=1)
-    trips = _day(page)
+    trips = _day(tmp_path)
     at = SEVEN + 100
     assert _standing(trips[0], at) and len(_trailing(trips, at)) == 10
     [run] = _trails([{"url": page, "steps": [HOLD, SPEED, *_looks_around(at)]}])
@@ -3875,7 +3878,7 @@ def test_a_train_standing_at_a_station_has_no_trail_until_it_leaves(tmp_path):
     """From a stop's arrival to its departure, at the first station of a trip
     and at its second, and the instant it leaves it has all four again."""
     page = _fixture_page(tmp_path, trail=1)
-    trips = _day(page)
+    trips = _day(tmp_path)
     times = [SEVEN - 31, SEVEN - 30, SEVEN - 25, SEVEN - 20, SEVEN + 99, SEVEN + 100,
              SEVEN + 105, SEVEN + 109, SEVEN + 110, SEVEN + 150]
     steps = [HOLD, SPEED]
@@ -3900,7 +3903,7 @@ def test_the_copies_follow_the_stepped_clock_and_every_view_the_dot_does(tmp_pat
     the geographic map they sit where the dots were; in the Time view, whose
     diagonals are the trail, there are none, and on the map again they are back."""
     page = _fixture_page(tmp_path, trail=1)
-    trips = _day(page)
+    trips = _day(tmp_path)
     at = SEVEN + 105
     stepped = [f"window.__present.seek({at - 60})", "window.__present.setPlaying(true)",
                "window.__present.advance(1)", "look", f"window.__present.seek({at})", "look"]
@@ -3923,31 +3926,40 @@ def test_the_copies_follow_the_stepped_clock_and_every_view_the_dot_does(tmp_pat
 
 
 @needs_browser
-def test_a_trail_is_not_drawn_under_reduced_motion_unless_a_capture_asks_or_the_page_is_presented(
-        tmp_path):
-    """Reduced motion shows none on a page nobody is capturing, as it shows the
-    draw-in whole, and a capture draws what it asks and gives it back after;
-    present mode keeps the trail, which is how the app's viewer runs the page."""
+def test_a_trail_is_not_drawn_under_reduced_motion_in_any_mode_unless_a_capture_asks(tmp_path):
+    """Reduced motion takes the trail away in every mode, present mode (which is
+    how the desktop app runs the page) included, as it does the draw-in; a
+    capture draws what it asks, present mode too, and gives it back after.
+    Without the preference the trail is drawn either way. The clock is held
+    from the first step, so nothing but the steps moves it."""
     page = _fixture_page(tmp_path, trail=1)
-    trips = _day(page)
+    trips = _day(tmp_path)
     at = SEVEN + 105
-    steps = [SPEED, f"window.__present.seek({at})", "look",
+    steps = ["window.__present.setPlaying(false)", SPEED,
+             f"window.__present.seek({at})", "look",
              "window.__present.setCapture(true)", f"window.__present.seek({at})", "look",
              "window.__present.setCapture(false)", f"window.__present.seek({at})", "look"]
-    loose, presented, plain = _trails([{"url": page, "reduce": True, "steps": steps},
-                                       {"url": _present(page), "reduce": True, "steps": steps},
-                                       {"url": page, "reduce": False, "steps": steps}])
-    before, during, after = loose["looks"]
-    assert before["copies"] == [] and after["copies"] == [] and before["dots"] and after["dots"]
-    _check_copies(during, trips, at)
-    for look in presented["looks"] + plain["looks"]:
-        _check_copies(look, trips, at)
+    loose, presented, plain, shown = _trails([
+        {"url": page, "reduce": True, "steps": steps},
+        {"url": _present(page), "reduce": True, "steps": steps},
+        {"url": page, "reduce": False, "steps": steps},
+        {"url": _present(page), "reduce": False, "steps": steps}])
+    for run in (loose, presented):
+        before, during, after = run["looks"]
+        assert before["copies"] == [] and after["copies"] == []
+        assert before["dots"] and after["dots"]
+        _check_copies(during, trips, at)
+    for run in (plain, shown):
+        for look in run["looks"]:
+            _check_copies(look, trips, at)
+    looks = [look for run in (loose, presented, plain, shown) for look in run["looks"]]
+    assert {look["now"] for look in looks} == {at}
 
 
 @needs_browser
 def test_a_line_that_is_hidden_takes_its_trail_with_it(tmp_path):
     page = _fixture_page(tmp_path, trail=1)
-    trips = _day(page)
+    trips = _day(tmp_path)
     at = SEVEN + 105
     steps = [HOLD, SPEED, f"window.__present.seek({at})", "look",
              'window.__present.setRoutes(["A"])', f"window.__present.seek({at})", "look",
@@ -3963,12 +3975,52 @@ def test_a_line_that_is_hidden_takes_its_trail_with_it(tmp_path):
 
 
 @needs_browser
-def test_two_captures_with_a_trail_agree_and_a_page_without_one_captures_what_it_did(tmp_path):
+def test_a_trail_has_the_length_the_speed_gives_it_and_none_at_a_speed_of_zero(tmp_path):
+    """The trail is playback time, so it is the clock's speed that gives it a
+    length: at 0 it has none and no copies are drawn, and a page that is paused,
+    which the speed does not change, keeps the trail its speed implies."""
+    page = _fixture_page(tmp_path, trail=1)
+    trips = _day(tmp_path)
+    at = SEVEN + 105
+    seek = f"window.__present.seek({at})"
+    steps = [HOLD, SPEED, seek, "look", "window.__present.setSpeed(0)", seek, "look",
+             SPEED, "window.__present.setPlaying(false)", seek, "look",
+             "window.__present.setPlaying(true)", "window.__present.setSpeed(240)", seek, "look"]
+    [run] = _trails([{"url": page, "steps": steps}])
+    running, still, paused, quick = run["looks"]
+    _check_copies(running, trips, at)
+    assert still["copies"] == [] and still["dots"]
+    assert paused["copies"] == running["copies"]
+    # Four times the speed reaches four times as far back: the copies move.
+    assert [c["at"] for c in quick["copies"]] != [c["at"] for c in running["copies"]]
+    _check_copies(quick, trips, at)
+
+
+@needs_browser
+def test_the_trail_waits_with_the_trains_while_the_network_draws_in(tmp_path):
+    """The copies live in the trains' group, so the draw-in's rule that hides it
+    hides them too (inherited, not set on them), and they come back with the
+    trains when the network is whole."""
+    page = _fixture_page(tmp_path, trail=1)
+    at = SEVEN + 105
+    steps = [HOLD, SPEED, f"window.__present.seek({at})", "look",
+             "window.__present.setDrawn(0.3)", "look",
+             "window.__present.setDrawn(1)", "look"]
+    [run] = _trails([{"url": page, "steps": steps}])
+    whole, drawing, back = run["looks"]
+    assert whole["shows"] == back["shows"] == {"trail": "visible", "trains": "visible"}
+    assert drawing["shows"] == {"trail": "hidden", "trains": "hidden"}
+    assert drawing["copies"] and back["copies"] == whole["copies"]
+
+
+@needs_browser
+def test_two_captures_with_a_trail_agree_within_the_tolerance_and_are_not_the_bare_page(tmp_path):
     """A map beat and a rows beat at 60x through the engine's own recorder at
     30 fps, a quarter of the reel's size, twice over a page whose trains have a
     radius of 8 and a trail of 1: the two agree within the determinism
-    tolerance frame for frame, and they are not the page without a trail, whose
-    two captures agree to the pixel, so the copies are in the frames."""
+    tolerance frame for frame, as the two of the same page without a trail do
+    (the control), and the two kinds are not alike, so the copies are in the
+    frames."""
     beats = [{"secs": 2, "view": "map", "at": "06:59", "speed": 60},
              {"secs": 2, "view": "linear", "speed": 60}]
     drawn = _fixture_page(tmp_path / "trail", dot_radius=8, trail=1)
@@ -4004,12 +4056,13 @@ def test_the_copies_fade_with_the_time_views_tween_and_with_the_lines_a_trip_fad
     tween = [HOLD, SPEED, f"window.__present.seek({at})", "window.__present.setPlaying(false)",
              'window.__present.showView("time", 1)', "window.__present.advance(0.5)", "look",
              "window.__present.advance(0.5)", "look"]
-    route = [SPEED, "window.__present.setPlaying(false)", f"window.__present.seek({at})", "look",
-             f"window.__present.setTrip({json.dumps(a_to_b[0])}, {json.dumps(a_to_b[1])})", "look"]
+    # Off capture and off reduced motion the fade is a tween, which a step of a
+    # second lands: so the copies are on show with no capture.
+    route = ["window.__present.setPlaying(false)", SPEED, f"window.__present.seek({at})", "look",
+             f"window.__present.setTrip({json.dumps(a_to_b[0])}, {json.dumps(a_to_b[1])})",
+             "window.__present.advance(1)", "look"]
     tweened, routed = _trails([{"url": page, "steps": tween},
-                               # Reduced motion lands the fade at once, and in present mode
-                               # the trail is kept under it, so both are on show with no capture.
-                               {"url": _present(page), "reduce": True, "steps": route}])
+                               {"url": page, "reduce": False, "steps": route}])
     half, whole = tweened["looks"]
     assert half["str"] == 0.5 and half["copies"] and whole["str"] == 1 and whole["copies"] == []
     # ease(0.5) is a half, so a copy is drawn at half its step's opacity.
