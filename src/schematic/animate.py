@@ -18,6 +18,7 @@ import datetime as dt
 import heapq
 import json
 import math
+import re
 from base64 import b64encode
 from html import escape as html_escape
 from dataclasses import dataclass, field
@@ -649,27 +650,30 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
 
     html_path = out_dir / f"{stem}.html"
     html_path.write_text(
-        _HTML.replace("__PRESENT__", _PRESENT_JS)
-             # First, while the template is the only text in the page, and with
-             # every underscore escaped (JSON reads "_" back as "_"), so no
-             # placeholder replaced below can match inside a feed's labels here.
-             .replace("__ROUTING__", _json_for_script(animation.routing).replace("_", "\\u005f"))
-             # Named for the button, not the file: map-trifold draws Geographic,
-             # graph the schematic view, line-segments the linear one.
-             .replace("__ICON_GEO__", _VIEW_ICONS["map-trifold"])
-             .replace("__ICON_SCHEMATIC__", _VIEW_ICONS["graph"])
-             .replace("__ICON_LINEAR__", _VIEW_ICONS["line-segments"])
-             .replace("__ICON_TIME__", _VIEW_ICONS["clock"])
-             .replace("__ICONS__", _ICON_LINKS.format(base=icons) if icons else "")
-             # Already escaped by the caller, which is the only thing that knows
-             # the site's origin. Empty for a page written for standalone use.
-             .replace("__SOCIAL__", social)
-             .replace("__TITLE__", html_escape(title))
-             .replace("__NAME__", html_escape(name or title))
-             .replace("__SUBTITLE__", html_escape(subtitle))
-             .replace("__BACK__", html_escape(back))
-             .replace("__SVG__", svg)
-             .replace("__DATA__", _json_for_script(data)),
+        _fill(_HTML, {
+            "__PRESENT__": _PRESENT_JS,
+            # Its underscores are escaped (JSON reads "\u005f" back as "_"). That
+            # once kept a label from matching a placeholder; nothing written is
+            # read again now, and the escape stays so a feed's page is the page
+            # it was.
+            "__ROUTING__": _json_for_script(animation.routing).replace("_", "\\u005f"),
+            # Named for the button, not the file: map-trifold draws Geographic,
+            # graph the schematic view, line-segments the linear one.
+            "__ICON_GEO__": _VIEW_ICONS["map-trifold"],
+            "__ICON_SCHEMATIC__": _VIEW_ICONS["graph"],
+            "__ICON_LINEAR__": _VIEW_ICONS["line-segments"],
+            "__ICON_TIME__": _VIEW_ICONS["clock"],
+            "__ICONS__": _ICON_LINKS.format(base=icons) if icons else "",
+            # Already escaped by the caller, which is the only thing that knows
+            # the site's origin. Empty for a page written for standalone use.
+            "__SOCIAL__": social,
+            "__TITLE__": html_escape(title),
+            "__NAME__": html_escape(name or title),
+            "__SUBTITLE__": html_escape(subtitle),
+            "__BACK__": html_escape(back),
+            "__SVG__": svg,
+            "__DATA__": _json_for_script(data),
+        }),
         encoding="utf-8", newline="\n")
     return json_path, html_path
 
@@ -701,6 +705,22 @@ def _json_for_script(data: object) -> str:
             .replace("<", "\\u003c")
             .replace(">", "\\u003e")
             .replace("&", "\\u0026"))
+
+
+def _fill(template: str, values: dict[str, str]) -> str:
+    """``template`` with every key of ``values`` replaced by its value, in one
+    pass over the template.
+
+    A value is written and never read again. Filling the placeholders one after
+    another read each value as part of the template for the fills after it, so
+    a line or a station whose name was a placeholder (``__DATA__``) was
+    replaced inside the map, and a title that was one inside the page's head.
+    The names come from an agency's feed, which is not ours to trust, and the
+    title and the rest from a caller (engine issue 65). The function hands the
+    value back as it is, where a replacement string would read its backslashes.
+    """
+    token = re.compile("|".join(re.escape(key) for key in values))
+    return token.sub(lambda found: values[found.group(0)], template)
 
 
 _HTML = (_PAGE_DIR / "page.html").read_text(encoding="utf-8")
