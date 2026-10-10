@@ -522,6 +522,9 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
     try:
         with _lock:
             _swap(scratch, layout_dir(key, layout))
+            # In the same hold as the swap, so no reader finds the new set
+            # with the old set's minutes still kept for it (engine issue 69).
+            _forget_minutes(layout)
     except BaseException:
         _forget(key, layout)
         shutil.rmtree(scratch, ignore_errors=True)
@@ -820,6 +823,10 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
                         progress=(lambda stage, _f, m: tick(stage, m)) if progress else None)
     paths = found.paths
     since = time.monotonic()
+    # Before the octi stage is read: a forced re-layout that swaps the stored
+    # set after this keeps the minutes of the day read below from being kept
+    # as the new set's (engine issue 69).
+    epoch = _minutes_epoch(found.id)
 
     # Match stops against the unprojected graph -- station_id is what matters
     # there, and reprojecting is only needed for geometry.
@@ -846,7 +853,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     # drawn lines' trips alone, and the match it reports is cut to the
     # stations that remain.
     day = schedule_for(found, date, anchor=anchor, graph=graph_all)
-    _remember_minutes(found.id, day)
+    _remember_minutes(found.id, day, epoch)
     date, match, trips = day.date, day.match, day.trips
     labels = set(graph_ll.labels)
     if hidden:
@@ -944,8 +951,18 @@ def schedule_for(found: Layout, date: dt.date | None, *, anchor: dt.date | None 
 # description of the same layout and day reads no timetable, and map.build,
 # which holds the day's trips already, fills it. Requests run on several
 # workers: two misses at once may both read the day, which is harmless.
+#
+# The minutes kept for an id are the stored set's, and only while that set
+# is the one stored (engine issue 69). A forced re-layout keeps the id and
+# swaps in a set whose octi stage may differ -- topo is not reproducible --
+# so the swap forgets the id's minutes and moves its epoch on, in the same
+# hold of ``_lock`` (``_forget_minutes``; ``_lock`` is taken before
+# ``_minutes_lock``, never after). A day read that began before the swap
+# ends after it with the old set's minutes: they answer the request that
+# read them and are not kept. The key stays the id and the day.
 _MINUTES: dict[tuple[str, dt.date], dict[str, dict[str, Any] | None]] = {}
 _minutes_lock = threading.Lock()
+_epochs: dict[str, int] = {}
 
 
 def line_minutes(found: Layout, date: dt.date, *,
@@ -957,24 +974,60 @@ def line_minutes(found: Layout, date: dt.date, *,
     layout still being laid out, whose octi file is not to be read from
     ``found``'s directory (``in_flight``). Without it, a miss reads the
     stored octi stage under the lock a swap takes, as ``read_stored`` reads
-    (engine issue 68), and a hit reads no file at all."""
+    (engine issue 68), and a hit reads no file at all.
+
+    A layout still being laid out -- ``found``'s directory is its build's
+    scratch -- is timed from ``graph`` and neither answered from the cache
+    nor kept in it: until its swap, what is kept under the id is the stored
+    set's, which a forced re-layout's new octi stage need not match, and the
+    swap forgets it in any case (engine issue 69)."""
+    if found.dir != layout_dir(found.key, found.id):
+        return _minutes_of(schedule_for(found, date, graph=graph))
     with _minutes_lock:
         known = _MINUTES.get((found.id, date))
+        epoch = _epochs.get(found.id, 0)
     if known is not None:
         return known
     if graph is None:
         with _lock:
             data = found.paths["octi"].read_bytes()
         graph = LineGraph.from_geojson(json.loads(data.decode("utf-8")))
-    return _remember_minutes(found.id, schedule_for(found, date, graph=graph))
+    return _remember_minutes(found.id, schedule_for(found, date, graph=graph), epoch)
 
 
-def _remember_minutes(layout: str, day: Day) -> dict[str, dict[str, Any] | None]:
+def _minutes_epoch(layout: str) -> int:
+    """How many times this process has swapped the stored set under
+    ``layout``: taken before a day is read from the set, and handed to
+    ``_remember_minutes`` after."""
+    with _minutes_lock:
+        return _epochs.get(layout, 0)
+
+
+def _forget_minutes(layout: str) -> None:
+    """The stored set under ``layout`` has just been swapped for another:
+    the minutes kept for it go, and a day read that began before now is not
+    kept when it ends (engine issue 69). The caller holds ``_lock``, the
+    swap's own hold, so no reader finds the new set and the old minutes."""
+    with _minutes_lock:
+        for kept in [known for known in _MINUTES if known[0] == layout]:
+            del _MINUTES[kept]
+        _epochs[layout] = _epochs.get(layout, 0) + 1
+
+
+def _minutes_of(day: Day) -> dict[str, dict[str, Any] | None]:
     from .describe import station_name
     from .schedule import line_runs
 
     names = {node.id: station_name(node) for node in day.graph.stations}
-    minutes = line_runs(day.trips, day.graph.labels, names)
+    return line_runs(day.trips, day.graph.labels, names)
+
+
+def _remember_minutes(layout: str, day: Day, epoch: int) -> dict[str, dict[str, Any] | None]:
+    """The day's minutes, kept under the layout and the day unless the
+    stored set has been swapped since ``epoch`` was taken, before the day
+    was read: then they are the old set's, and are answered and not kept."""
+    minutes = _minutes_of(day)
     with _minutes_lock:
-        _MINUTES[(layout, day.date)] = minutes
+        if _epochs.get(layout, 0) == epoch:
+            _MINUTES[(layout, day.date)] = minutes
     return minutes
