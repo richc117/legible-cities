@@ -436,7 +436,7 @@ The code is licensed under the GNU General Public License, version 3 or
 later (`GPL-3.0-or-later`); the text is in `LICENSE`, and `pyproject.toml`
 and `site/package.json` carry the SPDX identifier. That covers `src/`,
 `bin/`, `tests/`, `docker/`, the notebooks, and the site's templates,
-stylesheets and scripts. Three things in this repository are not code and
+stylesheets and scripts. Four things in this repository are not code and
 keep their own terms:
 
 - **The essay and the atlas prose** under `site/src/` are © the author, all
@@ -447,6 +447,14 @@ keep their own terms:
   (`map-trifold`, `graph`, `line-segments` and `clock`, regular weight, from
   the 2.1.1 release of `@phosphor-icons/core`) are redistributed unmodified
   under the MIT licence; its text is the `LICENSE` file beside them.
+- **The two label faces** in `src/schematic/fonts/`, Inter 4.1 (`inter/`)
+  and Atkinson Hyperlegible Next 2.001 (`atkinson-hyperlegible-next/`), are
+  weight-400 subsets to the Latin of station names, made by `bin/build-fonts`
+  from their pinned releases and redistributed under the SIL Open Font
+  License 1.1; each face's text is the `OFL.txt` beside it, and its
+  `README.md` says which release it came from. Neither licence reserves a
+  font name, so the subsets keep their family names. An SVG the engine draws
+  in one of them embeds that subset, as the licence allows.
 
 Each agency's GTFS feed stays under that agency's terms; `data/` is not
 tracked and nothing from a feed is redistributed here.
