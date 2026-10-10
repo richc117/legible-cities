@@ -8,7 +8,7 @@ the first test holds the three together. Omitting ``style`` -- or sending
 ``themed`` defaults to false and drops every ``var(--map-*)`` from the page.
 The drawing tests use the invented twelve-station network the theme pictures
 are made from, built in code, so they run without a feed, LOOM or a stored
-layout; the last test is the one that needs a stored layout.
+layout; the two tests over Pittsburgh's stored layout skip without it.
 """
 
 from __future__ import annotations
