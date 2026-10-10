@@ -259,6 +259,47 @@ def test_a_flat_set_is_adopted_only_by_the_registrys_own_layout(home, monkeypatc
     assert pipeline.stored(KEY).meta["migrated"] is True, "the registry's layout adopts it"
 
 
+def test_laying_out_a_flat_set_first_migrates_it_without_waiting_on_itself(home, monkeypatch):
+    """Engine issue 67. ``lay_out`` decides under ``_lock`` whether a layout
+    is stored, adopting a flat set as part of that, and the migration took
+    the lock again: a plain lock is not re-entrant, so the first call for a
+    home holding a flat set and nothing under the id waited on itself for
+    ever. Run from a thread with a deadline, and on a lock of the test's own,
+    so a regression fails here instead of hanging the run with the module's
+    lock held."""
+    folder = config.graphs_dir() / KEY
+    folder.mkdir(parents=True)
+    flat = {}
+    for name in pipeline.STAGE_FILES.values():
+        (folder / name).write_text(json.dumps({**GRAPH, "flat": name}))
+        flat[name] = (folder / name).read_bytes()
+    fake = FakeLoom(monkeypatch)
+    monkeypatch.setattr(pipeline, "_lock", threading.Lock())
+    answer: dict[str, object] = {}
+
+    def first() -> None:
+        try:
+            answer["layout"] = pipeline.lay_out(KEY)
+        except BaseException as exc:  # handed to the test's thread, which asserts on it
+            answer["error"] = exc
+
+    thread = threading.Thread(target=first, daemon=True)
+    thread.start()
+    thread.join(timeout=5)
+    assert not thread.is_alive(), "lay_out of a flat set was still waiting after 5 s"
+    assert "error" not in answer, answer
+    made = answer["layout"]
+    assert isinstance(made, pipeline.Layout)
+    assert made.meta["migrated"] is True
+    assert {p.name: p.read_bytes() for p in made.dir.iterdir()
+            if p.name != pipeline.META_FILE} == flat
+    assert not any((folder / name).exists() for name in flat), "moved, not copied"
+    assert ids_under(KEY) == [made.id]
+    assert pipeline.stored(KEY) == made
+    assert fake.calls == [], "adopted, not built"
+    assert pipeline._building == {} and not pipeline._lock.locked()
+
+
 def test_a_layout_remembers_a_recorded_null_over_the_registry(home, monkeypatch):
     FakeLoom(monkeypatch)
     first = pipeline.lay_out(KEY)

@@ -285,15 +285,21 @@ def stored(key: str, **overrides: Any) -> Layout | None:
     if not source.is_file():
         return None
     inputs, layout = _address(feed, source)
-    return read_layout(key, layout) or _migrated(feed, layout, inputs)
+    found = read_layout(key, layout)
+    if found is None:
+        with _lock:
+            found = _migrated(feed, layout, inputs)
+    return found
 
 
 def _migrated(feed: feeds.Feed, layout: str, inputs: dict[str, Any]) -> Layout | None:
     """A flat set was built from the registry entry and nothing else, so only
-    the registry's own layout may adopt it."""
+    the registry's own layout may adopt it. The caller holds ``_lock``:
+    ``lay_out`` decides under it whether the layout is stored, adopting a flat
+    set as part of that, and ``stored`` takes it for this."""
     if feeds.variant(feed) is not None:
         return None
-    return migrate(feed.key, layout, inputs)
+    return _migrate(feed.key, layout, inputs)
 
 
 def stage_path(key: str, stage: str, **overrides: Any) -> Path | None:
@@ -303,6 +309,11 @@ def stage_path(key: str, stage: str, **overrides: Any) -> Path | None:
     return None if found is None else found.paths[stage]
 
 
+# The store's one lock: who builds which layout, the scratches, and every
+# move of a set into, out of and aside from its place. A plain lock, not a
+# re-entrant one, so nothing done while it is held takes it again: what
+# needs it from inside and from outside has a body that assumes it held
+# (``_migrate``) and a door that takes it (``migrate``).
 _lock = threading.Lock()
 _building: dict[tuple[str, str], threading.Event] = {}
 
@@ -552,23 +563,34 @@ def migrate(key: str, layout: str, inputs: dict[str, Any]) -> Layout | None:
     Moved, not copied, so the site's cache survives the change in place. The
     inputs recorded are the feed and options as they are now; the set was
     made before they were recorded, which the meta says with ``migrated``."""
+    with _lock:
+        return _migrate(key, layout, inputs)
+
+
+def _migrate(key: str, layout: str, inputs: dict[str, Any]) -> Layout | None:
+    """``migrate``, for a caller that holds ``_lock`` already. The lock is a
+    plain one and not re-entrant, and ``lay_out`` adopts a flat set while it
+    holds it, deciding whether to build: a migration that took the lock
+    again there waited on itself for ever (engine issue 67). Everything here
+    is a few renames and one small write, so the lock is held as briefly as
+    a swap holds it, and the check that the flat set is whole is made under
+    it, where no other migration can move the set meanwhile."""
     folder = config.graphs_dir() / key
     flat = [folder / name for name in STAGE_FILES.values()]
     if not all(path.is_file() for path in flat):
         return None
     target = layout_dir(key, layout)
-    with _lock:
-        if target.exists():
-            return read_layout(key, layout)
-        scratch = Path(tempfile.mkdtemp(prefix=f"{layout}.building-{os.getpid()}-", dir=folder))
-        for path in flat:
-            shutil.move(str(path), str(scratch / path.name))
-        meta = {**inputs, "engine": __version__,
-                "made": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-                "migrated": True}
-        (scratch / META_FILE).write_text(json.dumps(meta, indent=2) + "\n",
-                                         encoding="utf-8", newline="\n")
-        os.replace(scratch, target)
+    if target.exists():
+        return read_layout(key, layout)
+    scratch = Path(tempfile.mkdtemp(prefix=f"{layout}.building-{os.getpid()}-", dir=folder))
+    for path in flat:
+        shutil.move(str(path), str(scratch / path.name))
+    meta = {**inputs, "engine": __version__,
+            "made": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+            "migrated": True}
+    (scratch / META_FILE).write_text(json.dumps(meta, indent=2) + "\n",
+                                     encoding="utf-8", newline="\n")
+    os.replace(scratch, target)
     return read_layout(key, layout)
 
 
