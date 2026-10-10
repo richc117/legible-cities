@@ -197,7 +197,12 @@ object over the sidecar) the widths, radii, label size and padding the map is
 drawn with. Its `label_font` is the face the station names are drawn and
 measured in: `system`, the default and the viewer's own Helvetica Neue stack,
 or `inter` or `atkinson-hyperlegible-next`, which ship with the engine and are
-embedded in the SVG only when chosen. Every line the map draws has an entry
+embedded in the SVG only when chosen. `station_shape` is `circle` (the
+default), TfL's `tick` or `square`, and `interchange_shape` `circle` or
+`square`. `style={"preset": "beck"}` (or `blueprint` or `paper`; the method
+`style.presets` lists them) stands for a named look's fields, alone or beside
+`label_font`. How the trains are drawn is not the map's but the animation's:
+`map.build`'s `dot_radius` and `trail` sit beside `style`. Every line the map draws has an entry
 in the page's `data.lines` in the colour it was drawn, so the chips, the train
 dots and the time chart never fall back on their own; a colour is written
 `#rrggbb` or refused; an override for a line the layout does not carry is
@@ -264,6 +269,12 @@ reads them back out of it, because the export is meant to *be* that figure
 rather than resemble it. `--no-title --no-clock` is the rest of the figure:
 it carries no furniture at all. `--tag` names the variant in the filename, so
 a dressed and an undressed cut of one preset can sit in the same folder.
+
+An authored beat list can also open on a title card (`card`: the city, the
+network, the service day and the caption over the map, cutting in and out) and
+draw the network in (`draw_in`: each line, in stacking order, from its first
+end), both through the page's seam, `setCard` and `setDrawn`; the named
+storyboards use neither.
 
 Each social shape has a GIF twin — `instagram-reel-gif`, `linkedin-gif`,
 `bluesky-gif` — for the places that will not take a video. They are smaller and

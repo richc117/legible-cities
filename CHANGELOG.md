@@ -5,6 +5,26 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.15.0] - 2026-10-10
+
+### Added
+
+- **`map.build`'s `style` takes a named look, and `style.presets` lists them** (issue 73). `style.presets`, a new method with no parameters, answers three presets in order, each with the fields of `style` it resolves to: `beck` (TfL's ratios: a ring half a line thick round an interchange, a third of a line between parallel strokes, and the tick of the next entry), `blueprint` (thin strokes, small round stations, generous ground) and `paper` (print-like, with a 12-unit label). `map.build`'s `style` takes either the object as before or `{ "preset": "beck" }` alone, or with a `label_font`, and a name draws exactly the bytes the same fields sent one by one draw. A name beside any other field, and a name outside the three, are refused with the `params` kind before anything is drawn. The defaults, the colours the theme owns and every stored layout are unchanged.
+
+- **A station's marker can be a circle, TfL's tick or a square** (issue 74). `MapStyle` gained `station_shape` (`circle`, `tick` or `square`) and `interchange_shape` (`circle` or `square`; an interchange is never a tick), both `circle` when omitted, which draws exactly what was drawn before. A tick is TfL's, 0.66 of the line's width past its edge in the line's own colour, perpendicular to the line (bisecting a bend) on the side of the station's name, with one bar across both sides at the end of a line; a square is turned with its line and rounded where lines meet. `beck` takes the tick and keeps the ring. Labels keep clear of the marker drawn, the stored layout never moves, and the page draws the map's own markers, read by `data-node` rather than redrawn as circles.
+
+- **`map.build` takes `dot_radius` and `trail`, and the page draws a train at the one and a faded trail by the other** (issue 75). `dot_radius` (2 to 12, 5 when left out) is the radius of a train's dot in SVG user units, and `trail` (0 to 3, 0 when left out) is how many seconds of playback the trail behind it reaches: four copies of the dot from the same keyframes at a quarter, a half, three quarters and the whole of that, in the line's colour at opacities 0.6, 0.45, 0.3 and 0.15, painted under the dots with no halo or filter. A train standing at a station has none, nor does the Time view, nor a page under reduced motion that nobody is capturing (present mode included); a capture draws what it asks. Both belong to the animation and not the map, so they sit beside `style`, reach the page's data only when they are not the default and never reach the SVG.
+
+- **A map's station names can be drawn in Inter or Atkinson Hyperlegible Next** (issue 76). `map.build`'s `style` takes `label_font`: `system`, the default and the Helvetica Neue stack as before, or `inter` or `atkinson-hyperlegible-next`, two faces that ship with the engine as weight-400 Latin subsets under the SIL Open Font License, made by `bin/build-fonts` from pinned releases and embedded in the SVG as a WOFF2 data URI, named first in `font-family`, only when chosen. The placer measures a chosen face's names from its own advances instead of 0.56 of an em a character, so New York places 345 names in Inter and 353 in Atkinson Hyperlegible Next against 337, none over another name or a station. The page's `settle()` now resolves once the map's face has loaded and re-fits a box measured before it; the row names stay on the system stack.
+
+- **A storyboard can open on a title card and draw the network in** (issue 44). The page learned both through its seam: `setCard(on)` puts up a scrim of the ground at 0.75 with the city, the network, the service day and the caption in `--text` inside the platform's zones, cutting in and out, and `setDrawn(fraction)` draws the shown lines in stacking order, each over half the beat from its spine's first end, with the trains and the clock held until the network is whole and nothing of the draw-in left on it at 1; `state()` reports `card` and `drawn`. `StoryboardBeat` and `BeatPayload` gained `card` (a second at least) and `draw_in` (two seconds at least, once a list, on the geographic or map view), written only where true, and a card too short to read at 0.3 s a word comes with a note; the eight named storyboards plan byte for byte as they did.
+
+### Fixed
+
+- **The page's station layer drew every station with a hard-coded outline** (issue 72). It hid the map's own markers and redrew each as a circle of 2.2, so `Style.station_stroke` reached the SVG and never the viewer or an export. The page's station circles now carry the map's own outline, and a `station_stroke` of 0 draws none; a page from the default style is pixel-identical.
+
+The schema moved additively at protocol 1: `style.presets`, `MapStyle.preset`, `station_shape`, `interchange_shape` and `label_font`, `StylePreset` and `StylePresets`, `MapBuildParams.dot_radius` and `trail`, and the two beat flags. The Pittsburgh `page_without_data` pin was re-pinned five times, once per page change (issues 72, 44, 76, 75 and 74); the SVG, the page's data and its lines did not move.
+
 ## [0.14.0] - 2026-10-09
 
 ### Added
