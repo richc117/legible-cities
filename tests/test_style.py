@@ -24,7 +24,7 @@ from test_colors import _graph, _stored
 from test_serve import DATE, KEY, NO_LAYOUT, SCHEMA, Client, check, invalid
 
 from schematic import animate, config, diagnostics, pipeline, serve
-from schematic.render import STYLE_RANGES, Style, render
+from schematic.render import PRESETS, STYLE_RANGES, Style, preset_style, render
 from schematic.theme_thumbnails import fixture
 
 # The ranges the issue fixes, written out here and not read from the table, so
@@ -39,6 +39,14 @@ RANGES = {
     "label_size": (6, 32),
     "label_offset": (0, 40),
     "padding": (0, 200),
+}
+# The three presets as issue 73 decided them, in ``STYLE_RANGES``' order and
+# written out here, not read from ``render.PRESETS``, so a number changed in the
+# table alone is a failure of the tests and not a new truth for them.
+PRESET_NUMBERS = {
+    "beck": (6, 1.33, 3.6, 7.5, 3, 11, 10, 24),
+    "blueprint": (4, 2, 3, 4.5, 1.5, 10, 8, 32),
+    "paper": (6, 1.6, 3.6, 5.5, 1.8, 12, 10, 28),
 }
 COLORS = ("background", "station_fill", "station_stroke_color", "label_color")
 UNIT = "SVG user units at the map's width"
@@ -309,3 +317,41 @@ def test_a_wider_line_reaches_the_map_the_page_and_the_geographic_layer(tmp_path
     assert circles(wide.render.svg) == circles(plain.render.svg)
     assert len(handed) == 2 and None not in handed
     assert [style.spacing for style in handed] == [7.0 * 1.6, 12 * 1.6]
+
+
+# ------------------------------------------------------------------ the presets
+
+def test_the_presets_are_the_three_the_issue_decided_in_its_order():
+    assert list(PRESETS) == ["beck", "blueprint", "paper"]
+    for name, numbers in PRESET_NUMBERS.items():
+        assert PRESETS[name] == dict(zip(STYLE_RANGES, numbers)), name
+        # All eight and nothing else: no colour, which the theme owns.
+        assert list(PRESETS[name]) == list(STYLE_RANGES), name
+
+
+def test_every_preset_value_is_inside_its_range_with_the_interchange_above_the_station():
+    for name, numbers in PRESETS.items():
+        for field, value in numbers.items():
+            low, high = RANGES[field]
+            assert low <= value <= high, f"{name}.{field} is {value}, outside {low} to {high}"
+        assert numbers["interchange_radius"] > numbers["station_radius"], name
+
+
+def test_no_preset_equals_the_default_or_another():
+    default = {field: getattr(Style(), field) for field in STYLE_RANGES}
+    for name, numbers in PRESETS.items():
+        assert numbers != default, f"{name} is the default style"
+    named = list(PRESETS.items())
+    for i, (one, first) in enumerate(named):
+        for other, second in named[i + 1:]:
+            assert first != second, f"{one} and {other} are the same style"
+
+
+def test_preset_style_answers_a_copy_and_refuses_what_is_not_a_name():
+    got = preset_style("beck")
+    assert got == PRESETS["beck"]
+    got["line_width"] = 99
+    assert PRESETS["beck"]["line_width"] == 6, "the answer is the table's own dict"
+    assert preset_style("beck") == PRESETS["beck"]
+    with pytest.raises(KeyError):
+        preset_style("night")

@@ -25,6 +25,10 @@ from .offsets import (cumulative_lengths, dedupe, offset_polyline, point_at,
 
 @dataclass
 class Style:
+    # The defaults here are the engine's own look and no preset's: ``PRESETS``
+    # below names three others, each a complete set of the eight numbers, and
+    # none equals this (a test holds it). Changing a default here changes
+    # every map drawn without a style; it is not how a look is added.
     line_width: float = 7.0
     line_gap: float = 1.6           # parallel track pitch, as a multiple of width
     station_radius: float = 4.2
@@ -78,6 +82,40 @@ STYLE_RANGES: dict[str, tuple[float, float, str | None]] = {
     "label_offset": (0, 40, USER_UNITS),
     "padding": (0, 200, USER_UNITS),
 }
+
+
+# Named looks, each a name over the eight numbers of ``STYLE_RANGES`` (issue
+# 73): what ``style.presets`` answers and what ``map.build``'s
+# ``{"preset": name}`` resolves to, in this order. The theme owns the colours,
+# so a preset carries none, and nothing here is ``Style``'s default. Each
+# value is inside its range with the interchange above the station, and no
+# preset equals the default or another; a test holds all three.
+#
+# beck: TfL's ratios (its Line diagram standard, January 2025). An interchange
+#   is a ring half a line thick round an interior two lines wide, so its outer
+#   diameter is three lines; names a line and two-thirds off it; a third of a
+#   line between parallel strokes, because feeds repeat trunk colours.
+# blueprint: thin strokes, small round stations and generous ground.
+# paper: print-like; a label of 12 is TfL's "x-height equals the line's
+#   thickness" at Helvetica Neue's 0.517 em.
+PRESETS: dict[str, dict[str, float]] = {
+    "beck": {"line_width": 6, "line_gap": 1.33, "station_radius": 3.6,
+             "interchange_radius": 7.5, "station_stroke": 3, "label_size": 11,
+             "label_offset": 10, "padding": 24},
+    "blueprint": {"line_width": 4, "line_gap": 2, "station_radius": 3,
+                  "interchange_radius": 4.5, "station_stroke": 1.5, "label_size": 10,
+                  "label_offset": 8, "padding": 32},
+    "paper": {"line_width": 6, "line_gap": 1.6, "station_radius": 3.6,
+              "interchange_radius": 5.5, "station_stroke": 1.8, "label_size": 12,
+              "label_offset": 10, "padding": 28},
+}
+
+
+def preset_style(name: str) -> dict[str, float]:
+    """The eight numbers of the preset ``name``, a copy a caller may change.
+    A KeyError for a name not in ``PRESETS``: the server refuses an unknown
+    name in its own sentence before it gets here."""
+    return dict(PRESETS[name])
 
 
 @dataclass
