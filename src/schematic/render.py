@@ -54,6 +54,11 @@ class Style:
     label_color: str = "#111111"
     default_line_color: str = "#888888"
     padding: float = 24.0
+    # The marker of a station on one line, and of one where lines meet: one of
+    # ``STATION_SHAPES`` and of ``INTERCHANGE_SHAPES`` (issue 74). Circles, the
+    # default, draw exactly what was drawn before there was a choice.
+    station_shape: str = "circle"
+    interchange_shape: str = "circle"
 
     # Emit the page furniture -- background, station markers, labels -- as CSS
     # custom properties so an embedding page can theme them, keeping the literal
@@ -63,6 +68,16 @@ class Style:
     # colours, and the alternative an embedding page reaches for is a CSS
     # invert filter, which turns LA's A Line from #0072bc into orange.
     themed: bool = False
+
+    def __post_init__(self) -> None:
+        # The marker fields are names, so a Python caller's slip would draw
+        # something else in silence; refused here as the server refuses it.
+        # An interchange is never a tick (``INTERCHANGE_SHAPES``).
+        for name, shapes in STYLE_SHAPES.items():
+            value = getattr(self, name)
+            if not isinstance(value, str) or value not in shapes:
+                raise ValueError(f"{name} must be {', '.join(shapes[:-1])} or {shapes[-1]}, "
+                                 f"not {value!r}")
 
     @property
     def spacing(self) -> float:
@@ -93,9 +108,26 @@ STYLE_RANGES: dict[str, tuple[float, float, str | None]] = {
     "padding": (0, 200, USER_UNITS),
 }
 
+# What a client may ask of the two marker fields of ``Style`` (issue 74), the
+# one table the server's sentences and the schema's enums agree with. A
+# circle is the ring every map drew before; a tick is TfL's (``TICK``); a
+# square is turned with the line. An interchange is never a tick: both TfL and
+# Beck pair ticks with rings, and a tick has no side where lines meet.
+STATION_SHAPES = ("circle", "tick", "square")
+INTERCHANGE_SHAPES = ("circle", "square")
+STYLE_SHAPES: dict[str, tuple[str, ...]] = {
+    "station_shape": STATION_SHAPES,
+    "interchange_shape": INTERCHANGE_SHAPES,
+}
+
+# TfL's station tick, as a multiple of the line's thickness: its Line diagram
+# standard (January 2025) has "Station ticks are 0.66x squared".
+TICK = 0.66
+
 
 # Named looks, each a name over the eight numbers of ``STYLE_RANGES`` (issue
-# 73): what ``style.presets`` answers and what ``map.build``'s
+# 73), and a marker of ``STYLE_SHAPES`` where the look has one of its own
+# (issue 74): what ``style.presets`` answers and what ``map.build``'s
 # ``{"preset": name}`` resolves to, in this order. The theme owns the colours,
 # so a preset carries none, and nothing here is ``Style``'s default. Each
 # value is inside its range with the interchange above the station, and no
@@ -104,14 +136,15 @@ STYLE_RANGES: dict[str, tuple[float, float, str | None]] = {
 # beck: TfL's ratios (its Line diagram standard, January 2025). An interchange
 #   is a ring half a line thick round an interior two lines wide, so its outer
 #   diameter is three lines; names a line and two-thirds off it; a third of a
-#   line between parallel strokes, because feeds repeat trunk colours.
+#   line between parallel strokes, because feeds repeat trunk colours. A
+#   station is TfL's tick and an interchange keeps the ring, as Beck drew them.
 # blueprint: thin strokes, small round stations and generous ground.
 # paper: print-like; a label of 12 is TfL's "x-height equals the line's
 #   thickness" at Helvetica Neue's 0.517 em.
-PRESETS: dict[str, dict[str, float]] = {
+PRESETS: dict[str, dict[str, float | str]] = {
     "beck": {"line_width": 6, "line_gap": 1.33, "station_radius": 3.6,
              "interchange_radius": 7.5, "station_stroke": 3, "label_size": 11,
-             "label_offset": 10, "padding": 24},
+             "label_offset": 10, "padding": 24, "station_shape": "tick"},
     "blueprint": {"line_width": 4, "line_gap": 2, "station_radius": 3,
                   "interchange_radius": 4.5, "station_stroke": 1.5, "label_size": 10,
                   "label_offset": 8, "padding": 32},
@@ -175,8 +208,8 @@ def label_measure(style: Style) -> Measure:
     return face.measure() if face else em_measure(style.label_char_width)
 
 
-def preset_style(name: str) -> dict[str, float]:
-    """The eight numbers of the preset ``name``, a copy a caller may change.
+def preset_style(name: str) -> dict[str, float | str]:
+    """The fields of the preset ``name``, a copy a caller may change.
     A KeyError for a name not in ``PRESETS``: the server refuses an unknown
     name in its own sentence before it gets here."""
     return dict(PRESETS[name])
@@ -334,6 +367,191 @@ def _horizontal_run(graph: LineGraph, node_id: str, proj: Projection) -> bool:
     return False
 
 
+# ------------------------------------------------------------------ markers
+
+def _heading(points: list[Coord], reach: float) -> Coord | None:
+    """The unit direction from a polyline's first point to its point ``reach``
+    along it (its last, if it is shorter), or None where it has no length.
+    Read a stretch away rather than off the first segment, because LOOM leaves
+    stubs at station nodes far shorter than a line is wide, and their angles
+    are rounding noise."""
+    pts = dedupe(points)
+    if len(pts) < 2:
+        return None
+    far = point_at(pts, min(reach, cumulative_lengths(pts)[-1]))
+    dx, dy = far[0] - pts[0][0], far[1] - pts[0][1]
+    length = math.hypot(dx, dy)
+    return (dx / length, dy / length) if length > 1e-9 else None
+
+
+def _through(legs: list[tuple[Coord, Coord]]) -> Coord:
+    """The line's direction at a node, as a unit vector in the drawing's
+    coordinates, from each edge there: its direction away from the node and
+    its direction of travel (``src`` to ``dst``) at the node.
+
+    One edge: its own travel. More: the two most nearly opposite, which are
+    the line running straight through or the bend it turns, and the
+    direction from one to the other, which is square to the bend's bisector,
+    so a marker across it bisects the bend. It runs the way the first of the
+    two travels, so its right is that edge's right. Pairs as opposite as each
+    other to nine places, as where two lines cross straight through, go to
+    the first in edge order: the last bit of a diagonal's unit vector does
+    not choose."""
+    if len(legs) == 1:
+        return legs[0][1]
+    pairs = [(i, j) for i in range(len(legs)) for j in range(i + 1, len(legs))]
+    i, j = min(pairs, key=lambda p: round(legs[p[0]][0][0] * legs[p[1]][0][0]
+                                          + legs[p[0]][0][1] * legs[p[1]][0][1], 9))
+    (a, travel), (b, _) = legs[i], legs[j]
+    tx, ty = b[0] - a[0], b[1] - a[1]
+    length = math.hypot(tx, ty)
+    if length < 1e-9:  # out and back along one bearing: across that bearing
+        return travel
+    tx, ty = tx / length, ty / length
+    return (tx, ty) if tx * travel[0] + ty * travel[1] >= 0 else (-tx, -ty)
+
+
+def _num(value: float) -> str:
+    text = f"{value:.2f}"
+    return "0.00" if text == "-0.00" else text
+
+
+@dataclass
+class _Marker:
+    """One station's marker, as ``Style``'s two shapes make it (issue 74).
+
+    ``size`` is a circle's radius, half a square's side, or a tick's line
+    width. ``tangent`` is the line's direction at the station (``_through``)
+    and ``side`` the side of it a tick stands on: 1 on its right, -1 on its
+    left. A tick at the end of its line (``terminus``) is TfL's double tab,
+    drawn as one bar across the line reaching a tick's length past it on
+    both sides; there ``tangent`` points out past the end."""
+
+    x: float
+    y: float
+    shape: str
+    size: float
+    interchange: bool
+    tangent: Coord = (1.0, 0.0)
+    terminus: bool = False
+    color: str = ""
+    side: float = 1.0
+
+    def corners(self, both: bool = False) -> list[Coord]:
+        """The outline's four corners in the drawing, a rounded square's
+        before its rounding. ``both`` is a tick standing on either side at
+        once: the bar a label is kept clear of before its side is known."""
+        tx, ty = self.tangent
+        rx, ry = -ty, tx
+        if self.shape == "tick":
+            # From the line's middle to TICK of its width past its edge, so
+            # the part outside the line is TfL's square and nothing of the
+            # ground shows between the tick and its line. The double tab's
+            # outer face is where the line's round cap ends, so the line
+            # stops at the bar rather than showing its cap past it.
+            tick = TICK * self.size
+            reach = self.size / 2 + tick
+            if self.terminus:
+                u0, u1, near = self.size / 2 - tick, self.size / 2, -reach
+            else:
+                u0, u1, near = -tick / 2, tick / 2, (-reach if both else 0.0)
+            local = [(u0, near), (u1, near), (u1, reach), (u0, reach)]
+            local = [(u, v * self.side) for u, v in local]
+        else:
+            h = self.size
+            local = [(-h, -h), (h, -h), (h, h), (-h, h)]
+        return [(self.x + u * tx + v * rx, self.y + u * ty + v * ry) for u, v in local]
+
+    def obstacle(self) -> Quad | None:
+        """What a label keeps clear of: the outline itself, and a tick's on
+        both sides of its line, since the side is its label's; None for a
+        circle, which keeps the square ``place`` gives every circle."""
+        return None if self.shape == "circle" else Quad.of(self.corners(both=True))
+
+    def face(self, label: Quad) -> None:
+        """Stand a tick on its label's side of the line; a label on neither
+        side, along the line itself, leaves it on the right. A double tab
+        stands on both sides already."""
+        if self.terminus:
+            return
+        cx = sum(p[0] for p in label.pts) / 4 - self.x
+        cy = sum(p[1] for p in label.pts) / 4 - self.y
+        self.side = -1.0 if -cx * self.tangent[1] + cy * self.tangent[0] < -1e-6 else 1.0
+
+    def path(self) -> str:
+        """The outline as path data: a moveto to the station, then the shape
+        drawn relative to it. So the station is the first two numbers, and
+        moving them moves the marker whole, which is how the page carries it
+        between views. Each corner is written to the hundredth, as a circle's
+        centre is, and every step is the difference of two written corners."""
+        tx, ty = self.tangent
+        rx, ry = -ty, tx
+
+        def at(u: float, v: float) -> Coord:
+            return (self.x + u * tx + v * rx, self.y + u * ty + v * ry)
+
+        if self.shape == "square" and self.interchange:
+            # Rounded by a quarter of the side, clockwise from the top edge.
+            h, q = self.size, self.size / 2
+            steps = [("m", at(-h + q, -h)), ("l", at(h - q, -h)), ("a", at(h, -h + q)),
+                     ("l", at(h, h - q)), ("a", at(h - q, h)), ("l", at(-h + q, h)),
+                     ("a", at(-h, h - q)), ("l", at(-h, -h + q)), ("a", at(-h + q, -h))]
+        else:
+            first, *rest = self.corners()
+            steps = [("m", first)] + [("l", p) for p in rest]
+        arc = f"a {_num(self.size / 2)} {_num(self.size / 2)} 0 0 1"
+        here = (float(f"{self.x:.2f}"), float(f"{self.y:.2f}"))
+        out = [f"M {self.x:.2f} {self.y:.2f}"]
+        for verb, point in steps:
+            snapped = (float(f"{point[0]:.2f}"), float(f"{point[1]:.2f}"))
+            out.append(f"{arc if verb == 'a' else verb} "
+                       f"{_num(snapped[0] - here[0])} {_num(snapped[1] - here[1])}")
+            here = snapped
+        return " ".join(out) + " z"
+
+
+def _markers(graph: LineGraph, style: Style, proj: Projection, node_xy: dict[str, Coord],
+             routes_at: dict[str, set[str]], colors: dict[str, str]) -> dict[str, _Marker]:
+    """Every station's marker, by node. An interchange is a node more than one
+    line runs through, as it always was, and takes ``interchange_shape``;
+    every other station takes ``station_shape``. A station no line reaches,
+    or whose edges have no length, is a circle whatever the style, since a
+    tick or a square has nothing to turn by. The line's direction is only
+    worked out when a shape needs it, so a map of circles costs what it did."""
+    adjacency = (graph.adjacency()
+                 if (style.station_shape, style.interchange_shape) != ("circle", "circle") else {})
+    markers: dict[str, _Marker] = {}
+    for node in graph.stations:
+        x, y = node_xy[node.id]
+        lines = routes_at.get(node.id, set())
+        interchange = len(lines) > 1
+        radius = style.interchange_radius if interchange else style.station_radius
+        shape = style.interchange_shape if interchange else style.station_shape
+        # Never a tick where lines meet, nor a shape that is not one, even from
+        # a style changed after it was made, which ``Style`` cannot see.
+        if shape not in (INTERCHANGE_SHAPES if interchange else STATION_SHAPES):
+            shape = "circle"
+        legs: list[tuple[Coord, Coord]] = []
+        if shape != "circle":
+            for edge, _ in adjacency.get(node.id, ()):
+                if not edge.lines or edge.src == edge.dst:
+                    continue
+                pts = [proj(c) for c in edge.geometry]
+                away = _heading(pts if edge.src == node.id else pts[::-1], style.line_width)
+                if away is not None:
+                    legs.append((away, away if edge.src == node.id else (-away[0], -away[1])))
+        if not legs:
+            markers[node.id] = _Marker(x, y, "circle", radius, interchange)
+        elif shape == "tick":
+            end = len(legs) == 1
+            tangent = (-legs[0][0][0], -legs[0][0][1]) if end else _through(legs)
+            markers[node.id] = _Marker(x, y, "tick", style.line_width, False, tangent,
+                                       terminus=end, color=colors[next(iter(lines))])
+        else:
+            markers[node.id] = _Marker(x, y, "square", radius, interchange, _through(legs))
+    return markers
+
+
 def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = None,
            labels: bool = True, title: str | None = None,
            line_order: list[str] | None = None,
@@ -359,6 +577,7 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     # A caller's order is a preference, not a whitelist: a line it leaves
     # out is drawn after the ones it names rather than not drawn at all.
     order = ordered_labels(line_order, sorted(colors))
+    markers = _markers(graph, style, proj, node_xy, routes_at, colors)
 
     # --- labels ---------------------------------------------------------
     placements: list[Placement] = []
@@ -386,12 +605,17 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
                 importance=len(routes_at.get(node.id, ())),
                 on_horizontal_run=_horizontal_run(graph, node.id, proj),
                 clearance=(n - 1) / 2 * style.spacing + style.line_width / 2,
+                marker=markers[node.id].obstacle(),
             ))
         placements, dropped_stations = place(
             stations, obstacles, size=style.label_size,
             measure=label_measure(style), offset=style.label_offset,
             marker_radius=style.interchange_radius)
         dropped = [s.text for s in dropped_stations]
+        # A tick stands toward its station's name, as TfL draws it.
+        for p in placements:
+            if markers[p.key].shape == "tick":
+                markers[p.key].face(p.quad)
 
     # --- canvas: derive from what is actually drawn ----------------------
     # Two boxes: the network alone, and the network plus its labels. Labels
@@ -406,6 +630,12 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
     for x, y in node_xy.values():
         net_xs += [x - style.interchange_radius, x + style.interchange_radius]
         net_ys += [y - style.interchange_radius, y + style.interchange_radius]
+    # A tick or a turned square can reach past that; a circle never does.
+    for marker in markers.values():
+        if marker.shape != "circle":
+            for x, y in marker.corners():
+                net_xs.append(x)
+                net_ys.append(y)
 
     xs, ys = list(net_xs), list(net_ys)
     for p in placements:
@@ -463,16 +693,28 @@ def render(graph: LineGraph, *, width: float = 1800.0, style: Style | None = Non
         out.append("</g>")
     out.append("</g>")
 
+    # One marker a station, each with its node. A circle is written as it
+    # always was, with no data-shape; a tick or a square is a path whose first
+    # moveto is the station (``_Marker.path``) and says which it is. A tick is
+    # in its line's colour and has no outline; a square has a circle's.
     out.append('<g id="stations">')
     for node in graph.stations:
         x, y = node_xy[node.id]
+        marker = markers[node.id]
+        ids = (f'data-node="{html.escape(node.id)}" '
+               f'data-station-id="{html.escape(node.station_id or "")}"')
+        if marker.shape == "tick":
+            out.append(f'<path d="{marker.path()}" fill="{_attr(marker.color)}" '
+                       f'{ids} data-shape="tick"/>')
+            continue
+        paint = (f'fill="{_attr(style.var("station-fill", style.station_fill))}" '
+                 f'stroke="{_attr(style.var("station-stroke", style.station_stroke_color))}" '
+                 f'stroke-width="{style.station_stroke:.2f}"')
+        if marker.shape == "square":
+            out.append(f'<path d="{marker.path()}" {paint} {ids} data-shape="square"/>')
+            continue
         r = style.interchange_radius if len(routes_at.get(node.id, ())) > 1 else style.station_radius
-        out.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{r:.2f}" '
-                   f'fill="{_attr(style.var("station-fill", style.station_fill))}" '
-                   f'stroke="{_attr(style.var("station-stroke", style.station_stroke_color))}" '
-                   f'stroke-width="{style.station_stroke:.2f}" '
-                   f'data-node="{html.escape(node.id)}" '
-                   f'data-station-id="{html.escape(node.station_id or "")}"/>')
+        out.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{r:.2f}" {paint} {ids}/>')
     out.append("</g>")
 
     if placements:

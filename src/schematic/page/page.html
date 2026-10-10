@@ -552,14 +552,57 @@ __SOCIAL__
   svg.removeAttribute("height");
 
   // Where each station sits on the map, read back off the drawing rather than
-  // shipped a second time in the payload.
+  // shipped a second time in the payload. A marker is a circle, or a tick or a
+  // square (engine issue 74): a path whose first moveto is the station and
+  // whose outline is drawn relative to it, so the station is its first two
+  // numbers and moving them moves the marker whole. Every marker is read, by
+  // its node, whatever element it is.
   const mapXY = new Map();
-  svg.querySelectorAll("#stations circle[data-node]").forEach(c => {
+  const MOVETO = /^\s*M\s*([-\d.]+)[\s,]+([-\d.]+)/;
+  // An outline's steps, each a verb and its numbers, whose last two are a
+  // step across the drawing: m and l, and a, whose first five are its radii
+  // and flags. The map writes no other verb after the station's moveto.
+  const stepsOf = text => [...text.matchAll(/([a-zA-Z])([^a-zA-Z]*)/g)].map(s =>
+    [s[1], s[2].trim() ? s[2].trim().split(/[\s,]+/).map(Number) : []]);
+  // On a row the marker is turned with the row, as it is with its line on the
+  // map: a tick stands up, toward the names, its second step being the way it
+  // stands out; a square squares up, its first step being along the line. The
+  // turn is the smallest that does it.
+  const turnOf = (shape, steps) => {
+    const lines = steps.filter(s => s[0] === "l");
+    if (!lines.length) return 0;
+    if (shape === "tick" && lines.length > 1) {
+      const a = -Math.PI / 2 - Math.atan2(lines[1][1][1], lines[1][1][0]);
+      return Math.atan2(Math.sin(a), Math.cos(a));
+    }
+    const a = Math.atan2(lines[0][1][1], lines[0][1][0]);
+    return Math.round(a / (Math.PI / 2)) * (Math.PI / 2) - a;
+  };
+  const turned = (steps, a) => {
+    const c = Math.cos(a), s = Math.sin(a);
+    return steps.map(([verb, n]) => {
+      if (n.length < 2) return " " + verb;
+      const k = n.length - 2, x = n[k], y = n[k + 1];
+      return " " + verb + " " + n.slice(0, k).concat(
+        [(x * c - y * s).toFixed(2), (x * s + y * c).toFixed(2)]).join(" ");
+    }).join("");
+  };
+  svg.querySelectorAll("#stations [data-node]").forEach(c => {
+    const shape = c.getAttribute("data-shape") || "circle";
+    const at = shape === "circle" ? null : MOVETO.exec(c.getAttribute("d") || "");
+    if (shape !== "circle" && !at) return;
+    const outline = at ? c.getAttribute("d").slice(at[0].length) : null;
+    const steps = at ? stepsOf(outline) : null;
     mapXY.set(c.getAttribute("data-node"), {
-      x: +c.getAttribute("cx"), y: +c.getAttribute("cy"), r: +c.getAttribute("r"),
+      x: at ? +at[1] : +c.getAttribute("cx"), y: at ? +at[2] : +c.getAttribute("cy"),
+      r: at ? 0 : +c.getAttribute("r"),
       // The marker's own outline, kept as the SVG wrote it: a style may set it
       // to nothing, and a number read back would make that falsy.
       w: c.getAttribute("stroke-width"),
+      // A tick's or a square's path, its outline after the station as written,
+      // and that outline's steps and turn for the rows.
+      shape: shape, marker: c, outline: outline, steps: steps,
+      turn: at ? turnOf(shape, steps) : 0,
     });
   });
 
@@ -908,14 +951,29 @@ __SOCIAL__
       const pt = mapXY.get(st.node);
       if (!pt) continue;
 
-      const dot = document.createElementNS(NS, "circle");
-      dot.setAttribute("r", pt.r);
-      dot.setAttribute("fill", "var(--map-station-fill, #fff)");
-      dot.setAttribute("stroke", "var(--map-station-stroke, #111)");
-      if (pt.w !== null) dot.setAttribute("stroke-width", pt.w);
+      let dot;
+      if (pt.shape === "circle") {
+        dot = document.createElementNS(NS, "circle");
+        dot.setAttribute("r", pt.r);
+        dot.setAttribute("fill", "var(--map-station-fill, #fff)");
+        dot.setAttribute("stroke", "var(--map-station-stroke, #111)");
+        if (pt.w !== null) dot.setAttribute("stroke-width", pt.w);
+      } else {
+        // The map's own marker, copied: its shape, its size, its turn and its
+        // outline's width, and a tick's fill, which is its line's colour. A
+        // square's fill and outline are the theme's, as a circle's are.
+        dot = pt.marker.cloneNode(false);
+        dot.removeAttribute("data-node");
+        dot.removeAttribute("data-station-id");
+        if (pt.shape === "square") {
+          dot.setAttribute("fill", "var(--map-station-fill, #fff)");
+          dot.setAttribute("stroke", "var(--map-station-stroke, #111)");
+        }
+      }
       dotLayer.appendChild(dot);
       const gn = geoData && geoData.nodes[st.node];
       dots.push({ el: dot, label: line.label, node: st.node, mapPt: pt, r: pt.r,
+                  shape: pt.shape, at: [pt.x, pt.y],
                   geoPt: gn ? { x: gn[0], y: gn[1] } : null });
 
       const name = (layout.names || {})[st.node];
@@ -1267,6 +1325,16 @@ __SOCIAL__
       let x = d.mapPt.x, y = d.mapPt.y;
       if (g > 0 && d.geoPt) { x = lerp(x, d.geoPt.x, g); y = lerp(y, d.geoPt.y, g); }
       if (m > 0 && lp) { x = lerp(x, lp.x, m); y = lerp(y, lp.y, m); }
+      d.at = [x, y];
+      if (d.shape !== "circle") {
+        // A tick or a square moves whole, the station being the path's first
+        // moveto, and keeps the map's turn everywhere but on the rows, where
+        // it turns with them; at the map's pose its outline is the map's own.
+        const a = m > 0 ? d.mapPt.turn * m : 0;
+        d.el.setAttribute("d", "M " + x.toFixed(2) + " " + y.toFixed(2)
+                          + (a ? turned(d.mapPt.steps, a) : d.mapPt.outline));
+        continue;
+      }
       d.el.setAttribute("cx", x.toFixed(1));
       d.el.setAttribute("cy", y.toFixed(1));
       // Interchanges are drawn larger on the map; on a row every stop is a stop.
@@ -2229,10 +2297,8 @@ __SOCIAL__
       nameOf(a).localeCompare(nameOf(b), undefined, { numeric: true }) || byUnits(a, b));
     if (!byName.length) return;
     const shownAt = n => dotsOf.get(n).some(d => d.el.style.display !== "none");
-    const at = n => {
-      const el = dotsOf.get(n)[0].el;
-      return [+el.getAttribute("cx"), +el.getAttribute("cy")];
-    };
+    // Where the view has put a station's first dot, whatever shape it is.
+    const at = n => dotsOf.get(n)[0].at;
 
     const aside = document.createElement("aside");
     aside.id = "trip";
@@ -2268,9 +2334,13 @@ __SOCIAL__
 
     placePick = () => {
       if (document.activeElement !== cursor) return;
-      const box = dotsOf.get(pickAt)[0].el.getBoundingClientRect();
+      // Centred on the station itself, where the view put it, not on its dot's
+      // box: a tick's box stands off to one side of its station.
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+      const p = new DOMPoint(...at(pickAt)).matrixTransform(ctm);
       const half = cursor.offsetWidth / 2, root = document.documentElement;
-      const x = box.left + box.width / 2 + scrollX - half, y = box.top + box.height / 2 + scrollY - half;
+      const x = p.x + scrollX - half, y = p.y + scrollY - half;
       // Held inside the document, so a dot at its edge never widens the page.
       cursor.style.left = Math.max(0, Math.min(x, root.scrollWidth - 2 * half)).toFixed(1) + "px";
       cursor.style.top = Math.max(0, y).toFixed(1) + "px";
@@ -2367,7 +2437,7 @@ __SOCIAL__
       let best = null, far = REACH / Math.hypot(ctm.a, ctm.b);
       for (const d of dots) {
         if (d.el.style.display === "none") continue;
-        const gap = Math.hypot(+d.el.getAttribute("cx") - p.x, +d.el.getAttribute("cy") - p.y);
+        const gap = Math.hypot(d.at[0] - p.x, d.at[1] - p.y);
         if (gap < far) { far = gap; best = d.node; }
       }
       if (best !== null) {

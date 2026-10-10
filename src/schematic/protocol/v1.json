@@ -467,7 +467,7 @@
       "properties": {
         "preset": {
           "enum": ["beck", "blueprint", "paper"],
-          "description": "A named look over the eight numbers: beck, blueprint or paper. style.presets answers the numbers each resolves to, and a name draws exactly what those numbers sent field by field draw. Sent alone, or with label_font, since a preset carries no face: beside any other field of this object it is refused with the params kind. A preset carries no colour either, the page's theme owning them; alone it draws in system, and beside label_font it draws its numbers in that face. Held equal to the engine's table by a test."
+          "description": "A named look over the eight numbers, and for beck the station shape: beck, blueprint or paper. style.presets answers the fields each resolves to, and a name draws exactly what those fields sent one by one draw. Sent alone, or with label_font, since a preset carries no face: beside any other field of this object it is refused with the params kind. A preset carries no colour either, the page's theme owning them; alone it draws in system, and beside label_font it draws its fields in that face. Held equal to the engine's table by a test."
         },
         "line_width": {
           "type": "number",
@@ -536,12 +536,20 @@
         "label_color": {
           "$ref": "#/$defs/HexColor",
           "description": "The station names, as the literal a standalone SVG falls back to; the page's theme overrides it. #111111 when omitted."
+        },
+        "station_shape": {
+          "enum": ["circle", "tick", "square"],
+          "description": "The marker of a station on one line; circle when omitted, which draws exactly what was drawn before. tick is TfL's: a square 0.66 line_width on a side standing out from the line's edge, in the line's own colour, perpendicular to the line (bisecting a bend) on the side its name is on, else the edge's right; at the end of a line, a bar across both sides. square is 2 station_radius on a side, turned with the line, in a circle's fill and outline. The stored layout never moves. Held equal to the engine's table by a test."
+        },
+        "interchange_shape": {
+          "enum": ["circle", "square"],
+          "description": "The marker of a station where lines meet; circle when omitted, the ring, whatever station_shape is. square is 2 interchange_radius on a side with its corners rounded by a quarter of it, turned with the line. Never a tick, which has no side where lines meet. Held equal to the engine's table by a test."
         }
       },
       "additionalProperties": false
     },
     "StylePreset": {
-      "description": "One named look: its name and the eight numbers it resolves to, in MapStyle's units and ranges and complete, so a client could send them field by field as map.build's style. No colour: the theme owns them.",
+      "description": "One named look: its name and the fields it resolves to, the eight numbers in MapStyle's units and ranges and complete, and a marker shape where the look has its own (beck's tick), so a client could send them field by field as map.build's style. No colour: the theme owns them.",
       "type": "object",
       "properties": {
         "name": {
@@ -558,7 +566,9 @@
             "station_stroke": { "type": "number", "minimum": 0, "maximum": 8 },
             "label_size": { "type": "number", "minimum": 6, "maximum": 32 },
             "label_offset": { "type": "number", "minimum": 0, "maximum": 40 },
-            "padding": { "type": "number", "minimum": 0, "maximum": 200 }
+            "padding": { "type": "number", "minimum": 0, "maximum": 200 },
+            "station_shape": { "enum": ["circle", "tick", "square"] },
+            "interchange_shape": { "enum": ["circle", "square"] }
           },
           "required": ["line_width", "line_gap", "station_radius", "interchange_radius", "station_stroke", "label_size", "label_offset", "padding"],
           "additionalProperties": false
@@ -568,7 +578,7 @@
       "additionalProperties": false
     },
     "StylePresets": {
-      "description": "The named looks map.build's style takes in place of its fields, beck, blueprint and paper in that order. Nothing is stored: the table is the engine's, and a name resolves to exactly the numbers listed here.",
+      "description": "The named looks map.build's style takes in place of its fields, beck, blueprint and paper in that order. Nothing is stored: the table is the engine's, and a name resolves to exactly the fields listed here.",
       "type": "object",
       "properties": {
         "presets": {

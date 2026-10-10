@@ -3063,6 +3063,239 @@ def test_the_pages_station_circles_take_their_outline_and_radius_from_the_maps_m
     assert sum(d["r"] == interchange for d in dots) == 5
 
 
+# Engine issue 74: the page's station layer is the map's own markers, whatever
+# their shape. The map is read twice: in a page of its own, where nothing hides
+# it, for each marker's shape, outline and box, and in the animation page,
+# whose dots must be those markers at the map's pose. Then route mode fades a
+# tick and the draw-in hides it, as they do a circle, and on the rows a tick
+# stands up toward the names and a square squares up.
+MARKERS = BROWSER + r"""
+main(async browser => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                         reducedMotion: "reduce" });
+  const page = await ctx.newPage();
+  const problems = [];
+  page.on("pageerror", e => problems.push(e.message));
+  const read = sel => page.evaluate(sel => [...document.querySelectorAll(sel)].map(el => {
+    const b = el.getBBox(), cs = getComputedStyle(el);
+    return { tag: el.tagName, shape: el.getAttribute("data-shape") || "circle",
+             d: el.getAttribute("d"), fill: el.getAttribute("fill"),
+             box: [b.x, b.y, b.width, b.height], undrawn: el.classList.contains("undrawn"),
+             visibility: cs.visibility, opacity: +cs.opacity };
+  }), sel);
+  await page.goto(job.map, { waitUntil: "load" });
+  const map = await read("#stations [data-node]");
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  const P = (fn, arg) => page.evaluate(fn, arg).then(answer => frames(page, 2).then(() => answer));
+  await P(() => { window.__present.setPlaying(false); window.__present.showView("schematic", 0);
+                  window.__present.settle(); });
+  const dots = await read("#linear-stations > *");
+  // B alone, so A, C and D fade; under reduced motion the fade lands at once.
+  await P(() => window.__present.setTrip("x5y9", "x5y1"));
+  const trip = await read("#linear-stations > *");
+  await P(() => window.__present.setTrip(null, null));
+  // The draw-in at nothing and then whole, held as an exporter holds it.
+  await P(() => { window.__present.setCapture(true); window.__present.settle();
+                  window.__present.setDrawn(0); });
+  const none = await read("#linear-stations > *");
+  await P(() => window.__present.setDrawn(1));
+  const whole = await read("#linear-stations > *");
+  await P(() => { window.__present.showView("linear", 0); window.__present.settle(); });
+  const rows = await read("#linear-stations > *");
+  return { problems, map, dots, trip, none, whole, rows };
+}).catch(fail);
+"""
+FIXTURE_COLOURS = {label: colour for label, (colour, _) in theme_thumbnails.LINES.items()}
+
+
+@needs_browser
+@pytest.mark.parametrize("style", [
+    Style(themed=True, station_shape="tick"),
+    Style(themed=True, station_shape="square", interchange_shape="square"),
+    Style(themed=True, station_shape="tick", interchange_shape="square", line_width=12),
+], ids=["tick", "square", "tick-and-rounded-square"])
+def test_the_pages_markers_are_the_maps_own_whatever_their_shape(tmp_path, style):
+    """Issue 53's twelve stations, ten of them on one line and two where lines
+    meet, so fifteen dots: at the map's pose each is its station's marker, of
+    the same shape and outline and within a hundredth of its box (a circle's
+    centre within the twentieth the page has always written it to)."""
+    graph = theme_thumbnails.fixture()
+    svg = render(graph, title="Twelve", style=style).svg
+    (tmp_path / "map.html").write_text(f"<!doctype html><body>{svg}</body>")
+    url = _trip_page(tmp_path, "Twelve", graph, style)
+    seen = _run(MARKERS, {"url": url, "map": (tmp_path / "map.html").as_uri()})
+    assert not seen["problems"], seen["problems"]
+    markers, dots = seen["map"], seen["dots"]
+    assert sorted(m["shape"] for m in markers) == sorted(
+        [style.station_shape] * 10 + [style.interchange_shape] * 2)
+    assert len(dots) == 15
+
+    def same(dot: dict, marker: dict) -> bool:
+        near = 0.051 if marker["shape"] == "circle" else 0.01
+        return (dot["shape"] == marker["shape"]
+                and all(abs(a - b) <= near for a, b in zip(dot["box"], marker["box"]))
+                and (marker["shape"] == "circle" or dot["d"] == marker["d"]))
+
+    for dot in dots:
+        assert any(same(dot, marker) for marker in markers), dot
+    for marker in markers:
+        assert any(same(dot, marker) for dot in dots), marker
+    # A tick is in its line's colour; a square is in the theme's, as a circle is.
+    for dot in dots:
+        if dot["shape"] == "tick":
+            assert dot["fill"] in FIXTURE_COLOURS.values(), dot
+        elif dot["shape"] == "square":
+            assert dot["fill"] == "var(--map-station-fill, #fff)", dot
+    ticks = [i for i, dot in enumerate(dots) if dot["shape"] == "tick"]
+    assert len(ticks) == (10 if style.station_shape == "tick" else 0)
+
+    # Route mode fades the ticks of the lines off the trip and leaves B's.
+    for i in ticks:
+        on_b = dots[i]["fill"] == FIXTURE_COLOURS["B"]
+        assert seen["trip"][i]["opacity"] == (1 if on_b else 0.16), dots[i]
+    # The draw-in hides every marker at nothing and shows it whole at the end.
+    assert all(d["undrawn"] and d["visibility"] == "hidden" for d in seen["none"])
+    assert not any(d["undrawn"] for d in seen["whole"])
+    assert all(d["visibility"] == "visible" for d in seen["whole"])
+    assert [d["d"] for d in seen["whole"]] == [d["d"] for d in dots]
+    # On a row a tick stands up, taller than it is wide, and a square is upright,
+    # its box its own side (a diamond's would be 1.41 times as wide): none lies
+    # along its row.
+    for dot in seen["rows"]:
+        x, y, w, h = dot["box"]
+        if dot["shape"] == "tick":
+            assert h > 1.5 * w, dot
+        elif dot["shape"] == "square":
+            side = 2 * (style.interchange_radius if dot["d"].count(" a ") else style.station_radius)
+            assert (w, h) == pytest.approx((side, side), abs=0.05), dot
+
+
+# The keyboard's station cursor on a map of ticks: its ring is centred on the
+# station itself, mapped to the screen, and not on the dot's box, which for a
+# tick stands to one side of its station. A letter key steps through the
+# stations A to Z, and all twelve here start with S.
+PICK_RING = BROWSER + r"""
+main(async browser => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                         reducedMotion: "reduce" });
+  const page = await ctx.newPage();
+  const problems = [];
+  page.on("pageerror", e => problems.push(e.message));
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  await page.evaluate(() => { window.__present.setPlaying(false);
+                              document.getElementById("station-pick").focus(); });
+  await frames(page, 2);
+  const read = () => page.evaluate(() => {
+    const cursor = document.getElementById("station-pick");
+    const names = JSON.parse(document.getElementById("data").textContent).linear.names;
+    const node = Object.keys(names).find(n => names[n] === cursor.textContent);
+    const m = document.querySelector('#stations [data-node="' + node + '"]');
+    const at = m.tagName === "circle" ? [+m.getAttribute("cx"), +m.getAttribute("cy")]
+      : m.getAttribute("d").match(/^M ([-\d.]+) ([-\d.]+)/).slice(1).map(Number);
+    const p = new DOMPoint(at[0], at[1]).matrixTransform(
+      document.querySelector("#stage svg").getScreenCTM());
+    const box = cursor.getBoundingClientRect();
+    return { name: cursor.textContent, shape: m.getAttribute("data-shape") || "circle",
+             off: [box.left + box.width / 2 - p.x, box.top + box.height / 2 - p.y] };
+  });
+  const out = [await read()];
+  for (let i = 0; i < 11; i++) {
+    await page.keyboard.press("s");
+    await frames(page, 2);
+    out.push(await read());
+  }
+  return { problems, out };
+}).catch(fail);
+"""
+
+
+@needs_browser
+def test_the_keyboard_cursor_rings_the_station_not_its_ticks_box(tmp_path):
+    url = _trip_page(tmp_path, "Twelve", theme_thumbnails.fixture(),
+                     Style(themed=True, station_shape="tick"))
+    seen = _run(PICK_RING, {"url": url})
+    assert not seen["problems"], seen["problems"]
+    rings = seen["out"]
+    assert len({r["name"] for r in rings}) == 12, "the letter key reached every station"
+    assert sum(r["shape"] == "tick" for r in rings) == 10
+    for ring in rings:
+        assert math.hypot(*ring["off"]) <= 0.5, ring
+
+
+# A map of ticks through the geographic morph: each tick is carried to its
+# station's place on the ground, its outline as the map wrote it, and a subset
+# of lines is framed with its ticks inside the frame, on the map and on the
+# ground.
+GEO_MARKERS = BROWSER + r"""
+main(async browser => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 },
+                                         reducedMotion: "reduce" });
+  const page = await ctx.newPage();
+  const problems = [];
+  page.on("pageerror", e => problems.push(e.message));
+  await page.goto(job.url, { waitUntil: "load" });
+  await ready(page);
+  const P = fn => page.evaluate(fn).then(answer => frames(page, 2).then(() => answer));
+  const read = () => page.evaluate(() => ({
+    box: window.__present.state().box,
+    dots: [...document.querySelectorAll("#linear-stations > *")].map(el => {
+      const b = el.getBBox();
+      return { shape: el.getAttribute("data-shape") || "circle", d: el.getAttribute("d"),
+               fill: el.getAttribute("fill"), shown: el.style.display !== "none",
+               box: [b.x, b.y, b.width, b.height] };
+    }),
+  }));
+  await P(() => { const S = window.__present; S.setPlaying(false); S.showView("schematic", 0);
+                  S.settle(); });
+  const markers = await page.evaluate(() => [...document.querySelectorAll("#stations [data-node]")]
+    .map(el => ({ node: el.getAttribute("data-node"), d: el.getAttribute("d") })));
+  const ground = await page.evaluate(
+    () => JSON.parse(document.getElementById("data").textContent).geo.nodes);
+  const map = await read();
+  await P(() => { window.__present.setGeo(true, 0); window.__present.settle(); });
+  const geo = await read();
+  await P(() => window.__present.setRoutes(["D"]));
+  const geoD = await read();
+  await P(() => { window.__present.setGeo(false, 0); window.__present.settle(); });
+  const mapD = await read();
+  return { problems, markers, ground, map, geo, geoD, mapD };
+}).catch(fail);
+"""
+
+
+def _moveto(d: str) -> tuple[tuple[float, float], str]:
+    """A marker's station, its path's first moveto, and the outline after it."""
+    words = d.split(" ", 3)
+    assert words[0] == "M", d
+    return (float(words[1]), float(words[2])), words[3]
+
+
+@needs_browser
+def test_a_tick_rides_the_geographic_morph_to_its_station_and_keeps_its_outline(tmp_path):
+    url = _fixture_page(tmp_path, style=Style(themed=True, station_shape="tick"))
+    seen = _run(GEO_MARKERS, {"url": url})
+    assert not seen["problems"], seen["problems"]
+    by_d = {m["d"]: m["node"] for m in seen["markers"] if m["d"]}
+    ticks = [i for i, dot in enumerate(seen["map"]["dots"]) if dot["shape"] == "tick"]
+    assert len(ticks) == 10
+    for i in ticks:
+        node = by_d[seen["map"]["dots"][i]["d"]]
+        at, outline = _moveto(seen["geo"]["dots"][i]["d"])
+        assert at == pytest.approx(tuple(seen["ground"][node]), abs=0.006), node
+        assert outline == _moveto(seen["map"]["dots"][i]["d"])[1], node
+    # D alone, framed with its ticks inside the frame, on the ground and on the map.
+    for look in (seen["geoD"], seen["mapD"]):
+        x, y, w, h = look["box"]
+        shown = [dot for dot in look["dots"] if dot["shown"]]
+        assert shown and all(dot["fill"] in (None, FIXTURE_COLOURS["D"]) or dot["shape"] != "tick"
+                             for dot in shown)
+        for dot in shown:
+            bx, by, bw, bh = dot["box"]
+            assert x <= bx and y <= by and bx + bw <= x + w and by + bh <= y + h, dot
+
+
 # ------------------------------------------------ the title card and the draw-in
 #
 # Engine issue 44, as settled on 9 Oct 2026: the seam gained setCard(on), a title
@@ -3101,13 +3334,15 @@ def _fixture_graph(spurs: bool = False) -> LineGraph:
     return graph
 
 
-def _fixture_page(into: Path, spurs: bool = False, **drawn_as) -> str:
+def _fixture_page(into: Path, spurs: bool = False, style: Style | None = None,
+                  **drawn_as) -> str:
     """Issue 53's network drawn with its names, with a geographic twin in which
     every station has moved a little, and a train on every edge either side of
     seven, so a capture at seven has trains; one more at ten makes the day.
-    ``drawn_as`` is how the trains are drawn (``dot_radius``, ``trail``)."""
+    Drawn in ``style`` where one is given (issue 74's markers); ``drawn_as`` is
+    how the trains are drawn (``dot_radius``, ``trail``)."""
     graph = _fixture_graph(spurs)
-    drawn = render(graph, style=Style(themed=True), title="Fixture")
+    drawn = render(graph, style=style or Style(themed=True), title="Fixture")
     moved = {nid: Node(id=nid, station_id=n.station_id, station_label=n.station_label,
                        coord=(n.coord[0] + 0.4 * math.sin(i), n.coord[1] + 0.4 * math.cos(i)))
              for i, (nid, n) in enumerate(sorted(graph.nodes.items()))}

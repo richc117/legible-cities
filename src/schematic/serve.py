@@ -52,7 +52,7 @@ from .describe import station_name
 from .linegraph import LineGraph
 from .render import (HEX_COLOR_PATTERN, draw_stage, octilinearity, stage as render_stage,
                      summary as render_summary)
-from .render import LABEL_FONTS, PRESETS, STYLE_RANGES, Style, preset_style
+from .render import LABEL_FONTS, PRESETS, STYLE_RANGES, STYLE_SHAPES, Style, preset_style
 
 log = logging.getLogger(__name__)
 
@@ -356,14 +356,16 @@ def _style(value: Any) -> Style | None:
     default, ``Style(themed=True)``, and every output is what it was.
     Otherwise an object of optional fields: the eight numbers of
     ``render.STYLE_RANGES``, each inside its closed range, the four
-    colours of ``STYLE_COLORS``, each written ``#rrggbb``, and
-    ``label_font``, one of the names of ``render.LABEL_FONTS`` (issue 76).
-    Any other key is refused, ``themed``, ``label_char_width`` and
-    ``default_line_color`` among them: they are the engine's, not a
-    client's (``default_color`` is a parameter of ``map.build`` itself).
+    colours of ``STYLE_COLORS``, each written ``#rrggbb``, the two marker
+    shapes of ``render.STYLE_SHAPES``, each one of its names (issue 74),
+    and ``label_font``, one of the names of ``render.LABEL_FONTS``
+    (issue 76). Any other key is refused, ``themed``,
+    ``label_char_width`` and ``default_line_color`` among them: they are
+    the engine's, not a client's (``default_color`` is a parameter of
+    ``map.build`` itself).
 
     Or the name of a look instead of the fields: ``{"preset": "beck"}``
-    resolves to exactly the eight numbers of ``render.PRESETS`` (issue 73),
+    resolves to exactly the fields of ``render.PRESETS`` (issue 73),
     so it draws what the same numbers sent one by one draw. The name is
     exclusive of the fields it could clash with: beside any other key but
     ``label_font`` it is refused, because which of the two won would be a
@@ -412,6 +414,13 @@ def _style(value: Any) -> Style | None:
         if not isinstance(color, str) or not COLOR_PATTERN.fullmatch(color):
             raise invalid_params(f"style.{name} must be a colour written #rrggbb")
         fields[name] = color
+    for name, shapes in STYLE_SHAPES.items():
+        if name not in left:
+            continue
+        shape = left.pop(name)
+        if not isinstance(shape, str) or shape not in shapes:
+            raise invalid_params(f"style.{name} must be {_or(shapes)}")
+        fields[name] = shape
     fields.update(_label_font(left))
     _no_extra("style", left)
     style = Style(themed=True, **fields)
@@ -1088,8 +1097,9 @@ class EngineEndpoint(Endpoint):
 
     def style_presets(self, params: Any = None) -> dict[str, Any]:
         """The named looks ``map.build``'s ``style`` takes in place of its
-        fields: each a name and the eight numbers it resolves to, as an
-        object a client could send field by field, in the table's order."""
+        fields: each a name and the fields it resolves to, the eight numbers
+        and a marker shape where the look has its own, as an object a client
+        could send field by field, in the table's order."""
         _no_params("style.presets", params)
         return {"presets": [{"name": name, "style": preset_style(name)} for name in PRESETS]}
 

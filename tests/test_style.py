@@ -13,8 +13,10 @@ layout; the two tests over Pittsburgh's stored layout skip without it.
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import hashlib
+import math
 import re
 from types import SimpleNamespace
 
@@ -24,7 +26,10 @@ from test_colors import _graph, _stored
 from test_serve import DATE, KEY, NO_LAYOUT, SCHEMA, Client, check, invalid
 
 from schematic import animate, config, diagnostics, pipeline, serve
-from schematic.render import PRESETS, STYLE_RANGES, Style, preset_style, render
+from schematic import render as render_module
+from schematic.labels import Quad, collide
+from schematic.linegraph import Edge, Line, LineGraph, Node
+from schematic.render import PRESETS, STYLE_RANGES, STYLE_SHAPES, Style, preset_style, render
 from schematic.theme_thumbnails import fixture
 
 # The ranges the issue fixes, written out here and not read from the table, so
@@ -48,6 +53,11 @@ PRESET_NUMBERS = {
     "blueprint": (4, 2, 3, 4.5, 1.5, 10, 8, 32),
     "paper": (6, 1.6, 3.6, 5.5, 1.8, 12, 10, 28),
 }
+# The marker shapes issue 74 settled, each field's names in order, and the one
+# preset that names a shape: beck, TfL's tick. Written out, as the numbers are.
+SHAPES = {"station_shape": ("circle", "tick", "square"),
+          "interchange_shape": ("circle", "square")}
+PRESET_SHAPES = {"beck": {"station_shape": "tick"}}
 COLORS = ("background", "station_fill", "station_stroke_color", "label_color")
 UNIT = "SVG user units at the map's width"
 # ``interchange_radius`` may not be below ``station_radius``, so an end of one
@@ -106,7 +116,7 @@ def test_the_table_and_the_schema_agree():
     assert defs["MapBuildParams"]["properties"]["style"] == {"$ref": "#/$defs/MapStyle"}
     assert style["type"] == "object" and style["additionalProperties"] is False
     assert "required" not in style
-    assert set(props) == set(RANGES) | set(COLORS) | {"preset", "label_font"}
+    assert set(props) == set(RANGES) | set(COLORS) | set(SHAPES) | {"preset", "label_font"}
     # The server's own list of colour fields is held to the schema too, so a
     # fifth colour added to the server alone cannot be accepted where the
     # schema refuses it, the one direction the hand-validation test cannot see.
@@ -130,6 +140,12 @@ def test_the_table_and_the_schema_agree():
         assert "falls back to" in prop["description"]
         assert "theme overrides it" in prop["description"]
         assert f"{getattr(defaults, name)} when omitted" in prop["description"]
+    for name, names in SHAPES.items():
+        prop = props[name]
+        assert prop["enum"] == list(names) == list(STYLE_SHAPES[name])
+        assert getattr(defaults, name) == "circle"
+        assert "circle when omitted" in prop["description"]
+    assert STYLE_SHAPES == SHAPES
     # What the schema cannot hold is said where a client reads.
     assert "interchange_radius may not be below station_radius" in style["description"]
 
@@ -331,27 +347,37 @@ def test_a_wider_line_reaches_the_map_the_page_and_the_geographic_layer(tmp_path
 def test_the_presets_are_the_three_the_issue_decided_in_its_order():
     assert list(PRESETS) == ["beck", "blueprint", "paper"]
     for name, numbers in PRESET_NUMBERS.items():
-        assert PRESETS[name] == dict(zip(STYLE_RANGES, numbers)), name
-        # All eight and nothing else: no colour, which the theme owns.
-        assert list(PRESETS[name]) == list(STYLE_RANGES), name
+        shapes = PRESET_SHAPES.get(name, {})
+        assert PRESETS[name] == {**dict(zip(STYLE_RANGES, numbers)), **shapes}, name
+        # All eight, then a shape where the look has its own, and nothing else:
+        # no colour, which the theme owns.
+        assert list(PRESETS[name]) == list(STYLE_RANGES) + list(shapes), name
 
 
 def test_every_preset_value_is_inside_its_range_with_the_interchange_above_the_station():
     for name, numbers in PRESETS.items():
         for field, value in numbers.items():
+            if field in SHAPES:
+                assert value in SHAPES[field], f"{name}.{field} is {value!r}"
+                continue
             low, high = RANGES[field]
             assert low <= value <= high, f"{name}.{field} is {value}, outside {low} to {high}"
         assert numbers["interchange_radius"] > numbers["station_radius"], name
 
 
 def test_no_preset_equals_the_default_or_another():
+    """By the eight numbers alone: beck's tick is a ninth key, and a preset
+    whose numbers were the default's would differ from it by that key only."""
+    def eight(fields: dict) -> dict:
+        return {k: v for k, v in fields.items() if k in STYLE_RANGES}
+
     default = {field: getattr(Style(), field) for field in STYLE_RANGES}
     for name, numbers in PRESETS.items():
-        assert numbers != default, f"{name} is the default style"
+        assert eight(numbers) != default, f"{name} is the default style"
     named = list(PRESETS.items())
     for i, (one, first) in enumerate(named):
         for other, second in named[i + 1:]:
-            assert first != second, f"{one} and {other} are the same style"
+            assert eight(first) != eight(second), f"{one} and {other} are the same style"
 
 
 def test_preset_style_answers_a_copy_and_refuses_what_is_not_a_name():
@@ -370,8 +396,9 @@ UNKNOWN = "style.preset must be beck, blueprint or paper; style.presets describe
 
 
 def numbers(name: str) -> dict:
-    """The preset's numbers as the issue wrote them, never read from the table."""
-    return dict(zip(RANGES, PRESET_NUMBERS[name]))
+    """The preset's fields as the issues wrote them, never read from the table:
+    its eight numbers, and beck's tick."""
+    return {**dict(zip(RANGES, PRESET_NUMBERS[name])), **PRESET_SHAPES.get(name, {})}
 
 
 def test_the_schema_knows_the_presets_by_name_and_by_their_numbers():
@@ -381,10 +408,14 @@ def test_the_schema_knows_the_presets_by_name_and_by_their_numbers():
     assert SCHEMA["methods"]["style.presets"] == {
         "params": {"$ref": "#/$defs/NoParams"}, "result": {"$ref": "#/$defs/StylePresets"}}
     assert defs["StylePresets"]["properties"]["presets"]["items"] == {"$ref": "#/$defs/StylePreset"}
-    # The eight, complete and closed, inside the bounds MapStyle sends them with.
+    # The eight, complete and closed, inside the bounds MapStyle sends them with,
+    # and the two shapes, which a preset may name and need not.
     style = defs["StylePreset"]["properties"]["style"]
     assert style["additionalProperties"] is False
-    assert list(style["properties"]) == list(RANGES) == style["required"]
+    assert list(style["properties"]) == list(RANGES) + list(SHAPES)
+    assert style["required"] == list(RANGES)
+    for field, names in SHAPES.items():
+        assert style["properties"][field] == {"enum": list(names)}
     for field, (low, high) in RANGES.items():
         assert style["properties"][field] == {"type": "number", "minimum": low, "maximum": high}
         mapped = defs["MapStyle"]["properties"][field]
@@ -516,3 +547,405 @@ def test_over_a_stored_layout_a_name_and_its_numbers_write_byte_identical_maps(t
     # Each preset's own stroke width is what the strokes carry.
     for name in answered:
         assert set(line_widths(maps[name])) == {f"{PRESET_NUMBERS[name][0]:.2f}"}, name
+
+
+# ------------------------------------------------------ the markers (issue 74)
+#
+# A station's marker is a circle, TfL's tick or a square turned with its line;
+# an interchange's is a circle or a rounded square, never a tick. A circle is
+# written as it always was; a tick or a square is a path whose first moveto is
+# the station and whose outline is relative to it, and says which it is in
+# data-shape. Drawn on the invented network, and on one line that runs east,
+# bends to the north-east and bends again to the north, so a tick is seen
+# square to a straight line, bisecting a bend, and across a line's end.
+
+# The fixture's drawing in the default style, labels on, as the commit before
+# issue 74 wrote it: what a map of circles must still be, byte for byte.
+BEFORE_74 = "64fb020f643d2d0cdb887569387fe19b8b20e0acd2ccff2897c0702061ca41dc"
+# TfL's tick, written out: 0.66 of the line's width on a side, past its edge.
+TICK_OF = 0.66
+BENDS = [("k0", 0, 0), ("k1", 3, 0), ("k2", 6, 0), ("k3", 9, 3), ("k4", 12, 6),
+         ("k5", 12, 9), ("k6", 12, 12)]
+
+
+def bends() -> LineGraph:
+    """One line, K, through the seven stations of ``BENDS`` in order."""
+    nodes = {nid: Node(id=nid, coord=(float(x), float(y)), station_id=nid,
+                       station_label=f"Stop {nid[1:]}") for nid, x, y in BENDS}
+    edges = [Edge(src=a, dst=b, geometry=[nodes[a].coord, nodes[b].coord],
+                  lines=[Line(id="K", label="K", color="#2f6fd6")])
+             for (a, *_), (b, *_) in zip(BENDS, BENDS[1:])]
+    return LineGraph(nodes=nodes, edges=edges)
+
+
+def outline(d: str) -> tuple[tuple[float, float], list[tuple[float, float]], list[tuple]]:
+    """A marker's path read as the page reads it: the station (its first
+    moveto), the points its outline visits in the drawing's coordinates, and
+    each arc's radii and flags."""
+    words = d.split()
+    assert words[0] == "M" and words[3] == "m" and words[-1] == "z", d
+    x, y = float(words[1]), float(words[2])
+    at, points, arcs, i = (x, y), [], [], 3
+    while words[i] != "z":
+        if words[i] == "a":
+            arcs.append(tuple(float(v) for v in words[i + 1:i + 6]))
+            i += 5
+        else:
+            assert words[i] in ("m", "l"), d
+        x, y = x + float(words[i + 1]), y + float(words[i + 2])
+        points.append((x, y))
+        i += 3
+    return at, points, arcs
+
+
+def markers(svg: str) -> dict[str, dict]:
+    """Every station's marker, by node, in the order the map writes them: its
+    shape (a marker without data-shape is a circle), where its station is, its
+    attributes, and a path's outline."""
+    start = svg.index('<g id="stations">')
+    found = {}
+    for tag, attrs in re.findall(r"<(circle|path) ([^>]*)/>", svg[start:svg.index("</g>", start)]):
+        a = dict(re.findall(r'([\w-]+)="([^"]*)"', attrs))
+        m = {"tag": tag, "shape": a.get("data-shape", "circle"), "attrs": a}
+        if tag == "circle":
+            m["at"] = (float(a["cx"]), float(a["cy"]))
+        else:
+            m["at"], m["points"], m["arcs"] = outline(a["d"])
+        found[a["data-node"]] = m
+    return found
+
+
+def tracks(svg: str) -> list[str]:
+    return re.findall(r'<path id="[^"]+" data-src="[^"]*" data-dst="[^"]*" d="[^"]+"/>', svg)
+
+
+def label_at(svg: str, node: str) -> tuple[float, float]:
+    found = re.search(rf'<text x="([-\d.]+)" y="([-\d.]+)"[^>]*data-node="{node}"', svg)
+    assert found, f"no label for {node}"
+    return float(found[1]), float(found[2])
+
+
+def sub(a, b):
+    return (a[0] - b[0], a[1] - b[1])
+
+
+def dot(a, b):
+    return a[0] * b[0] + a[1] * b[1]
+
+
+def unit(v):
+    length = math.hypot(*v)
+    return (v[0] / length, v[1] / length)
+
+
+def shaped(**fields) -> Style:
+    return Style(themed=True, **fields)
+
+
+@pytest.mark.parametrize("name,shape", [(n, s) for n, names in SHAPES.items() for s in names])
+def test_each_shape_is_taken_by_name(name, shape):
+    style = serve._style({name: shape})
+    assert getattr(style, name) == shape and style.themed
+    check({"key": KEY, "layout": NO_LAYOUT, "date": DATE, "style": {name: shape}},
+          "MapBuildParams")
+
+
+@pytest.mark.parametrize("name,wrong", [
+    ("station_shape", "diamond"), ("station_shape", "Tick"), ("station_shape", "tick "),
+    ("station_shape", ""), ("station_shape", None), ("station_shape", 1),
+    ("station_shape", ["tick"]), ("interchange_shape", "tick"), ("interchange_shape", "ring"),
+    ("interchange_shape", True),
+])
+def test_a_shape_not_on_the_list_is_refused_naming_the_list(name, wrong):
+    """A tick is not an interchange's shape: it has no side where lines meet."""
+    hint = refusal({name: wrong})["hint"]
+    assert hint == {"station_shape": "style.station_shape must be circle, tick or square",
+                    "interchange_shape": "style.interchange_shape must be circle or square"}[name]
+    assert invalid({"key": KEY, "layout": NO_LAYOUT, "date": DATE, "style": {name: wrong}},
+                   "MapBuildParams")
+
+
+def test_beck_is_a_tick_with_the_ring_for_an_interchange():
+    style = serve._style({"preset": "beck"})
+    assert (style.station_shape, style.interchange_shape) == ("tick", "circle")
+    drawn = markers(draw(style))
+    assert {node: m["shape"] for node, m in drawn.items()} == {
+        node: "circle" if node in ("x5y5", "x11y5") else "tick" for node in drawn}
+    for name in ("blueprint", "paper"):
+        assert {m["shape"] for m in markers(draw(serve._style({"preset": name}))).values()} == \
+            {"circle"}, name
+
+
+def test_circles_are_written_byte_for_byte_as_before():
+    plain = draw()
+    assert hashlib.sha256(plain.encode()).hexdigest() == BEFORE_74
+    assert draw(shaped(station_shape="circle", interchange_shape="circle")) == plain
+    assert draw(serve._style({"station_shape": "circle", "interchange_shape": "circle"})) == plain
+    assert "data-shape" not in plain
+
+
+@pytest.mark.parametrize("station", SHAPES["station_shape"])
+@pytest.mark.parametrize("interchange", SHAPES["interchange_shape"])
+def test_every_shape_keeps_each_station_where_its_circle_was_and_moves_no_track(
+        station, interchange):
+    """The two interchanges take the interchange's shape and the other ten the
+    station's; each marker's station is its circle's centre, and the lines are
+    the same bytes."""
+    plain = draw()
+    drawn = draw(shaped(station_shape=station, interchange_shape=interchange))
+    assert tracks(drawn) == tracks(plain) and len(tracks(plain)) == 11
+    before, after = markers(plain), markers(drawn)
+    assert list(after) == list(before) and len(after) == 12
+    for node, marker in after.items():
+        assert marker["at"] == before[node]["at"], node
+        middle = before[node]["attrs"]["r"] == "6.00"
+        assert marker["shape"] == (interchange if middle else station), node
+        assert marker["attrs"]["data-station-id"] == node
+
+
+def test_a_tick_is_square_to_its_line_bisects_a_bend_and_stands_toward_its_name():
+    """On the line with two bends: every station between the ends has a tick
+    0.66 of the line's width along the line, reaching from the line's middle
+    to 0.66 of its width past its edge, square to the line through the
+    station (the direction from the station before to the one after, which
+    at a bend is square to the bend's bisector), and on its name's side."""
+    width = 7.0
+    svg = render(bends(), width=448, style=shaped(station_shape="tick")).svg
+    drawn = markers(svg)
+    assert [m["shape"] for m in drawn.values()] == ["tick"] * 7
+    for (before, *_), (node, *_), (after, *_) in zip(BENDS, BENDS[1:], BENDS[2:]):
+        at, points, arcs = drawn[node]["at"], drawn[node]["points"], drawn[node]["arcs"]
+        assert len(points) == 4 and not arcs, node
+        assert drawn[node]["attrs"]["fill"] == "#2f6fd6" and "stroke" not in drawn[node]["attrs"]
+        back = unit(sub(drawn[before]["at"], at))
+        on = unit(sub(drawn[after]["at"], at))
+        through = unit(sub(on, back))
+        along, across = sub(points[1], points[0]), sub(points[2], points[1])
+        assert math.hypot(*along) == pytest.approx(TICK_OF * width, abs=0.02), node
+        assert math.hypot(*across) == pytest.approx(width / 2 + TICK_OF * width, abs=0.02), node
+        assert abs(dot(unit(across), through)) < 0.005, f"{node}'s tick is not square to its line"
+        assert abs(dot(unit(along), through)) > 0.999, node
+        if abs(dot(back, on)) < 0.99:  # a bend: the tick lies on its bisector
+            assert abs(dot(unit(across), unit((back[0] + on[0], back[1] + on[1])))) > 0.999, node
+        # Its inner end on the line's middle, its outer end past the edge on the
+        # side its name is on.
+        out = unit(across)
+        assert abs(dot(sub(points[0], at), out)) < 0.02, node
+        assert dot(sub(points[2], at), out) > width / 2
+        assert dot(sub(label_at(svg, node), at), out) > 1, f"{node}'s tick is not on its name's side"
+
+
+def test_a_tick_with_no_name_stands_on_the_right_of_its_edge():
+    """With the labels off, every tick between the ends is on the right of the
+    way its first edge runs, src to dst: here, the line's direction of travel."""
+    drawn = markers(render(bends(), width=448, style=shaped(station_shape="tick"),
+                           labels=False).svg)
+    for (before, *_), (node, *_), (after, *_) in zip(BENDS, BENDS[1:], BENDS[2:]):
+        at, points = drawn[node]["at"], drawn[node]["points"]
+        travel = unit(sub(unit(sub(drawn[after]["at"], at)), unit(sub(drawn[before]["at"], at))))
+        right = (-travel[1], travel[0])     # y runs down the drawing
+        assert dot(sub(points[2], at), right) > 0, node
+
+
+def test_a_line_s_end_is_one_bar_across_both_sides_where_its_cap_ends():
+    """TfL's double tab, as one bar 0.66 of the line's width thick reaching
+    0.66 of its width past both edges, its outer face at the end of the line's
+    round cap, half the line's width past the station."""
+    width, tick = 7.0, TICK_OF * 7.0
+    ends = []
+    for graph in (bends(), fixture()):
+        drawn = markers(render(graph, width=448, style=shaped(station_shape="tick")).svg)
+        here = [n for n, m in drawn.items() if m["shape"] == "tick"
+                and math.hypot(*sub(m["points"][2], m["points"][1])) > width + tick]
+        ends += here
+        for node in here:
+            at, points = drawn[node]["at"], drawn[node]["points"]
+            (edge,) = [e for e in graph.edges if node in (e.src, e.dst)]
+            other = drawn[edge.dst if edge.src == node else edge.src]["at"]
+            outward = unit(sub(at, other))
+            side = (-outward[1], outward[0])
+            past = [dot(sub(p, at), outward) for p in points]
+            across = [dot(sub(p, at), side) for p in points]
+            assert min(past) == pytest.approx(width / 2 - tick, abs=0.02), node
+            assert max(past) == pytest.approx(width / 2, abs=0.02), node
+            assert min(across) == pytest.approx(-(width / 2 + tick), abs=0.02), node
+            assert max(across) == pytest.approx(width / 2 + tick, abs=0.02), node
+    # The line's two ends, then the fixture's eight: every end of every line.
+    assert ends[:2] == ["k0", "k6"]
+    assert sorted(ends[2:]) == ["x11y1", "x11y9", "x14y2", "x15y5", "x1y5", "x5y1", "x5y9", "x8y8"]
+
+
+def test_a_square_is_turned_with_its_line_and_an_interchange_is_rounded():
+    """A station's square is 2 station_radius on a side with its first side
+    along the line; on a diagonal it is turned 45 degrees, not drawn upright.
+    An interchange's is 2 interchange_radius on a side with its corners rounded
+    by a quarter of it, in the ring's fill and outline."""
+    svg = render(bends(), width=448, style=shaped(station_shape="square")).svg
+    drawn = markers(svg)
+    for (before, *_), (node, *_), (after, *_) in zip(BENDS, BENDS[1:], BENDS[2:]):
+        at, points = drawn[node]["at"], drawn[node]["points"]
+        through = unit(sub(unit(sub(drawn[after]["at"], at)), unit(sub(drawn[before]["at"], at))))
+        sides = [sub(b, a) for a, b in zip(points, points[1:] + points[:1])]
+        assert [round(math.hypot(*s), 1) for s in sides] == [8.4] * 4, node
+        assert abs(dot(unit(sides[0]), through)) > 0.999, f"{node}'s square is not turned"
+        assert abs(dot(unit(sides[1]), through)) < 0.005, node
+    diagonal = drawn["k3"]["points"]
+    assert abs(dot(unit(sub(diagonal[1], diagonal[0])), (1.0, 0.0))) == pytest.approx(
+        math.sqrt(0.5), abs=0.005)
+
+    fixture_drawn = markers(draw(shaped(interchange_shape="square")))
+    for node in ("x5y5", "x11y5"):
+        rounded = fixture_drawn[node]
+        assert rounded["shape"] == "square" and rounded["tag"] == "path"
+        assert rounded["arcs"] == [(3.0, 3.0, 0.0, 0.0, 1.0)] * 4, node
+        xs, ys = zip(*rounded["points"])
+        assert (max(xs) - min(xs), max(ys) - min(ys)) == pytest.approx((12, 12), abs=0.02)
+        attrs = rounded["attrs"]
+        assert (attrs["fill"], attrs["stroke"], attrs["stroke-width"]) == (
+            "var(--map-station-fill, #ffffff)", "var(--map-station-stroke, #111111)", "2.20")
+    assert {fixture_drawn[n]["shape"] for n in fixture_drawn
+            if n not in ("x5y5", "x11y5")} == {"circle"}
+
+
+def test_no_label_overlaps_a_marker_drawn(monkeypatch):
+    """The labels keep clear of each tick and square as drawn, not of the
+    circle's square: at a wide line with names close in, a tick reaches past
+    where the circle's square ends."""
+    placed = []
+    real = render_module.place
+
+    def spy(*args, **kwargs):
+        answer = real(*args, **kwargs)
+        placed.extend(answer[0])
+        return answer
+
+    monkeypatch.setattr(render_module, "place", spy)
+    for graph in (fixture(), bends()):
+        for style in (shaped(station_shape="tick", line_width=12, label_offset=0),
+                      shaped(station_shape="square", interchange_shape="square",
+                             station_radius=6, interchange_radius=6, label_offset=0)):
+            placed.clear()
+            drawn = markers(render(graph, width=448, style=style).svg)
+            assert placed
+            outlines = [Quad.of(m["points"][:4] if not m["arcs"] else m["points"])
+                        for m in drawn.values() if m["tag"] == "path"]
+            assert outlines
+            for label in placed:
+                for marker in outlines:
+                    assert not collide(label.quad, marker), (label.text, style.station_shape)
+
+
+def test_the_canvas_holds_every_marker():
+    """The network's own box reaches past every tick and square by the
+    padding, where a tick on a straight run stands out further than the
+    line's own reach, and a turned square further than the interchange's."""
+    row = LineGraph(nodes={n: Node(id=n, coord=(x, 0.0), station_id=n, station_label=n)
+                           for n, x in (("a", 0.0), ("b", 1.0), ("c", 2.0))},
+                    edges=[Edge(src=a, dst=b, geometry=[(x, 0.0), (x + 1.0, 0.0)],
+                                lines=[Line(id="R", label="R", color="#d6322f")])
+                           for a, b, x in (("a", "b", 0.0), ("b", "c", 1.0))])
+    slant = LineGraph(nodes={n: Node(id=n, coord=xy, station_id=n, station_label=n)
+                             for n, xy in (("p", (0.0, 0.0)), ("q", (1.0, 1.0)))},
+                      edges=[Edge(src="p", dst="q", geometry=[(0.0, 0.0), (1.0, 1.0)],
+                                  lines=[Line(id="S", label="S", color="#2f6fd6")])])
+    for graph, style in ((row, shaped(station_shape="tick")),
+                         (slant, shaped(station_shape="square", line_width=1,
+                                        station_radius=10, interchange_radius=10))):
+        for labels in (True, False):
+            svg = render(graph, width=300, style=style, labels=labels).svg
+            x, y, w, h = nolabels(svg)
+            x0, y0, x1, y1 = x + style.padding, y + style.padding, x + w - style.padding, \
+                y + h - style.padding
+            corners = [p for m in markers(svg).values() for p in m["points"]]
+            assert corners
+            for px, py in corners:
+                assert x0 - 0.01 <= px <= x1 + 0.01 and y0 - 0.01 <= py <= y1 + 0.01, \
+                    f"({px:.2f}, {py:.2f}) is outside the network's box {x0, y0, x1, y1}"
+
+
+@pytest.mark.parametrize("fields,named", [
+    ({"station_shape": "diamond"}, "station_shape"), ({"station_shape": None}, "station_shape"),
+    ({"station_shape": "Tick"}, "station_shape"), ({"interchange_shape": "tick"}, "interchange_shape"),
+    ({"interchange_shape": "ring"}, "interchange_shape"),
+])
+def test_a_style_refuses_a_shape_that_is_not_one_when_it_is_made(fields, named):
+    """``Style`` itself, for a Python caller the server never sees, and again
+    through ``replace``: a tick is not an interchange's shape."""
+    with pytest.raises(ValueError, match=f"^{named} must be "):
+        Style(**fields)
+    with pytest.raises(ValueError, match=f"^{named} must be "):
+        dataclasses.replace(Style(themed=True), **fields)
+
+
+def test_an_interchange_is_never_a_tick_even_from_a_style_changed_after_it_was_made():
+    """A style changed after it was made is past ``Style``'s own check, so the
+    renderer holds the rule too: an interchange told to be a tick is the ring,
+    and a station told to be a shape that is not one is a circle."""
+    style = shaped(station_shape="tick")
+    style.interchange_shape = "tick"
+    drawn = markers(draw(style))
+    assert {node: drawn[node]["shape"] for node in ("x5y5", "x11y5")} == \
+        {"x5y5": "circle", "x11y5": "circle"}
+    assert drawn["x5y5"]["attrs"]["r"] == drawn["x11y5"]["attrs"]["r"] == "6.00"
+    assert sum(m["shape"] == "tick" for m in drawn.values()) == 10
+    style.station_shape = "hexagon"
+    assert {m["shape"] for m in markers(draw(style)).values()} == {"circle"}
+
+
+def test_where_lines_cross_straight_through_the_first_line_turns_the_square():
+    """At x11y5 three lines run straight through: A east-west, D north-south
+    and C on the diagonal, each pair of legs as opposite as the others. The
+    rounded square turns with A, the first in edge order, however the last
+    bits of the diagonal's ends fall: nudged by up to three units in the last
+    place, a dot product of -1.0000000000000002 once chose C's 45 degrees."""
+    def square_at(graph: LineGraph) -> str:
+        return markers(render(graph, width=448, style=shaped(interchange_shape="square")).svg)[
+            "x11y5"]["attrs"]["d"]
+
+    def nudge(value: float, steps: int) -> float:
+        for _ in range(abs(steps)):
+            value = math.nextafter(value, math.inf if steps > 0 else -math.inf)
+        return value
+
+    upright = square_at(fixture())
+    assert outline(upright)[1][0] == pytest.approx((317.0, 122.0), abs=0.01)  # its top edge
+    for dx in range(-3, 4):
+        for dy in range(-3, 4):
+            graph = fixture()
+            for edge in graph.edges:
+                if edge.lines[0].label == "C":
+                    far = 0 if edge.dst == "x11y5" else 1
+                    points = [list(p) for p in edge.geometry]
+                    points[far] = [nudge(points[far][0], dx), nudge(points[far][1], dy)]
+                    edge.geometry = [tuple(p) for p in points]
+            assert square_at(graph) == upright, (dx, dy)
+
+
+def test_over_a_stored_layout_each_shape_moves_no_stage_and_no_station(tmp_path):
+    """Pittsburgh from its stored layout, in circles, in ticks and in squares:
+    the four stage files are not touched, each map is drawn from the stored
+    layout, and every station's marker is where its circle is. Skips where
+    the layout is not stored."""
+    stored = _stored("pittsburgh-t")
+    day = dt.date(2026, 9, 10)
+
+    def stages() -> dict[str, str]:
+        return {stage: hashlib.sha256(path.read_bytes()).hexdigest()
+                for stage, path in stored.paths.items()}
+
+    before = stages()
+    plain = pipeline.run("pittsburgh-t", layout=stored.id, date=day, out_dir=tmp_path / "plain")
+    circles_at = {node: m["at"] for node, m in markers(plain.render.svg).items()}
+    assert {m["shape"] for m in markers(plain.render.svg).values()} == {"circle"}
+    for station, interchange in (("tick", "circle"), ("square", "square")):
+        result = pipeline.run("pittsburgh-t", layout=stored.id, date=day,
+                              out_dir=tmp_path / station,
+                              style=serve._style({"station_shape": station,
+                                                  "interchange_shape": interchange}))
+        assert result.layout == plain.layout == stored.id
+        drawn = markers(result.render.svg)
+        assert {node: m["at"] for node, m in drawn.items()} == circles_at, station
+        assert {m["shape"] for m in drawn.values()} == {station, interchange}
+        assert tracks(result.render.svg) == tracks(plain.render.svg)
+        assert (tmp_path / station / "pittsburgh-t.svg").read_text() == result.render.svg
+    assert stages() == before

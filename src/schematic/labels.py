@@ -194,6 +194,10 @@ class Station:
     # fixed distance lands inside the bundle wherever several lines run
     # together, so each station clears its own.
     clearance: float = 0.0
+    # What the station's own marker keeps every label clear of, where it is a
+    # tick or a square (render._Marker.obstacle); None for a circle, which is
+    # the square of ``place``'s ``marker_radius`` round the station.
+    marker: Quad | None = None
 
 
 def place(
@@ -223,7 +227,8 @@ def place(
     markers: list[Quad] = []
     for s in stations:
         r = marker_radius
-        markers.append(Quad.rect(s.x - r, s.y - r, s.x + r, s.y + r))
+        markers.append(s.marker if s.marker is not None
+                       else Quad.rect(s.x - r, s.y - r, s.x + r, s.y + r))
 
     # Hard blockers can never be crossed; soft ones (the drawn lines) can be, as
     # a last resort, because an unnamed station is worse than a name sitting
