@@ -480,3 +480,39 @@ def test_style_presets_answers_each_name_with_numbers_a_client_can_send(client):
     assert client.call("style.presets", {})["result"] == result
     assert client.call("style.presets", {"preset": "beck"})["error"]["code"] == -32602
     assert client.call("style.presets", ["beck"])["error"]["code"] == -32602
+
+
+def test_over_a_stored_layout_a_name_and_its_numbers_write_byte_identical_maps(tmp_path):
+    """Pittsburgh from its stored layout, once per preset by name and once by
+    the numbers ``style.presets`` answered: the SVG on the wire's side and the
+    one written to disk are the same bytes, and the three presets and the
+    default are four different maps. Skips where the layout is not stored."""
+    stored = _stored("pittsburgh-t")
+    day = dt.date(2026, 9, 10)
+
+    def drawn(label: str, style: dict | None) -> str:
+        folder = tmp_path / label
+        result = pipeline.run("pittsburgh-t", layout=stored.id, date=day, out_dir=folder,
+                              style=serve._style(style))
+        written = (folder / "pittsburgh-t.svg").read_text()
+        assert written == result.render.svg, label
+        return written
+
+    client = Client()
+    try:
+        answered = {p["name"]: p["style"]
+                    for p in client.call("style.presets")["result"]["presets"]}
+    finally:
+        client.endpoint.close()
+    assert list(answered) == ["beck", "blueprint", "paper"]
+
+    maps = {}
+    for name, style in answered.items():
+        by_name = drawn(f"{name}-by-name", {"preset": name})
+        assert by_name == drawn(f"{name}-by-numbers", style), name
+        maps[name] = by_name
+    maps["default"] = drawn("default", None)
+    assert len(set(maps.values())) == 4, "the three differ from each other and from the default"
+    # Each preset's own stroke width is what the strokes carry.
+    for name in answered:
+        assert set(line_widths(maps[name])) == {f"{PRESET_NUMBERS[name][0]:.2f}"}, name
