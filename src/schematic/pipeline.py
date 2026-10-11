@@ -311,10 +311,11 @@ def stage_path(key: str, stage: str, **overrides: Any) -> Path | None:
 
 # The store's one lock: who builds which layout, the scratches, every move
 # of a set into, out of and aside from its place, and the reads that must
-# not overlap a move (``in_flight``, ``read_stored``). A plain lock, not a
-# re-entrant one, so nothing done while it is held takes it again: what
-# needs it from inside and from outside has a body that assumes it held
-# (``_migrate``) and a door that takes it (``migrate``).
+# not overlap a move (``in_flight``, ``read_stored``, and ``lay_out``'s
+# replay of a stored set through ``_read``). A plain lock, not a re-entrant
+# one, so nothing done while it is held takes it again: what needs it from
+# inside and from outside has a body that assumes it held (``_migrate``,
+# ``_read``) and a door that takes it (``migrate``, ``read_stored``).
 _lock = threading.Lock()
 _building: dict[tuple[str, str], threading.Event] = {}
 
@@ -401,13 +402,19 @@ def read_stored(key: str, layout: str,
     """
     with _lock:
         found = read_layout(key, layout)
-        if found is None:
-            return None
-        try:
-            files = {stage: found.paths[stage].read_bytes() for stage in stages}
-        except FileNotFoundError:
-            return None
-    return found, files
+        files = None if found is None else _read(found, stages)
+    return None if files is None else (found, files)
+
+
+def _read(found: Layout, stages: list[str]) -> dict[str, bytes] | None:
+    """The files of ``stages`` of a stored layout, read whole, or None when
+    one of them has gone since the layout was found. The caller holds
+    ``_lock``, the hold it found the layout in: ``read_stored``, and
+    ``lay_out`` deciding that a layout is stored."""
+    try:
+        return {stage: found.paths[stage].read_bytes() for stage in stages}
+    except FileNotFoundError:
+        return None
 
 
 def _whole(key: str, layout: str, stage: str) -> None:
@@ -442,6 +449,7 @@ def lay_out(key: str, *, force: bool = False,
     # for the same id -- two projects on one feed -- waits for the first
     # and reads what it stored rather than building beside it.
     waited = 0.0
+    files: dict[str, bytes] | None = {}
     while True:
         with _lock:
             in_flight = _building.get((key, layout))
@@ -449,17 +457,26 @@ def lay_out(key: str, *, force: bool = False,
                 existing = None
                 if not force:
                     existing = read_layout(key, layout) or _migrated(feed, layout, inputs)
+                if existing is not None and progress is not None:
+                    # What the reports parse is read in the hold the layout
+                    # was found in, so the set reported is the set found, and
+                    # a forced re-layout's swap, which takes this lock, never
+                    # finds one of its files open (engine issue 77). A file
+                    # gone since is a layout not stored whole.
+                    files = _read(existing, list(STAGE_FILES))
+                    if files is None:
+                        existing = None
                 if existing is None:
                     _building[(key, layout)] = threading.Event()
                 break
         began = time.monotonic()
         in_flight.wait()
         waited += time.monotonic() - began
-    # Reported outside the lock: a report parses four files and writes to the
+    # Reported outside the lock: a report parses a file and writes to the
     # client, and nothing else in the process should wait on either.
     if existing is not None:
-        for stage, path in existing.paths.items():
-            _report(progress, stage, _fraction(stage, stages), path, existing.id)
+        for stage, data in (files or {}).items():
+            _report(progress, stage, _fraction(stage, stages), data, existing.id)
         _from_store(existing, waited)
         return existing
     try:
@@ -637,10 +654,18 @@ def schematize(key: str, *, force: bool = False,
     return lay_out(key, force=force, stages=stages, progress=progress, **overrides).paths
 
 
-def _report(progress: Progress | None, stage: str, fraction: float, path: Path,
+def _report(progress: Progress | None, stage: str, fraction: float, data: bytes,
             layout: str) -> None:
+    """A stored stage reported from its file's bytes, read by the caller
+    under the lock a swap takes and parsed here, outside it."""
     if progress is not None:
-        _tell(progress, layout, stage, fraction, LineGraph.from_geojson(path).summary())
+        _tell(progress, layout, stage, fraction, _parsed(data).summary())
+
+
+def _parsed(data: bytes) -> LineGraph:
+    """A stage file's bytes as the graph ``LineGraph.from_geojson`` reads
+    from the file itself."""
+    return LineGraph.from_geojson(json.loads(data.decode("utf-8")))
 
 
 # The layout whose stage is being reported, while the report's callback runs
@@ -816,7 +841,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
                                 f"first (graph.build)")
         if progress is not None:
             for stage, path in found.paths.items():
-                _report(lambda st, _f, m: tick(st, m), stage, 0.0, path, found.id)
+                _report(lambda st, _f, m: tick(st, m), stage, 0.0, path.read_bytes(), found.id)
         _from_store(found)
     else:
         found = lay_out(key, force=force,
