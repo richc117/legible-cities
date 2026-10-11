@@ -5,6 +5,16 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.16.2] - 2026-10-11
+
+### Fixed
+
+- **Every reader of a stored layout now reads it under the lock a forced re-layout's swap takes** (issue 77). `map.build`, the replay of a layout already stored and `graph.build`'s answer opened the stored set's files with no lock held. On Windows a forced re-layout's swap could find one of them open and fail, removing the finished build, and a read that landed between the swap's two renames found the set gone and reached the client as kind `io` with the folder's path in its hint. Each now reads what it needs whole in one hold of the lock, through `read_stored`, and parses and draws outside it, so it answers from one set and waits out a swap instead of failing it. The swap also retries a rename Windows refuses, five times a tenth of a second apart, to ride out a virus scanner or the file explorer holding a file open for a moment, with the lock held, before giving the build up as before; and if the new set still cannot be moved in, the old one is put back first, so a refused swap costs the build and never the stored layout. No schema, method or page behaviour changed, and `render.stage`, `map.build` and `graph.build` of the stored layouts answer byte for byte as before.
+
+### Changed
+
+- **The Instagram Stories safe-zone row is dated again** (issue 71). Meta's Ads Guide for Instagram Stories video ads, read on 11 Oct 2026, says roughly 14% of the top, 35% of the bottom and 6% on each side for an ad, whose call to action sits where a person's own story has the reply bar. No first-party figure for an organic story could be read, so the numbers stay as they were (top 0.14, bottom 0.20, no side zone) and the row's date and source sentence say what was read and what was not.
+
 ## [0.16.1] - 2026-10-10
 
 ### Fixed
