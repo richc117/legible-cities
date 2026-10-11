@@ -271,10 +271,17 @@ SAFE_ZONES: dict[str, Zones] = {
                "button rail 227 px from the right edge, at 1080x1920."),
     "instagram-stories": Zones(
         top=0.14, bottom=0.20, side=None, rail_width=None, rail_top=None,
-        measured=dt.date(2026, 10, 2),
+        measured=dt.date(2026, 10, 11),
         source="Meta's Stories template as traced by Cadenus (July 2026): "
                "\"roughly the top 14 percent (about 270 pixels) and the bottom "
-               "20 percent (about 385 pixels)\"."),
+               "20 percent (about 385 pixels)\". Re-read on 11 Oct 2026 against "
+               "Meta's Ads Guide for Instagram Stories video ads, which says "
+               "\"roughly 14% of the top, 35% of the bottom, and 6% on each side\" "
+               "for an ad, whose call to action sits where a person's own story "
+               "has the reply bar. No first-party figure for an organic story "
+               "could be read (Meta's help pages are drawn by script), so the "
+               "top is the guide's, the bottom stays at the 20% the reply bar "
+               "was set for, and there is no side zone."),
 }
 
 # Where the page can put the clock. Bottom right is where it has always sat,

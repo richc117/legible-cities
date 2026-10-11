@@ -80,7 +80,8 @@ def test_the_two_rows_are_the_numbers_measured():
     stories = export.SAFE_ZONES["instagram-stories"]
     assert (stories.top, stories.bottom) == (0.14, 0.20)
     assert stories.side is None and stories.rail_width is None and stories.rail_top is None
-    assert stories.measured == dt.date(2026, 10, 2)
+    assert stories.measured == dt.date(2026, 10, 11)
+    assert "Re-read on 11 Oct 2026" in stories.source and "35% of the bottom" in stories.source
     assert all(row.source for row in export.SAFE_ZONES.values())
 
 
