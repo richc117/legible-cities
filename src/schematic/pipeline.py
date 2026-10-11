@@ -555,15 +555,46 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
 
 def _swap(scratch: Path, target: Path) -> None:
     """The finished set into place. What was there goes aside first and is
-    removed after, so the target is never a directory with some of each."""
+    removed after, so the target is never a directory with some of each.
+    Each rename is tried again for a moment while Windows refuses it
+    (``_replace``)."""
     aside: Path | None = None
     if target.exists():
         aside = target.with_name(f"{target.name}.old-{os.getpid()}")
         shutil.rmtree(aside, ignore_errors=True)
-        os.replace(target, aside)
-    os.replace(scratch, target)
+        _replace(target, aside)
+    _replace(scratch, target)
     if aside is not None:
         shutil.rmtree(aside, ignore_errors=True)
+
+
+# How often a swap's rename is tried, and how long apart, while it is refused
+# (engine issue 77). The store's lock keeps this process's own readers out of
+# a set being moved; it cannot keep out another process that has a file of it
+# open for a moment -- a virus scanner reading what was just written, the
+# file explorer, an indexer -- and Windows refuses the rename while one does.
+# Five tries a tenth of a second apart wait at most 0.4 s a rename, only on a
+# refusal, with the lock held: only this process's readers of the store wait
+# on it meanwhile, and a holder that stays longer fails the swap as before.
+_SWAP_TRIES = 5
+_SWAP_WAIT = 0.1
+_pause = time.sleep
+
+
+def _replace(src: Path, dst: Path) -> None:
+    """``os.replace``, tried again while it is refused with a
+    ``PermissionError``, which is how Windows refuses to move a directory
+    with a file in it open: ``_SWAP_TRIES`` times, ``_SWAP_WAIT`` seconds
+    apart, and then the refusal is raised to the swap's caller, which removes
+    the build as it always has. Any other error is raised at once."""
+    for tried in range(1, _SWAP_TRIES + 1):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if tried == _SWAP_TRIES:
+                raise
+        _pause(_SWAP_WAIT)
 
 
 _LEFTOVER = re.compile(r"^(?P<layout>[0-9a-f]{64})\.(?P<what>building|old)-(?P<pid>\d+)")

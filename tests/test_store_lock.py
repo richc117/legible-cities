@@ -80,6 +80,11 @@ class Race:
         self.builder = threading.Thread(target=self._build, daemon=True)
         self.reader: threading.Thread | None = None
         monkeypatch.setattr(pipeline, "_lock", Watched(self.moved_on))
+        # The swap's own retry of a refused rename would hide a reader that
+        # held a file open outside the lock: here no rename is ever refused,
+        # so the swap never waits to try one again.
+        self.paused: list[float] = []
+        monkeypatch.setattr(pipeline, "_pause", self.paused.append)
         real_open, real_replace = Path.open, os.replace
 
         @contextlib.contextmanager
@@ -211,6 +216,7 @@ class Race:
         self.builder.join(30)
         self.reader.join(30)
         assert not self.builder.is_alive() and not self.reader.is_alive()
+        assert self.paused == [], f"the swap had a rename refused: {self.answers}"
         assert "build failed" not in self.answers, self.answers["build failed"]
         assert "read failed" not in self.answers, self.answers["read failed"]
         assert self.answers["built"].id == self.made.id
@@ -400,3 +406,78 @@ def test_graph_builds_answer_read_between_the_swaps_renames_waits_for_the_new_se
     finally:
         let_on.set()
     assert octi_nodes(reply) == 3
+
+
+# ------------------------------------------ a rename refused for a moment
+
+def refusing(monkeypatch, made: pipeline.Layout, rename: str, times: int | None,
+             error: OSError) -> list[tuple[str, str]]:
+    """``os.replace`` raising ``error`` for one of a forced re-layout's two
+    renames of ``made`` -- ``aside``, the stored set moved out of its place,
+    or ``into place``, the new set moved in -- ``times`` times, or every
+    time when None, as a virus scanner or the file explorer holding a file
+    of it open for a moment makes Windows do. Every other rename is let
+    through. The renames refused are listed."""
+    refused: list[tuple[str, str]] = []
+    real = os.replace
+
+    def replace(src, dst):
+        src, dst = Path(src), Path(dst)
+        which = ("aside" if src == made.dir else
+                 "into place" if dst == made.dir and ".building-" in src.name else None)
+        if which == rename and (times is None or len(refused) < times):
+            refused.append((src.name, dst.name))
+            raise error
+        return real(src, dst)
+
+    monkeypatch.setattr(os, "replace", replace)
+    return refused
+
+
+def refusal() -> PermissionError:
+    return PermissionError(13, "The process cannot access the file because it is being used "
+                               "by another process")
+
+
+@pytest.mark.parametrize("rename", ["aside", "into place"])
+def test_a_swap_refused_for_a_moment_tries_the_rename_again(tmp_path, monkeypatch, rename):
+    """Issue 77, for what the lock cannot cover: another process with a file
+    of the set open for a moment. The swap tries the refused rename again,
+    a short wait apart, and the re-layout is stored rather than given up."""
+    made = small_layout(tmp_path, monkeypatch, write=write_three_stop_feed)
+    monkeypatch.setattr(test_layouts, "GRAPH", longer_graph())
+    paused: list[float] = []
+    monkeypatch.setattr(pipeline, "_pause", paused.append)
+    refused = refusing(monkeypatch, made, rename, 2, refusal())
+    assert pipeline.lay_out(KEY, force=True).id == made.id
+    assert len(refused) == 2
+    assert paused == [pipeline._SWAP_WAIT] * 2
+    assert test_layouts.ids_under(KEY) == [made.id], "nothing left aside or half made"
+    _found, files = pipeline.read_stored(KEY, made.id, ["octi"])
+    assert len(pipeline._parsed(files["octi"]).nodes) == 3, "the new set is the one stored"
+
+
+@pytest.mark.parametrize("error, tries", [
+    (refusal(), pipeline._SWAP_TRIES),
+    (OSError(16, "Device or resource busy"), 1),
+], ids=["refused", "another error"])
+def test_a_swap_refused_for_good_gives_the_build_up_as_before(tmp_path, monkeypatch, error,
+                                                              tries):
+    """A rename refused every time is tried ``_SWAP_TRIES`` times and then
+    the refusal is the build's failure, as it was before the retry: the
+    finished build is removed and the stored set is untouched. An error that
+    is not a refusal is not tried again at all."""
+    made = small_layout(tmp_path, monkeypatch, write=write_three_stop_feed)
+    before = {path.name: path.read_bytes() for path in made.dir.iterdir()}
+    monkeypatch.setattr(test_layouts, "GRAPH", longer_graph())
+    paused: list[float] = []
+    monkeypatch.setattr(pipeline, "_pause", paused.append)
+    refused = refusing(monkeypatch, made, "aside", None, error)
+    with pytest.raises(type(error)) as raised:
+        pipeline.lay_out(KEY, force=True)
+    assert raised.value is error
+    assert len(refused) == tries
+    assert paused == [pipeline._SWAP_WAIT] * (tries - 1)
+    assert test_layouts.ids_under(KEY) == [made.id], "the build is removed"
+    assert {path.name: path.read_bytes() for path in made.dir.iterdir()} == before
+    assert pipeline._building == {} and pipeline._scratches == {}

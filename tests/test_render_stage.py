@@ -200,6 +200,10 @@ def test_a_forced_re_layouts_swap_never_finds_a_stored_stage_open(tmp_path, monk
     # Set once the swap has had to wait for the lock, or has been refused.
     moved_on = threading.Event()
     monkeypatch.setattr(pipeline, "_lock", Watched(moved_on))
+    # The swap tries a refused rename again (engine issue 77), which would
+    # hide a read made outside the lock: here no rename is ever refused.
+    paused: list[float] = []
+    monkeypatch.setattr(pipeline, "_pause", paused.append)
     open_files: list[Path] = []
     answers: dict[str, object] = {}
 
@@ -263,6 +267,7 @@ def test_a_forced_re_layouts_swap_never_finds_a_stored_stage_open(tmp_path, monk
     builder.join(30)
     reader.join(30)
     assert not builder.is_alive() and not reader.is_alive()
+    assert paused == [], f"the swap had a rename refused: {answers}"
     assert "build failed" not in answers, answers["build failed"]
     assert "draw failed" not in answers, answers["draw failed"]
     assert answers["drawn"] == before, "read whole from the set it began on"
