@@ -389,8 +389,10 @@ def read_stored(key: str, layout: str,
                 stages: list[str]) -> tuple[Layout, dict[str, bytes]] | None:
     """A stored layout with the files of ``stages`` of it, read whole under
     the lock and parsed by the caller outside it: what ``render.stage`` draws
-    from the store, as ``in_flight`` is what it draws from a build's scratch.
-    None when the layout is not stored whole.
+    from the store, as ``in_flight`` is what it draws from a build's scratch,
+    and what ``run`` draws a map from (engine issue 77). None when the
+    layout is not stored whole. A caller that needs several files names
+    them all in one call, so it reads them in one hold and has one set's.
 
     A forced re-layout's swap moves the stored set aside under the lock, and
     Windows will not rename a directory while a file in it is open, so a
@@ -834,28 +836,41 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         _log(f"{stage}: {line if line is not None else message} ({_took(since)})")
         since = time.monotonic()
 
+    # What the draw reads of the stored set: the octi stage it draws, and the
+    # loom stage the geographic twin is drawn from. Read whole in one hold of
+    # the lock a forced re-layout's swap takes, so the draw is one set's and
+    # the swap never finds one of its files open, and parsed outside it
+    # (engine issue 77). The epoch is taken before: a swap after it keeps the
+    # minutes of the day read below from being kept as the new set's (engine
+    # issue 69).
+    drawn = ["octi", *(["loom"] if feeds.get(key).geographic else [])]
     if layout is not None:
-        found = read_layout(key, layout)
-        if found is None:
+        epoch = _minutes_epoch(layout)
+        # The four stages its reports parse are read in the same hold.
+        read = read_stored(key, layout, list(STAGE_FILES) if progress is not None else drawn)
+        if read is None:
             raise LayoutMissing(f"{key} has no stored layout {layout[:8]}; lay the feed out "
                                 f"first (graph.build)")
+        found, files = read
         if progress is not None:
-            for stage, path in found.paths.items():
-                _report(lambda st, _f, m: tick(st, m), stage, 0.0, path.read_bytes(), found.id)
+            for stage in STAGE_FILES:
+                _report(lambda st, _f, m: tick(st, m), stage, 0.0, files[stage], found.id)
         _from_store(found)
     else:
-        found = lay_out(key, force=force,
-                        progress=(lambda stage, _f, m: tick(stage, m)) if progress else None)
+        laid = lay_out(key, force=force,
+                       progress=(lambda stage, _f, m: tick(stage, m)) if progress else None)
+        epoch = _minutes_epoch(laid.id)
+        read = read_stored(key, laid.id, drawn)
+        if read is None:
+            raise LayoutMissing(f"{key}'s layout {laid.id[:8]} was moved or removed as it was "
+                                f"read; lay the feed out again")
+        found, files = read
     paths = found.paths
     since = time.monotonic()
-    # Before the octi stage is read: a forced re-layout that swaps the stored
-    # set after this keeps the minutes of the day read below from being kept
-    # as the new set's (engine issue 69).
-    epoch = _minutes_epoch(found.id)
 
     # Match stops against the unprojected graph -- station_id is what matters
     # there, and reprojecting is only needed for geometry.
-    graph_ll = LineGraph.from_geojson(paths["octi"])
+    graph_ll = _parsed(files["octi"])
     require_edges(found.feed, graph_ll)
     # A hidden line comes off the graph here, once, so the stop matching, the
     # schedule, the drawing, the thumbnails and the page see only the lines
@@ -907,7 +922,7 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     # keeps a hidden line: the morph pairs the drawn tracks, which lack it.
     geo = None
     if feeds.get(key).geographic:
-        geo_graph = LineGraph.from_geojson(paths["loom"]).reproject(to_mercator)
+        geo_graph = _parsed(files["loom"]).reproject(to_mercator)
         geo = animate.geographic_tracks(geo_graph, graph, r, style)
 
     # A name for a line the map does not draw, hidden or unknown, is dropped.
