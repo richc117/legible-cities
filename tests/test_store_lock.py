@@ -350,9 +350,9 @@ def octi_nodes(reply: dict) -> int:
 
 def test_graph_build_answers_from_files_read_under_the_lock(tmp_path, monkeypatch, client):
     """graph.build of a stored layout reports its four stages from the
-    replay and answers their counts and its meta from a read of its own:
-    every file of the set either opens, it opens under the lock a forced
-    re-layout's swap takes."""
+    replay and answers their counts and its meta from a read of its own;
+    each file of the set that either read opens is opened under the lock a
+    forced re-layout's swap takes."""
     made = small_layout(tmp_path, monkeypatch)
     opened = opened_under_the_lock(monkeypatch, made.dir)
     reply = client.call("graph.build", {"key": KEY})
