@@ -557,13 +557,27 @@ def _swap(scratch: Path, target: Path) -> None:
     """The finished set into place. What was there goes aside first and is
     removed after, so the target is never a directory with some of each.
     Each rename is tried again for a moment while Windows refuses it
-    (``_replace``)."""
+    (``_replace``). If the new set cannot be moved in after all, the old one
+    is put back before the refusal is raised, so a refused second rename costs
+    the build and not the stored layout (engine issue 77)."""
     aside: Path | None = None
     if target.exists():
         aside = target.with_name(f"{target.name}.old-{os.getpid()}")
         shutil.rmtree(aside, ignore_errors=True)
         _replace(target, aside)
-    _replace(scratch, target)
+    try:
+        _replace(scratch, target)
+    except BaseException:
+        # The old set was in place a moment ago and is not freshly written,
+        # which is what makes the new one the likelier rename to be held open.
+        # If it cannot be put back either, the original error is still the one
+        # raised, and the aside is what a later sweep finds.
+        if aside is not None:
+            try:
+                _replace(aside, target)
+            except OSError:
+                pass
+        raise
     if aside is not None:
         shutil.rmtree(aside, ignore_errors=True)
 

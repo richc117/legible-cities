@@ -457,22 +457,25 @@ def test_a_swap_refused_for_a_moment_tries_the_rename_again(tmp_path, monkeypatc
     assert len(pipeline._parsed(files["octi"]).nodes) == 3, "the new set is the one stored"
 
 
+@pytest.mark.parametrize("rename", ["aside", "into place"])
 @pytest.mark.parametrize("error, tries", [
     (refusal(), pipeline._SWAP_TRIES),
     (OSError(16, "Device or resource busy"), 1),
 ], ids=["refused", "another error"])
 def test_a_swap_refused_for_good_gives_the_build_up_as_before(tmp_path, monkeypatch, error,
-                                                              tries):
+                                                              tries, rename):
     """A rename refused every time is tried ``_SWAP_TRIES`` times and then
     the refusal is the build's failure, as it was before the retry: the
-    finished build is removed and the stored set is untouched. An error that
-    is not a refusal is not tried again at all."""
+    finished build is removed and the stored set is untouched, whichever of
+    the two renames was refused -- when it is the second, the old set has been
+    moved aside by then and is put back. An error that is not a refusal is not
+    tried again at all."""
     made = small_layout(tmp_path, monkeypatch, write=write_three_stop_feed)
     before = {path.name: path.read_bytes() for path in made.dir.iterdir()}
     monkeypatch.setattr(test_layouts, "GRAPH", longer_graph())
     paused: list[float] = []
     monkeypatch.setattr(pipeline, "_pause", paused.append)
-    refused = refusing(monkeypatch, made, "aside", None, error)
+    refused = refusing(monkeypatch, made, rename, None, error)
     with pytest.raises(type(error)) as raised:
         pipeline.lay_out(KEY, force=True)
     assert raised.value is error
@@ -481,3 +484,16 @@ def test_a_swap_refused_for_good_gives_the_build_up_as_before(tmp_path, monkeypa
     assert test_layouts.ids_under(KEY) == [made.id], "the build is removed"
     assert {path.name: path.read_bytes() for path in made.dir.iterdir()} == before
     assert pipeline._building == {} and pipeline._scratches == {}
+
+
+def test_the_lock_is_held_while_a_refused_rename_waits(tmp_path, monkeypatch):
+    """Issue 77: the pause between tries is inside the swap's hold of the
+    store's lock, so a reader arriving between the two renames waits for the
+    new set rather than finding the stored one missing."""
+    made = small_layout(tmp_path, monkeypatch, write=write_three_stop_feed)
+    monkeypatch.setattr(test_layouts, "GRAPH", longer_graph())
+    held: list[bool] = []
+    monkeypatch.setattr(pipeline, "_pause", lambda _wait: held.append(pipeline._lock.locked()))
+    refusing(monkeypatch, made, "into place", 2, refusal())
+    assert pipeline.lay_out(KEY, force=True).id == made.id
+    assert held == [True, True]
