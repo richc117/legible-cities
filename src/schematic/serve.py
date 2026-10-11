@@ -922,17 +922,27 @@ class EngineEndpoint(Endpoint):
         _no_extra("graph.build", left)
 
         def work(job: loom.Job, progress: Progress) -> dict[str, Any]:
-            layout = pipeline.lay_out(key, force=force, stages=tuned, progress=progress,
-                                      **overrides)
-            paths = layout.paths
-            octi = LineGraph.from_geojson(paths["octi"])
+            laid = pipeline.lay_out(key, force=force, stages=tuned, progress=progress,
+                                    **overrides)
+            # The answer's four stages and its meta, read whole in one hold
+            # of the lock a forced re-layout's swap takes, so they are one
+            # set's and the swap never finds one of them open, and parsed
+            # outside it (engine issue 77).
+            read = pipeline.read_stored(key, laid.id, list(pipeline.STAGE_FILES))
+            if read is None:
+                raise pipeline.LayoutMissing(
+                    f"{key}'s layout {laid.id[:8]} was moved or removed as it was read; "
+                    f"lay the feed out again")
+            layout, files = read
+            graphs = {stage: LineGraph.from_geojson(json.loads(data.decode("utf-8")))
+                      for stage, data in files.items()}
+            octi = graphs["octi"]
             pipeline.require_edges(layout.feed, octi)
-            stages = {stage: _stage_summary(LineGraph.from_geojson(path))
-                      for stage, path in paths.items()}
+            stages = {stage: _stage_summary(graph) for stage, graph in graphs.items()}
             ok, total = octilinearity(octi.reproject(to_mercator))
             stages["octi"]["octilinear"] = ok / total if total else 0.0
             return {"layout": layout.id, "meta": layout.meta, "stages": stages,
-                    "paths": {s: str(p) for s, p in paths.items()}}
+                    "paths": {s: str(p) for s, p in layout.paths.items()}}
 
         return self._job(work)
 

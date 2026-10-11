@@ -28,6 +28,7 @@ from typing import Any, Callable
 import pytest
 import test_layouts
 from test_render_stage import DAY, Watched, longer_graph, small_layout, write_three_stop_feed
+from test_serve import Client
 
 from schematic import pipeline, render
 
@@ -52,18 +53,18 @@ def opened_under_the_lock(monkeypatch, folder: Path) -> list[tuple[str, bool]]:
 class Race:
     """A forced re-layout of ``made``, raced against a reader of the stored
     set that is held with one of its files open: the ``nth`` time the
-    reader opens the ``held`` stage's file.
+    reader opens the ``held`` stage's file, or never when ``held`` is None.
 
     The reader is any thread but the test's own and the builder's, so a
     request answered on the server's own worker is a reader too.
     ``moved_on`` is set once anyone has had to wait for the store's lock, a
     rename has been refused, or the reader has ended."""
 
-    def __init__(self, monkeypatch, made: pipeline.Layout, *, held: str = "octi",
+    def __init__(self, monkeypatch, made: pipeline.Layout, *, held: str | None = "octi",
                  nth: int = 1) -> None:
         self.monkeypatch = monkeypatch
         self.made = made
-        self.held = made.paths[held]
+        self.held = made.paths[held] if held is not None else None
         self.nth = nth
         self.moved_on = threading.Event()
         self.reading, self.let_read = threading.Event(), threading.Event()
@@ -123,7 +124,7 @@ class Race:
         except BaseException as exc:  # handed to the test's thread, which asserts on it
             self.answers["build failed"] = exc
 
-    def _start_reader(self, read: Callable[[], Any]) -> None:
+    def start_reader(self, read: Callable[[], Any]) -> None:
         def run() -> None:
             try:
                 self.answers["read"] = read()
@@ -143,7 +144,7 @@ class Race:
         reach its swap with the file open; and the reader is answered from
         the set it began on."""
         try:
-            self._start_reader(read)
+            self.start_reader(read)
             assert self.reading.wait(30) and self.reader.is_alive(), \
                 f"the reader never opened {self.held.name}: {self.answers}"
             self.builder.start()
@@ -172,7 +173,7 @@ class Race:
         try:
             self.builder.start()
             assert self.at_swap.wait(30), f"the re-layout never reached its swap: {self.answers}"
-            self._start_reader(read)
+            self.start_reader(read)
             assert self.reading.wait(30) and self.reader.is_alive(), \
                 f"the reader never opened {self.held.name}: {self.answers}"
             self.let_swap.set()
@@ -182,10 +183,12 @@ class Race:
             self.let_read.set()
         return self._joined()
 
-    def in_the_gap(self, read: Callable[[], Any]) -> Any:
+    def in_the_gap(self, read: Callable[[], Any] | None = None, *,
+                   then: Callable[[], None] | None = None) -> Any:
         """A forced re-layout is held between its swap's two renames, the
         stored set moved aside and the new one not yet in its place; the
-        reader starts there. It must wait for the lock, never find the set
+        reader starts there (``read``), or, started before and paused, is let
+        on there (``then``). It must wait for the lock, never find the set
         missing (a ``FileNotFoundError``, or a layout not stored), and is
         answered from the new set once the swap is done."""
         self.let_gap.clear()
@@ -193,7 +196,10 @@ class Race:
         try:
             self.builder.start()
             assert self.in_gap.wait(30), f"the re-layout never reached its swap: {self.answers}"
-            self._start_reader(read)
+            if read is not None:
+                self.start_reader(read)
+            if then is not None:
+                then()
             assert self.moved_on.wait(30), "the reader neither waited for the lock nor ended"
             assert self.reader.is_alive(), \
                 f"the read ended between the swap's two renames: {self.answers}"
@@ -210,6 +216,13 @@ class Race:
         assert self.answers["built"].id == self.made.id
         assert test_layouts.ids_under(KEY) == [self.made.id], "nothing left aside or half made"
         return self.answers["read"]
+
+
+@pytest.fixture
+def client():
+    c = Client()
+    yield c
+    c.endpoint.close()
 
 
 def nodes_reported(reports: list[tuple[str, str]]) -> dict[str, str]:
@@ -320,3 +333,70 @@ def test_a_read_that_lands_between_the_swaps_renames_waits_for_the_new_set(
         result = race.in_the_gap(lambda: draw(made, tmp_path / "out",
                                               by_id=reader == "map.build"))
         assert len(result.graph.nodes) == 3
+
+
+# ------------------------------------------------------- graph.build's answer
+
+def octi_nodes(reply: dict) -> int:
+    assert "result" in reply, reply
+    return reply["result"]["stages"]["octi"]["nodes"]
+
+
+def test_graph_build_answers_from_files_read_under_the_lock(tmp_path, monkeypatch, client):
+    """graph.build of a stored layout reports its four stages from the
+    replay and answers their counts and its meta from a read of its own:
+    every file of the set either opens, it opens under the lock a forced
+    re-layout's swap takes."""
+    made = small_layout(tmp_path, monkeypatch)
+    opened = opened_under_the_lock(monkeypatch, made.dir)
+    reply = client.call("graph.build", {"key": KEY})
+    assert reply["result"]["layout"] == made.id and reply["result"]["meta"] == made.meta
+    names = [name for name, _held in opened]
+    assert sorted(set(names)) == sorted({*pipeline.STAGE_FILES.values(), pipeline.META_FILE})
+    assert names.count("03_octi.json") == 2, "the replay's report, then the answer's read"
+    assert [name for name, held in opened if not held] == []
+
+
+def test_a_forced_re_layout_waits_for_graph_builds_answer_still_reading_the_set(
+        tmp_path, monkeypatch, client):
+    """Issue 77 as Windows has it, for graph.build: its answer's read is
+    held with the stored octi stage open (the second time it opens it; the
+    first is the replay's report), then a forced re-layout starts. It waits
+    for the lock rather than reach its swap and be refused, and graph.build
+    answers the set it found."""
+    made = small_layout(tmp_path, monkeypatch, write=write_three_stop_feed)
+    monkeypatch.setattr(test_layouts, "GRAPH", longer_graph())
+    race = Race(monkeypatch, made, nth=2)
+    assert octi_nodes(race.read_first(lambda: client.call("graph.build", {"key": KEY}))) == 2
+    assert octi_nodes(client.call("graph.build", {"key": KEY})) == 3
+
+
+def test_graph_builds_answer_read_between_the_swaps_renames_waits_for_the_new_set(
+        tmp_path, monkeypatch, client):
+    """Issue 77: graph.build has laid out (here, found the layout stored and
+    replayed it) and is paused before it reads its answer; a forced
+    re-layout is held between its swap's two renames; graph.build is let
+    on. Its read waits for the lock rather than find the set missing, which
+    answered a ``FileNotFoundError`` as kind ``io`` with the folder's path
+    in its hint, and it answers the new set."""
+    made = small_layout(tmp_path, monkeypatch, write=write_three_stop_feed)
+    monkeypatch.setattr(test_layouts, "GRAPH", longer_graph())
+    race = Race(monkeypatch, made, held=None)
+    laid, let_on = threading.Event(), threading.Event()
+    real = pipeline.lay_out
+
+    def paused(key, **kwargs):
+        found = real(key, **kwargs)
+        if not kwargs.get("force"):
+            laid.set()
+            assert let_on.wait(30), "the test never let graph.build go on"
+        return found
+
+    monkeypatch.setattr(pipeline, "lay_out", paused)
+    race.start_reader(lambda: client.call("graph.build", {"key": KEY}))
+    try:
+        assert laid.wait(30), f"graph.build never laid out: {race.answers}"
+        reply = race.in_the_gap(then=let_on.set)
+    finally:
+        let_on.set()
+    assert octi_nodes(reply) == 3
