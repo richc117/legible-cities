@@ -312,6 +312,7 @@ READINGS = {
         ("map.build", lambda v: {"key": KEY, "layout": NO_LAYOUT, "date": DATE, "out": v}, "out"),
         ("export.plan", lambda v: {"key": KEY, "preset": "instagram-reel",
                                    "options": {"tag": v}}, "tag"),
+        ("export.plan", lambda v: {"key": KEY, "preset": "linkedin-gif", "out": v}, "out"),
     ]),
     "DATE_PATTERN": ("2026-10-07", [
         ("map.build", lambda v: {"key": KEY, "layout": NO_LAYOUT, "date": v}, "date"),
@@ -353,6 +354,9 @@ READINGS = {
                                  "colors": {"A": v}}, "colors"),
         ("map.build", lambda v: {"key": KEY, "layout": NO_LAYOUT, "date": DATE,
                                  "style": {"background": v}}, "style.background"),
+        ("export.encode", lambda v: {"plan": {**_plan_dict(), "colors": [v]},
+                                     "source": tempfile.gettempdir(),
+                                     "dest": "/elsewhere/out.mp4"}, "plan.colors"),
     ]),
 }
 
@@ -881,6 +885,10 @@ BAD_PARAMS = [
      "ExportPlanParams"),
     ("export.plan", {"key": KEY, "preset": "instagram-reel",
                      "options": {"clock_corner": "middle"}}, "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "linkedin-gif", "out": "../x"}, "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "linkedin-gif", "out": "/x"}, "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "linkedin-gif", "out": "a/b"}, "ExportPlanParams"),
+    ("export.plan", {"key": KEY, "preset": "linkedin-gif", "out": None}, "ExportPlanParams"),
     ("export.encode", {}, "ExportEncodeParams"),
     ("export.encode", {"plan": {}, "source": "/a", "dest": "/b/x.mp4"}, "ExportEncodeParams"),
     ("export.encode", {"plan": "plan", "source": "/a", "dest": "/b/x.mp4"}, "ExportEncodeParams"),
@@ -903,6 +911,8 @@ BAD_PLANS = [
     {"keep": "yes"}, {"fade": -1}, {"stem": "../x"}, {"theme": "sepia"}, {"view": "plan"},
     {"storyboard": "unknown"}, {"at": "07:00"}, {"notes": "note"},
     {"caption": "x" * 81}, {"clock_corner": "middle"}, {"extra": 1},
+    {"colors": "#ff0000"}, {"colors": ["red"]}, {"colors": [7]},
+    {"colors": ["#ff0000", "#ff0000"]},
 ]
 
 

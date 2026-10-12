@@ -1201,6 +1201,10 @@
           "$ref": "#/$defs/ServiceDate",
           "description": "The service day the title names, when the caller knows it (the app's project does)."
         },
+        "out": {
+          "$ref": "#/$defs/Token",
+          "description": "The out map.build was given: the folder under the home's out/ the page was written into. A GIF's plan reads the line colours of the page there into colors; a positions file there that is a link to outside the folder is an export error. Omitted, they are read beside the site's page when page is omitted too, and otherwise not at all."
+        },
         "options": {
           "$ref": "#/$defs/ExportOptions"
         }
@@ -1400,6 +1404,7 @@
         },
         "caption": { "oneOf": [{ "$ref": "#/$defs/Caption" }, { "type": "null" }], "description": "The caption as given; null for none." },
         "clock_corner": { "$ref": "#/$defs/ClockCorner", "description": "The corner resolved, given even where the clock is off and the address names none." },
+        "colors": { "oneOf": [{ "type": "array", "items": { "$ref": "#/$defs/HexColor" }, "uniqueItems": true }, { "type": "null" }], "description": "A GIF's: the line colours of the page it is captured from, distinct, sorted and in lower case, which export.encode composes its palette from. Null for any other format, and where the plan could not read them (no out, or no page there), when a GIF's palette is counted from its frames as before. A plan handed back without it is read as null." },
         "filename": {
           "type": "string",
           "description": "stem plus the format's extension; the plan's convenience."

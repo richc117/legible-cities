@@ -11,16 +11,19 @@ ground and its midpoint with the text. These hold its arithmetic.
 
 import io
 import itertools
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from schematic import export
+from schematic import config, export, serve
+from test_serve import Client, check
 
 PAGE = Path(export.__file__).parent / "page" / "page.html"
 
@@ -219,6 +222,7 @@ def test_making_the_png_needs_no_imaging_library():
 
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
 
+KEY = "la-metro-rail"
 PRESET = "linkedin-gif"                    # 640 x 640, the smallest GIF preset
 SIZE = 640
 FRAMES = 24
@@ -351,9 +355,11 @@ def _colour_table(gif: Path) -> bytes:
 
 
 def _gif(theme: str, frames: Path, dest: Path, colors=BART) -> Path:
-    """The GIF ``export.encode`` makes of ``frames`` for one plan."""
-    job = export.plan("la-metro-rail", PRESET, theme=theme, quality="draft")
-    return export.encode(job, frames, dest / job.filename, colors=colors)[0]
+    """The GIF ``export.encode`` makes of ``frames`` for a plan carrying
+    ``colors``."""
+    job = export.plan(KEY, PRESET, theme=theme, quality="draft")
+    job = replace(job, colors=None if colors is None else tuple(colors))
+    return export.encode(job, frames, dest / job.filename)[0]
 
 
 @pytest.fixture(scope="module", params=["dark", "light"])
@@ -476,35 +482,249 @@ def test_past_59_colours_the_palette_is_counted_from_the_frames(colors, counted,
 
 
 # ------------------------------------------------- where the colours come from
+#
+# The plan carries them: from the folder map.build wrote the page into, which
+# the desktop app names with ``out`` (its project's id), else beside the
+# site's page. The encode composes the palette from the plan alone.
+
+APP_PAGE = "app://local/projects/p1/la-metro-rail.html"
+SORTED = ("#000000", "#0099cc", "#339933", "#b0bec7", "#ff0000", "#ff9933", "#ffff33")
 
 
-def test_a_pages_colours_are_its_positions_files_lines(tmp_path):
-    import json
-    (tmp_path / "bart.positions.json").write_text(json.dumps(
-        {"date": "2026-09-05", "lines": dict(zip("ABCDEFGH", BART)), "paths": []}))
-    assert export.page_colors(tmp_path, "bart") == BART
+def _positions(folder: Path, lines, key: str = KEY) -> Path:
+    """A positions file as ``animate.write`` leaves one, with ``lines``."""
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{key}.positions.json"
+    path.write_text(json.dumps({"date": "2026-09-05", "lines": lines, "paths": []}),
+                    encoding="utf-8")
+    return path
+
+
+def _link(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=target.is_dir())
+    except OSError as exc:                       # Windows without the privilege
+        pytest.skip(f"cannot make a symbolic link here: {exc}")
+
+
+@pytest.fixture
+def home(tmp_path, monkeypatch):
+    """A scratch engine home, whose out/ holds the pages map.build wrote."""
+    root = tmp_path / "home"
+    (root / "out").mkdir(parents=True)
+    monkeypatch.setenv(config.ENV, str(root))
+    return root
+
+
+def test_a_pages_colours_are_its_positions_files_lines_distinct_and_sorted(tmp_path):
+    _positions(tmp_path, {**dict(zip("ABCDEFGH", BART)), "Z": "#FF0000"})
+    assert export.page_colors(tmp_path, KEY) == SORTED
     assert export.page_colors(tmp_path, "boston-t") is None
-    (tmp_path / "odd.positions.json").write_text(json.dumps({"paths": []}))
-    assert export.page_colors(tmp_path, "odd") is None
+
+
+@pytest.mark.parametrize("data", [
+    b'{"paths": []}', b'{"lines": ["#ff0000"]}', b'{"lines": {"A": "red"}}',
+    b'{"lines": {"A": 7}}', b'["#ff0000"]', b'{"lines": {"A": "#ff0000"}', b"",
+    b'{"lines": {"A": "#ff0000"}}\xff',                 # not UTF-8
+])
+def test_a_positions_file_that_cannot_be_read_as_one_gives_no_colours(tmp_path, data):
+    (tmp_path / f"{KEY}.positions.json").write_bytes(data)
+    assert export.page_colors(tmp_path, KEY) is None
+
+
+def test_a_gif_plan_carries_the_colours_of_the_page_out_names(home):
+    _positions(home / "out" / "p1", dict(zip("ABCDEFGH", BART)))
+    job = export.plan(KEY, PRESET, page=APP_PAGE, out="p1")
+    assert job.colors == SORTED
+    answer = {**job.to_dict(), "filename": job.filename}
+    assert answer["colors"] == list(SORTED)
+    check(answer, "CaptureJob")
+
+
+@pytest.mark.parametrize("folder", ["missing", "empty", "other-key"])
+def test_a_plan_whose_folder_holds_no_page_carries_none(home, folder):
+    (home / "out" / "empty").mkdir()
+    _positions(home / "out" / "other-key", {"A": "#ff0000"}, key="bart")
+    job = export.plan(KEY, PRESET, page=APP_PAGE, out=folder)
+    assert job.colors is None and job.to_dict()["colors"] is None
+    check({**job.to_dict(), "filename": job.filename}, "CaptureJob")
+
+
+@pytest.mark.parametrize("preset", ["linkedin-video", "instagram-reel", "linkedin", "bluesky"])
+def test_only_a_gif_plan_carries_colours(home, preset):
+    _positions(home / "out" / "p1", {"A": "#ff0000"})
+    assert export.plan(KEY, preset, page=APP_PAGE, out="p1").colors is None
+
+
+def test_without_out_the_colours_are_the_site_pages_or_none(home, tmp_path, monkeypatch):
+    maps = tmp_path / "maps"
+    _positions(maps, {"A": "#0099CC", "B": "#ff0000"})
+    _positions(home / "out", {"A": "#00ff00"})           # out/ itself is never read
+    monkeypatch.setattr(export, "MAPS_DIR", maps)
+    assert export.plan(KEY, PRESET).colors == ("#0099cc", "#ff0000")
+    assert export.plan(KEY, PRESET, page=APP_PAGE).colors is None
+    # out wins over the site's page, whatever page says.
+    _positions(home / "out" / "p1", {"A": "#123456"})
+    assert export.plan(KEY, PRESET, out="p1").colors == ("#123456",)
+
+
+@pytest.mark.parametrize("out", ["../x", "..", ".", "", "/x", "a/b", "x/", "../out/p1"])
+def test_out_is_one_folder_name_never_a_path(home, out):
+    """Even where the path would reach a real page: beside the home, and the
+    project's own folder reached the long way round."""
+    _positions(home / "x", {"A": "#ff0000"})
+    _positions(home / "out" / "p1", {"A": "#ff0000"})
+    with pytest.raises(ValueError, match="out must be one folder name"):
+        export.plan(KEY, PRESET, page=APP_PAGE, out=out)
+
+
+def test_out_as_an_absolute_path_to_a_page_is_refused(home):
+    folder = home / "out" / "p1"
+    _positions(folder, {"A": "#ff0000"})
+    with pytest.raises(ValueError, match="out must be one folder name"):
+        export.plan(KEY, PRESET, page=APP_PAGE, out=str(folder))
+
+
+def test_a_positions_file_that_is_a_link_outside_its_folder_is_refused(home, tmp_path):
+    outside = _positions(tmp_path / "elsewhere", {"A": "#ff0000"})
+    (home / "out" / "p1").mkdir()
+    _link(home / "out" / "p1" / f"{KEY}.positions.json", outside)
+    with pytest.raises(ValueError, match="link to outside its folder"):
+        export.plan(KEY, PRESET, page=APP_PAGE, out="p1")
+    # A link that stays in the folder is the folder's own file.
+    inside = _positions(home / "out" / "p2", {"A": "#ff0000"}, key="kept")
+    _link(home / "out" / "p2" / f"{KEY}.positions.json", inside)
+    assert export.plan(KEY, PRESET, page=APP_PAGE, out="p2").colors == ("#ff0000",)
+    # A dangling link is no page.
+    _link(home / "out" / "p3", tmp_path / "nowhere")
+    (home / "out" / "p4").mkdir()
+    _link(home / "out" / "p4" / f"{KEY}.positions.json", tmp_path / "nowhere.json")
+    assert export.plan(KEY, PRESET, page=APP_PAGE, out="p4").colors is None
+
+
+def test_a_project_folder_that_is_a_link_outside_is_refused(home, tmp_path):
+    _positions(tmp_path / "elsewhere", {"A": "#ff0000"})
+    _link(home / "out" / "p1", tmp_path / "elsewhere")
+    with pytest.raises(ValueError, match="leads outside the engine's out folder"):
+        export.plan(KEY, PRESET, page=APP_PAGE, out="p1")
+
+
+# --------------------------------------------------------- through the protocol
+
+
+@pytest.fixture
+def client():
+    c = Client()
+    yield c
+    c.endpoint.close()
+
+
+@needs_ffmpeg
+def test_the_colours_ride_the_plan_from_export_plan_to_export_encode(home, client, tmp_path):
+    """The app names its project's folder, and hands the plan back as it came."""
+    import numpy as np
+    _positions(home / "out" / "p1", dict(zip("ABCDEFGH", BART)))
+    asked = {"key": KEY, "preset": PRESET, "page": APP_PAGE, "out": "p1",
+             "options": {"quality": "draft"}}
+    check(asked, "ExportPlanParams")
+    plan = client.call("export.plan", asked)["result"]
+    check(plan, "CaptureJob")
+    assert plan["colors"] == list(SORTED)
+    assert serve._capture_job(plan).colors == SORTED
+    frames = _save([np.asarray(_map_frame("dark", i)) for i in range(3)], tmp_path / "frames")
+    # The page's colours change after the plan: the encode reads the plan's.
+    _positions(home / "out" / "p1", {"A": "#123456"})
+    dest = tmp_path / "out" / plan["filename"]
+    done = client.call("export.encode", {"plan": plan, "source": str(frames),
+                                         "dest": str(dest)})
+    assert "result" in done, done
+    entries = _colour_table(dest)
+    table = export.gif_palette("dark", BART)
+    assert sorted(entries[i:i + 3] for i in range(0, 768, 3)) == sorted(bytes(c) for c in table)
+
+
+@pytest.mark.parametrize("out", ["../x", "/x", "a/b", "a\\b", ".hidden", "x\n"])
+def test_the_protocol_refuses_an_out_that_is_not_a_folder_name(home, client, out):
+    error = client.call("export.plan", {"key": KEY, "preset": PRESET, "out": out})["error"]
+    assert error["code"] == -32602 and error["data"]["kind"] == "params", error
+    assert error["data"]["hint"].startswith("out must be a folder name")
+
+
+def test_the_protocol_refuses_a_positions_file_that_leaves_its_folder(home, client, tmp_path):
+    outside = _positions(tmp_path / "elsewhere", {"A": "#ff0000"})
+    (home / "out" / "p1").mkdir()
+    _link(home / "out" / "p1" / f"{KEY}.positions.json", outside)
+    error = client.call("export.plan", {"key": KEY, "preset": PRESET, "page": APP_PAGE,
+                                        "out": "p1"})["error"]
+    assert error["code"] == -32000 and error["data"]["kind"] == "export", error
+    assert "link to outside its folder" in error["data"]["hint"]
+    assert str(tmp_path) not in error["data"]["hint"]
+
+
+def test_a_plan_handed_back_without_colours_reads_as_none(home, client):
+    _positions(home / "out" / "p1", {"A": "#ff0000"})
+    plan = client.call("export.plan", {"key": KEY, "preset": PRESET, "page": APP_PAGE,
+                                       "out": "p1"})["result"]
+    older = {k: v for k, v in plan.items() if k != "colors"}
+    assert serve._capture_job(older).colors is None
+    assert serve._capture_job({**plan, "colors": None}).colors is None
+
+
+# ----------------------------------------------------------- the old path, kept
+
+
+@needs_ffmpeg
+def test_a_plan_without_colours_encodes_byte_for_byte_as_before(tmp_path, monkeypatch):
+    """No colours, as from a client that names no folder: the two passes the
+    encode always ran, palettegen=stats_mode=diff then paletteuse, give the
+    same bytes run by hand."""
+    import numpy as np
+    frames = _save([np.asarray(_map_frame("light", i)) for i in range(4)], tmp_path / "frames")
+    job = export.plan(KEY, PRESET, theme="light", page=APP_PAGE, quality="draft")
+    assert job.colors is None
+    made = export.encode(job, frames, tmp_path / "made" / job.filename)[0]
+    ffmpeg, src = shutil.which("ffmpeg"), str(frames / "%06d.png")
+    palette, by_hand = tmp_path / "palette.png", tmp_path / "by-hand.gif"
+    for args in (["-framerate", "12", "-i", src, "-vf", "palettegen=stats_mode=diff",
+                  str(palette)],
+                 ["-framerate", "12", "-i", src, "-i", str(palette), "-lavfi",
+                  "scale=640:640:flags=lanczos[s];[s][1:v]paletteuse=dither=bayer:bayer_scale=3",
+                  str(by_hand)]):
+        subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-nostats", *args], check=True,
+                       timeout=300)
+    assert made.read_bytes() == by_hand.read_bytes()
+
+
+@needs_ffmpeg
+def test_the_encode_never_reads_a_page(tmp_path, monkeypatch):
+    """The palette is the plan's: the encode composes it from the plan's
+    colours and asks no folder for any."""
+    import numpy as np
+    frames = _save([np.asarray(_map_frame("dark", 0))], tmp_path / "frames")
+    job = replace(export.plan(KEY, PRESET, page=APP_PAGE, quality="draft"), colors=SORTED)
+    monkeypatch.setattr(export, "page_colors", lambda *a: pytest.fail("the encode read a page"))
+    monkeypatch.setattr(export, "out_folder", lambda *a: pytest.fail("the encode read a page"))
+    gif = export.encode(job, frames, tmp_path / "out" / job.filename)[0]
+    entries = _colour_table(gif)
+    table = export.gif_palette("dark", BART)
+    assert sorted(entries[i:i + 3] for i in range(0, 768, 3)) == sorted(bytes(c) for c in table)
 
 
 @needs_ffmpeg
 def test_the_sites_export_composes_from_its_pages_colours(tmp_path, monkeypatch):
-    """``run`` captures the site's page, so its palette is composed from
+    """``run`` plans for the site's page, so the plan carries the colours of
     the positions file beside that page."""
-    import json
     maps = tmp_path / "maps"
-    maps.mkdir()
-    (maps / "la-metro-rail.positions.json").write_text(json.dumps(
-        {"lines": {"A": "#0099cc", "B": "#ff0000"}}))
+    _positions(maps, {"A": "#0099cc", "B": "#ff0000"})
     monkeypatch.setattr(export, "MAPS_DIR", maps)
 
     def capture(job, *, frames=None, out=None):
         import numpy as np
+        assert job.colors == ("#0099cc", "#ff0000")
         return _save([np.asarray(_map_frame("dark", i)) for i in range(3)], frames)
 
     monkeypatch.setattr(export, "capture", capture)
-    written = export.run("la-metro-rail", PRESET, out=tmp_path / "out")
+    written = export.run(KEY, PRESET, out=tmp_path / "out")
     table = export.gif_palette("dark", ["#0099cc", "#ff0000"])
     entries = _colour_table(written[0])
     assert sorted(entries[i:i + 3] for i in range(0, 768, 3)) == sorted(bytes(c) for c in table)

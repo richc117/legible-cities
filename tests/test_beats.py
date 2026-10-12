@@ -105,14 +105,17 @@ def test_the_pins_cover_every_name_and_every_video_preset():
 # address to v0.11.0; the caption, the corner and the zones are E40's
 # additions, judged by tests/test_overlay.py, so they are left out of the hash.
 E40_FIELDS = ("caption", "clock_corner")
+# Issue 33's addition to every plan, a GIF's line colours, judged by
+# tests/test_gif_palette.py; null on all of these, which name no folder.
+E33_FIELDS = ("colors",)
 E40_QUERY = ("corner", "ztop", "zbottom", "zside", "zrail", "zrailtop")
 
 
 def _as_before_e40(plan: dict) -> dict:
-    """The plan without E40's two fields, and its address without E40's
-    keys: the query parsed and re-encoded as url_for writes it, so the order
+    """The plan without E40's two fields and issue 33's one, and its address
+    without E40's keys: the query parsed and re-encoded as url_for writes it, so the order
     and the encoding of every other key are untouched."""
-    plan = {k: v for k, v in plan.items() if k not in E40_FIELDS}
+    plan = {k: v for k, v in plan.items() if k not in E40_FIELDS + E33_FIELDS}
     base, query = plan["url"].split("?", 1)
     kept = [(k, v) for k, v in parse_qsl(query, keep_blank_values=True) if k not in E40_QUERY]
     plan["url"] = base + "?" + urlencode(kept)

@@ -716,13 +716,23 @@ def _capture_job(value: Any) -> export.CaptureJob:
     if corner not in export.CLOCK_CORNERS:
         raise invalid_params("plan.clock_corner must be one of "
                              + ", ".join(export.CLOCK_CORNERS))
+    # A GIF's line colours (issue 33), as the plan wrote them; a plan from
+    # before there were any has none, and is encoded as it was then.
+    colors = left.pop("colors", None)
+    if colors is not None and not (
+            isinstance(colors, list)
+            and all(isinstance(c, str) and COLOR_PATTERN.fullmatch(c) for c in colors)
+            and len(set(colors)) == len(colors)):
+        raise invalid_params("plan.colors must be a list of distinct colours written #rrggbb, "
+                             "or null")
     _no_extra("plan", left)
     return export.CaptureJob(key=key, preset=preset, mode=mode, url=url, width=ints["width"],
                              height=ints["height"], scale=ints["scale"], fps=ints["fps"],
                              format=fmt, settle=ints["settle"], beats=beats, keep=keep,
                              crf=ints["crf"], fade=float(fade), stem=stem, theme=theme,
                              view=view, storyboard=board, at=at, notes=tuple(notes),
-                             caption=caption, clock_corner=corner)
+                             caption=caption, clock_corner=corner,
+                             colors=None if colors is None else tuple(colors))
 
 
 def _absolute(left: dict[str, Any], name: str) -> Path:
@@ -1170,6 +1180,8 @@ class EngineEndpoint(Endpoint):
                          lambda v: isinstance(v, str) and bool(URL_PATTERN.fullmatch(v)),
                          "must be the page's address, with its scheme")
         date = _date(left.pop("date")).isoformat() if "date" in left else None
+        # The folder map.build wrote the page into, read for a GIF's colours.
+        out = _token(left.pop("out")) if "out" in left else None
         options = _export_options(left.pop("options", None))
         _no_extra("export.plan", left)
         # Refused here rather than by export.plan, so it is the caller's
@@ -1179,7 +1191,7 @@ class EngineEndpoint(Endpoint):
                 and (options.get("view") or options.get("at"))):
             raise invalid_params(export.BESIDE_A_LIST)
         try:
-            job = export.plan(key, preset, page=page, date=date, **options)
+            job = export.plan(key, preset, page=page, date=date, out=out, **options)
         except (KeyError, ValueError) as exc:
             raise classify(exc) from exc
         return {**job.to_dict(), "filename": job.filename}

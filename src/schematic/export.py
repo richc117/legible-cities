@@ -44,7 +44,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Callable, Sequence
 
-from . import feeds, loom
+from . import config, feeds, loom
 from .config import REPO_ROOT
 from .schedule import service_day_text
 
@@ -154,8 +154,8 @@ GIF_STEPS = ((33, 6), (59, 3))
 # every frame, with no entry kept for a transparency a map never has (arm B
 # of ADR-055).
 COUNTED = "palettegen=stats_mode=full:reserve_transparent=0"
-# Counted as every GIF was before issue 33, where the line colours are not
-# known: what reaches ``encode`` through the protocol names none yet.
+# Counted as every GIF was before issue 33, where the plan carries no line
+# colours: a client that does not name the folder its page is in.
 COUNTED_BEFORE = "palettegen=stats_mode=diff"
 
 RGB = tuple[int, int, int]
@@ -1232,6 +1232,10 @@ class CaptureJob:
     # The corner resolved, carried even where the clock is off and the
     # address names none.
     clock_corner: str = DEFAULT_CORNER
+    # A GIF's: the line colours of the page it is captured from, distinct,
+    # sorted and in lower case, which its palette is composed from (issue
+    # 33). None for any other format, and where the plan could not read them.
+    colors: tuple[str, ...] | None = None
 
     @property
     def filename(self) -> str:
@@ -1242,6 +1246,7 @@ class CaptureJob:
         out = asdict(self)
         out["beats"] = list(self.beats)
         out["notes"] = list(self.notes)
+        out["colors"] = None if self.colors is None else list(self.colors)
         return out
 
     def recorder_job(self, *, frames: Path | None = None, out: Path | None = None) -> dict:
@@ -1263,14 +1268,15 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
          storyboard: str | Sequence[Beat | dict] | None = None, quality: str = "standard",
          fade: float = 0.0, safe: bool = False, tag: str = "", page: str | None = None,
          date: str | None = None, caption: str | None = None,
-         clock_corner: str | None = None) -> CaptureJob:
+         clock_corner: str | None = None, out: str | None = None) -> CaptureJob:
     """Describe an export without doing any of it.
 
-    Pure: reads the registry and the atlas's data, touches no file, starts no
-    browser, and knows nothing of the recorder. A vector preset is not a
-    capture and is refused; ``run`` handles it. ``page`` is the page's own
-    address when it is not the site's file, and ``date`` the service day its
-    title names, when the caller knows them; the desktop app knows both.
+    Pure: reads the registry, the atlas's data and, for a GIF, the colours of
+    the page it is for; writes no file, starts no browser, and knows nothing
+    of the recorder. A vector preset is not a capture and is refused; ``run``
+    handles it. ``page`` is the page's own address when it is not the site's
+    file, and ``date`` the service day its title names, when the caller knows
+    them; the desktop app knows both.
 
     ``storyboard`` is a storyboard's name or a list of beats, which
     ``authored_beats`` checks; a still ignores it. For a video, ``view`` and
@@ -1288,6 +1294,12 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
     A storyboard with a title card carries the city, the network and the day
     on its address, title or not, and a card whose words need longer to read
     than its beat lasts comes with a note (issue 44).
+
+    A GIF's plan carries the line colours of its page, which its palette is
+    composed from (issue 33): read from the folder ``map.build`` wrote it into
+    when ``out`` names that folder (``out_folder``), else beside the site's
+    page when there is no ``page``, else not at all, and then the palette is
+    counted from the frames as it was before.
     """
     if key not in feeds.all():
         raise KeyError(f"unknown feed {key!r}")
@@ -1300,6 +1312,8 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
         raise ValueError(f"quality is draft, standard or high, not {quality!r}")
     if caption is not None:
         check_caption(caption)
+    folder = out_folder(out) if out is not None else (MAPS_DIR if page is None else None)
+    colors = page_colors(folder, key) if folder is not None and preset.fmt == "gif" else None
     zones = SAFE_ZONES[preset.zones] if preset.zones else None
     corner, corner_note = _clock_corner(preset, zones, clock_corner,
                                         clock=preset.kind == "video" if clock is None else clock,
@@ -1359,7 +1373,8 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
                       fps=preset.fps, format=preset.fmt, settle=SETTLE_MS, beats=beats,
                       keep=keep, crf=crf, fade=fade, stem=stem, theme=theme,
                       view=view or preset.view, storyboard=board, at=pinned,
-                      notes=tuple(notes), caption=caption, clock_corner=corner)
+                      notes=tuple(notes), caption=caption, clock_corner=corner,
+                      colors=colors)
 
 
 def card_words(key: str, *, date: str | None = None, caption: str | None = None) -> int:
@@ -1459,21 +1474,52 @@ def sidecar_path(path: Path) -> Path:
     return path.with_suffix(path.suffix + ".json")
 
 
-def page_colors(folder: Path, key: str) -> list[str] | None:
+def out_folder(out: str) -> Path:
+    """The folder ``map.build`` wrote into when it was given ``out``: one
+    name under the engine's out folder, never a path, and never a link to a
+    folder anywhere else. A name that is a path, or climbs out, is refused,
+    and so is one whose folder is a link that leads outside."""
+    if (not isinstance(out, str) or out in ("", ".", "..") or Path(out).name != out
+            or Path(out).is_absolute()):
+        raise ValueError(f"out must be one folder name under the engine's out folder, "
+                         f"never a path, not {out!r}")
+    try:
+        root = config.out_dir().resolve()
+        folder = (root / out).resolve()
+    except (OSError, RuntimeError):                 # a loop of links, or worse
+        folder = root = None
+    if folder is None or folder.parent != root:
+        raise ValueError(f"the folder out {out!r} names leads outside the engine's out "
+                         f"folder")
+    return folder
+
+
+def page_colors(folder: Path, key: str) -> tuple[str, ...] | None:
     """The line colours of the page ``pipeline.run`` wrote for ``key`` into
-    ``folder``, every line it draws in the colour it draws it: the ``lines``
-    of the positions file written beside the page in the same call. None
-    where there is no such file."""
+    ``folder``, distinct, sorted and in lower case: every line it draws, in
+    the colour it draws it, from the ``lines`` of the positions file written
+    beside the page in the same call. None where there is no such file, or
+    it cannot be read as one.
+
+    The file must really be in ``folder``: one that is a link to anywhere
+    else is refused, so naming a folder never reads a file outside it."""
     path = folder / f"{key}.positions.json"
     if not path.is_file():
         return None
-    lines = json.loads(path.read_text(encoding="utf-8")).get("lines")
-    return list(lines.values()) if isinstance(lines, dict) else None
+    if path.resolve().parent != folder.resolve():
+        raise ValueError(f"{key}.positions.json is a link to outside its folder")
+    try:
+        lines = json.loads(path.read_text(encoding="utf-8")).get("lines")
+    except (OSError, ValueError, AttributeError):
+        return None
+    if not isinstance(lines, dict) or not all(
+            isinstance(c, str) and _HEX.fullmatch(c) for c in lines.values()):
+        return None
+    return tuple(sorted({c.lower() for c in lines.values()}))
 
 
 def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None = None,
-           progress: Progress | None = None,
-           colors: Sequence[str] | None = None) -> list[Path]:
+           progress: Progress | None = None) -> list[Path]:
     """What was captured -- a directory of frames, or one still -- to the
     deliverable at ``dest``, with its sidecar beside it. ``source`` is the
     caller's: read, never written to, never removed. ``provenance`` is what
@@ -1482,17 +1528,16 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
     into the sidecar over the atlas's. A cancel, a failure or a file over the
     platform's limit leaves nothing behind. Returns what it wrote.
 
-    ``colors`` are the line colours of the map the frames show, as its page
-    draws them (``page_colors``): a GIF's palette is composed from them and
-    the plan's theme. Without them it is counted from the frames, as every
-    GIF's was before issue 33."""
+    A GIF's palette is composed from the plan's theme and ``colors`` alone,
+    never from the page or the frames; a plan without colours has it counted
+    from the frames, as every GIF's was before issue 33."""
     preset = PRESETS[job.preset]
     _guard_outside_repo(dest.parent)
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         if job.mode == "video":
             _encode(source, dest, preset, fade=job.fade, crf=job.crf, keep=job.keep,
-                    progress=progress, theme=job.theme, colors=colors)
+                    progress=progress, theme=job.theme, colors=job.colors)
         elif job.keep:
             # Kept as captured, when it is already what the preset delivers. A
             # client that captures for itself (the desktop app writes PNG) can
@@ -1582,8 +1627,7 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
             source = capture(job, frames=work / "frames")
         else:
             source = capture(job, out=work / f"capture.{job.format}")
-        # The page captured is the site's, so its colours are beside it.
-        return encode(job, source, dest / job.filename, colors=page_colors(MAPS_DIR, key))
+        return encode(job, source, dest / job.filename)
 
 
 def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
