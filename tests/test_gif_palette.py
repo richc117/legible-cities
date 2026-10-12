@@ -606,6 +606,41 @@ def test_a_positions_file_past_the_bound_is_not_read(tmp_path, monkeypatch):
     assert export.page_colors(tmp_path, KEY) is None
 
 
+COUNTED_NOTE = "will be counted from its frames"
+
+
+@pytest.mark.parametrize("folder,lines,said", [
+    ("missing", None, "could not be read from its folder"),
+    ("p1", '{"lines": {"A": "#ff0000"', "could not be read from its folder"),   # cut short
+    ("p1", '{"lines": {"A": "red"}}', "could not be read from its folder"),
+    ("p1", json.dumps({"lines": dict(enumerate(GRID[:60]))}), "drawn in 60 colours"),
+    ("p1", json.dumps({"lines": dict(enumerate(GRID[:55])), "casings": GRID[55:60]}),
+     "drawn in 60 colours"),
+], ids=["missing", "cut-short", "not-a-colour", "60-lines", "55-lines-5-casings"])
+def test_a_gif_whose_palette_will_be_counted_says_so(home, folder, lines, said):
+    if lines is not None:
+        (home / "out" / folder).mkdir()
+        (home / "out" / folder / f"{KEY}.positions.json").write_text(lines, encoding="utf-8")
+    notes = export.plan(KEY, PRESET, page=APP_PAGE, out=folder).notes
+    assert [n for n in notes if COUNTED_NOTE in n] == [n for n in notes if said in n]
+    assert len([n for n in notes if COUNTED_NOTE in n]) == 1
+
+
+def test_no_word_of_the_palette_where_it_is_composed_or_out_is_not_named(home):
+    _positions(home / "out" / "p1", dict(enumerate(GRID[:59])))
+    _positions(home / "out" / "p2", dict(enumerate(GRID[:60])))
+
+    def said(preset, **kw):
+        return [n for n in export.plan(KEY, preset, **kw).notes if COUNTED_NOTE in n]
+
+    assert said(PRESET, page=APP_PAGE, out="p1") == []                 # composed
+    assert said(PRESET, page=APP_PAGE) == []                            # no out
+    assert said(PRESET) == []                                           # the site's
+    for preset in ("linkedin-video", "instagram-reel", "linkedin", "bluesky"):
+        for out in ("p2", "missing"):
+            assert said(preset, page=APP_PAGE, out=out) == [], (preset, out)
+
+
 def test_without_out_the_colours_are_the_site_pages_or_none(home, tmp_path, monkeypatch):
     maps = tmp_path / "maps"
     _positions(maps, {"A": "#0099CC", "B": "#ff0000"})

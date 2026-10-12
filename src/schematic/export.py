@@ -1373,6 +1373,8 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
         beats = tuple(beat_payload(planned))
     if corner_note:
         notes.append(corner_note)
+    if preset.fmt == "gif" and out is not None:
+        notes += _palette_notes(colors)
     # A video's beats pin the clock themselves; a still is pinned here.
     pinned = _hms(at) if at else (_hms(PAGE_START) if preset.kind == "still" else None)
     return CaptureJob(key=key, preset=preset.name, mode=preset.kind, url=url,
@@ -1382,6 +1384,24 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
                       view=view or preset.view, storyboard=board, at=pinned,
                       notes=tuple(notes), caption=caption, clock_corner=corner,
                       colors=colors)
+
+
+def _palette_notes(colors: tuple[str, ...] | None) -> list[str]:
+    """What a GIF's plan that names its folder says when its palette will be
+    counted from its frames after all (issue 33): no colours could be read
+    there, or more than the composed palette holds. Two exports of the map
+    can then differ in colour where their frames differ by a little, which a
+    person who expects the GIF to be stable should hear before the capture."""
+    most = GIF_STEPS[-1][0]
+    if colors is None:
+        return ["the colours of this map could not be read from its folder, so this GIF's "
+                "palette will be counted from its frames, and two exports of it can differ "
+                "in colour."]
+    if len(colors) > most:
+        return [f"this map's lines and casings are drawn in {len(colors)} colours, more than "
+                f"the {most} a GIF's palette can be composed from, so it will be counted "
+                f"from its frames, and two exports of it can differ in colour."]
+    return []
 
 
 def card_words(key: str, *, date: str | None = None, caption: str | None = None) -> int:
