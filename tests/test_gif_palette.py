@@ -206,3 +206,305 @@ def test_making_the_png_needs_no_imaging_library():
                           timeout=60)
     assert done.returncode == 0, done.stderr.decode()
     assert done.stdout == export.palette_png(export.gif_palette("light", BART))
+
+
+# ---------------------------------------------------- the encode's guarantees
+#
+# ADR-055's, on a synthetic map instead of a capture: the theme's ground, its
+# title, muted subtitle and clock, BART's seven colours as octilinear lines,
+# three of them sharing a corridor edge to edge, stations with their names,
+# and trains with their halos, moving. Drawn at four times the size and
+# reduced, so every edge is anti-aliased as a browser's is. Three folders
+# per theme: S, a near twin within 8 of it, and S with one box in one frame.
+
+needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+
+PRESET = "linkedin-gif"                    # 640 x 640, the smallest GIF preset
+SIZE = 640
+FRAMES = 24
+SUPER = 4
+BOX = {"frame": FRAMES // 2, "x": 300, "y": 500, "size": 10, "color": (255, 0, 0)}
+
+MAP_LINES = [
+    ("#ff0000", [(40, 150), (200, 150), (320, 270), (320, 600)]),
+    ("#ffff33", [(40, 158), (196, 158), (312, 274), (312, 600)]),
+    ("#339933", [(40, 166), (192, 166), (304, 278), (304, 470), (420, 586), (600, 586)]),
+    ("#0099cc", [(600, 300), (420, 300), (328, 392), (328, 600)]),
+    ("#ff9933", [(600, 308), (424, 308), (336, 396), (336, 520), (430, 614)]),
+    ("#b0bec7", [(100, 420), (296, 420), (296, 300), (380, 216), (600, 216)]),
+    ("#000000", [(60, 520), (200, 520), (280, 440), (288, 440)]),
+]
+MAP_STATIONS = [(40, 158), (120, 158), (200, 154), (260, 214), (316, 300), (316, 380),
+                (316, 460), (316, 560), (600, 304), (500, 304), (420, 304), (332, 440),
+                (360, 586), (500, 586), (100, 420), (200, 420), (296, 360), (440, 216),
+                (540, 216), (60, 520), (140, 520), (240, 480)]
+
+
+def _along(points: list, t: float) -> tuple:
+    """The point a fraction ``t`` of the way along a polyline, wrapping."""
+    lengths = [((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5 for a, b in zip(points, points[1:])]
+    left = (t % 1.0) * sum(lengths)
+    for (a, b), length in zip(zip(points, points[1:]), lengths):
+        if left <= length:
+            f = left / length
+            return (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
+        left -= length
+    return points[-1]
+
+
+def _map_frame(theme: str, i: int):
+    from PIL import Image, ImageDraw, ImageFont
+    ground, text = export.PALETTES[theme]["bg"], export.PALETTES[theme]["label"]
+    muted = export.MUTED[theme]
+    im = Image.new("RGB", (SIZE * SUPER, SIZE * SUPER), ground)
+    draw = ImageDraw.Draw(im)
+
+    def font(size):
+        return ImageFont.load_default(size=size * SUPER)
+
+    def at(x, y):
+        return (x * SUPER, y * SUPER)
+
+    def disc(x, y, r, **kw):
+        draw.ellipse([(x - r) * SUPER, (y - r) * SUPER, (x + r) * SUPER, (y + r) * SUPER], **kw)
+
+    for color, points in MAP_LINES:
+        draw.line([at(*p) for p in points], fill=color, width=6 * SUPER, joint="curve")
+    for x, y in MAP_STATIONS:
+        disc(x, y, 4.5, fill=text, outline=ground, width=6)
+    for k, (x, y) in enumerate(MAP_STATIONS):
+        draw.text(at(x + 8, y - 14), f"Station {k + 1}", fill=text, font=font(10))
+    draw.text(at(24, 24), "Bay Area Rapid Transit", fill=text, font=font(22))
+    draw.text(at(24, 54), "Saturday 5 September 2026", fill=muted, font=font(13))
+    minute = 7 * 60 + 10 + i
+    draw.text(at(520, 600), f"{minute // 60:02d}:{minute % 60:02d}", fill=text, font=font(18))
+    for j, (color, points) in enumerate(MAP_LINES):
+        for start in (0.0, 0.5):
+            x, y = _along(points, start + i / FRAMES * 0.3 + j * 0.07)
+            disc(x, y, 5.0, fill=ground)
+            disc(x, y, 3.5, fill=color)
+    return im.reduce(SUPER)
+
+
+def _save(frames, into: Path) -> Path:
+    from PIL import Image
+    into.mkdir(parents=True)
+    for i, frame in enumerate(frames):
+        Image.fromarray(frame, "RGB").save(into / f"{i:06d}.png", compress_level=1)
+    return into
+
+
+def _near_twin(frames, theme: str):
+    """Within 8 of ``frames`` by construction: on 2% of each frame's pixels,
+    edges first (a pixel whose neighbour differs by more than 24), every
+    channel moved by 1 to 8 either way, seeded."""
+    import numpy as np
+    out = frames.copy()
+    touched = round(0.02 * SIZE * SIZE)
+    for i, frame in enumerate(frames):
+        rng = np.random.default_rng([33, ["dark", "light"].index(theme), i])
+        a = frame.astype(np.int16)
+        edge = np.zeros(frame.shape[:2], bool)
+        dx = np.abs(a[:, 1:] - a[:, :-1]).max(2) > 24
+        dy = np.abs(a[1:] - a[:-1]).max(2) > 24
+        edge[:, 1:] |= dx
+        edge[:, :-1] |= dx
+        edge[1:] |= dy
+        edge[:-1] |= dy
+        edges, rest = np.flatnonzero(edge), np.flatnonzero(~edge)
+        if len(edges) >= touched:
+            pick = rng.choice(edges, touched, replace=False)
+        else:
+            pick = np.concatenate([edges, rng.choice(rest, touched - len(edges), replace=False)])
+        move = rng.integers(1, 9, size=(touched, 3)) * rng.choice([-1, 1], size=(touched, 3))
+        flat = a.reshape(-1, 3)
+        flat[pick] = np.clip(flat[pick] + move, 0, 255)
+        out[i] = flat.reshape(frame.shape).astype(np.uint8)
+    return out
+
+
+def _decode(gif: Path):
+    import numpy as np
+    done = subprocess.run([shutil.which("ffmpeg"), "-loglevel", "error", "-i", str(gif),
+                           "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                          capture_output=True, timeout=300)
+    assert done.returncode == 0, done.stderr.decode()
+    return np.frombuffer(done.stdout, np.uint8).reshape(-1, SIZE, SIZE, 3)
+
+
+def _colour_table(gif: Path) -> bytes:
+    """The GIF's global colour table, and the check that no frame has its own."""
+    data = gif.read_bytes()
+    assert data[:6] == b"GIF89a" and data[10] & 0x80
+    end = 13 + 3 * 2 ** ((data[10] & 7) + 1)
+    table, pos = data[13:end], end
+    while data[pos] != 0x3B:
+        if data[pos] == 0x21:                       # an extension: skip its sub-blocks
+            pos += 2
+        else:                                       # an image: no local table
+            assert data[pos] == 0x2C and not data[pos + 9] & 0x80
+            pos += 11
+        while data[pos]:
+            pos += data[pos] + 1
+        pos += 1
+    return table
+
+
+def _gif(theme: str, frames: Path, dest: Path, colors=BART) -> Path:
+    """The GIF ``export.encode`` makes of ``frames`` for one plan."""
+    job = export.plan("la-metro-rail", PRESET, theme=theme, quality="draft")
+    return export.encode(job, frames, dest / job.filename, colors=colors)[0]
+
+
+@pytest.fixture(scope="module", params=["dark", "light"])
+def pair(request, tmp_path_factory):
+    """Per theme: S, its near twin and its one-box copy, each as frames, as
+    the GIF the encode makes of them and as that GIF decoded."""
+    import numpy as np
+    theme = request.param
+    work = tmp_path_factory.mktemp(f"gif-{theme}")
+    source = np.stack([np.asarray(_map_frame(theme, i)) for i in range(FRAMES)])
+    boxed = source.copy()
+    b = BOX
+    boxed[b["frame"], b["y"]:b["y"] + b["size"], b["x"]:b["x"] + b["size"]] = b["color"]
+    out = {"theme": theme, "work": work}
+    for name, frames in (("S", source), ("twin", _near_twin(source, theme)), ("box", boxed)):
+        folder = _save(frames, work / name)
+        gif = _gif(theme, folder, work / f"gif-{name}")
+        out[name] = {"frames": frames, "folder": folder, "gif": gif, "decoded": _decode(gif)}
+    return out
+
+
+@needs_ffmpeg
+def test_identical_frames_encode_to_identical_gifs(pair, tmp_path):
+    again = _gif(pair["theme"], pair["S"]["folder"], tmp_path / "again")
+    copy = shutil.copytree(pair["S"]["folder"], tmp_path / "copy")
+    elsewhere = _gif(pair["theme"], copy, tmp_path / "elsewhere")
+    assert again.read_bytes() == elsewhere.read_bytes() == pair["S"]["gif"].read_bytes()
+
+
+@needs_ffmpeg
+def test_frames_within_8_share_the_colour_table(pair):
+    import numpy as np
+    moved = np.abs(pair["twin"]["frames"].astype(np.int16) - pair["S"]["frames"])
+    assert moved.max() == 8
+    assert all(moved[i].any() for i in range(FRAMES)), "every frame of the twin differs"
+    assert _colour_table(pair["twin"]["gif"]) == _colour_table(pair["S"]["gif"])
+
+
+@needs_ffmpeg
+def test_no_pixel_the_inputs_agree_on_differs_out(pair):
+    differ_in = (pair["S"]["frames"] != pair["twin"]["frames"]).any(axis=3)
+    differ_out = (pair["S"]["decoded"] != pair["twin"]["decoded"]).any(axis=3)
+    assert not (differ_out & ~differ_in).any(), "a pixel the inputs agree on moved"
+    assert differ_out.sum() <= differ_in.sum()
+
+
+@needs_ffmpeg
+def test_one_box_changes_the_box_alone(pair):
+    differ = (pair["S"]["decoded"] != pair["box"]["decoded"]).any(axis=3)
+    b = BOX
+    inside = differ[b["frame"], b["y"]:b["y"] + b["size"], b["x"]:b["x"] + b["size"]].sum()
+    assert inside > 0, "the box is in the GIF"
+    assert differ.sum() == inside, "nothing outside the box moved"
+    assert _colour_table(pair["box"]["gif"]) == _colour_table(pair["S"]["gif"])
+
+
+@needs_ffmpeg
+def test_the_gif_is_faithful_to_its_frames(pair):
+    """ADR-055's bounds, mean absolute error per channel at most 1.5 and
+    the worst frame's at most 2.0, measured on 0 to 255."""
+    import numpy as np
+    error = np.abs(pair["S"]["decoded"].astype(np.int16) - pair["S"]["frames"])
+    mean, worst = error.mean(), error.mean(axis=(1, 2, 3)).max()
+    print(f"\n{pair['theme']}: mean {mean:.3f}, worst frame {worst:.3f}, "
+          f"{pair['S']['gif'].stat().st_size:,} bytes")
+    assert mean <= 1.5
+    assert worst <= 2.0
+
+
+@needs_ffmpeg
+def test_the_palette_is_the_plans_whatever_the_frames_hold(pair, tmp_path, monkeypatch):
+    """The same plan and colours give the same palette bytes and the same
+    colour table for frames that share nothing, here seeded noise; the
+    table is the composed one, in whatever order the GIF keeps it."""
+    import numpy as np
+    handed = []
+    run = export._ffmpeg
+
+    def spy(args, **kw):
+        handed.extend(Path(a).read_bytes() for a in args if a.endswith("palette.png"))
+        return run(args, **kw)
+
+    monkeypatch.setattr(export, "_ffmpeg", spy)
+    noise = np.random.default_rng(55).integers(0, 256, size=(4, SIZE, SIZE, 3), dtype=np.uint8)
+    gifs = [_gif(pair["theme"], pair["S"]["folder"], tmp_path / "map"),
+            _gif(pair["theme"], _save(noise, tmp_path / "noise"), tmp_path / "noise-gif")]
+    table = export.gif_palette(pair["theme"], BART)
+    assert handed == [export.palette_png(table)] * 2
+    assert _colour_table(gifs[0]) == _colour_table(gifs[1])
+    entries = _colour_table(gifs[1])
+    assert sorted(entries[i:i + 3] for i in range(0, 768, 3)) == sorted(bytes(c) for c in table)
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("colors,counted", [
+    (GRID[:60], export.COUNTED),           # past the table's last bound
+    (GRID, export.COUNTED),
+    (None, export.COUNTED_BEFORE),         # colours not known: as before issue 33
+    (GRID[:59], None),                     # composed: ffmpeg never counts
+    (BART, None),
+])
+def test_past_59_colours_the_palette_is_counted_from_the_frames(colors, counted, tmp_path,
+                                                                 monkeypatch):
+    import numpy as np
+    calls = []
+    run = export._ffmpeg
+
+    def spy(args, **kw):
+        calls.append(args)
+        return run(args, **kw)
+
+    monkeypatch.setattr(export, "_ffmpeg", spy)
+    frames = _save([np.asarray(_map_frame("dark", 0))], tmp_path / "frames")
+    _gif("dark", frames, tmp_path / "out", colors=colors)
+    counting = [a for a in calls if any(arg.startswith("palettegen") for arg in a)]
+    assert [a[a.index("-vf") + 1] for a in counting] == ([counted] if counted else [])
+    assert len(calls) == len(counting) + 1
+    assert calls[-1][calls[-1].index("-lavfi") + 1].endswith(
+        "[s][1:v]paletteuse=dither=bayer:bayer_scale=3")
+
+
+# ------------------------------------------------- where the colours come from
+
+
+def test_a_pages_colours_are_its_positions_files_lines(tmp_path):
+    import json
+    (tmp_path / "bart.positions.json").write_text(json.dumps(
+        {"date": "2026-09-05", "lines": dict(zip("ABCDEFGH", BART)), "paths": []}))
+    assert export.page_colors(tmp_path, "bart") == BART
+    assert export.page_colors(tmp_path, "boston-t") is None
+    (tmp_path / "odd.positions.json").write_text(json.dumps({"paths": []}))
+    assert export.page_colors(tmp_path, "odd") is None
+
+
+@needs_ffmpeg
+def test_the_sites_export_composes_from_its_pages_colours(tmp_path, monkeypatch):
+    """``run`` captures the site's page, so its palette is composed from
+    the positions file beside that page."""
+    import json
+    maps = tmp_path / "maps"
+    maps.mkdir()
+    (maps / "la-metro-rail.positions.json").write_text(json.dumps(
+        {"lines": {"A": "#0099cc", "B": "#ff0000"}}))
+    monkeypatch.setattr(export, "MAPS_DIR", maps)
+
+    def capture(job, *, frames=None, out=None):
+        import numpy as np
+        return _save([np.asarray(_map_frame("dark", i)) for i in range(3)], frames)
+
+    monkeypatch.setattr(export, "capture", capture)
+    written = export.run("la-metro-rail", PRESET, out=tmp_path / "out")
+    table = export.gif_palette("dark", ["#0099cc", "#ff0000"])
+    entries = _colour_table(written[0])
+    assert sorted(entries[i:i + 3] for i in range(0, 768, 3)) == sorted(bytes(c) for c in table)

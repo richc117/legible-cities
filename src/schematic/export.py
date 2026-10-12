@@ -150,6 +150,13 @@ GIF_RAMP = 16
 # entries: 3 + 16 + 33 * 7 = 250 and 3 + 16 + 59 * 4 = 255. Past the last
 # there is no palette to compose, and it is counted from the frames.
 GIF_STEPS = ((33, 6), (59, 3))
+# Counted from the frames where there is no table to compose: every pixel of
+# every frame, with no entry kept for a transparency a map never has (arm B
+# of ADR-055).
+COUNTED = "palettegen=stats_mode=full:reserve_transparent=0"
+# Counted as every GIF was before issue 33, where the line colours are not
+# known: what reaches ``encode`` through the protocol names none yet.
+COUNTED_BEFORE = "palettegen=stats_mode=diff"
 
 RGB = tuple[int, int, int]
 _HEX = re.compile(r"#[0-9a-fA-F]{6}")
@@ -1113,24 +1120,36 @@ def _transcode(src: Path, dest: Path, preset: Preset) -> None:
 
 
 def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
-            crf: int = 20, keep: bool = False, progress: Progress | None = None) -> None:
+            crf: int = 20, keep: bool = False, progress: Progress | None = None,
+            theme: str | None = None, colors: Sequence[str] | None = None) -> None:
     """PNG sequence to a deliverable. Text never enters here.
 
     This ffmpeg has no drawtext, no subtitles and no freetype, so it cannot
     render a glyph. Every word in an export is drawn by the page.
+
+    A GIF's palette is composed from ``theme`` and the map's line ``colors``
+    where they are given and fit (``gif_palette``), and counted from the
+    frames otherwise: ``COUNTED`` past the table's last bound, and
+    ``COUNTED_BEFORE`` where the colours are not given at all.
     """
     src = str(frames / "%06d.png")
     n = len(list(frames.glob("*.png")))
     if preset.fmt == "gif":
-        # Two passes: a palette built from the actual frames, then applied.
         # A single pass would quantise to the default 216-colour cube and the
-        # agency line colours would shift. The palette goes to a directory of
-        # its own: the frames are the caller's, and nothing is written there.
+        # agency line colours would shift, so paletteuse is handed a palette.
+        # Composed, it is the plan's and not the pixels', so two captures of
+        # one plan share it however their pixels differ (issue 33). It goes to
+        # a directory of its own: the frames are the caller's, and nothing is
+        # written there.
+        table = None if colors is None else gif_palette(theme, colors)
         with tempfile.TemporaryDirectory(prefix="legible-palette-") as tmp:
             palette = Path(tmp) / "palette.png"
-            _ffmpeg(["-framerate", str(preset.fps), "-i", src,
-                     "-vf", "palettegen=stats_mode=diff", str(palette)],
-                    progress=progress, frames=n, stage="palette")
+            if table is not None:
+                palette.write_bytes(palette_png(table))
+            else:
+                _ffmpeg(["-framerate", str(preset.fps), "-i", src,
+                         "-vf", COUNTED_BEFORE if colors is None else COUNTED, str(palette)],
+                        progress=progress, frames=n, stage="palette")
             _ffmpeg(["-framerate", str(preset.fps), "-i", src, "-i", str(palette), "-lavfi",
                      f"scale={preset.width}:{preset.height}:flags=lanczos[s];"
                      "[s][1:v]paletteuse=dither=bayer:bayer_scale=3", str(dest)],
@@ -1440,22 +1459,40 @@ def sidecar_path(path: Path) -> Path:
     return path.with_suffix(path.suffix + ".json")
 
 
+def page_colors(folder: Path, key: str) -> list[str] | None:
+    """The line colours of the page ``pipeline.run`` wrote for ``key`` into
+    ``folder``, every line it draws in the colour it draws it: the ``lines``
+    of the positions file written beside the page in the same call. None
+    where there is no such file."""
+    path = folder / f"{key}.positions.json"
+    if not path.is_file():
+        return None
+    lines = json.loads(path.read_text(encoding="utf-8")).get("lines")
+    return list(lines.values()) if isinstance(lines, dict) else None
+
+
 def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None = None,
-           progress: Progress | None = None) -> list[Path]:
+           progress: Progress | None = None,
+           colors: Sequence[str] | None = None) -> list[Path]:
     """What was captured -- a directory of frames, or one still -- to the
     deliverable at ``dest``, with its sidecar beside it. ``source`` is the
     caller's: read, never written to, never removed. ``provenance`` is what
     the caller knows about the map that the atlas's data would not (the
     desktop app's project has its own service day and diagnostics); it goes
     into the sidecar over the atlas's. A cancel, a failure or a file over the
-    platform's limit leaves nothing behind. Returns what it wrote."""
+    platform's limit leaves nothing behind. Returns what it wrote.
+
+    ``colors`` are the line colours of the map the frames show, as its page
+    draws them (``page_colors``): a GIF's palette is composed from them and
+    the plan's theme. Without them it is counted from the frames, as every
+    GIF's was before issue 33."""
     preset = PRESETS[job.preset]
     _guard_outside_repo(dest.parent)
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         if job.mode == "video":
             _encode(source, dest, preset, fade=job.fade, crf=job.crf, keep=job.keep,
-                    progress=progress)
+                    progress=progress, theme=job.theme, colors=colors)
         elif job.keep:
             # Kept as captured, when it is already what the preset delivers. A
             # client that captures for itself (the desktop app writes PNG) can
@@ -1545,7 +1582,8 @@ def run(key: str, preset_name: str, *, theme: str = "dark", view: str | None = N
             source = capture(job, frames=work / "frames")
         else:
             source = capture(job, out=work / f"capture.{job.format}")
-        return encode(job, source, dest / job.filename)
+        # The page captured is the site's, so its colours are beside it.
+        return encode(job, source, dest / job.filename, colors=page_colors(MAPS_DIR, key))
 
 
 def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
