@@ -5,6 +5,14 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.17.0] - 2026-10-12
+
+### Changed
+
+- **A GIF export's colour table is composed from the map, not counted from its frames** (issue 33, ADR-055). `palettegen` built the 256 colours from the pixels that changed between frames, so noise well inside the tolerance of 8 moved nearly every entry and changed pixels two captures agreed on. `export.plan` now takes an optional `out`, the folder `map.build` wrote the page into. A GIF's plan answers the colours of that page's lines and of their casings as `colors` (distinct, sorted, or null), read from the positions file, which now names the casings' colours as `casings` where a line has one. `export.encode` composes the table from the plan alone and hands it to the same `paletteuse` pass: the theme's ground, text and muted text, sixteen steps between ground and text, and for each distinct colour the colour, its steps toward the ground and its midpoint with the text, at six entries a colour up to 33 colours and three up to 59, with the table counted from every frame past that. On BART's reel GIF this halved the file and lowered the mean error from 1.77 to 1.34 in dark and from 1.54 to 0.26 in light. A plan that names its folder but whose palette will be counted after all, because no colours could be read there or there are more than 59, says so in its notes; a plan with no `out` is encoded exactly as before, and `bin/export` reads the colours beside the site's page.
+
+The schema moved additively at protocol 1: `out` on `ExportPlanParams` and `colors` on `CaptureJob`, both optional. An uncased map's page and data are byte for byte as before (a cased map's data gains `casings`), and MP4s and stills are unchanged. `out` is a folder name under the engine's out folder, refused as anything else; the positions file is read only for a GIF's plan, at most 32 MB, and a link leading outside its folder is an export error. The Pillow bound in the development dependencies is now 10.1.
+
 ## [0.16.2] - 2026-10-11
 
 ### Fixed
