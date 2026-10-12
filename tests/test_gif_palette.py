@@ -581,6 +581,31 @@ def test_only_a_gif_plan_carries_colours(home, preset):
     assert export.plan(KEY, preset, page=APP_PAGE, out="p1").colors is None
 
 
+@pytest.mark.parametrize("preset", ["linkedin-video", "instagram-reel", "linkedin", "bluesky"])
+def test_a_plan_that_is_not_a_gif_touches_no_disk_for_out(home, tmp_path, monkeypatch, preset):
+    """Nothing is read for an mp4 or a still, so a link under out that a
+    GIF's plan would refuse refuses nothing here."""
+    outside = _positions(tmp_path / "elsewhere", {"A": "#ff0000"})
+    (home / "out" / "p1").mkdir()
+    _link(home / "out" / "p1" / f"{KEY}.positions.json", outside)
+    with pytest.raises(ValueError, match="link to outside"):
+        export.plan(KEY, PRESET, page=APP_PAGE, out="p1")
+    monkeypatch.setattr(export, "out_folder", lambda *a: pytest.fail("read for a non-GIF"))
+    monkeypatch.setattr(export, "page_colors", lambda *a: pytest.fail("read for a non-GIF"))
+    assert export.plan(KEY, preset, page=APP_PAGE, out="p1").colors is None
+    assert export.plan(KEY, preset).colors is None
+
+
+def test_a_positions_file_past_the_bound_is_not_read(tmp_path, monkeypatch):
+    """32 MB, well above New York's 4.7 MB; a bigger file is no colours."""
+    assert export.POSITIONS_MOST == 32 * 1024 * 1024
+    path = _positions(tmp_path, {"A": "#ff0000"})
+    monkeypatch.setattr(export, "POSITIONS_MOST", path.stat().st_size)
+    assert export.page_colors(tmp_path, KEY) == ("#ff0000",)
+    monkeypatch.setattr(export, "POSITIONS_MOST", path.stat().st_size - 1)
+    assert export.page_colors(tmp_path, KEY) is None
+
+
 def test_without_out_the_colours_are_the_site_pages_or_none(home, tmp_path, monkeypatch):
     maps = tmp_path / "maps"
     _positions(maps, {"A": "#0099CC", "B": "#ff0000"})

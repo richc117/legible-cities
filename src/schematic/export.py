@@ -1301,7 +1301,8 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
     composed from (issue 33): read from the folder ``map.build`` wrote it into
     when ``out`` names that folder (``out_folder``), else beside the site's
     page when there is no ``page``, else not at all, and then the palette is
-    counted from the frames as it was before.
+    counted from the frames as it was before. Any other plan reads nothing
+    and ignores ``out``.
     """
     if key not in feeds.all():
         raise KeyError(f"unknown feed {key!r}")
@@ -1314,8 +1315,12 @@ def plan(key: str, preset_name: str, *, theme: str = "dark", view: str | None = 
         raise ValueError(f"quality is draft, standard or high, not {quality!r}")
     if caption is not None:
         check_caption(caption)
-    folder = out_folder(out) if out is not None else (MAPS_DIR if page is None else None)
-    colors = page_colors(folder, key) if folder is not None and preset.fmt == "gif" else None
+    # Only a GIF's plan looks for its page's colours: any other is planned
+    # without touching the disk, whatever out names.
+    colors = None
+    if preset.fmt == "gif":
+        folder = out_folder(out) if out is not None else (MAPS_DIR if page is None else None)
+        colors = None if folder is None else page_colors(folder, key)
     zones = SAFE_ZONES[preset.zones] if preset.zones else None
     corner, corner_note = _clock_corner(preset, zones, clock_corner,
                                         clock=preset.kind == "video" if clock is None else clock,
@@ -1496,12 +1501,19 @@ def out_folder(out: str) -> Path:
     return folder
 
 
+# The most of a positions file a plan reads, on the server's one reader: well
+# above the largest a registered feed makes (New York's, 4.7 MB, read in about
+# 35 ms). A bigger one is not read, and its GIF is counted from its frames.
+POSITIONS_MOST = 32 * 1024 * 1024
+
+
 def page_colors(folder: Path, key: str) -> tuple[str, ...] | None:
     """The line colours of the page ``pipeline.run`` wrote for ``key`` into
     ``folder``, distinct, sorted and in lower case: every line it draws, in
     the colour it draws it, and every line's casing, from the ``lines`` and
     the ``casings`` of the positions file written beside the page in the same
-    call. None where there is no such file, or it cannot be read as one.
+    call. None where there is no such file, or it cannot be read as one,
+    and where it is bigger than ``POSITIONS_MOST``.
 
     The file must really be in ``folder``: one that is a link to anywhere
     else is refused, so naming a folder never reads a file outside it. What
@@ -1518,7 +1530,11 @@ def page_colors(folder: Path, key: str) -> tuple[str, ...] | None:
     if not inside:
         raise ValueError(f"{key}.positions.json is a link to outside its folder")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        with path.open("rb") as f:
+            raw = f.read(POSITIONS_MOST + 1)
+        if len(raw) > POSITIONS_MOST:
+            return None
+        data = json.loads(raw.decode("utf-8"))
         lines, casings = data.get("lines"), data.get("casings", [])
     except (OSError, RuntimeError, ValueError, AttributeError):
         return None
