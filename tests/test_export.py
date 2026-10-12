@@ -1,8 +1,9 @@
 """The export presets, framing and palettes.
 
-All pure Python: no browser, no ffmpeg. The parts that need those are exercised
-by running ``bin/export`` -- what is worth asserting here is the arithmetic and
-the agreement between the three places the palette is written down.
+No browser: the capture is exercised by running ``bin/export``. ffmpeg runs
+where it is on PATH, and the tests that encode skip without it. What is worth
+asserting here is the arithmetic, what the encode makes of frames made by hand,
+and the agreement between the three places the palette is written down.
 """
 
 import datetime as dt

@@ -311,8 +311,10 @@ PRESETS: dict[str, Preset] = {p.name: p for p in [
     # --- video, as GIF -------------------------------------------------------
     # The same three shapes again, because a GIF is what plays in a place that
     # will not take a video: an email, a README, a slide. They are deliberately
-    # smaller and slower than their mp4 siblings -- a GIF carries a full palette
-    # per frame, so resolution and frame rate are what its weight is made of.
+    # smaller and slower than their mp4 siblings -- a GIF has no motion
+    # compression, only each frame's changed rectangle as indices into one
+    # 256-colour table, so resolution and frame rate are what its weight is
+    # made of.
     Preset("instagram-reel-gif", "Instagram", 630, 1120, "video", "gif",
            storyboard="morph", fps=12,
            note="9:16 as GIF; half the mp4's size and rate, or it is unusable"),
