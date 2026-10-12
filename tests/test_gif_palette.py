@@ -536,6 +536,27 @@ def test_a_positions_file_that_cannot_be_read_as_one_gives_no_colours(tmp_path, 
     assert export.page_colors(tmp_path, KEY) is None
 
 
+@pytest.mark.skipif(os.name != "posix" or os.geteuid() == 0,
+                    reason="a folder nobody may enter: POSIX, and not as root")
+@pytest.mark.parametrize("shut", ["folder", "file"])
+def test_a_folder_or_file_that_cannot_be_read_gives_no_colours_and_no_error(home, client, shut):
+    """Python 3.12's ``is_file`` raises for a folder it may not enter, and
+    reading a file it may not read raises, each naming the path; the plan
+    carries no colours instead, over the protocol too."""
+    folder = home / "out" / "p1"
+    path = _positions(folder, {"A": "#ff0000"})
+    (folder if shut == "folder" else path).chmod(0)
+    try:
+        assert export.plan(KEY, PRESET, page=APP_PAGE, out="p1").colors is None
+        answer = client.call("export.plan", {"key": KEY, "preset": PRESET, "page": APP_PAGE,
+                                             "out": "p1"})
+        assert "result" in answer, answer
+        assert answer["result"]["colors"] is None
+    finally:
+        folder.chmod(0o755)
+        path.chmod(0o644)
+
+
 def test_a_gif_plan_carries_the_colours_of_the_page_out_names(home):
     _positions(home / "out" / "p1", dict(zip("ABCDEFGH", BART)))
     job = export.plan(KEY, PRESET, page=APP_PAGE, out="p1")

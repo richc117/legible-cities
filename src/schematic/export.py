@@ -1504,16 +1504,23 @@ def page_colors(folder: Path, key: str) -> tuple[str, ...] | None:
     call. None where there is no such file, or it cannot be read as one.
 
     The file must really be in ``folder``: one that is a link to anywhere
-    else is refused, so naming a folder never reads a file outside it."""
+    else is refused, so naming a folder never reads a file outside it. What
+    the filesystem refuses (a folder that may not be entered, a name too
+    long, a loop of links) is a file that cannot be read, and no error, so
+    no path the error names leaves here."""
     path = folder / f"{key}.positions.json"
-    if not path.is_file():
+    try:
+        if not path.is_file():
+            return None
+        inside = path.resolve().parent == folder.resolve()
+    except (OSError, RuntimeError):
         return None
-    if path.resolve().parent != folder.resolve():
+    if not inside:
         raise ValueError(f"{key}.positions.json is a link to outside its folder")
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         lines, casings = data.get("lines"), data.get("casings", [])
-    except (OSError, ValueError, AttributeError):
+    except (OSError, RuntimeError, ValueError, AttributeError):
         return None
     if not isinstance(lines, dict) or not isinstance(casings, list):
         return None
