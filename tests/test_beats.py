@@ -127,6 +127,7 @@ def test_the_eight_names_plan_as_the_release_before(preset, storyboard):
     """A name asked for without ``view`` or ``at`` plans byte for byte what
     v0.11.0 planned: the same beats, address and job."""
     job = export.plan(KEY, preset, storyboard=storyboard, page=PAGE, date=DATE)
+    assert job.colors is None, "left out of the hash below, so it must say nothing"
     plan = _as_before_e40(job.to_dict())
     digest = hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()
     assert digest == BEFORE[(preset, storyboard)]

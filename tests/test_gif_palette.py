@@ -181,7 +181,7 @@ def test_the_png_is_the_same_bytes_for_the_same_table():
 
 def test_ffmpeg_reads_the_png_as_256_pixels(tmp_path):
     """What paletteuse is handed: ffmpeg's own decoder agrees with Pillow."""
-    ffmpeg = shutil.which("ffmpeg")
+    ffmpeg = shutil.which(export.ffmpeg_path())
     if ffmpeg is None:
         pytest.skip("ffmpeg not installed")
     table = export.gif_palette("dark", GRID[:33])
@@ -222,7 +222,10 @@ def test_making_the_png_needs_no_imaging_library():
 # reduced, so every edge is anti-aliased as a browser's is. Three folders
 # per theme: S, a near twin within 8 of it, and S with one box in one frame.
 
-needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+# The ffmpeg the encode runs, SCHEMATIC_FFMPEG's where it is set (a bundled
+# build), so what decodes and checks a GIF is what made it.
+needs_ffmpeg = pytest.mark.skipif(shutil.which(export.ffmpeg_path()) is None,
+                                  reason="ffmpeg not installed")
 
 KEY = "la-metro-rail"
 PRESET = "linkedin-gif"                    # 640 x 640, the smallest GIF preset
@@ -331,7 +334,7 @@ def _near_twin(frames, theme: str):
 
 def _decode(gif: Path):
     import numpy as np
-    done = subprocess.run([shutil.which("ffmpeg"), "-loglevel", "error", "-i", str(gif),
+    done = subprocess.run([shutil.which(export.ffmpeg_path()), "-loglevel", "error", "-i", str(gif),
                            "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                           capture_output=True, timeout=300)
     assert done.returncode == 0, done.stderr.decode()
@@ -711,7 +714,8 @@ UNCASED = {
 
 
 @pytest.mark.parametrize("name,lines", [("plain", None), ("wide", {"A": {"width": 1.5}})])
-def test_an_uncased_maps_data_is_byte_for_byte_what_it_was(stand, tmp_path, name, lines):  # noqa: F811
+def test_an_uncased_maps_data_is_byte_for_byte_what_it_was(stand,  # noqa: F811
+                                                           tmp_path, name, lines):
     import hashlib
     out = tmp_path / name
     stand.run(out, date=STAND_DAY, **({"lines": lines} if lines else {}))
@@ -835,7 +839,7 @@ def test_a_plan_without_colours_encodes_byte_for_byte_as_before(tmp_path, monkey
     job = export.plan(KEY, PRESET, theme="light", page=APP_PAGE, quality="draft")
     assert job.colors is None
     made = export.encode(job, frames, tmp_path / "made" / job.filename)[0]
-    ffmpeg, src = shutil.which("ffmpeg"), str(frames / "%06d.png")
+    ffmpeg, src = shutil.which(export.ffmpeg_path()), str(frames / "%06d.png")
     palette, by_hand = tmp_path / "palette.png", tmp_path / "by-hand.gif"
     for args in (["-framerate", "12", "-i", src, "-vf", "palettegen=stats_mode=diff",
                   str(palette)],

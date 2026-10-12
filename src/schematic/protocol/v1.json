@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Legible Cities engine protocol, version 1",
-  "description": "JSON-RPC 2.0 over stdin/stdout with Content-Length framing. `methods` maps each request to the schema of its params and result; `notifications` maps each notification to the schema of its params. Long requests (graph.build, map.build, export.encode, feeds.service, feeds.inspect, feeds.add, feeds.remove, render.stage) stay open until done and send job/progress and job/log carrying the request's id meanwhile; $/cancelRequest ends the process they are waiting on (a LOOM tool, or ffmpeg) and they answer with the cancelled error (-32800). feeds.service starts no process: a cancel is answered with the same error once its read finishes. feeds.remove has a point of no return, the write of the registry: a cancel before it leaves the feed registered with every file in place and is answered with the same error, and one after it is not honoured (the feed is already forgotten and its files are removed to the end) and is said so in the answer. A feed a long request downloads stops at the cancel, between chunks or once it has arrived, and nothing of it is cached; on a server that has stopped sending, the cancel waits for the next chunk or the read timeout. The export methods are the two halves of an export a client cannot do itself: export.plan describes one and is pure, export.encode turns the frames the client captured into the file; there is no export.capture, because the desktop app captures for itself. Errors a person can act on are code -32000 with `data` of the ErrorData shape; bad parameters are -32602 with the same shape and kind `params`.",
+  "description": "JSON-RPC 2.0 over stdin/stdout with Content-Length framing. `methods` maps each request to the schema of its params and result; `notifications` maps each notification to the schema of its params. Long requests (graph.build, map.build, export.encode, feeds.service, feeds.inspect, feeds.add, feeds.remove, render.stage) stay open until done and send job/progress and job/log carrying the request's id meanwhile; $/cancelRequest ends the process they are waiting on (a LOOM tool, or ffmpeg) and they answer with the cancelled error (-32800). feeds.service starts no process: a cancel is answered with the same error once its read finishes. feeds.remove has a point of no return, the write of the registry: a cancel before it leaves the feed registered with every file in place and is answered with the same error, and one after it is not honoured (the feed is already forgotten and its files are removed to the end) and is said so in the answer. A feed a long request downloads stops at the cancel, between chunks or once it has arrived, and nothing of it is cached; on a server that has stopped sending, the cancel waits for the next chunk or the read timeout. The export methods are the two halves of an export a client cannot do itself: export.plan describes one and writes nothing, reading at most one small file (the positions file beside a GIF's page, for its line colours), export.encode turns the frames the client captured into the file; there is no export.capture, because the desktop app captures for itself. Errors a person can act on are code -32000 with `data` of the ErrorData shape; bad parameters are -32602 with the same shape and kind `params`.",
   "protocol": 1,
   "methods": {
     "engine.info": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/EngineInfo" } },
@@ -1185,7 +1185,7 @@
       "additionalProperties": false
     },
     "ExportPlanParams": {
-      "description": "Describe an export: what to capture and how to encode it. Pure and instant; nothing is written. A vector preset is refused (it is resolved from the built map, not captured).",
+      "description": "Describe an export: what to capture and how to encode it. Instant, and nothing is written; a GIF's plan reads one small file, the positions file beside its page, for the line colours. A vector preset is refused (it is resolved from the built map, not captured).",
       "type": "object",
       "properties": {
         "key": {
@@ -1203,7 +1203,7 @@
         },
         "out": {
           "$ref": "#/$defs/Token",
-          "description": "The out map.build was given: the folder under the home's out/ the page was written into. A GIF's plan reads the line colours of the page there into colors; a positions file there that is a link to outside the folder is an export error. Omitted, they are read beside the site's page when page is omitted too, and otherwise not at all."
+          "description": "The out map.build was given: the folder under the home's out/ the page was written into, which must be the folder of the page that page names. A GIF's plan reads the line colours of the page there into colors; a folder that is a link leading outside the home's out/, or a positions file there that is a link leading outside the folder, is an export error. Omitted, they are read beside the site's page when page is omitted too, and otherwise not at all. Any other plan ignores it."
         },
         "options": {
           "$ref": "#/$defs/ExportOptions"

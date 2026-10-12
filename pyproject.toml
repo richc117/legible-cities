@@ -23,7 +23,7 @@ notebooks = [
 ]
 dev = [
     "pytest>=8",
-    "pillow>=10",
+    "pillow>=10.1",
     "jsonschema>=4.23",
     # bin/build-fonts makes the label faces under src/schematic/fonts/; the
     # sidecar never imports either, so they are development tools only.
