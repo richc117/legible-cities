@@ -1499,9 +1499,9 @@ def out_folder(out: str) -> Path:
 def page_colors(folder: Path, key: str) -> tuple[str, ...] | None:
     """The line colours of the page ``pipeline.run`` wrote for ``key`` into
     ``folder``, distinct, sorted and in lower case: every line it draws, in
-    the colour it draws it, from the ``lines`` of the positions file written
-    beside the page in the same call. None where there is no such file, or
-    it cannot be read as one.
+    the colour it draws it, and every line's casing, from the ``lines`` and
+    the ``casings`` of the positions file written beside the page in the same
+    call. None where there is no such file, or it cannot be read as one.
 
     The file must really be in ``folder``: one that is a link to anywhere
     else is refused, so naming a folder never reads a file outside it."""
@@ -1511,13 +1511,16 @@ def page_colors(folder: Path, key: str) -> tuple[str, ...] | None:
     if path.resolve().parent != folder.resolve():
         raise ValueError(f"{key}.positions.json is a link to outside its folder")
     try:
-        lines = json.loads(path.read_text(encoding="utf-8")).get("lines")
+        data = json.loads(path.read_text(encoding="utf-8"))
+        lines, casings = data.get("lines"), data.get("casings", [])
     except (OSError, ValueError, AttributeError):
         return None
-    if not isinstance(lines, dict) or not all(
-            isinstance(c, str) and _HEX.fullmatch(c) for c in lines.values()):
+    if not isinstance(lines, dict) or not isinstance(casings, list):
         return None
-    return tuple(sorted({c.lower() for c in lines.values()}))
+    colors = [*lines.values(), *casings]
+    if not all(isinstance(c, str) and _HEX.fullmatch(c) for c in colors):
+        return None
+    return tuple(sorted({c.lower() for c in colors}))
 
 
 def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None = None,

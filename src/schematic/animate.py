@@ -424,6 +424,11 @@ class Animation:
     # seconds of playback. Each is in the data only when it is not the default.
     dot_radius: float = DOT_RADIUS
     trail: float = TRAIL
+    # The colours of the lines' casings (issue 55), distinct, sorted and in
+    # lower case, where any line has one: drawn on the map, so an export's
+    # GIF composes its palette from them as from the lines' own (issue 33).
+    # Nothing on the page reads them, and a map without a casing has none.
+    casings: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict:
         return {
@@ -436,6 +441,8 @@ class Animation:
             # (8, not 8.0).
             **({"dot_radius": _plain(self.dot_radius)} if self.dot_radius != DOT_RADIUS else {}),
             **({"trail": _plain(self.trail)} if self.trail != TRAIL else {}),
+            # And the casings, only where a line has one.
+            **({"casings": self.casings} if self.casings else {}),
             "linear": self.linear,
             "paths": self.paths,
             "trips": self.trips,
@@ -616,7 +623,9 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
                      unrouted=unrouted, trips_with_skipped_calls=skipped_calls,
                      trips_with_borrowed_track=borrowed,
                      linear=layout_json, routing=route_rules(graph),
-                     dot_radius=dot_radius, trail=trail)
+                     dot_radius=dot_radius, trail=trail,
+                     casings=sorted({stroke.casing_color.lower()
+                                     for stroke in render.strokes.values() if stroke.casing > 0}))
 
 
 # Emitted only when the caller says where the icons live, so a page written for

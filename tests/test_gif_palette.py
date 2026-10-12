@@ -9,6 +9,7 @@ first two, and per distinct line colour the colour, its steps toward the
 ground and its midpoint with the text. These hold its arithmetic.
 """
 
+import datetime as dt
 import io
 import itertools
 import json
@@ -23,6 +24,7 @@ from pathlib import Path
 import pytest
 
 from schematic import config, export, serve
+from test_lines import KEY as STAND_KEY, stand  # noqa: F401  (the store and the feed stood in)
 from test_serve import Client, check
 
 PAGE = Path(export.__file__).parent / "page" / "page.html"
@@ -526,6 +528,8 @@ def test_a_pages_colours_are_its_positions_files_lines_distinct_and_sorted(tmp_p
     b'{"paths": []}', b'{"lines": ["#ff0000"]}', b'{"lines": {"A": "red"}}',
     b'{"lines": {"A": 7}}', b'["#ff0000"]', b'{"lines": {"A": "#ff0000"}', b"",
     b'{"lines": {"A": "#ff0000"}}\xff',                 # not UTF-8
+    b'{"lines": {"A": "#ff0000"}, "casings": "#ffffff"}',
+    b'{"lines": {"A": "#ff0000"}, "casings": ["white"]}',
 ])
 def test_a_positions_file_that_cannot_be_read_as_one_gives_no_colours(tmp_path, data):
     (tmp_path / f"{KEY}.positions.json").write_bytes(data)
@@ -607,6 +611,73 @@ def test_a_project_folder_that_is_a_link_outside_is_refused(home, tmp_path):
     _link(home / "out" / "p1", tmp_path / "elsewhere")
     with pytest.raises(ValueError, match="leads outside the engine's out folder"):
         export.plan(KEY, PRESET, page=APP_PAGE, out="p1")
+
+
+# ------------------------------------------------------------------ casings
+#
+# A line's casing (issue 55) is drawn under it in its own colour, so its
+# pixels are the map's as much as the line's are. The positions file names
+# the casings' colours only where a line has one, and the plan counts them
+# with the lines' colours, towards k and the cap at 59.
+
+STAND_DAY = dt.date(2026, 9, 10)
+# sha256 of the stood-in map's positions file before casings were written,
+# taken at the commit before this test: uncased, and widened but uncased.
+UNCASED = {
+    "plain": "d9dda941f83720585520c5e9611dba5afad06c6f39303e853536c354bc6e76dc",
+    "wide": "c72ef588933e6b122017ea8879e251af20c9427470f51c8b0e58040130312abc",
+}
+
+
+@pytest.mark.parametrize("name,lines", [("plain", None), ("wide", {"A": {"width": 1.5}})])
+def test_an_uncased_maps_data_is_byte_for_byte_what_it_was(stand, tmp_path, name, lines):  # noqa: F811
+    import hashlib
+    out = tmp_path / name
+    stand.run(out, date=STAND_DAY, **({"lines": lines} if lines else {}))
+    data = (out / f"{STAND_KEY}.positions.json").read_bytes()
+    assert hashlib.sha256(data).hexdigest() == UNCASED[name]
+    assert b'"casings"' not in data
+
+
+def test_a_cased_maps_plan_carries_its_casing_colour(stand, home):  # noqa: F811
+    """Through the real map build, stood in: two lines cased in one colour,
+    written once, which the plan counts with the lines' colours and the
+    palette composes its steps from."""
+    folder = home / "out" / "p1"
+    _result, svg, data, _page = stand.run(folder, date=STAND_DAY, lines={
+        "A": {"casing": {"width": 0.5, "color": "#F0E0C0"}},
+        "B": {"width": 1.5, "casing": {"width": 0.25, "color": "#f0e0c0"}}})
+    assert 'stroke="#F0E0C0"' in svg and 'stroke="#f0e0c0"' in svg     # drawn, both
+    assert data["casings"] == ["#f0e0c0"]
+    job = export.plan(STAND_KEY, PRESET, page=APP_PAGE, out="p1")
+    assert job.colors == tuple(sorted({*(c.lower() for c in data["lines"].values()), "#f0e0c0"}))
+    table = export.gif_palette("dark", job.colors)
+    k = 6                                       # a handful of colours
+    ground, text = (21, 18, 15), (242, 237, 230)
+    cased = (240, 224, 192)
+    assert cased in table
+    assert all(export._mix(cased, ground, j / k) in table for j in range(1, k))
+    assert export._mix(cased, text, 0.5) in table
+
+
+def test_a_casing_in_a_lines_colour_is_one_colour(tmp_path):
+    (tmp_path / f"{KEY}.positions.json").write_text(json.dumps(
+        {"lines": {"A": "#ff0000"}, "casings": ["#FF0000", "#00ff00"]}), encoding="utf-8")
+    assert export.page_colors(tmp_path, KEY) == ("#00ff00", "#ff0000")
+
+
+def test_the_cap_at_59_counts_the_casings(home):
+    folder = home / "out" / "p1"
+    folder.mkdir()
+    path = folder / f"{KEY}.positions.json"
+    path.write_text(json.dumps({"lines": dict(enumerate(GRID[:55])), "casings": GRID[55:60]}),
+                    encoding="utf-8")
+    job = export.plan(KEY, PRESET, page=APP_PAGE, out="p1")
+    assert len(job.colors) == 60 and export.gif_palette("dark", job.colors) is None
+    path.write_text(json.dumps({"lines": dict(enumerate(GRID[:55])), "casings": GRID[:4]}),
+                    encoding="utf-8")
+    job = export.plan(KEY, PRESET, page=APP_PAGE, out="p1")
+    assert len(job.colors) == 55 and export.gif_palette("dark", job.colors) is not None
 
 
 # --------------------------------------------------------- through the protocol
