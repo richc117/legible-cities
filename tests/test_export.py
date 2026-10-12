@@ -486,8 +486,13 @@ def test_every_ffmpeg_call_goes_through_the_resolver(tmp_path, monkeypatch):
     wrapper.chmod(0o755)
     monkeypatch.setenv("SCHEMATIC_FFMPEG", str(wrapper))
     frames = _frames(tmp_path / "frames")
-    gif = export.plan("la-metro-rail", "linkedin-gif")
+    # The plan's colours are set here and not read from whatever site page the
+    # checkout holds: counted from the frames (palettegen, then paletteuse) and
+    # composed (paletteuse alone) are both reached through the resolver.
+    gif = replace(export.plan("la-metro-rail", "linkedin-gif"), colors=None)
     export.encode(gif, frames, tmp_path / "out" / gif.filename)
+    composed = replace(gif, colors=("#0072bc", "#e0245e"))
+    export.encode(composed, frames, tmp_path / "out" / "composed.gif")
     still = export.plan("la-metro-rail", "bluesky")            # standard: resampled, jpg
     big = tmp_path / "big.png"
     from PIL import Image
@@ -496,7 +501,8 @@ def test_every_ffmpeg_call_goes_through_the_resolver(tmp_path, monkeypatch):
     kept = export.plan("la-metro-rail", "bluesky", quality="draft")   # keep: a PNG transcoded
     export.encode(kept, big, tmp_path / "out" / "kept.jpg")
     calls = log.read_text().splitlines()
-    assert len(calls) == 4, calls          # palettegen, paletteuse, the resample, the transcode
+    # palettegen and paletteuse; paletteuse alone; the resample; the transcode
+    assert len(calls) == 5, calls
     assert all("-loglevel error" in c for c in calls)
 
 
