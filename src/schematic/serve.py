@@ -1171,9 +1171,9 @@ class EngineEndpoint(Endpoint):
         return {"storyboards": export.storyboard_table()}
 
     def export_plan(self, params: Any) -> dict[str, Any]:
-        """Instant, and writes nothing: a GIF's plan reads one small file,
-        the positions file beside its page, for the line colours, here on the
-        one reader (a plan that reads as a long request would be a protocol
+        """Instant, and writes nothing: besides the feed registry, a GIF's plan
+        reads the positions file beside its page (at most 32 MB), for the line
+        colours, here on the one reader (a plan that reads as a long request would be a protocol
         change). The plan's own refusals (a vector preset, a geographic view
         on a feed without the geometry, a folder or positions file that is a
         link leading outside) are export errors."""

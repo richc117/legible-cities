@@ -625,7 +625,8 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
                      linear=layout_json, routing=route_rules(graph),
                      dot_radius=dot_radius, trail=trail,
                      casings=sorted({stroke.casing_color.lower()
-                                     for stroke in render.strokes.values() if stroke.casing > 0}))
+                                     for label, stroke in render.strokes.items()
+                                     if stroke.casing > 0 and label in render.colors}))
 
 
 # Emitted only when the caller says where the icons live, so a page written for

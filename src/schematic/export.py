@@ -1555,9 +1555,11 @@ def page_colors(folder: Path, key: str) -> tuple[str, ...] | None:
         if len(raw) > POSITIONS_MOST:
             return None
         data = json.loads(raw.decode("utf-8"))
-        lines, casings = data.get("lines"), data.get("casings", [])
-    except (OSError, RuntimeError, ValueError, AttributeError):
+    except (OSError, RuntimeError, ValueError):
         return None
+    if not isinstance(data, dict):
+        return None
+    lines, casings = data.get("lines"), data.get("casings", [])
     if not isinstance(lines, dict) or not isinstance(casings, list):
         return None
     colors = [*lines.values(), *casings]

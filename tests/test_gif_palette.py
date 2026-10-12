@@ -745,6 +745,23 @@ def test_a_cased_maps_plan_carries_its_casing_colour(stand, home):  # noqa: F811
     assert export._mix(cased, text, 0.5) in table
 
 
+def test_a_hidden_cased_line_leaves_no_casing_colour(stand, home):  # noqa: F811
+    """A hidden line is not drawn, so its casing is not either: the data names no
+    casing for it. Held twice: by the pipeline, which takes it off the graph, and
+    by `animate.build`, which names only labels the map has colours for."""
+    folder = home / "out" / "p1"
+    _result, svg, data, _page = stand.run(folder, date=STAND_DAY, lines={
+        "A": {"hidden": True, "casing": {"width": 0.5, "color": "#123456"}}})
+    assert "casings" not in data and "#123456" not in svg
+    from schematic import animate
+    from schematic.render import line_strokes, render
+    from test_colors import _graph
+    graph = _graph([[("A", "0072bc")]])
+    strokes = line_strokes({"Z": {"casing": {"width": 0.5, "color": "#123456"}}})
+    drawn = render(graph, labels=False, strokes=strokes)
+    assert animate.build(drawn, graph, [], STAND_DAY).casings == []
+
+
 def test_a_casing_in_a_lines_colour_is_one_colour(tmp_path):
     (tmp_path / f"{KEY}.positions.json").write_text(json.dumps(
         {"lines": {"A": "#ff0000"}, "casings": ["#FF0000", "#00ff00"]}), encoding="utf-8")
@@ -799,9 +816,12 @@ def test_the_colours_ride_the_plan_from_export_plan_to_export_encode(home, clien
     assert sorted(entries[i:i + 3] for i in range(0, 768, 3)) == sorted(bytes(c) for c in table)
 
 
+@pytest.mark.parametrize("preset", [PRESET, "instagram-reel", "instagram-post"])
 @pytest.mark.parametrize("out", ["../x", "/x", "a/b", "a\\b", ".hidden", "x\n"])
-def test_the_protocol_refuses_an_out_that_is_not_a_folder_name(home, client, out):
-    error = client.call("export.plan", {"key": KEY, "preset": PRESET, "out": out})["error"]
+def test_the_protocol_refuses_an_out_that_is_not_a_folder_name(home, client, out, preset):
+    # Every preset: a plan that is not a GIF reads nothing, so the token is the
+    # only guard it has.
+    error = client.call("export.plan", {"key": KEY, "preset": preset, "out": out})["error"]
     assert error["code"] == -32602 and error["data"]["kind"] == "params", error
     assert error["data"]["hint"].startswith("out must be a folder name")
 
