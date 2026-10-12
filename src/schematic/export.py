@@ -34,10 +34,12 @@ import math
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 import threading
+import zlib
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Callable, Sequence
@@ -194,6 +196,27 @@ def gif_palette(theme: str, colors: Sequence[str]) -> list[RGB] | None:
         entries.append(_mix(color, text, 0.5))
     table = list(dict.fromkeys(entries))
     return table + [ground] * (GIF_COLORS - len(table))
+
+
+def palette_png(table: Sequence[RGB]) -> bytes:
+    """``table`` as the image ``paletteuse`` reads it, which "must be a 256
+    pixels image": 16 by 16 and 8-bit RGB, row by row from the top left.
+    Written with zlib and struct, so making it needs no imaging library."""
+    if len(table) != GIF_COLORS or any(len(color) != 3 for color in table):
+        raise ValueError(f"a GIF palette is {GIF_COLORS} RGB colours")
+    side = 16
+    # Each row begins with its filter type, 0: the bytes as they are.
+    rows = b"".join(b"\x00" + bytes(v for color in table[r * side:(r + 1) * side] for v in color)
+                    for r in range(side))
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (struct.pack(">I", len(data)) + kind + data
+                + struct.pack(">I", zlib.crc32(kind + data)))
+
+    return (b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", side, side, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(rows, 9))
+            + chunk(b"IEND", b""))
 
 
 # -------------------------------------------------------------------- framing

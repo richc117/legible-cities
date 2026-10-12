@@ -9,9 +9,11 @@ first two, and per distinct line colour the colour, its steps toward the
 ground and its midpoint with the text. These hold its arithmetic.
 """
 
+import io
 import itertools
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -148,3 +150,59 @@ def test_a_colour_not_written_rrggbb_is_refused(bad):
 def test_a_theme_the_page_lacks_is_refused():
     with pytest.raises(ValueError, match="dark or light"):
         export.gif_palette("sepia", BART)
+
+
+# -------------------------------------------------------------------- the PNG
+
+
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_the_png_reads_back_as_the_table_row_by_row(theme):
+    from PIL import Image
+    table = export.gif_palette(theme, BART)
+    data = export.palette_png(table)
+    with Image.open(io.BytesIO(data)) as im:
+        im.load()
+        assert (im.format, im.mode, im.size) == ("PNG", "RGB", (16, 16))
+        assert [im.getpixel((i % 16, i // 16)) for i in range(256)] == table
+
+
+def test_the_png_is_the_same_bytes_for_the_same_table():
+    a = export.palette_png(export.gif_palette("dark", BART))
+    b = export.palette_png(export.gif_palette("dark", list(reversed(BART))))
+    assert a == b
+    assert a.startswith(b"\x89PNG\r\n\x1a\n")
+    assert export.palette_png(export.gif_palette("light", BART)) != a
+
+
+def test_ffmpeg_reads_the_png_as_256_pixels(tmp_path):
+    """What paletteuse is handed: ffmpeg's own decoder agrees with Pillow."""
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        pytest.skip("ffmpeg not installed")
+    table = export.gif_palette("dark", GRID[:33])
+    (tmp_path / "p.png").write_bytes(export.palette_png(table))
+    done = subprocess.run([ffmpeg, "-loglevel", "error", "-i", str(tmp_path / "p.png"),
+                           "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                          capture_output=True, timeout=60)
+    assert done.returncode == 0, done.stderr
+    assert done.stdout == bytes(v for color in table for v in color)
+
+
+@pytest.mark.parametrize("table", [[(0, 0, 0)] * 255, [(0, 0, 0)] * 257, [(0, 0)] * 256,
+                                   [(0, 0, 256)] * 256])
+def test_a_table_that_is_not_256_rgb_colours_is_refused(table):
+    with pytest.raises(ValueError):
+        export.palette_png(table)
+
+
+def test_making_the_png_needs_no_imaging_library():
+    """Pillow is a development dependency. The engine composes and writes
+    the palette with it unimportable."""
+    script = ("import sys; sys.modules['PIL'] = None; from schematic import export; "
+              "data = export.palette_png(export.gif_palette('light', sys.argv[1:])); "
+              "assert 'PIL' not in [m.split('.')[0] for m in sys.modules if sys.modules[m]]; "
+              "sys.stdout.buffer.write(data)")
+    done = subprocess.run([sys.executable, "-c", script, *BART], capture_output=True,
+                          timeout=60)
+    assert done.returncode == 0, done.stderr.decode()
+    assert done.stdout == export.palette_png(export.gif_palette("light", BART))
