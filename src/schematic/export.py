@@ -124,6 +124,78 @@ def resolve(svg: str, palette: dict[str, str]) -> str:
     return _VAR.sub(lambda m: palette.get(m.group(1), m.group(2).strip()), svg)
 
 
+# ----------------------------------------------------------------- GIF palette
+
+# A GIF's 256 colours, composed from what the map paints rather than counted
+# from the frames (issue 33; the desktop app's ADR-055). Counted, the table is
+# a function of pixel statistics, and noise inside the tolerance of 8 moved
+# nearly every entry and changed pixels two captures agreed on. What a frame
+# can hold is known before it exists: the theme's ground, its text and its
+# muted text, the blends of the two that anti-aliased text makes, and each
+# line's colour with its own blends toward the ground and the text.
+
+# The page's --muted, the third colour its furniture paints. Its --bg and
+# --text are PALETTES' bg and label; test_gif_palette.py holds all three to
+# page.html.
+MUTED = {"dark": "#c3b8aa", "light": "#655748"}
+
+GIF_COLORS = 256
+# Steps strictly between the ground and the text, for the text's edges.
+GIF_RAMP = 16
+# Each distinct line colour takes 1 + k entries: itself, k - 1 even steps
+# toward the ground and its midpoint with the text. k is the first here whose
+# bound the count is within, the most that fit beside the 3 + GIF_RAMP fixed
+# entries: 3 + 16 + 33 * 7 = 250 and 3 + 16 + 59 * 4 = 255. Past the last
+# there is no palette to compose, and it is counted from the frames.
+GIF_STEPS = ((33, 6), (59, 3))
+
+RGB = tuple[int, int, int]
+_HEX = re.compile(r"#[0-9a-fA-F]{6}")
+
+
+def _rgb(color: str) -> RGB:
+    if not isinstance(color, str) or not _HEX.fullmatch(color):
+        raise ValueError(f"a line colour must be written #rrggbb, not {color!r}")
+    return (int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16))
+
+
+def _mix(a: RGB, b: RGB, t: float) -> RGB:
+    return (round(a[0] + (b[0] - a[0]) * t), round(a[1] + (b[1] - a[1]) * t),
+            round(a[2] + (b[2] - a[2]) * t))
+
+
+def gif_palette(theme: str, colors: Sequence[str]) -> list[RGB] | None:
+    """The 256 colours of a GIF of a map in ``theme`` whose lines are drawn
+    in ``colors`` (``#rrggbb`` in any case, any order, repeats allowed), or
+    None when there are more distinct colours than the table holds.
+
+    A function of its two arguments alone, never of a frame, so two captures
+    of one plan get one table however their pixels differ. In order: the
+    ground, the text, the muted text, the ramp from ground to text, then each
+    distinct line colour in the order of its red, green and blue values, with
+    its steps toward the ground and its midpoint with the text; a colour
+    already in the table keeps its first place, and what is left is the
+    ground.
+    """
+    if theme not in PALETTES:
+        raise ValueError(f"theme is dark or light, not {theme!r}")
+    # Sorted: the table's order is its bytes, so it follows which colours
+    # there are, never the order they came in or a set's.
+    distinct = sorted({_rgb(c) for c in colors})
+    k = next((k for most, k in GIF_STEPS if len(distinct) <= most), None)
+    if k is None:
+        return None
+    ground, text = _rgb(PALETTES[theme]["bg"]), _rgb(PALETTES[theme]["label"])
+    entries = [ground, text, _rgb(MUTED[theme])]
+    entries += [_mix(ground, text, i / (GIF_RAMP + 1)) for i in range(1, GIF_RAMP + 1)]
+    for color in distinct:
+        entries.append(color)
+        entries += [_mix(color, ground, j / k) for j in range(1, k)]
+        entries.append(_mix(color, text, 0.5))
+    table = list(dict.fromkeys(entries))
+    return table + [ground] * (GIF_COLORS - len(table))
+
+
 # -------------------------------------------------------------------- framing
 
 
