@@ -5,6 +5,12 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.17.1] - 2026-10-14
+
+### Fixed
+
+- **A train rides its line across a node on every map, not only on one with a line's own stroke** (issue 70). Where a line's two tracks ended apart at a node, a plain map's trip path cut a chord from the one track's end to the next track's second point. That took the train off its painted line, and where a line turned past a stub it ran the train back up the track it was joining. Because the stops counted the track rather than the chord, they also drifted from the path, so a train reached its station up to 88.6 units away on Chicago and 623 on New York. Every map now keeps the step across the node that v0.16.0 kept only on a map with a width, casing or dash set, going to its foot on the next track where the step would back a train up. On Los Angeles 13 of 28 dot paths still leave their paint somewhere, by up to 5.1 units against 21 by 8.1 before, where LOOM reorders the lines further apart than the round caps bridge (a connector drawn across such a reorder is not done). No trip path on any of the 22 stored layouts backs a train up, on the map or its geographic twin, and a train's stops now agree with its path (the worst train at a station is 50 units from it on New York, down from 623). Only the page's data moves, and with it where a train is on the chords and along the paths after them in an existing export; the SVG and the page around its data do not. The Pittsburgh `data_without_lines` pin was re-pinned once (6 of its 8 paths). The v0.16.0 entry's remark that a plain map's trips still cut the chord was true then and is not now.
+
 ## [0.17.0] - 2026-10-12
 
 ### Changed
