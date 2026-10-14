@@ -12,13 +12,18 @@ line. The page's data moves for that; the SVG does not.
 """
 
 import datetime as dt
+import hashlib
+import json
 import math
+from dataclasses import replace
+from pathlib import Path
 
 import pytest
-from test_animate import TURNS, _hopton, _places, _samples
+from test_animate import TURNS, _hopton, _samples
+from test_lines import KEY as STAND_KEY
 from test_lines import stand  # noqa: F401  (the fixture: the store and the feed stood in)
 
-from schematic import animate, pipeline
+from schematic import animate, feeds, pipeline
 from schematic.offsets import polyline_length
 from schematic.render import Style, render
 from schematic.schedule import Call, Trip
@@ -87,30 +92,22 @@ def _nearest(q, track, reach: float) -> float:
     return best[0]
 
 
-def _backs_up(tp: animate.TripPath, tracks) -> list[tuple]:
-    """Whatever would back a train up on a trip laid over ``tracks``.
-
-    The page places a train by distance along its path, so its stops must
-    not go back and the last must be the path's length. And the path must be
-    made of pieces that each either ride one segment of a track the segment's
-    way, or step at a node from the end of one track to a point of the next
-    within its first hop of arc: no longer than that hop, so the path never
-    doubles back by more than it, and no further back along the next track
-    than the train already is, the point of that first hop of arc nearest
-    where the step starts, so the train never moves back along the track it
-    joins. A piece that is neither runs back along a track or leaves them."""
-    stops = tp.stop_lengths
-    out: list[tuple] = [("stop", i, a, b) for i, (a, b) in enumerate(zip(stops, stops[1:]))
-                        if b < a]
-    if stops[-1] != pytest.approx(polyline_length(tp.points)):
-        out.append(("length", stops[-1], polyline_length(tp.points)))
+def _pieces(points, tracks) -> list[tuple[str | None, float]]:
+    """What each piece of a path laid over ``tracks`` is, and how long:
+    ``"ride"`` where it lies on one segment of a track and runs the segment's
+    way; ``"step"`` where it goes at a node from the end of one track to a
+    point of the next within its first hop of arc, no longer than that hop
+    and no further back along the next track than the train already is, the
+    point of that first hop of arc nearest where the step starts; ``None``
+    where it is neither, and runs back along a track or leaves them."""
     hop = [0.0] + [math.dist(a[-1], b[0]) for a, b in zip(tracks, tracks[1:])]
-    k = 0
-    for i, (a, b) in enumerate(zip(tp.points, tp.points[1:])):
+    k, out = 0, []
+    for a, b in zip(points, points[1:]):
         riding = next((j for j in range(k, min(k + 3, len(tracks))) if _rides(a, b, tracks[j])),
                       None)
         if riding is not None:
             k = riding
+            out.append(("ride", math.dist(a, b)))
             continue
         for j in range(k + 1, min(k + 3, len(tracks))):
             at = _first(b, tracks[j])
@@ -118,9 +115,50 @@ def _backs_up(tp: animate.TripPath, tracks) -> list[tuple]:
                     and math.dist(a, b) <= hop[j] + ON and at <= hop[j] + ON \
                     and at >= _nearest(a, tracks[j], hop[j]) - ON:
                 k = j
+                out.append(("step", math.dist(a, b)))
                 break
         else:
-            out.append(("piece", i, a, b, k))
+            out.append((None, math.dist(a, b)))
+    return out
+
+
+def _backs_up(tp: animate.TripPath, tracks) -> list[tuple]:
+    """Whatever would back a train up on a trip laid over ``tracks``.
+
+    The page places a train by distance along its path, so its stops must
+    not go back and the last must be the path's length. And every piece of
+    the path must ride a track its way or step at a node (``_pieces``): a
+    step is no longer than the hop there, so the path never doubles back by
+    more than it, and lands no further back along the next track than the
+    train already is, so the train never moves back along the track it
+    joins."""
+    stops = tp.stop_lengths
+    out: list[tuple] = [("stop", i, a, b) for i, (a, b) in enumerate(zip(stops, stops[1:]))
+                        if b < a]
+    if stops[-1] != pytest.approx(polyline_length(tp.points)):
+        out.append(("length", stops[-1], polyline_length(tp.points)))
+    return out + [("piece", i, length) for i, (kind, length)
+                  in enumerate(_pieces(tp.points, tracks)) if kind is None]
+
+
+def _offs(points, tracks) -> list[float]:
+    """How far each of a path's samples, a unit apart, is from the nearest
+    of ``tracks``; a track whose box is no nearer than the best so far is
+    passed over, and the track the last sample was nearest is tried first."""
+    boxes = [(min(x for x, _ in t), min(y for _, y in t), max(x for x, _ in t),
+              max(y for _, y in t)) for t in tracks]
+    out, last = [], 0
+    for q in _samples(points):
+        best, near = math.inf, last
+        for t in [last, *range(len(tracks))]:
+            x0, y0, x1, y1 = boxes[t]
+            if math.hypot(max(x0 - q[0], 0.0, q[0] - x1), max(y0 - q[1], 0.0, q[1] - y1)) >= best:
+                continue
+            off = min(_foot(q, a, b)[1] for a, b in zip(tracks[t], tracks[t][1:]))
+            if off < best:
+                best, near = off, t
+        out.append(best)
+        last = near
     return out
 
 
@@ -159,6 +197,27 @@ def test_a_plain_map_keeps_the_hop_where_a_lines_neighbours_change(stand, tmp_pa
     assert tp.geo_stop_lengths[-1] == pytest.approx(polyline_length(tp.geo_points))
 
 
+def test_a_plain_map_without_a_twin_keeps_the_hop_too(stand, tmp_path,  # noqa: F811
+                                                       monkeypatch):
+    """The same chain for a feed drawn without its geographic twin: the map's
+    own path keeps the step at n1 all the same, so keeping the hop hangs on
+    nothing but the map."""
+    monkeypatch.setitem(feeds.FEEDS, STAND_KEY,
+                        replace(feeds.FEEDS[STAND_KEY], geographic=False))
+    result, _svg, data, _page = stand.run(tmp_path / "flat", date=DAY)
+    drawn = result.render
+    assert not drawn.strokes and not result.animation.geo
+    path = next(p for p in data["paths"] if p["route"] == "A")
+    assert "gd" not in path
+    net = animate.RouteNetwork.build(drawn)
+    tp = animate.build_trip_path(net, path["nodes"], "A", hops=True)
+    assert path["d"] == tp.path_d()
+    hop = [animate._oriented(drawn.track("A", "n0", "n1"), "n0")[-1],
+           animate._oriented(drawn.track("A", "n1", "n2"), "n1")[0]]
+    at = tp.points.index(hop[0])
+    assert tp.points[at:at + 2] == hop and math.dist(*hop) == pytest.approx(HALF_PITCH)
+
+
 @pytest.mark.parametrize("turn", list(TURNS))
 def test_a_train_on_a_plain_map_never_backs_up_where_its_line_turns(turn):
     """Hopton with no stroke, through ``animate.build`` as the pipeline calls
@@ -184,51 +243,142 @@ def test_a_train_on_a_plain_map_never_backs_up_where_its_line_turns(turn):
     assert tp.path_d() == animate.build_trip_path(net, nodes, "Y", hops=True).path_d()
 
 
+# ------------------------------------------- what the hop moves, and only that
+
+# The hashes the two plain maps' data were pinned at before issue 70: the
+# stood-in map's positions file (tests/test_gif_palette.py, ``UNCASED``) and
+# Pittsburgh's data apart from its lines (tests/fixtures/colors).
+STAND_BEFORE_70 = "d9dda941f83720585520c5e9611dba5afad06c6f39303e853536c354bc6e76dc"
+PITTSBURGH_BEFORE_70 = "4faa6aa26ea350dabcd144c35f950c5d90075525a1c125b2c750df2d0547ba27"
+
+
+def _differences(a, b, at: tuple = ()) -> list[tuple]:
+    """Where two JSON values differ, each as the keys and indices down to it."""
+    if isinstance(a, dict) and isinstance(b, dict):
+        return [at + (key,) for key in sorted(a.keys() ^ b.keys())] + [
+            found for key in sorted(a.keys() & b.keys())
+            for found in _differences(a[key], b[key], at + (key,))]
+    if isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
+        return [found for i, (x, y) in enumerate(zip(a, b))
+                for found in _differences(x, y, at + (i,))]
+    return [] if a == b else [at]
+
+
+def _only_the_paths_move(result: pipeline.Result, written: dict) -> tuple[dict, dict]:
+    """The page's data built from what the pipeline drew, once cutting the
+    chord and once keeping the hop: the second is what was written, and the
+    two differ in the paths' geometry and stops and nowhere else."""
+    cut, kept = (json.loads(json.dumps(animate.build(
+        result.render, result.graph, result.trips, result.date,
+        result.animation.geo or None, hops=hops).to_json())) for hops in (False, True))
+    assert kept == written
+    moved = _differences(cut, kept)
+    assert moved
+    assert all(at[0] == "paths" and at[2] in ("d", "gd", "stops", "gstops")
+               for at in moved), [at for at in moved if at[0] != "paths"][:5] or moved[:5]
+    return cut, kept
+
+
+def test_the_hop_moves_the_stood_in_maps_paths_and_nothing_else(stand, tmp_path):  # noqa: F811
+    """The stood-in plain map: keeping the hop moves its paths' geometry and
+    stops and nothing else in the page's data, and the positions file it
+    writes moves from the hash pinned before issue 70 to the one pinned
+    since, which is the whole of that re-pin."""
+    result, _svg, _data, _page = stand.run(tmp_path, date=DAY)
+    written = (tmp_path / f"{STAND_KEY}.positions.json").read_bytes()
+    cut, kept = _only_the_paths_move(result, json.loads(written))
+    digest = lambda data: hashlib.sha256(
+        json.dumps(data, separators=(",", ":")).encode()).hexdigest()
+    assert (digest(cut), digest(kept)) == (STAND_BEFORE_70, hashlib.sha256(written).hexdigest())
+
+
+def test_the_hop_moves_pittsburghs_paths_and_nothing_else(tmp_path):
+    """Pittsburgh from the stored layout its colour snapshot was taken from:
+    keeping the hop moves its paths' geometry and stops and nothing else, and
+    the data apart from its lines moves from the hash pinned before issue 70
+    to the one pinned since, which is the whole of that re-pin."""
+    snapshot = json.loads((Path(__file__).parent / "fixtures" / "colors"
+                           / "pittsburgh-t.json").read_text())
+    found = pipeline.stored("pittsburgh-t")
+    if found is None:
+        pytest.skip("needs the stored layout for pittsburgh-t")
+    if found.id != snapshot["layout"]:
+        pytest.skip("the stored Pittsburgh layout is not the one the snapshot was taken from")
+    result = pipeline.run("pittsburgh-t", layout=found.id,
+                          date=dt.date.fromisoformat(snapshot["date"]), out_dir=tmp_path)
+    written = json.loads((tmp_path / "pittsburgh-t.positions.json").read_text())
+    cut, kept = _only_the_paths_move(result, written)
+    rest = lambda data: hashlib.sha256(json.dumps(
+        {k: v for k, v in data.items() if k != "lines"}, sort_keys=True,
+        separators=(",", ":")).encode()).hexdigest()
+    assert (rest(cut), rest(kept)) == (PITTSBURGH_BEFORE_70, snapshot["data_without_lines"])
+    assert sum(any(at[:2] == ("paths", i) for at in _differences(cut, kept))
+               for i in range(len(kept["paths"]))) == 6
+
+
 # ------------------------------------------------ a stored layout, plain
 
+# The stored Los Angeles layout these tests were measured on, built 11 Sep
+# 2026; another is skipped, as tests/test_colors.py skips another Pittsburgh.
+LOS_ANGELES = "9dc37088cc48a1547e6410844ff80cb32069cc46434f618ccdee6c4d8fff81e8"
+
+
 @pytest.fixture(scope="module")
-def los_angeles(tmp_path_factory) -> list[tuple[dict, animate.TripPath, list]]:
+def los_angeles(tmp_path_factory) -> list[tuple[dict, animate.TripPath, animate.TripPath,
+                                                list]]:
     """Los Angeles drawn from its stored layout with no stroke chosen: each
-    path the page was written with, the trip built again to the unit (its
-    path the one written), and the tracks it rides."""
+    path the page was written with, its trip built again to the unit as the
+    page has it, the same trip cutting the chord, and the tracks it rides."""
     found = pipeline.stored("la-metro-rail")
     if found is None:
         pytest.skip("needs the stored layout for la-metro-rail")
+    if found.id != LOS_ANGELES:
+        pytest.skip("the stored Los Angeles layout is not the one these tests were measured on")
     result = pipeline.run("la-metro-rail", layout=found.id, date=DAY,
                           out_dir=tmp_path_factory.mktemp("la-metro-rail"))
     assert not result.render.strokes
     net = animate.RouteNetwork.build(result.render)
     out = []
     for path in result.animation.paths:
-        tp = animate.build_trip_path(net, path["nodes"], path["route"])
-        assert tp.path_d() == path["d"]
-        out.append((path, tp, _ridden(net, path["route"], path["nodes"])))
+        kept, cut = (animate.build_trip_path(net, path["nodes"], path["route"], hops=hops)
+                     for hops in (True, False))
+        written = next(tp for tp in (kept, cut) if tp.path_d() == path["d"])
+        out.append((path, written, cut, _ridden(net, path["route"], path["nodes"])))
     return out
 
 
-def test_a_plain_los_angeles_keeps_most_of_its_trains_on_their_paint(los_angeles):
-    """Every trip path, sampled every unit, against the drawn tracks it rides,
-    which on Los Angeles are its own line's: with the chord 21 of the 28 left
-    their paint somewhere, by up to 8.10 against a half-width of 3.5. With
-    the hop 13 still do, by up to 5.1, where LOOM reorders the lines at a
-    node and the step is wider than the caps bridge; a connector drawn across
-    it would close those, and none is drawn."""
-    leaving, farthest = 0, 0.0
-    for _path, tp, tracks in los_angeles:
-        worst = max(off for _, off in _places(_samples(tp.points), tracks))
-        farthest = max(farthest, worst)
-        leaving += worst > HALF + 1e-6
-    print(f"\nLos Angeles, plain: {leaving} of {len(los_angeles)} paths off their paint "
-          f"somewhere, the farthest sample {farthest:.2f} from its tracks")
-    assert len(los_angeles) == 28
-    assert leaving <= 13 and farthest <= 5.1
+def test_a_plain_los_angeles_keeps_its_trains_nearer_their_paint(los_angeles):
+    """Every trip path the page has, sampled every unit, against the drawn
+    tracks it rides: wherever it is off them it is on a step at a node,
+    within half the step of a painted end; and fewer paths leave their paint
+    than with the chord, none as far. Measured, 13 of the 28 leave it by up
+    to 5.10 against 21 by up to 8.10, where LOOM reorders the lines at a node
+    and the step is wider than the caps bridge; a connector drawn across it
+    would close those, and none is drawn."""
+    figures = {}
+    for name, trip in (("hop", 1), ("chord", 2)):
+        leaving, farthest = 0, 0.0
+        for row in los_angeles:
+            tp, tracks = row[trip], row[3]
+            worst = max(_offs(tp.points, tracks))
+            if name == "hop":
+                steps = [length for kind, length in _pieces(tp.points, tracks) if kind == "step"]
+                assert worst <= max(steps, default=0.0) / 2 + ON, (row[0]["route"], worst, steps)
+            farthest = max(farthest, worst)
+            leaving += worst > HALF + ON
+        figures[name] = leaving, farthest
+    print(f"\nLos Angeles, plain: {figures['hop'][0]} of {len(los_angeles)} paths off their "
+          f"paint somewhere, the farthest sample {figures['hop'][1]:.2f} from its tracks; "
+          f"with the chord {figures['chord'][0]}, {figures['chord'][1]:.2f}")
+    assert figures["hop"][0] < figures["chord"][0] and figures["hop"][1] < figures["chord"][1]
 
 
 def test_no_train_on_a_plain_los_angeles_ever_backs_up(los_angeles):
-    """Every trip path of the plain map: its stops in order and the last its
+    """Every trip path the page has: its stops in order and the last its
     length, and every piece of it riding a track its way or stepping at a
     node by no more than the hop there, never back along the track it joins
-    (``_backs_up``). With the chord, 23 of the 28 paths broke it."""
-    found = {(path["route"], i): problems for i, (path, tp, tracks) in enumerate(los_angeles)
-             if (problems := _backs_up(tp, tracks))}
+    (``_backs_up``). The chord breaks it, on 23 of the 28 as measured."""
+    found = {(path["route"], i): problems for i, (path, tp, _cut, tracks)
+             in enumerate(los_angeles) if (problems := _backs_up(tp, tracks))}
     assert not found, {key: problems[:2] for key, problems in list(found.items())[:4]}
+    assert any(_backs_up(cut, tracks) for _path, _tp, cut, tracks in los_angeles)

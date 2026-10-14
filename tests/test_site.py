@@ -4431,23 +4431,21 @@ main(async browser => {
 """
 
 
-@needs_browser
-def test_a_train_on_a_widened_cased_dashed_line_lies_on_its_drawn_path_across_a_node_hop(
-        tmp_path):
-    """The issue's criterion: every point of every trip path the page places a
-    train on, a unit apart, lies on its own line's painted stroke, within half
-    the line's width of one of its drawn tracks; so does every train and every
-    copy of its trail at each second through the trips, and at tenths across
-    X's step at n1. X's path keeps that step (9.1, which its caps bridge) and
-    a train is caught on it."""
-    seen = _run(ON_LINES, {"url": _hopton_page(tmp_path, trail=1),
+def _lies_on_its_paint(tmp_path: Path, strokes: dict | None, half: dict[str, float],
+                       step: tuple, between: tuple[float, float]) -> None:
+    """Hopton drawn with ``strokes`` through ON_LINES: every point of every
+    trip path the page places a train on, a unit apart, lies on its own line's
+    painted stroke, within half the line's width of one of its drawn tracks;
+    so does every train and every copy of its trail at each second through
+    the trips, and at tenths across X's step at n1. X's way east keeps that
+    step, ``step``, and a train is caught on it, ``between`` the two in y."""
+    seen = _run(ON_LINES, {"url": _hopton_page(tmp_path, strokes, trail=1),
                            "times": [SEVEN + s for s in range(0, 241)]
                                     + [SEVEN + 140 + k / 10 for k in range(11)]})
     assert not seen["problems"], seen["problems"]
     tracks = {label: [seg for d in line["tracks"] for seg in _segments(d)]
               for label, line in seen["lines"].items()}
-    half = {label: line["width"] / 2 for label, line in seen["lines"].items()}
-    assert half == {"X": 5.25, "Y": 5.25, "Z": 3.5}
+    assert {label: line["width"] / 2 for label, line in seen["lines"].items()} == half
     worst: dict[str, float] = {}
     for path in seen["paths"]:
         assert path["own"]
@@ -4456,21 +4454,40 @@ def test_a_train_on_a_widened_cased_dashed_line_lies_on_its_drawn_path_across_a_
             worst[path["route"]] = max(worst.get(path["route"], 0.0), off)
             assert off <= half[path["route"]], (path["route"], point, off)
     print(f"\nthe farthest a trip path runs from its line's drawn track: {worst}")
-    # X's way east steps across n1 from beside Y (9.1 off the centre) onto it.
     east = next(p for p in seen["paths"] if p["route"] == "X" and p["pts"][0][0] < 1)
     vertices = [a for a, _ in _segments(east["d"])] + [_segments(east["d"])[-1][1]]
-    assert ((900.0, 710.9), (900.0, 720.0)) in list(zip(vertices, vertices[1:])), east["d"]
+    assert step in list(zip(vertices, vertices[1:])), east["d"]
     on_the_step = 0
     for look in seen["trains"]:
         for dot in look["dots"]:
             # Written to tenths, so a twentieth either way.
             assert _off(dot["at"], tracks[dot["line"]]) <= half[dot["line"]] + 0.05, dot
-            on_the_step += dot["line"] == "X" and dot["at"][0] == 900 and 711 < dot["at"][1] < 719
+            on_the_step += dot["line"] == "X" and dot["at"][0] == step[0][0] \
+                and between[0] < dot["at"][1] < between[1]
         for copy in look["copies"]:
             line = seen["trips"][copy["trip"]]
             assert _off(copy["at"], tracks[line]) <= half[line] + 0.05, copy
     assert on_the_step, "no train was caught on X's step at n1"
     assert any(look["copies"] for look in seen["trains"])
+
+
+@needs_browser
+def test_a_train_on_a_widened_cased_dashed_line_lies_on_its_drawn_path_across_a_node_hop(
+        tmp_path):
+    """The issue's criterion, on Hopton with its strokes: X steps across n1
+    from beside Y, 9.1 off the centre, onto it, which its caps (10.5 wide)
+    bridge."""
+    _lies_on_its_paint(tmp_path, HOPTON_STROKES, {"X": 5.25, "Y": 5.25, "Z": 3.5},
+                       ((900.0, 710.9), (900.0, 720.0)), (711, 719))
+
+
+@needs_browser
+def test_a_train_on_a_plain_line_lies_on_its_drawn_path_across_a_node_hop(tmp_path):
+    """The same on Hopton with no stroke, as every map has it since issue 70:
+    X steps 5.6 across n1 from beside Y onto the centre, and every point of
+    the step is within 2.8 of a painted end, inside the 3.5 its caps reach."""
+    _lies_on_its_paint(tmp_path, None, {"X": 3.5, "Y": 3.5, "Z": 3.5},
+                       ((900.0, 714.4), (900.0, 720.0)), (714.5, 719.5))
 
 
 CHIPS = BROWSER + r"""
