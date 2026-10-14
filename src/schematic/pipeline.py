@@ -857,7 +857,9 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     is ignored. ``width``, ``casing`` and ``dash`` are how the line is stroked
     (issue 55, ``render.line_strokes``): the map, the geographic twin and the
     page draw a drawn line's, and a map whose lines choose none of them, or
-    only their defaults, is the map it was, byte for byte. ``dot_radius`` and
+    only their defaults, is the map it was, byte for byte (its drawing: every
+    map's trips keep a node's hop since issue 70, which moved the page's data
+    once and not the SVG). ``dot_radius`` and
     ``trail`` are how the page draws a train, the animation's and not the
     map's (``animate.DOT_RADIUS``); they reach the page's data and nothing
     else. ``back`` is the href the animation page's

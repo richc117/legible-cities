@@ -51,8 +51,8 @@ naive per-segment offset leaves visible notches at every bend.
 # Z(1). X sits at -9.1 on A and -5.6 on B, a hop of 3.5 its caps bridge; all
 # width 1, both are -5.6.
 #
-# As built, see animate._ride: the hop is kept only on a map where a line has a
-# stroke set, and goes to the foot on the next track where it would back a train up.
+# As built, see animate._ride: the hop is kept on every map (issue 70), and goes to
+# the foot on the next track where it would back a train up.
 
 from __future__ import annotations
 
