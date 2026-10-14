@@ -277,12 +277,17 @@ def _ride(points: list[Coord], seg: list[Coord], hops: bool) -> float:
 
     The map joins no two tracks at a node: each is its own round-capped path,
     and a line's two ends there differ wherever its neighbours change, LOOM
-    reorders it or it turns. With ``hops`` the trip keeps that hop, a straight
-    step from the last track's end to this one's start that the round caps
-    bridge, counted in the distance (the note in ``offsets.py``). Without it
-    the trip runs from the last end straight to this track's second point, a
-    chord that can leave the painted line (engine issue 70): what every map
-    drawn without a stroke of its own still does, so its data does not move.
+    reorders it or it turns. With ``hops``, as on every map since engine
+    issue 70, the trip keeps that hop, a straight step from the last track's
+    end to this one's start, counted in the distance (the note in
+    ``offsets.py``). The round caps bridge a step up to the line's width, so
+    the train stays on its paint there; where the step is wider, as where
+    LOOM reorders the lines, it leaves its paint for the step. Without
+    ``hops`` the trip runs from the last end straight to this track's second
+    point, a chord that can leave the painted line further and back a train
+    up, and counts the track rather than the chord, so the stops drift from
+    the path: what a map drawn without a stroke of its own did before engine
+    issue 70, kept to measure against.
 
     A train never backs up. Where a line turns at a node, this track's start
     can lie behind the last end along this track's way (Y beside a widened X,
@@ -335,16 +340,16 @@ class TripPath:
 
 
 def build_trip_path(net: RouteNetwork, nodes: list[str], label: str,
-                    geo: GeoLayer | None = None, hops: bool = False) -> TripPath | None:
+                    geo: GeoLayer | None = None, hops: bool = True) -> TripPath | None:
     """Walk a node sequence across the drawn network. None if it cannot be routed.
 
     One walk, two geometries: when ``geo`` is given the same hop sequence is
     accumulated over the pre-octilinear track shapes as well, so a train is at
     the same fraction of the same hop in both and the morph cannot desynchronise
     it. A track with no geographic twin falls back to its drawn shape, which
-    simply holds still while the rest of the network moves. ``hops`` keeps the
-    step between two tracks' ends at a node instead of cutting across it
-    (``_ride``).
+    simply holds still while the rest of the network moves. ``hops``, true
+    unless a caller asks otherwise, keeps the step between two tracks' ends at
+    a node in both walks instead of cutting a chord across it (``_ride``).
     """
     if not nodes or any(n is None for n in nodes):
         return None
@@ -506,14 +511,15 @@ def build(render: RenderResult, graph: LineGraph, trips: list[Trip],
           line_order: list[str] | None = None,
           names: dict[str, str] | None = None,
           dot_radius: float = DOT_RADIUS, trail: float = TRAIL,
-          hops: bool = False) -> Animation:
+          hops: bool = True) -> Animation:
     """Route every trip and collect the deduplicated paths. ``names`` is a
     display name per line label, which the page writes in the line's chip,
     row, band and train titles; the caller gives names for drawn lines only.
     ``dot_radius`` and ``trail`` are how the page draws a train (see
     ``DOT_RADIUS``); the caller has judged them against their ranges.
-    ``hops`` keeps a node's hop in every trip's path (``_ride``), which the
-    pipeline asks for on a map drawn with a line's own width, casing or dash.
+    ``hops`` keeps a node's hop in every trip's path (``_ride``), as the
+    pipeline has it on every map since engine issue 70; false cuts the chord
+    a map drawn without a line's own width, casing or dash cut before it.
 
     The layout the page draws its rows from is in ``line_order`` first and
     the rest after. When the order names a line the layout carries, the

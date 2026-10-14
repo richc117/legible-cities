@@ -109,9 +109,10 @@ def test_the_pipeline_hands_the_dot_and_the_trail_to_the_page(stand, tmp_path): 
 # ------------------------------------------------ a node's hop (issue 55)
 #
 # The map joins no two tracks at a node: each is its own round-capped path.
-# Where a line's two ends there differ, a trip's path on a map drawn with a
-# line's own stroke keeps the hop between them, counted in its length, instead
-# of cutting a chord from the one end to the next track's second point.
+# Where a line's two ends there differ, a trip's path keeps the hop between
+# them, counted in its length, instead of cutting a chord from the one end to
+# the next track's second point: on a map drawn with a line's own stroke
+# since issue 55, and on every map since issue 70 (tests/test_hops.py).
 
 X = Line(id="X", label="X", color="#0072bc")
 Y = Line(id="Y", label="Y", color="#d6322f")
@@ -157,11 +158,11 @@ def test_a_trip_keeps_the_hop_at_a_node_and_counts_it():
     assert tp.stop_lengths[-1] == pytest.approx(polyline_length(tp.points))
 
 
-def test_without_the_hop_the_trip_is_the_chord_it_always_was():
-    """Asked for no hop, the walk is today's: the run from the first track's
-    end goes straight to the second's far point, and the step is not counted.
-    And a line whose ends meet at every node has no hop to keep, so the two
-    walks are one there."""
+def test_asked_for_no_hop_the_trip_cuts_the_chord():
+    """Asked for no hop, the walk is the one every plain map made before
+    issue 70: the run from the first track's end goes straight to the
+    second's far point, and the step is not counted. And a line whose ends
+    meet at every node has no hop to keep, so the two walks are one there."""
     tp, drawn = _ride_x(False, WIDE)
     first, second = drawn.track("X", "n0", "n1").points, drawn.track("X", "n1", "n2").points
     assert tp.points == first + second[1:]
@@ -363,16 +364,19 @@ def test_the_geographic_twin_makes_room_for_a_widened_line_as_the_map_does():
         on_map[0] / on_map[1], rel=0.03)
 
 
-def test_the_pipeline_keeps_the_hop_only_on_a_map_with_a_stroke(stand, tmp_path):  # noqa: F811
-    """Through ``pipeline.run``: a map with a line's own stroke keeps each
-    node's hop in its trips' paths; the same map without one, or with only
-    a name, writes the data it always wrote (engine issue 70 stays open for
-    those, whose pinned data would move)."""
+def test_the_pipeline_keeps_the_hop_on_every_map(stand, tmp_path):  # noqa: F811
+    """Through ``pipeline.run``: a map with a line's own stroke and the same
+    map without one both keep each node's hop in their trips' paths (issue
+    70), where A's ends at n1 differ; a name changes the names and nothing
+    else."""
     plain = stand.run(tmp_path / "plain", date=DAY)
     named = stand.run(tmp_path / "named", date=DAY, lines={"A": {"name": "Airport"}})
     assert named[2] == {**plain[2], "names": {"A": "Airport"}}
     styled = stand.run(tmp_path / "styled", date=DAY, lines={"B": {"width": 1.5}})
-    hops = animate.build_trip_path(animate.RouteNetwork.build(styled[0].render),
-                                   ["n0", "n1", "n2", "n3"], "A", hops=True)
-    assert any(p["route"] == "A" and p["d"] == hops.path_d() for p in styled[2]["paths"])
+    for result, _svg, data, _page in (plain, styled):
+        net = animate.RouteNetwork.build(result.render)
+        kept, cut = (animate.build_trip_path(net, ["n0", "n1", "n2", "n3"], "A", hops=hops)
+                     for hops in (True, False))
+        assert kept.path_d() != cut.path_d()
+        assert any(p["route"] == "A" and p["d"] == kept.path_d() for p in data["paths"])
     assert [p["d"] for p in styled[2]["paths"]] != [p["d"] for p in plain[2]["paths"]]

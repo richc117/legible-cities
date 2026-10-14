@@ -137,7 +137,11 @@ def test_without_overrides_the_page_changes_only_by_the_missing_entries(tmp_path
     the stored stage graph, not a regeneration, because a regeneration also
     moves geometry (app ADR-023). ``page_without_data`` is re-pinned whenever
     ``page.html`` changes on purpose -- E24 rebuilt the line chips out of DOM
-    nodes -- and the other three hashes are the ones that must not move."""
+    nodes -- and the other three hashes are the ones that must not move.
+    ``data_without_lines`` was re-pinned once, for issue 70: every map's trips
+    keep a node's hop, and 6 of Pittsburgh's 8 paths (``d``, ``gd`` and
+    ``stops``) step across a node where they cut a chord; the SVG, the page
+    around its data and ``lines`` did not move."""
     snapshot = json.loads((SNAPSHOTS / "pittsburgh-t.json").read_text())
     stored = _stored("pittsburgh-t")
     if stored.id != snapshot["layout"]:

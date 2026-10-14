@@ -4344,7 +4344,7 @@ def _hopton_page(into: Path, strokes: dict | None = HOPTON_STROKES, **drawn_as) 
     """Hopton drawn with ``strokes`` (none for the plain map), a geographic twin
     with every station moved a little, and trains: X twice and Y and Z once
     from seven, one more X at ten to make the day. The trips keep their hops,
-    as the pipeline has them on a map with a stroke."""
+    as the pipeline has them on every map."""
     graph = _hopton(HOPTON)
     chosen = line_strokes(strokes)
     drawn = render(graph, style=Style(themed=True), title="Hopton", strokes=chosen)
@@ -4360,7 +4360,7 @@ def _hopton_page(into: Path, strokes: dict | None = HOPTON_STROKES, **drawn_as) 
              trip("y1", "Y", ["n0", "n1", "n3"], SEVEN), trip("z1", "Z", ["n1", "n4"], SEVEN),
              trip("late", "X", ["n0", "n1", "n2"], SEVEN + 3 * 3600)]
     animation = animate.build(drawn, graph, trips, dt.date.fromisoformat(CARD_DATE), geo=geo,
-                              hops=bool(chosen), **drawn_as)
+                              **drawn_as)
     assert len(animation.trips) == len(trips) and animation.geo
     _, html = animate.write(animation, drawn.svg, into, stem="hopton", name="Hopton")
     return html.as_uri()

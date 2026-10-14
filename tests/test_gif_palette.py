@@ -706,9 +706,13 @@ def test_a_project_folder_that_is_a_link_outside_is_refused(home, tmp_path):
 
 STAND_DAY = dt.date(2026, 9, 10)
 # sha256 of the stood-in map's positions file before casings were written,
-# taken at the commit before this test: uncased, and widened but uncased.
+# taken at the commit before this test: uncased, and widened but uncased. The
+# plain one was re-pinned once for issue 70, which keeps a node's hop on every
+# map: A changes neighbours at n1, B at n3 and both turn at n2, so their paths
+# step there where they cut a chord. The widened one kept its hops already and
+# did not move.
 UNCASED = {
-    "plain": "d9dda941f83720585520c5e9611dba5afad06c6f39303e853536c354bc6e76dc",
+    "plain": "561c08cca7d641f802fa0ed0d7329a05ff0cc8f306bd8d7109c67bbc0d5f31d7",
     "wide": "c72ef588933e6b122017ea8879e251af20c9427470f51c8b0e58040130312abc",
 }
 
