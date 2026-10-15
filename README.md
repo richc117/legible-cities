@@ -229,7 +229,12 @@ and takes LOOM's own tuning flags by name, a tuned layout being a layout of
 its own)
 and `map.build` (which takes that id and a service day, and never lays out
 on the way to a map), with progress and LOOM's log as notifications and
-`$/cancelRequest` to stop a run. While a layout runs, each progress report
+`$/cancelRequest` to stop a run. A method that writes what a client sees (a
+layout into the store, a map's files, an export, the feed registry) has a
+point of no return just before that write: a cancel before it leaves
+everything as it was and is answered with the cancelled error, and one after
+it is too late, so the request runs to its end and its result says
+`cancel_too_late`. While a layout runs, each progress report
 names the layout and `render.stage` draws the stages the run has finished, so
 a client can show the map as it solves. The service day is a required parameter
 of `map.build`, never picked on the way to a map; `feeds.service` is where
