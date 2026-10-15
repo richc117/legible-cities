@@ -2092,6 +2092,56 @@ def test_work_past_its_point_of_no_return_answers_for_itself_whatever_was_cancel
         assert endpoint.jobs == {}
 
 
+def test_a_cancel_never_falls_between_the_look_and_the_commit():
+    """Issue 80: ``commit_unless_cancelled`` looks at ``cancelled`` and commits
+    in one hold of the lock ``cancel`` sets it under. A cancel before it is
+    honoured (False, nothing committed), one after it is too late (True,
+    committed), and a cancel raced against it from another thread ends as one
+    of the two, never as a cancel honoured with the commit made."""
+    early = serve._Job()
+    early.cancel()
+    assert early.commit_unless_cancelled() is False and not early.committed
+    late = serve._Job()
+    assert late.commit_unless_cancelled() is True and late.committed
+    late.cancel()
+    assert late.commit_unless_cancelled() is True and late.committed, "committed stays so"
+
+    # The look is made in the hold: while the lock is held here, the commit
+    # waits, and a cancel set in the same hold is the one it sees.
+    held = serve._Job()
+    said: list[bool] = []
+    with held._lock:
+        committing = threading.Thread(target=lambda: said.append(held.commit_unless_cancelled()))
+        committing.start()
+        committing.join(0.2)
+        assert committing.is_alive() and said == [] and not held.committed, \
+            "the commit did not wait for the lock cancel() takes"
+        held.cancelled = True              # what cancel() does, in its own hold of the lock
+    committing.join(10)
+    assert said == [False] and not held.committed
+
+    for _ in range(300):
+        job = serve._Job()
+        start = threading.Barrier(2)
+        said = []
+
+        def commit(job=job, start=start, said=said):
+            start.wait()
+            said.append(job.commit_unless_cancelled())
+
+        def cancel(job=job, start=start):
+            start.wait()
+            job.cancel()
+
+        raced = [threading.Thread(target=commit), threading.Thread(target=cancel)]
+        for thread in raced:
+            thread.start()
+        for thread in raced:
+            thread.join(10)
+        assert job.cancelled
+        assert said == [job.committed], "a cancel honoured, and the commit made anyway"
+
+
 def test_feeds_inspect_for_la_is_the_librarys_answer(client, home):
     result = client.call("feeds.inspect", {"key": KEY, "anchor": "2026-09-10"})["result"]
     check(result, "Inspection")

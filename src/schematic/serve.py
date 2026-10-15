@@ -88,14 +88,36 @@ class _Job(loom.Job):
     """A job that can pass its point of no return: work that has done what a
     cancel could no longer undo says so with ``commit()``, and from then on a
     cancel is not honoured and does not turn the work's own answer, or its own
-    failure, into the cancelled error. Only the worker reads or sets it."""
+    failure, into the cancelled error. Only the worker sets it.
+
+    Work whose first write a client can see is about to happen takes the point
+    with ``commit_unless_cancelled()`` (issue 80): the look at ``cancelled``
+    and the commit are one step under the lock ``cancel()`` sets ``cancelled``
+    under, so a cancel is either before it, and honoured, or after it, and
+    too late; it never falls between the two."""
 
     def __init__(self, log: Callable[[str], None] | None = None) -> None:
         super().__init__(log=log)
         self.committed = False
 
     def commit(self) -> None:
-        self.committed = True
+        """Past the point of no return, whatever has been cancelled: for work
+        whose own last look at a cancel came before what it cannot undo
+        (``feeds.remove``'s registry write)."""
+        with self._lock:
+            self.committed = True
+
+    def commit_unless_cancelled(self) -> bool:
+        """Past the point of no return unless a cancel came first: False when
+        the job is cancelled, and nothing is committed, so the work stops and
+        writes nothing; else committed, and True. Once committed it stays so,
+        and a second call answers True whatever came since."""
+        with self._lock:
+            if not self.committed:
+                if self.cancelled:
+                    return False
+                self.committed = True
+            return True
 
 
 Progress = pipeline.Progress
