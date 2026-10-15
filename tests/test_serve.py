@@ -2099,6 +2099,54 @@ def test_a_feed_added_again_while_its_removal_deletes_keeps_the_zip_it_was_given
     assert client.endpoint.jobs == {}
 
 
+def test_a_cancel_while_an_add_waits_on_a_removal_of_its_key_is_honoured(
+        client, reader, mine, tmp_path, monkeypatch):
+    """Issue 80: the add of a key whose removal is still deleting its files
+    waits on the feed's disk lock, for as long as the deletions take. Its
+    point of no return is taken inside that lock, so a cancel that arrives
+    while it waits is honoured: nothing is kept, the answer is the cancelled
+    error, and the removal finishes as it would have."""
+    again = gtfs_zip(tmp_path / "again.zip", {
+        **GOOD, "agency.txt": GOOD["agency.txt"].replace("Metro de Prueba", "Metro Otra Vez")})
+    waiting = threading.Event()
+    real_disk = feeds._disk
+    adding = client.n + 2                        # the removal's id comes first
+
+    class Watched:
+        """The feed's disk lock, saying when the add's worker reaches it."""
+
+        def __init__(self, lock: threading.Lock) -> None:
+            self.lock = lock
+
+        def __enter__(self):
+            if loom.current_job() is client.endpoint.jobs.get(adding):
+                waiting.set()
+            self.lock.acquire()
+            return self
+
+        def __exit__(self, *exc) -> None:
+            self.lock.release()
+
+    monkeypatch.setattr(feeds, "_disk", lambda key: Watched(real_disk(key)))
+    held = hold(monkeypatch, Path, "unlink", set(mine.zips))
+    try:
+        removing = reader.send("feeds.remove", {"key": "mine"})
+        assert held.entered.wait(10), "the removal never reached its files"
+        assert reader.send("feeds.add", {"source": str(again), "key": "mine"}) == adding
+        assert waiting.wait(10), "the add never reached the disk lock"
+        reader.notify("$/cancelRequest", {"id": adding})
+        wait_for(lambda: client.endpoint.jobs[adding].cancelled, 10, "the cancel to be read")
+    finally:
+        held.release.set()
+    assert client.wait(removing)["result"] == {"ok": True}
+    answer = client.wait(adding)
+    assert answer.get("error", {}).get("code") == JsonRpcRequestCancelled.CODE, answer
+    assert not _is_listed(client, "mine")
+    assert not any(config.feeds_dir().glob("mine.*zip")), "the add's zip was kept"
+    assert not list(config.feeds_dir().glob(".adding-*")), "nor its staging"
+    assert client.endpoint.jobs == {}
+
+
 def test_a_registry_write_that_fails_answers_the_error_and_leaves_everything(client, mine,
                                                                             monkeypatch):
     registry = feeds.user_file()

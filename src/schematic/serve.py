@@ -17,7 +17,8 @@ A method that writes what a client sees has a point of no return,
 immediately before its first such write (issue 80): ``graph.build`` moving a
 layout into the store, ``map.build`` moving its files into place,
 ``export.encode`` moving the file and its sidecar into place, ``feeds.add``
-and ``feeds.remove`` writing the registry. A cancel before it is honoured,
+moving its zip into the cache and writing the registry, ``feeds.remove``
+writing the registry. A cancel before it is honoured,
 with nothing written, and answered with the cancelled error; a cancel after
 it is too late: the work runs to its end, and the answer is its result with
 ``cancel_too_late`` (``_job``), or its own error if it fails.

@@ -645,9 +645,10 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
     kept, so a yes at any point raises Interrupted and leaves no feed in the
     registry and nothing on disk -- whichever source it came from.
     ``committing()`` is the caller's point of no return (issue 80), asked
-    under the registry's lock immediately before the zip is kept and the
-    registry written: a no is a cancel, raised as Interrupted with nothing
-    kept; after a yes the feed is kept whatever ``cancelled()`` says.
+    under the registry's lock and the feed's disk lock immediately before
+    the zip is moved into the cache and the registry written: a no is a
+    cancel, raised as Interrupted with nothing kept; after a yes the feed is
+    kept whatever ``cancelled()`` says.
     """
     source_text = str(source)
     from_url = _is_url(source_text)
@@ -704,15 +705,17 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
                 raise FeedError(f"{key!r} is already a feed; choose another key")
             feed = Feed(key=key, name=name, url=url, mode=mode, agency=agency,
                         headways=headways, source="user")
-            # The point of no return, in the registry's own hold, so a cancel
-            # that came while the add waited for the lock is honoured too and
-            # none falls between the look and the keeping (issue 80).
-            if committing is not None and not committing():
-                raise Interrupted()
             # Under the feed's disk lock as well, as remove's deletions are: a
             # removal of this key still deleting its files would otherwise
             # delete the zip just kept, from the list it made before.
             with _disk(key):
+                # The point of no return, in the hold of both locks, so a
+                # cancel that came while the add waited for either -- a
+                # removal of the key can hold the disk lock for seconds -- is
+                # honoured too, and none falls between the look and the
+                # keeping (issue 80).
+                if committing is not None and not committing():
+                    raise Interrupted()
                 os.replace(staging, feed.zip_path)
             users[key] = feed
             _write_user_feeds(users)
