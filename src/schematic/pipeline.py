@@ -1048,9 +1048,12 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
 def _unless_cancelled(step: str) -> None:
     """``loom.Cancelled`` when the job the thread runs for has been
     cancelled: what work that starts no process asks between its steps.
-    Outside a request there is no job and nothing is asked."""
+    Outside a request there is no job and nothing is asked. A job past its
+    point of no return (the server's ``committed``) is not stopped: what it
+    wrote stands, and the work runs to its end (issue 80), as ``run`` does
+    after laying out and storing a layout on the way."""
     job = loom.current_job()
-    if job is not None and job.cancelled:
+    if job is not None and job.cancelled and not getattr(job, "committed", False):
         raise loom.Cancelled(f"{step}: cancelled")
 
 

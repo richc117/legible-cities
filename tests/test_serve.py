@@ -2863,6 +2863,39 @@ def test_a_cancel_inside_the_stores_swap_is_too_late_and_answers_the_new_layout(
     assert client.endpoint.jobs == {}
 
 
+def test_a_draw_that_stored_its_layout_on_the_way_is_not_stopped_by_a_later_cancel(
+        tmp_path, monkeypatch):
+    """``pipeline.run`` without a layout lays the feed out on the way and hands
+    its ``committing`` to ``lay_out``: once the layout is stored the job is
+    past its point of no return, so a cancel that comes after it stops none
+    of the draw's steps, and the draw runs to its end and writes its files.
+    map.build always names its layout today; this is the rule that keeps a
+    caller that does not from answering "cancelled" for a stored layout."""
+    small_home(tmp_path, monkeypatch)
+    FakeLoom(monkeypatch)
+    job = serve._Job()
+    swap = pipeline._swap
+
+    def swapped(scratch, target):
+        swap(scratch, target)
+        job.cancel()
+
+    monkeypatch.setattr(pipeline, "_swap", swapped)
+    out = tmp_path / "drawn"
+    with loom.cancellable(job):
+        result = pipeline.run(KEY, date=dt.date.fromisoformat(DATE), out_dir=out,
+                              committing=job.commit_unless_cancelled)
+    assert job.cancelled and job.committed
+    assert pipeline.read_layout(KEY, result.layout) is not None
+    assert sorted(path.name for path in out.iterdir()) == sorted(
+        [f"{KEY}.svg", f"{KEY}.html", f"{KEY}.positions.json"])
+    # The same cancel before any commit is still asked about at the steps.
+    early = serve._Job()
+    early.cancel()
+    with loom.cancellable(early), pytest.raises(loom.Cancelled, match="^schedule: cancelled"):
+        pipeline._unless_cancelled("schedule")
+
+
 PNG = b"\x89PNG\r\n\x1a\n"
 
 
