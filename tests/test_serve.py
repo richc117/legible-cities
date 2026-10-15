@@ -1815,6 +1815,61 @@ def test_a_failed_add_from_a_keyed_address_tells_nobody_the_key(client, home, mo
     assert sorted(feeds.all()) == before, "nothing was kept"
 
 
+def test_a_cancel_once_an_add_is_keeping_its_feed_is_too_late_and_answers_its_record(
+        client, tmp_path, monkeypatch):
+    """Issue 80: an add's point of no return is the moment its feed is kept.
+    A cancel that arrives as the registry is written is past it: the feed is
+    registered with its zip, and the answer is its record with
+    cancel_too_late, never the cancelled error a client takes for nothing kept."""
+    monkeypatch.setenv(config.ENV, str(tmp_path / "home"))
+    source = gtfs_zip(tmp_path / "late.zip")
+    msg_id = client.n + 1
+    real = feeds._write_user_feeds
+
+    def write(records):
+        if loom.current_job() is not None:       # the add's worker
+            cancel_from_inside(client, msg_id)
+        return real(records)
+
+    monkeypatch.setattr(feeds, "_write_user_feeds", write)
+    assert client.send("feeds.add", {"source": str(source), "key": "late"}) == msg_id
+    answer = client.wait(msg_id)
+    assert "result" in answer, answer
+    result = answer["result"]
+    check(result, "FeedRecord")
+    assert result["key"] == "late" and result["cancel_too_late"] is True
+    assert result["cached"] is True and feeds.get("late").zip_path.is_file()
+    listed = client.call("feeds.list")["result"]
+    check(listed, "FeedsList")
+    assert [f for f in listed["feeds"] if f["key"] == "late"] == [
+        {k: v for k, v in result.items() if k != "cancel_too_late"}]
+    assert client.endpoint.jobs == {}
+
+
+def test_a_cancel_while_an_add_waits_on_the_registry_is_honoured_and_keeps_nothing(
+        client, tmp_path, monkeypatch):
+    """The point is taken in the registry's own hold: a cancel that arrives
+    after the add's checks, while it reads the registry under that hold, is
+    before it, so nothing is kept and the answer is the cancelled error."""
+    monkeypatch.setenv(config.ENV, str(tmp_path / "home"))
+    source = gtfs_zip(tmp_path / "early.zip")
+    msg_id = client.n + 1
+    real = feeds.user_feeds
+
+    def user_feeds():
+        if loom.current_job() is not None:       # the add's worker, holding the lock
+            cancel_from_inside(client, msg_id)
+        return real()
+
+    monkeypatch.setattr(feeds, "user_feeds", user_feeds)
+    assert client.send("feeds.add", {"source": str(source), "key": "early"}) == msg_id
+    answer = client.wait(msg_id)
+    assert answer.get("error", {}).get("code") == JsonRpcRequestCancelled.CODE, answer
+    assert "early" not in feeds.all()
+    assert sorted(p.name for p in config.feeds_dir().iterdir()) == [], "a zip was kept"
+    assert client.endpoint.jobs == {}
+
+
 # ---------------------------------------------- feeds.remove as a job (issue 35)
 
 class Reader:

@@ -1093,7 +1093,9 @@ class EngineEndpoint(Endpoint):
     def feeds_add(self, params: Any) -> Callable[[], Any]:
         """A feed from a URL or a file the client owns. A long request: the
         download reports its bytes, then the check reports once; a cancel is
-        honoured until the moment the feed is kept and leaves nothing."""
+        honoured until the moment the feed is kept and leaves nothing. That
+        moment is the point of no return (issue 80): a cancel after it is
+        answered with the record and ``cancel_too_late``."""
         left = _object("feeds.add", params)
         source = left.pop("source", None)
         if not isinstance(source, str) or not source or (
@@ -1115,7 +1117,7 @@ class EngineEndpoint(Endpoint):
             raise invalid_params("agency must be an agency_id from the feed, or left out")
         _no_extra("feeds.add", left)
 
-        def work(job: loom.Job, progress: Progress) -> dict[str, Any]:
+        def work(job: _Job, progress: Progress) -> dict[str, Any]:
             feeds_report = _download_report(progress)
 
             def report(stage: str, done: int, total: int | None) -> None:
@@ -1125,7 +1127,8 @@ class EngineEndpoint(Endpoint):
                     progress("check", 1.0, "checked the feed's tables")
             feed = feeds.add(source, key=key, name=name.strip() if name else None,
                              mode=overrides.get("mode", "all"), agency=overrides.get("agency"),
-                             progress=report, cancelled=lambda: job.cancelled)
+                             progress=report, cancelled=lambda: job.cancelled,
+                             committing=job.commit_unless_cancelled)
             return _feed_record(feed)
 
         return self._job(work)
