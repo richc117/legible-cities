@@ -974,9 +974,12 @@ class EngineEndpoint(Endpoint):
         tuned = pipeline.stages_for(_tuning(left.pop("tuning")) if "tuning" in left else None)
         _no_extra("graph.build", left)
 
-        def work(job: loom.Job, progress: Progress) -> dict[str, Any]:
+        def work(job: _Job, progress: Progress) -> dict[str, Any]:
+            # A layout made here is moved into the store at its point of no
+            # return (issue 80): a cancel before it keeps the stored set, and
+            # one after it is answered with the layout and cancel_too_late.
             laid = pipeline.lay_out(key, force=force, stages=tuned, progress=progress,
-                                    **overrides)
+                                    committing=job.commit_unless_cancelled, **overrides)
             # The answer's four stages and its meta, read whole in one hold
             # of the lock a forced re-layout's swap takes, so they are one
             # set's and the swap never finds one of them open, and parsed

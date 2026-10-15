@@ -433,7 +433,8 @@ def _forget(key: str, layout: str) -> None:
 
 def lay_out(key: str, *, force: bool = False,
             stages: list[tuple[str, tuple[str, ...]]] | None = None,
-            progress: Progress | None = None, **overrides: Any) -> Layout:
+            progress: Progress | None = None,
+            committing: Callable[[], bool] | None = None, **overrides: Any) -> Layout:
     """The layout for a feed and its options: found, or made.
 
     Made: gtfs2graph, then the stages, into a scratch directory beside the
@@ -442,6 +443,14 @@ def lay_out(key: str, *, force: bool = False,
     there stays readable until the new set is whole, and is then replaced.
     Progress is reported per stage either way, so a caller sees the same
     four reports whether anything ran.
+
+    ``committing`` is asked under the store's lock immediately before the
+    new set is moved into place, and is the point of no return (issue 80):
+    a no is a cancel, and the scratch goes with the stored set, if there was
+    one, as it was, raising ``loom.Cancelled``; after a yes the set is
+    moved in whatever is cancelled. It is asked only when a set was made: a
+    layout found in the store writes nothing. Without it, the job the thread
+    runs for, if any, is asked whether it was cancelled.
     """
     stages = stages or STAGES
     feed = feeds.resolved(key, **overrides)
@@ -482,7 +491,7 @@ def lay_out(key: str, *, force: bool = False,
         _from_store(existing, waited)
         return existing
     try:
-        return _build(feed, layout, inputs, stages, progress)
+        return _build(feed, layout, inputs, stages, progress, committing)
     finally:
         with _lock:
             _scratches.pop((key, layout), None)
@@ -495,7 +504,8 @@ def _fraction(stage: str, stages: list[tuple[str, tuple[str, ...]]]) -> float:
 
 
 def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
-           stages: list[tuple[str, tuple[str, ...]]], progress: Progress | None) -> Layout:
+           stages: list[tuple[str, tuple[str, ...]]], progress: Progress | None,
+           committing: Callable[[], bool] | None = None) -> Layout:
     key = feed.key
     folder = graph_dir(key)
     with _lock:
@@ -540,6 +550,15 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
         raise
     try:
         with _lock:
+            # The point of no return, in the hold the swap is made in, so no
+            # cancel falls between the two (issue 80): a forced re-layout's
+            # stored set cannot be made again, since octi is not
+            # reproducible, so a cancel honoured here must leave it.
+            if committing is None:
+                _unless_cancelled(f"{key}: layout {layout[:8]}")
+            elif not committing():
+                raise loom.Cancelled(f"{key}: cancelled before layout {layout[:8]} was "
+                                     f"stored")
             _swap(scratch, layout_dir(key, layout))
             # In the same hold as the swap, so no reader finds the new set
             # with the old set's minutes still kept for it (engine issue 69).
@@ -879,6 +898,8 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     positions, the SVG and ``beside``'s first and the page last. ``committing``
     is asked just before the first move, and is the point of no return: a
     no is a cancel, raised as ``loom.Cancelled`` with the folder as it was.
+    Without ``layout`` it is ``lay_out``'s too, asked before a layout made on
+    the way is stored.
     """
     steps = ("gtfs2graph", "topo", "loom", "octi", "schedule", "render", "animate", "write")
 
@@ -922,7 +943,8 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         _from_store(found)
     else:
         laid = lay_out(key, force=force,
-                       progress=(lambda stage, _f, m: tick(stage, m)) if progress else None)
+                       progress=(lambda stage, _f, m: tick(stage, m)) if progress else None,
+                       committing=committing)
         epoch = _minutes_epoch(laid.id)
         read = read_stored(key, laid.id, drawn)
         if read is None:

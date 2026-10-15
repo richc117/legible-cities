@@ -2734,6 +2734,80 @@ def test_a_draw_sweeps_what_a_dead_writer_left_and_nothing_else(client, tmp_path
     assert sorted(in_folder(folder)) == sorted([*MAP_FILES, mine.name, named.name, "notes"])
 
 
+def re_laid_out(client: Client, tmp_path: Path, monkeypatch) -> tuple[str, dict[str, bytes]]:
+    """A layout stored, its files, and the stand-in LOOM moved on so that a
+    forced re-layout of it makes a set that differs from the stored one."""
+    layout, _folder = laid_out(client, tmp_path, monkeypatch)
+    stored = {path.name: path.read_bytes()
+              for path in pipeline.layout_dir(KEY, layout).iterdir()}
+    moved = json.loads(json.dumps(test_layouts.GRAPH))
+    moved["features"][1]["geometry"]["coordinates"] = [-118.6, 34.1]
+    moved["features"][2]["geometry"]["coordinates"][1] = [-118.6, 34.1]
+    monkeypatch.setattr(test_layouts, "GRAPH", moved)
+    return layout, stored
+
+
+def stages_stored(layout: str) -> dict[str, bytes]:
+    return {name: (pipeline.layout_dir(KEY, layout) / name).read_bytes()
+            for name in pipeline.STAGE_FILES.values()}
+
+
+def test_a_cancel_as_a_forced_re_layout_reaches_the_store_keeps_the_stored_set(
+        client, tmp_path, monkeypatch):
+    """The new set is whole and its meta being written when the cancel comes:
+    before the point of no return, so the scratch goes, the stored set is
+    the one stored before, byte for byte, and the answer is the cancelled
+    error. ``octi`` is not reproducible: a set replaced cannot be made again."""
+    layout, stored = re_laid_out(client, tmp_path, monkeypatch)
+    msg_id = client.n + 1
+    real = Path.write_text
+
+    def write_text(self, *args, **kwargs):
+        if self.name == pipeline.META_FILE and ".building-" in self.parent.name:
+            cancel_from_inside(client, msg_id)
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", write_text)
+    assert client.send("graph.build", {"key": KEY, "force": True}) == msg_id
+    answer = client.wait(msg_id)
+    assert answer.get("error", {}).get("code") == JsonRpcRequestCancelled.CODE, answer
+    assert {path.name: path.read_bytes()
+            for path in pipeline.layout_dir(KEY, layout).iterdir()} == stored, \
+        "the stored set was replaced"
+    assert [path.name for path in (config.graphs_dir() / KEY).iterdir()] == [layout], \
+        "no scratch and nothing put aside"
+    assert pipeline._scratches == {} and pipeline._building == {}
+    assert client.endpoint.jobs == {}
+
+
+def test_a_cancel_inside_the_stores_swap_is_too_late_and_answers_the_new_layout(
+        client, tmp_path, monkeypatch):
+    """The cancel comes while the new set is being moved into the store: past
+    the point of no return, which is taken in the same hold of the store's
+    lock as the swap. The new set is stored and the answer is the layout,
+    with cancel_too_late."""
+    layout, stored = re_laid_out(client, tmp_path, monkeypatch)
+    msg_id = client.n + 1
+    swap = pipeline._swap
+
+    def swapped(scratch, target):
+        cancel_from_inside(client, msg_id)
+        swap(scratch, target)
+
+    monkeypatch.setattr(pipeline, "_swap", swapped)
+    assert client.send("graph.build", {"key": KEY, "force": True}) == msg_id
+    answer = client.wait(msg_id)
+    assert "result" in answer, answer
+    result = answer["result"]
+    check(result, "GraphBuildResult")
+    assert result["layout"] == layout and result["cancel_too_late"] is True
+    new = stages_stored(layout)
+    assert all(new[name] != stored[name] for name in new), "the new set is the one stored"
+    assert [path.name for path in (config.graphs_dir() / KEY).iterdir()] == [layout]
+    assert pipeline._scratches == {} and pipeline._building == {}
+    assert client.endpoint.jobs == {}
+
+
 # ---------------------------------------------------- layout tuning (issue 37)
 #
 # graph.build's ``tuning``: LOOM's own flags, by name. The stand-in LOOM
