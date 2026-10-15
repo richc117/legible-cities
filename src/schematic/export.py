@@ -1612,7 +1612,8 @@ def page_colors(folder: Path, key: str) -> tuple[str, ...] | None:
 
 
 def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None = None,
-           progress: Progress | None = None) -> list[Path]:
+           progress: Progress | None = None,
+           committing: Callable[[], bool] | None = None) -> list[Path]:
     """What was captured -- a directory of frames, or one still -- to the
     deliverable at ``dest``, with its sidecar beside it. ``source`` is the
     caller's: read, never written to, never removed, and so never the
@@ -1627,7 +1628,12 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
     file moved into place, and then its sidecar. A cancel, a failure or a
     file over the platform's limit removes the ``.part`` names and leaves
     ``dest`` and its sidecar as they were, a previous export under the same
-    name included (issue 79).
+    name included (issue 79). ``committing`` is asked once both are written
+    and checked, immediately before the first move, and is the point of no
+    return (issue 80): a no is a cancel, raised as ``loom.Cancelled`` with
+    ``dest`` as it was; after a yes both are moved whatever is cancelled.
+    Without it, the job the thread runs for, if any, is asked whether it was
+    cancelled.
 
     A GIF's palette is composed from the plan's theme and ``colors`` alone,
     never from the page or the frames; a plan without colours has it counted
@@ -1664,8 +1670,11 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
         # The last word before anything is moved into place: a cancel that
         # came while nothing asked (a copy asks nothing; ffmpeg is asked as it
         # ends) leaves the file that was there.
-        running = loom.current_job()
-        if running is not None and running.cancelled:
+        if committing is None:
+            running = loom.current_job()
+            if running is not None and running.cancelled:
+                raise loom.Cancelled("export: cancelled before the file was kept")
+        elif not committing():
             raise loom.Cancelled("export: cancelled before the file was kept")
         os.replace(part, dest)
         os.replace(sidecar_part, sidecar)

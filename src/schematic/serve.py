@@ -1255,7 +1255,8 @@ class EngineEndpoint(Endpoint):
         """The frames the client captured, or its still, to the file. Long:
         ffmpeg's own frame count arrives as job/progress, and a cancel ends
         ffmpeg and removes the partial file, leaving any file already at
-        ``dest`` as it was (issue 79)."""
+        ``dest`` as it was (issue 79), until the file and its sidecar are
+        moved into place, its point of no return (issue 80)."""
         left = _object("export.encode", params)
         job = _capture_job(left.pop("plan", None))
         source = _absolute(left, "source")
@@ -1267,9 +1268,13 @@ class EngineEndpoint(Endpoint):
         if job.mode == "still" and not source.is_file():
             raise EngineError("io", "the captured still is not there")
 
-        def work(_job: loom.Job, progress: Progress) -> dict[str, Any]:
+        def work(request: _Job, progress: Progress) -> dict[str, Any]:
+            # The move of the file and its sidecar into place is the point of
+            # no return (issue 80): a cancel after it is answered with both
+            # files and cancel_too_late.
             written = export.encode(job, source, dest, provenance=provenance,
-                                    progress=progress)
+                                    progress=progress,
+                                    committing=request.commit_unless_cancelled)
             sidecar = json.loads(export.sidecar_path(dest).read_text(encoding="utf-8"))
             return {"files": [{"path": str(f), "bytes": f.stat().st_size} for f in written],
                     "sidecar": sidecar}

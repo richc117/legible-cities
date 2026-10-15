@@ -2863,6 +2863,79 @@ def test_a_cancel_inside_the_stores_swap_is_too_late_and_answers_the_new_layout(
     assert client.endpoint.jobs == {}
 
 
+PNG = b"\x89PNG\r\n\x1a\n"
+
+
+def kept_still(tmp_path: Path, name: str, body: bytes) -> tuple[dict, Path]:
+    """A plan for a still the preset already is, and a capture for it: copied
+    to the deliverable, so no ffmpeg runs."""
+    job = export.plan(KEY, "instagram-post", quality="draft")
+    assert job.mode == "still" and job.keep
+    source = tmp_path / name
+    source.write_bytes(PNG + body)
+    return {**job.to_dict(), "filename": job.filename}, source
+
+
+def test_a_cancel_before_an_export_moves_into_place_leaves_the_export_already_there(
+        client, tmp_path, monkeypatch):
+    """A re-export cancelled while its sidecar is written beside it: before
+    the point of no return, so it is honoured, the export already at dest and
+    its sidecar are the bytes they were, and no .part file is left."""
+    plan, first = kept_still(tmp_path, "first.png", b"the first capture")
+    dest = tmp_path / "out" / plan["filename"]
+    params = {"plan": plan, "source": str(first), "dest": str(dest)}
+    assert "result" in client.call("export.encode", params)
+    before = in_folder(dest.parent)
+    assert sorted(before) == [dest.name, export.sidecar_path(dest).name]
+    _plan, again = kept_still(tmp_path, "again.png", b"the second capture")
+    msg_id = client.n + 1
+    real = export._write_sidecar
+
+    def write_sidecar(*args, **kwargs):
+        cancel_from_inside(client, msg_id)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(export, "_write_sidecar", write_sidecar)
+    assert client.send("export.encode", {**params, "source": str(again)}) == msg_id
+    answer = client.wait(msg_id)
+    assert answer.get("error", {}).get("code") == JsonRpcRequestCancelled.CODE, answer
+    assert in_folder(dest.parent) == before, "the cancelled re-export moved a file into place"
+    assert client.endpoint.jobs == {}
+
+
+def test_a_cancel_as_an_exports_sidecar_moves_into_place_is_too_late_and_answers_both(
+        client, tmp_path, monkeypatch):
+    """The issue's case: the file is in place and its sidecar is being moved
+    beside it when the cancel comes. Past the point of no return: both files
+    are at dest, and the answer is the encode's with cancel_too_late."""
+    plan, source = kept_still(tmp_path, "capture.png", b"a capture")
+    dest = tmp_path / "out" / plan["filename"]
+    sidecar = export.sidecar_path(dest)
+    msg_id = client.n + 1
+    real = os.replace
+
+    def replace(src, dst, *args, **kwargs):
+        if Path(dst) == sidecar:
+            assert dest.read_bytes() == source.read_bytes(), "the file goes first"
+            cancel_from_inside(client, msg_id)
+        return real(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(os, "replace", replace)
+    assert client.send("export.encode", {"plan": plan, "source": str(source),
+                                         "dest": str(dest)}) == msg_id
+    answer = client.wait(msg_id)
+    assert "result" in answer, answer
+    result = answer["result"]
+    check(result, "ExportEncodeResult")
+    assert result["cancel_too_late"] is True
+    assert result["files"] == [{"path": str(dest), "bytes": len(source.read_bytes())}]
+    assert dest.read_bytes() == source.read_bytes()
+    assert json.loads(sidecar.read_text(encoding="utf-8")) == result["sidecar"]
+    assert result["sidecar"]["file"] == dest.name
+    assert sorted(in_folder(dest.parent)) == [dest.name, sidecar.name], "no .part left"
+    assert client.endpoint.jobs == {}
+
+
 # ---------------------------------------------------- layout tuning (issue 37)
 #
 # graph.build's ``tuning``: LOOM's own flags, by name. The stand-in LOOM
