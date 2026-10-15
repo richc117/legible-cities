@@ -936,10 +936,38 @@ def test_a_plan_handed_back_is_checked_field_by_field(client, wrong):
     {"source": "/somewhere/frames", "dest": "/elsewhere/out.mp4",
      "provenance": {"alt": "x" * 1001}},
     {"source": "/somewhere/frames", "dest": "/elsewhere/out.mp4", "provenance": {"alt": 7}},
+    # Issue 79: a dest that would write over the source, the file or its .part.
+    {"source": "/somewhere/out.mp4", "dest": "/somewhere/out.mp4"},
+    {"source": "/somewhere/out.mp4.part", "dest": "/somewhere/out.mp4"},
 ])
 def test_encode_refuses_a_path_it_must_not_write_to(client, params):
     error = client.call("export.encode", {"plan": _plan_dict(), **params})["error"]
     assert error["code"] == -32602, error
+
+
+@pytest.mark.parametrize("name,dest", [
+    ("capture.png", "capture.png"),
+    ("capture.png", "elsewhere/../capture.png"),
+    ("capture.png.part", "capture.png"),
+    ("capture.png.json", "capture.png"),
+], ids=["itself", "spelled otherwise", "its part", "its sidecar"])
+def test_encode_refuses_a_dest_that_would_write_over_its_source_and_leaves_it(
+        client, tmp_path, name, dest):
+    """Issue 79 over the protocol: the caller's mistake, refused before any
+    job starts, and the still it captured is as it was."""
+    job = export.plan(KEY, "instagram-post", quality="draft")
+    source = tmp_path / name
+    source.write_bytes(b"\x89PNG\r\n\x1a\n" + b"not a real picture")
+    error = client.call("export.encode", {"plan": {**job.to_dict(), "filename": job.filename},
+                                          "source": str(source),
+                                          "dest": str(tmp_path / dest)})["error"]
+    assert error["code"] == -32602, error
+    check(error["data"], "ErrorData")
+    assert error["data"]["kind"] == "params"
+    assert error["data"]["hint"].startswith("dest must not be the source"), error
+    assert client.endpoint.jobs == {}
+    assert source.read_bytes() == b"\x89PNG\r\n\x1a\n" + b"not a real picture"
+    assert sorted(tmp_path.iterdir()) == [source]
 
 
 @pytest.mark.parametrize("method,params,definition", BAD_PARAMS)
@@ -1220,6 +1248,7 @@ def test_cancel_ends_ffmpeg_and_leaves_no_partial_file(client, tmp_path):
     assert client.endpoint.jobs == {}
     assert not dest.exists(), "a partial file was left behind"
     assert not export.sidecar_path(dest).exists()
+    assert list(dest.parent.iterdir()) == [], "nor a .part file"
     assert sorted(p.name for p in frames.iterdir()) == [f"{i:06d}.png" for i in range(90)]
 
 

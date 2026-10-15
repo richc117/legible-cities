@@ -735,8 +735,11 @@ def _capture_job(value: Any) -> export.CaptureJob:
                              colors=None if colors is None else tuple(colors))
 
 
-def _absolute(left: dict[str, Any], name: str) -> Path:
-    """A path the client owns: absolute, and never inside the engine's own tree."""
+def _absolute(left: dict[str, Any], name: str, *, source: Path | None = None) -> Path:
+    """A path the client owns: absolute, and never inside the engine's own
+    tree. Given the ``source`` it is encoded from, a ``dest`` that would be
+    written over the source is refused too (``export.overwrites_source``,
+    issue 79): the source is the client's and is never written to."""
     value = left.pop(name, None)
     if not isinstance(value, str) or not value or not Path(value).is_absolute():
         raise invalid_params(f"{name} must be an absolute path")
@@ -745,6 +748,9 @@ def _absolute(left: dict[str, Any], name: str) -> Path:
         export._guard_outside_repo(path if name == "source" else path.parent)
     except ValueError:
         raise invalid_params(f"{name} must not be inside the engine's own repository") from None
+    if source is not None and export.overwrites_source(source, path):
+        raise invalid_params(f"{name} must not be the source, or put its sidecar or a .part "
+                             f"file on it: the source is read and never written to")
     return path
 
 
@@ -1203,11 +1209,12 @@ class EngineEndpoint(Endpoint):
     def export_encode(self, params: Any) -> Callable[[], Any]:
         """The frames the client captured, or its still, to the file. Long:
         ffmpeg's own frame count arrives as job/progress, and a cancel ends
-        ffmpeg and removes the partial file."""
+        ffmpeg and removes the partial file, leaving any file already at
+        ``dest`` as it was (issue 79)."""
         left = _object("export.encode", params)
         job = _capture_job(left.pop("plan", None))
         source = _absolute(left, "source")
-        dest = _absolute(left, "dest")
+        dest = _absolute(left, "dest", source=source)
         provenance = _provenance(left.pop("provenance", None))
         _no_extra("export.encode", left)
         if job.mode == "video" and not source.is_dir():

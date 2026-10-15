@@ -1472,7 +1472,7 @@
       "additionalProperties": false
     },
     "ExportEncodeParams": {
-      "description": "The frames the client captured (a directory of 000000.png onwards), or its still, to the deliverable at dest with its sidecar beside it. The source is read and never touched; a cancel, a failure or a file over the platform's limit leaves nothing at dest.",
+      "description": "The frames the client captured (a directory of 000000.png onwards), or its still, to the deliverable at dest with its sidecar beside it. The source is read and never touched. Both are written beside dest under .part names and moved into place once the file is whole and within the platform's limit, the file first: a cancel, a failure or a file over the limit removes the .part files and leaves dest and its sidecar as they were, an earlier export under the same name included.",
       "type": "object",
       "properties": {
         "plan": {
@@ -1484,7 +1484,7 @@
         },
         "dest": {
           "$ref": "#/$defs/AbsolutePath",
-          "description": "The file to write; its folder is created."
+          "description": "The file to write; its folder is created. Refused when it is the source, or when its sidecar (dest with .json appended) or either's .part name is."
         },
         "provenance": {
           "$ref": "#/$defs/Provenance"

@@ -979,12 +979,54 @@ def _guard_outside_repo(dest: Path) -> None:
         raise ValueError(f"refusing to export into the repository: {dest}")
 
 
-def check_size(path: Path, preset: Preset) -> None:
-    """Fail loudly rather than let a file be silently rejected at upload."""
+def check_size(path: Path, preset: Preset, *, name: str | None = None) -> None:
+    """Fail loudly rather than let a file be silently rejected at upload.
+    ``name`` is what the sentence calls the file, when that is not the name
+    it has yet (``encode`` checks its ``.part``)."""
     if preset.max_bytes and path.stat().st_size > preset.max_bytes:
         raise ValueError(
-            f"{path.name} is {path.stat().st_size/1e6:.1f} MB, over "
+            f"{name or path.name} is {path.stat().st_size/1e6:.1f} MB, over "
             f"{preset.platform}'s {preset.max_bytes/1e6:.1f} MB limit")
+
+
+def part_path(path: Path) -> Path:
+    """Where ``encode`` writes a file before it is moved into place: beside
+    it, with ``.part`` appended, so a file that is not finished is never
+    under the name a finished one has (issue 79)."""
+    return path.with_name(path.name + ".part")
+
+
+def _same_file(a: Path, b: Path) -> bool:
+    """Whether two paths name one file: one path once resolved, or, where both
+    exist, one file under two names (a link, a second hard link, a case the
+    filesystem does not tell apart)."""
+    try:
+        if os.path.samefile(a, b):
+            return True
+    except OSError:
+        pass
+    try:
+        return a.resolve() == b.resolve()
+    except (OSError, RuntimeError):         # a loop of links: neither can be written
+        return False
+
+
+def overwrites_source(source: Path, dest: Path) -> bool:
+    """Whether encoding ``source`` to ``dest`` would write over ``source``:
+    ``dest`` is it, or the sidecar beside ``dest`` is, or either's ``.part``
+    name is. ``encode`` refuses such a ``dest`` before it writes anything,
+    and so does the server (issue 79)."""
+    sidecar = sidecar_path(dest)
+    return any(_same_file(source, written)
+               for written in (dest, part_path(dest), sidecar, part_path(sidecar)))
+
+
+# The muxer of each format a deliverable can be in, and a still's encoder,
+# named for ffmpeg: ``encode`` writes to a ``.part`` name (issue 79), which
+# says neither. They are the ones the file's own extension chose, so the bytes
+# are the bytes that name made.
+_OUTPUT = {"png": ("-f", "image2", "-c:v", "png"), "jpg": ("-f", "image2", "-c:v", "mjpeg"),
+           "gif": ("-f", "gif"), "mp4": ("-f", "mp4")}
 
 
 def _run_recorder(job: dict) -> None:
@@ -1094,7 +1136,7 @@ def _resample(src: Path, dest: Path, preset: Preset) -> None:
     """Down to the preset's exact size. Lanczos, because these maps are mostly
     one-pixel strokes and a box filter turns them to mush."""
     _ffmpeg(["-i", str(src), "-vf", f"scale={preset.width}:{preset.height}:flags=lanczos",
-             *_still_quality(preset), str(dest)])
+             *_still_quality(preset), *_OUTPUT[preset.fmt], str(dest)])
 
 
 # What a still's first bytes say it is, for the two formats a still preset can ask for.
@@ -1118,7 +1160,7 @@ def _transcode(src: Path, dest: Path, preset: Preset) -> None:
     """A still into the preset's format at the size it was captured: the call
     ``_resample`` makes, without its ``scale``, because ``keep`` is the plan
     saying the capture's pixels are the deliverable's."""
-    _ffmpeg(["-i", str(src), *_still_quality(preset), str(dest)])
+    _ffmpeg(["-i", str(src), *_still_quality(preset), *_OUTPUT[preset.fmt], str(dest)])
 
 
 def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
@@ -1154,7 +1196,8 @@ def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
                         progress=progress, frames=n, stage="palette")
             _ffmpeg(["-framerate", str(preset.fps), "-i", src, "-i", str(palette), "-lavfi",
                      f"scale={preset.width}:{preset.height}:flags=lanczos[s];"
-                     "[s][1:v]paletteuse=dither=bayer:bayer_scale=3", str(dest)],
+                     "[s][1:v]paletteuse=dither=bayer:bayer_scale=3", *_OUTPUT[preset.fmt],
+                     str(dest)],
                     progress=progress, frames=n)
         return
 
@@ -1173,7 +1216,7 @@ def _encode(frames: Path, dest: Path, preset: Preset, *, fade: float = 0.0,
         "-vf", ",".join(vf),
         "-c:v", "libx264", "-profile:v", "high", "-preset", "slow", "-crf", str(crf),
         "-r", str(preset.fps), "-c:a", "aac", "-b:a", "96k", "-shortest",
-        "-movflags", "+faststart", str(dest)], progress=progress, frames=n)
+        "-movflags", "+faststart", *_OUTPUT[preset.fmt], str(dest)], progress=progress, frames=n)
 
 
 def _vector(key: str, dest: Path, preset: Preset) -> list[Path]:
@@ -1572,21 +1615,34 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
            progress: Progress | None = None) -> list[Path]:
     """What was captured -- a directory of frames, or one still -- to the
     deliverable at ``dest``, with its sidecar beside it. ``source`` is the
-    caller's: read, never written to, never removed. ``provenance`` is what
-    the caller knows about the map that the atlas's data would not (the
-    desktop app's project has its own service day and diagnostics); it goes
-    into the sidecar over the atlas's. A cancel, a failure or a file over the
-    platform's limit leaves nothing behind. Returns what it wrote.
+    caller's: read, never written to, never removed, and so never the
+    deliverable: a ``dest`` that would write over it (``overwrites_source``)
+    is refused before anything is written. ``provenance`` is what the caller
+    knows about the map that the atlas's data would not (the desktop app's
+    project has its own service day and diagnostics); it goes into the
+    sidecar over the atlas's. Returns what it wrote.
+
+    The file and its sidecar are written beside ``dest`` under ``.part``
+    names (``part_path``) and the size is checked there; only then is the
+    file moved into place, and then its sidecar. A cancel, a failure or a
+    file over the platform's limit removes the ``.part`` names and leaves
+    ``dest`` and its sidecar as they were, a previous export under the same
+    name included (issue 79).
 
     A GIF's palette is composed from the plan's theme and ``colors`` alone,
     never from the page or the frames; a plan without colours has it counted
     from the frames, as every GIF's was before issue 33."""
     preset = PRESETS[job.preset]
     _guard_outside_repo(dest.parent)
+    if overwrites_source(source, dest):
+        raise ValueError(f"refusing to export over the source: writing {dest.name} would "
+                         f"write over what was captured; choose another file to write")
     dest.parent.mkdir(parents=True, exist_ok=True)
+    sidecar = sidecar_path(dest)
+    part, sidecar_part = part_path(dest), part_path(sidecar)
     try:
         if job.mode == "video":
-            _encode(source, dest, preset, fade=job.fade, crf=job.crf, keep=job.keep,
+            _encode(source, part, preset, fade=job.fade, crf=job.crf, keep=job.keep,
                     progress=progress, theme=job.theme, colors=job.colors)
         elif job.keep:
             # Kept as captured, when it is already what the preset delivers. A
@@ -1596,17 +1652,25 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
             # PNG over the platform's limit that a JPEG would have met (issue
             # 30). Then it is transcoded, at the size it was captured.
             if _still_format(source) == preset.fmt:
-                shutil.copyfile(source, dest)
+                shutil.copyfile(source, part)
             else:
-                _transcode(source, dest, preset)
+                _transcode(source, part, preset)
         else:
-            _resample(source, dest, preset)
-        check_size(dest, preset)
-        _write_sidecar(job.key, preset, [dest], theme=job.theme, view=job.view,
+            _resample(source, part, preset)
+        check_size(part, preset, name=dest.name)
+        _write_sidecar(job.key, preset, [part], theme=job.theme, view=job.view,
                        storyboard=job.storyboard, beats=job.beats, provenance=provenance,
-                       alt=(provenance or {}).get("alt"))
+                       alt=(provenance or {}).get("alt"), part=".part")
+        # The last word before anything is moved into place: a cancel that
+        # came while nothing asked (a copy asks nothing; ffmpeg is asked as it
+        # ends) leaves the file that was there.
+        running = loom.current_job()
+        if running is not None and running.cancelled:
+            raise loom.Cancelled("export: cancelled before the file was kept")
+        os.replace(part, dest)
+        os.replace(sidecar_part, sidecar)
     except BaseException:
-        for path in (dest, sidecar_path(dest)):
+        for path in (part, sidecar_part):
             path.unlink(missing_ok=True)
         raise
     if progress is not None:
@@ -1684,19 +1748,23 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
                    theme: str, view: str, storyboard: str = "",
                    beats: Sequence[Beat | dict] = (),
                    provenance: dict | None = None,
-                   alt: str | None = None) -> None:
+                   alt: str | None = None, part: str = "") -> None:
     """What this file is, beside the file. Includes the caveats the atlas shows:
     an image travels further than the page it came from. ``provenance`` from
     the caller wins over the atlas's, field by field. ``alt`` is the caller's own
     description, written as given in place of the generated one; it is not
-    checked here, the server checks it."""
+    checked here, the server checks it. ``part`` is a suffix every file in
+    ``written`` carries until it is moved into place (``encode``'s ``.part``):
+    the sidecar names the file as it will be named, and is written under its
+    own name with the same suffix, to be moved beside it."""
     feed = feeds.get(key)
     prov = {**_provenance(key),
             **{k: v for k, v in (provenance or {}).items() if v is not None}}
     stats = {k: prov[k] for k in ("stations", "lines") if k in prov} or _network_stats(key)
     for path in written:
+        final = path.with_name(path.name.removesuffix(part)) if part else path
         meta = {
-            "file": path.name,
+            "file": final.name,
             "bytes": path.stat().st_size,
             "feed": key,
             "city": feed.city,
@@ -1722,8 +1790,9 @@ def _write_sidecar(key: str, preset: Preset, written: list[Path], *,
             # come from a keyed link. A preset's is public, and written whole.
             "source": feed.shown_url,
         }
-        sidecar_path(path).write_text(json.dumps(meta, indent=2) + "\n",
-                                      encoding="utf-8", newline="\n")
+        beside = sidecar_path(final)
+        beside.with_name(beside.name + part).write_text(json.dumps(meta, indent=2) + "\n",
+                                                        encoding="utf-8", newline="\n")
 
 
 def _provenance(key: str) -> dict:

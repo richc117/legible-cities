@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from pylsp_jsonrpc.exceptions import JsonRpcInvalidParams
 
-from schematic import config, export, feeds, serve
+from schematic import config, export, feeds, loom, serve
 from schematic.schedule import service_day_text
 from test_serve import check, invalid
 
@@ -605,7 +605,148 @@ def test_a_kept_still_that_is_no_image_leaves_nothing_behind(tmp_path):
     with pytest.raises(RuntimeError, match="ffmpeg failed"):
         export.encode(job, junk, dest)
     assert not dest.exists() and not export.sidecar_path(dest).exists()
+    assert _parts(dest.parent) == []
     assert junk.read_bytes() == b"not a picture"
+
+
+# ------------------------------------------- an export already there (issue 79)
+#
+# The desktop app names an export by its options, so an export of the same
+# options again replaces the one a person already has. One that fails, is
+# over the platform's limit or is cancelled leaves that one as it was: the
+# encode writes under .part names and moves them into place only at the end.
+
+def _parts(folder: Path) -> list[str]:
+    """What an encode left under a ``.part`` name in ``folder``."""
+    return sorted(p.name for p in folder.iterdir() if p.name.endswith(".part"))
+
+
+def _as_it_was(dest: Path) -> tuple[bytes, bytes]:
+    return dest.read_bytes(), export.sidecar_path(dest).read_bytes()
+
+
+def test_a_re_export_that_fails_or_is_cancelled_leaves_the_export_already_there(
+        tmp_path, monkeypatch):
+    """A still the preset already is, so it is copied and no ffmpeg runs:
+    once over a size check forced to fail, once under a cancelled job, and
+    each time the first export's file and sidecar are the bytes they were.
+    The same re-export, let through, then replaces them."""
+    job = export.plan("la-metro-rail", "instagram-post", quality="draft")
+    assert job.mode == "still" and job.keep
+    dest = tmp_path / "out" / job.filename
+    assert export.encode(job, _still(tmp_path / "first.png", "png"), dest) == [dest]
+    kept = _as_it_was(dest)
+    again = _still(tmp_path / "again.png", "png", (320, 240))
+    captured = again.read_bytes()
+    assert captured != kept[0]
+
+    def over(path, preset, *, name=None):
+        raise ValueError(f"{name or path.name} is 9.9 MB, over the platform's limit")
+
+    with monkeypatch.context() as stub:
+        stub.setattr(export, "check_size", over)
+        with pytest.raises(ValueError, match=f"^{re.escape(job.filename)} is 9.9 MB"):
+            export.encode(job, again, dest)
+    assert _as_it_was(dest) == kept
+    assert _parts(dest.parent) == []
+
+    cancelled = loom.Job()
+    cancelled.cancel()
+    with loom.cancellable(cancelled), pytest.raises(loom.Cancelled):
+        export.encode(job, again, dest)
+    assert _as_it_was(dest) == kept
+    assert _parts(dest.parent) == []
+
+    assert export.encode(job, again, dest) == [dest]
+    assert dest.read_bytes() == captured == again.read_bytes()
+    assert json.loads(export.sidecar_path(dest).read_text(encoding="utf-8"))["bytes"] == \
+        len(captured)
+    assert sorted(p.name for p in dest.parent.iterdir()) == [job.filename,
+                                                             f"{job.filename}.json"]
+
+
+def test_a_re_export_over_the_platforms_limit_leaves_the_export_already_there(tmp_path):
+    """The issue's own case: an export at dest, then the same options again
+    with a capture over Bluesky's 976,000 bytes. A JPEG the preset already
+    is, so it is copied and no ffmpeg runs."""
+    from PIL import Image
+    job = export.plan("la-metro-rail", "bluesky", quality="draft")
+    assert job.keep and export.PRESETS["bluesky"].fmt == "jpg"
+    dest = tmp_path / "out" / job.filename
+    export.encode(job, _still(tmp_path / "small.jpg", "jpg"), dest)
+    kept = _as_it_was(dest)
+    big = tmp_path / "big.jpg"
+    noise = random.Random(79).randbytes(1200 * 900 * 3)
+    Image.frombytes("RGB", (1200, 900), noise).save(big, format="JPEG", quality=100)
+    assert big.stat().st_size > export.PRESETS["bluesky"].max_bytes
+    with pytest.raises(ValueError, match=rf"^{re.escape(job.filename)} is .* over Bluesky's "
+                                         rf"1\.0 MB limit$"):
+        export.encode(job, big, dest)
+    assert _as_it_was(dest) == kept
+    assert _parts(dest.parent) == []
+
+
+@needs_ffmpeg
+def test_a_re_encode_that_ffmpeg_fails_or_a_cancel_stops_leaves_the_export_already_there(
+        tmp_path):
+    """The same through ffmpeg, which wrote ``dest`` itself and truncated it
+    the moment it opened it: a capture ffmpeg refuses, and a job cancelled
+    before ffmpeg starts, each leave the first export as it was."""
+    job = export.plan("la-metro-rail", "bluesky")               # standard: resampled
+    assert not job.keep
+    dest = tmp_path / "out" / job.filename
+    export.encode(job, _still(tmp_path / "capture.png", "png"), dest)
+    kept = _as_it_was(dest)
+    junk = tmp_path / "junk.png"
+    junk.write_bytes(b"not a picture")
+    with pytest.raises(RuntimeError, match="ffmpeg failed"):
+        export.encode(job, junk, dest)
+    assert _as_it_was(dest) == kept
+    cancelled = loom.Job()
+    cancelled.cancel()
+    with loom.cancellable(cancelled), pytest.raises(loom.Cancelled):
+        export.encode(job, _still(tmp_path / "again.png", "png", (320, 240)), dest)
+    assert _as_it_was(dest) == kept
+    assert _parts(dest.parent) == []
+
+
+@pytest.mark.parametrize("source_name,dest_name", [
+    ("capture.png", "capture.png"),
+    ("capture.png", "../out/capture.png"),
+    ("capture.png.part", "capture.png"),
+    ("capture.png.json", "capture.png"),
+    ("capture.png.json.part", "capture.png"),
+], ids=["itself", "spelled otherwise", "its part", "its sidecar", "its sidecar's part"])
+def test_an_encode_that_would_write_over_its_source_is_refused_and_leaves_it(
+        tmp_path, source_name, dest_name):
+    """``source`` is the caller's, read and never written to: a ``dest`` that
+    is it, or that would put its sidecar or a .part file on it, is refused
+    with a sentence before anything is written."""
+    job = export.plan("la-metro-rail", "instagram-post", quality="draft")
+    folder = tmp_path / "out"
+    folder.mkdir()
+    source = folder / source_name
+    source.write_bytes(_still(tmp_path / "capture.png", "png").read_bytes())
+    before = source.read_bytes()
+    with pytest.raises(ValueError, match="^refusing to export over the source: writing "
+                                         "capture.png would write over what was captured"):
+        export.encode(job, source, folder / dest_name)
+    assert source.read_bytes() == before
+    assert sorted(folder.iterdir()) == [source]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="a symbolic link")
+def test_an_encode_to_a_link_to_its_source_is_refused_and_leaves_it(tmp_path):
+    job = export.plan("la-metro-rail", "instagram-post", quality="draft")
+    source = _still(tmp_path / "capture.png", "png")
+    before = source.read_bytes()
+    (tmp_path / "out").mkdir()
+    link = tmp_path / "out" / job.filename
+    link.symlink_to(source)
+    with pytest.raises(ValueError, match="^refusing to export over the source"):
+        export.encode(job, source, link)
+    assert source.read_bytes() == before
+    assert sorted(p.name for p in (tmp_path / "out").iterdir()) == [job.filename]
 
 
 def test_the_sidecar_names_a_persons_source_without_its_secrets(tmp_path, monkeypatch):
