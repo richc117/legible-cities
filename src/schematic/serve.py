@@ -18,10 +18,11 @@ immediately before its first such write (issue 80): ``graph.build`` moving a
 layout into the store, ``map.build`` moving its files into place,
 ``export.encode`` moving the file and its sidecar into place, ``feeds.add``
 moving its zip into the cache and writing the registry, ``feeds.remove``
-writing the registry. A cancel before it is honoured,
-with nothing written, and answered with the cancelled error; a cancel after
-it is too late: the work runs to its end, and the answer is its result with
-``cancel_too_late`` (``_job``), or its own error if it fails.
+writing the registry. A cancel before it is honoured, with nothing a client
+sees written (a feed fetched whole on the way stays cached), and answered
+with the cancelled error; a cancel after it is too late: the work runs to
+its end, and the answer is its result with ``cancel_too_late`` (``_job``),
+or its own error if it fails.
 
 Errors a person can act on are code -32000 with ``data: {kind, detail,
 hint}``: ``hint`` is the sentence the engine already raises, ``detail`` says

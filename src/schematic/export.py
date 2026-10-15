@@ -1636,7 +1636,11 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
     first move, and is the point of no return (issue 80): a no is a cancel,
     raised as ``loom.Cancelled`` with ``dest`` as it was; after a yes both
     are moved whatever is cancelled. Without it, the job the thread runs
-    for, if any, is asked whether it was cancelled.
+    for, if any, is asked whether it was cancelled. A process ended
+    mid-encode, by a crash or a kill, may leave the ``.part`` files beside
+    ``dest``, which nothing removes; the next export to the same ``dest``
+    writes over them, and a failed one removes them. That is the price of
+    never leaving a truncated file under the real name.
 
     A GIF's palette is composed from the plan's theme and ``colors`` alone,
     never from the page or the frames; a plan without colours has it counted
