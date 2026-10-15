@@ -835,7 +835,9 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         dot_radius: float = animate.DOT_RADIUS, trail: float = animate.TRAIL,
         force: bool = False, out_dir: Path | None = None, back: str = "index.html",
         icons: str | None = None, social: str = "",
-        progress: Progress | None = None) -> Result:
+        progress: Progress | None = None,
+        beside: Callable[[LineGraph], Mapping[str, str]] | None = None,
+        committing: Callable[[], bool] | None = None) -> Result:
     """Everything: the layout, then draw, schedule, animate, write.
 
     ``layout`` names a stored layout to draw from, and then nothing is laid
@@ -866,6 +868,17 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
     back-link points at. The default is the sibling gallery in ``out/``;
     the site passes its own atlas URL, because a relative "index.html"
     resolves to /maps/index.html there.
+
+    Nothing is written until everything is drawn (issue 80). A cancel of the
+    job the thread runs for is honoured after each of the schedule, render
+    and animate steps, none of which starts a process a cancel could end,
+    with ``loom.Cancelled``. ``beside`` draws more files from the graph the
+    map is drawn from, by file name (``map.build``'s thumbnails), to be
+    written with the map's own. Then all of them are written into a scratch
+    folder inside the output folder and moved into place (``_publish``): the
+    positions, the SVG and ``beside``'s first and the page last. ``committing``
+    is asked just before the first move, and is the point of no return: a
+    no is a cancel, raised as ``loom.Cancelled`` with the folder as it was.
     """
     steps = ("gtfs2graph", "topo", "loom", "octi", "schedule", "render", "animate", "write")
 
@@ -882,6 +895,10 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
         tick(stage, message)
         _log(f"{stage}: {line if line is not None else message} ({_took(since)})")
         since = time.monotonic()
+        # A step starts no process a cancel could end, so a cancel is asked
+        # about at its end; the write's own is ``_publish``'s (issue 80).
+        if stage != "write":
+            _unless_cancelled(stage)
 
     # What the draw reads of the stored set: the octi stage it draws, and the
     # loom stage the geographic twin is drawn from. Read whole in one hold of
@@ -985,18 +1002,84 @@ def run(key: str, *, layout: str | None = None, date: dt.date | None = None,
          + (f", {len(anim.unrouted)} unrouted" if anim.unrouted else ""))
 
     out = out_dir or config.out_dir()
-    out.mkdir(parents=True, exist_ok=True)
-    (out / f"{key}.svg").write_text(r.svg, encoding="utf-8", newline="\n")
-    animate.write(anim, r.svg, out, stem=key, back=back, icons=icons,
-                  social=social,
-                  title=f"{name} — {service_day_text(date)}", name=name,
-                  subtitle=f"{len(trips):,} trips · {service_day_text(date)}")
+    page = animate.texts(anim, r.svg, stem=key, back=back, icons=icons,
+                         social=social,
+                         title=f"{name} — {service_day_text(date)}", name=name,
+                         subtitle=f"{len(trips):,} trips · {service_day_text(date)}")
+    # In the order they are moved into place: the page, which is what a
+    # client loads, last.
+    html = f"{key}.html"
+    files = {f"{key}.positions.json": page[f"{key}.positions.json"], f"{key}.svg": r.svg,
+             **(beside(graph) if beside is not None else {})}
+    files[html] = page[html]
+    _publish(out, key, files, committing)
     # The progress message has always been the folder; the log line names
     # the files and never where they are (see ``_log``).
     done("write", str(out), f"{key}.svg, {key}.html and {key}.positions.json")
 
     return Result(key=key, date=date, layout=found.id, graph=graph, render=r, trips=trips,
                   match=match, animation=anim, paths=paths)
+
+
+def _unless_cancelled(step: str) -> None:
+    """``loom.Cancelled`` when the job the thread runs for has been
+    cancelled: what work that starts no process asks between its steps.
+    Outside a request there is no job and nothing is asked."""
+    job = loom.current_job()
+    if job is not None and job.cancelled:
+        raise loom.Cancelled(f"{step}: cancelled")
+
+
+# One map's files are moved into a folder at a time in this process, so two
+# draws into one folder never leave some files of each (issue 80).
+_writing = threading.Lock()
+
+_WRITING = re.compile(r"^\.(?P<stem>.+)\.writing-(?P<pid>\d+)-")
+
+
+def _publish(folder: Path, stem: str, files: Mapping[str, str],
+             committing: Callable[[], bool] | None) -> None:
+    """A map's files into ``folder``, whole (issue 80). Each is written UTF-8
+    with LF line ends into a scratch folder of this writer's own inside
+    ``folder``, named with the process as a layout's scratch is, so a sweep
+    can tell a live writer's from what a crash left (``_sweep_writes``); then,
+    once ``committing`` says the work goes on, moved over the file of its
+    name, in ``files``' order, through ``_replace``'s retry of a rename
+    Windows refuses. ``committing`` is the point of no return: a no raises
+    ``loom.Cancelled`` with every file in ``folder`` as it was; after a yes
+    the moves go on whatever is cancelled, and a move that fails leaves the
+    files before it moved and the rest as they were. Without it, the job the
+    thread runs for, if any, is asked whether it was cancelled. The scratch
+    goes either way."""
+    folder.mkdir(parents=True, exist_ok=True)
+    _sweep_writes(folder)
+    scratch = Path(tempfile.mkdtemp(prefix=f".{stem}.writing-{os.getpid()}-", dir=folder))
+    try:
+        for name, text in files.items():
+            (scratch / name).write_text(text, encoding="utf-8", newline="\n")
+        with _writing:
+            if committing is None:
+                _unless_cancelled("write")
+            elif not committing():
+                raise loom.Cancelled("write: cancelled before the map's files were moved "
+                                     "into place")
+            for name in files:
+                _replace(scratch / name, folder / name)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
+def _sweep_writes(folder: Path) -> None:
+    """What a crash left of a map's files in ``folder``: a writer's scratch
+    whose process is gone (``_alive``), in the shape of ``_sweep``. A live
+    writer's, this process's included, is its own, and so is anything that
+    is not a folder of that name."""
+    for child in folder.iterdir():
+        m = _WRITING.match(child.name)
+        if (m is None or child.is_symlink() or not child.is_dir()
+                or _alive(int(m["pid"]))):
+            continue
+        shutil.rmtree(child, ignore_errors=True)
 
 
 # -------------------------------------------------------- a layout's service day

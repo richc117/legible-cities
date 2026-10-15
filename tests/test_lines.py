@@ -658,7 +658,8 @@ def test_the_pipeline_draws_a_drawn_lines_stroke_and_drops_a_hidden_ones(stand, 
 def test_map_build_draws_the_strokes_into_the_thumbnails(tmp_path, monkeypatch):
     """The server hands the lines' strokes to the thumbnails it writes beside
     the page, drawn from the graph the pipeline answers, as it hands the
-    colours and the order. Stood in as test_serve's thumbnail test is."""
+    colours and the order. Stood in as test_serve's thumbnail test is, the
+    stand-in writing what the server hands it to draw beside the page."""
     from types import SimpleNamespace
 
     from test_serve import NO_LAYOUT, Client, check
@@ -674,6 +675,8 @@ def test_map_build_draws_the_strokes_into_the_thumbnails(tmp_path, monkeypatch):
 
     def stood_in(key, **kwargs):
         kwargs["out_dir"].mkdir(parents=True)
+        for name, text in kwargs["beside"](graph).items():
+            (kwargs["out_dir"] / name).write_text(text, encoding="utf-8", newline="\n")
         return SimpleNamespace(layout=NO_LAYOUT, date=DAY, graph=graph, diagnostics=lambda: diag)
 
     monkeypatch.setattr(pipeline, "run", stood_in)

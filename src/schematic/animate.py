@@ -650,23 +650,35 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
     """Write ``<stem>.positions.json`` and a self-contained ``<stem>.html``.
 
     The stem is per-city: with a fixed filename, generating a second network
-    silently overwrites the first one's animation.
+    silently overwrites the first one's animation. What is written is
+    ``texts``'s, which a caller that moves the files into place itself
+    (``pipeline.run``, issue 80) asks for instead.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    data = animation.to_json()
-
     # UTF-8 and LF whatever the platform says, here and wherever the engine
     # reads or writes text. The page declares <meta charset="utf-8">, and a
     # bare write_text uses the locale's encoding: on Windows, where the
     # pinned Python predates the UTF-8 default, that wrote the title's em
     # dash as one cp1252 byte and refused a station name outside the code
     # page. A text-mode write there also turns every \n into \r\n.
-    json_path = out_dir / f"{stem}.positions.json"
-    json_path.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8", newline="\n")
+    for file_name, text in texts(animation, svg, stem=stem, title=title, name=name,
+                                 subtitle=subtitle, back=back, icons=icons,
+                                 social=social).items():
+        (out_dir / file_name).write_text(text, encoding="utf-8", newline="\n")
+    return out_dir / f"{stem}.positions.json", out_dir / f"{stem}.html"
 
-    html_path = out_dir / f"{stem}.html"
-    html_path.write_text(
-        _fill(_HTML, {
+
+def texts(animation: Animation, svg: str, *,
+          stem: str = "animation", title: str = "Transit animation",
+          name: str | None = None, subtitle: str = "",
+          back: str = "index.html", icons: str | None = None,
+          social: str = "") -> dict[str, str]:
+    """The two files ``write`` writes, by name, as text to be written UTF-8
+    with LF line ends: ``<stem>.positions.json``, then ``<stem>.html``."""
+    data = animation.to_json()
+    return {
+        f"{stem}.positions.json": json.dumps(data, separators=(",", ":")),
+        f"{stem}.html": _fill(_HTML, {
             "__PRESENT__": _PRESENT_JS,
             # Its underscores are escaped (JSON reads "\u005f" back as "_"). That
             # once kept a label from matching a placeholder; nothing written is
@@ -690,8 +702,7 @@ def write(animation: Animation, svg: str, out_dir: Path, *,
             "__SVG__": svg,
             "__DATA__": _json_for_script(data),
         }),
-        encoding="utf-8", newline="\n")
-    return json_path, html_path
+    }
 
 
 # The page lives as a real HTML file rather than a string literal. It is 950

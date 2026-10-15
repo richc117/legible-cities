@@ -1018,28 +1018,34 @@ class EngineEndpoint(Endpoint):
         _no_extra("map.build", left)
         folder = config.out_dir() / out if out else None
 
-        def work(job: loom.Job, progress: Progress) -> dict[str, Any]:
+        def thumbnails(graph: LineGraph) -> dict[str, str]:
+            # The picture the app's front door shows, beside the page, drawn
+            # from the graph just drawn in the project's colours, order and
+            # strokes (a hidden line is not on the graph, so its are unread),
+            # and moved into place with the map's own files (issue 80).
+            return thumbnail.texts(graph, key, colors=colors, default_color=default_color,
+                                   line_order=line_order, strokes=line_strokes(lines))
+
+        def work(job: _Job, progress: Progress) -> dict[str, Any]:
             # From the stored layout, and never a layout of its own: a map
-            # that re-laid a network unasked would be a different map.
+            # that re-laid a network unasked would be a different map. Its
+            # point of no return is the move of its files into place, once
+            # every one of them is drawn (issue 80).
             result = pipeline.run(key, layout=layout, date=date, width=width,
                                   colors=colors, default_color=default_color, style=style,
                                   line_order=line_order, lines=lines, dot_radius=dot_radius,
-                                  trail=trail, out_dir=folder, progress=progress)
+                                  trail=trail, out_dir=folder, progress=progress,
+                                  beside=thumbnails, committing=job.commit_unless_cancelled)
             where = folder or config.out_dir()
             diag = result.diagnostics()
-            # The picture the app's front door shows, beside the page, drawn
-            # from the graph just drawn in the project's colours, order and
-            # strokes (a hidden line is not on the graph, so its are unread).
-            thumbs = thumbnail.write(result.graph, where, key, colors=colors,
-                                     default_color=default_color, line_order=line_order,
-                                     strokes=line_strokes(lines))
             return {
                 "layout": result.layout,
                 "date": result.date.isoformat(),
                 "files": {"svg": str(where / f"{key}.svg"),
                           "html": str(where / f"{key}.html"),
                           "positions": str(where / f"{key}.positions.json"),
-                          **{name: str(path) for name, path in thumbs.items()}},
+                          **{answer: str(where / name)
+                             for answer, name in thumbnail.files_for(key).items()}},
                 # What a client's trip pickers offer (engine issue 49): the
                 # stations of the map just drawn, a hidden line's own gone.
                 "stations": _stations(result.graph),

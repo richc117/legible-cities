@@ -491,7 +491,9 @@ def test_map_build_answers_a_thumbnail_pair_beside_the_page(client, tmp_path, mo
     folder of the page, drawn from the graph the build drew with the colours,
     default and order the request carried. In-process, with the pipeline stood
     in for by a hand-made graph, so it runs without a feed or LOOM; the same
-    through the real pipeline is the LOOM-gated test below."""
+    through the real pipeline is the LOOM-gated test below. The server hands
+    the drawing to the pipeline as ``beside``, to be moved into place with the
+    map's own files (issue 80), and the stand-in writes what it draws."""
     monkeypatch.setenv(config.ENV, str(tmp_path))
     graph = _graph([[("A", "0072bc"), ("B", None)], [("B", None), ("C", "ff0000")]])
     diag = diagnostics.Diagnostics(
@@ -504,6 +506,8 @@ def test_map_build_answers_a_thumbnail_pair_beside_the_page(client, tmp_path, mo
     def stood_in(key, **kwargs):
         asked.update(kwargs)
         kwargs["out_dir"].mkdir(parents=True)
+        for name, text in kwargs["beside"](graph).items():
+            (kwargs["out_dir"] / name).write_text(text, encoding="utf-8", newline="\n")
         return SimpleNamespace(layout=NO_LAYOUT, date=dt.date.fromisoformat(DATE), graph=graph,
                                diagnostics=lambda: diag)
 
@@ -2586,6 +2590,148 @@ def test_the_schema_names_a_layout_in_progress_and_in_a_not_yet_refusal_optional
     check({**refusal, "layout": "0" * 64, "stage": "topo", "building": True}, "ErrorData")
     assert invalid({**refusal, "building": False}, "ErrorData")
     assert invalid({**refusal, "stage": "labels"}, "ErrorData")
+
+
+# ----------------------------------- a cancel and the point of no return (issue 80)
+#
+# A long method that writes what a client sees has a point of no return just
+# before its first such write: a cancel before it is honoured, with nothing
+# written, and answered with the cancelled error; a cancel after it is too
+# late, and the answer is the result with cancel_too_late. A client told
+# "cancelled" takes it that nothing was written. The stand-in LOOM and the
+# small feed, so these run without Docker; each cancel is sent from inside
+# the work, where the reader would deliver it, at the moment the test is about.
+
+MAP_FILES = sorted([f"{KEY}.svg", f"{KEY}.html", f"{KEY}.positions.json",
+                    *thumbnail.files_for(KEY).values()])
+
+
+def laid_out(client: Client, tmp_path: Path, monkeypatch) -> tuple[str, Path]:
+    """The small feed laid out by graph.build, and the folder map.build draws
+    it into with ``out: "p"``."""
+    small_home(tmp_path, monkeypatch)
+    FakeLoom(monkeypatch)
+    layout = client.call("graph.build", {"key": KEY})["result"]["layout"]
+    return layout, config.out_dir() / "p"
+
+
+def in_folder(folder: Path) -> dict[str, bytes | str]:
+    """Every entry of ``folder`` by name: a file's bytes, or "a folder"."""
+    return {path.name: path.read_bytes() if path.is_file() else "a folder"
+            for path in sorted(folder.iterdir())}
+
+
+def cancel_from_inside(client: Client, msg_id: int) -> None:
+    """The cancel for ``msg_id``, read while its work runs."""
+    client.notify("$/cancelRequest", {"id": msg_id})
+    assert client.endpoint.jobs[msg_id].cancelled
+
+
+def test_a_cancel_at_a_maps_render_step_is_honoured_and_writes_no_file(client, tmp_path,
+                                                                       monkeypatch):
+    """map.build starts no process, so a cancel is asked about at the end of
+    each of its steps: one that arrives while it renders is honoured there,
+    no step after it runs, and nothing is written under out/<id>/."""
+    layout, folder = laid_out(client, tmp_path, monkeypatch)
+    msg_id = client.n + 1
+    real = pipeline.render
+
+    def render(*args, **kwargs):
+        cancel_from_inside(client, msg_id)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(pipeline, "render", render)
+    assert client.send("map.build", {"key": KEY, "layout": layout, "date": DATE,
+                                     "out": "p"}) == msg_id
+    answer = client.wait(msg_id)
+    assert answer.get("error", {}).get("code") == JsonRpcRequestCancelled.CODE, answer
+    steps = [note["stage"] for note in client.notifications("job/progress", msg_id)]
+    assert steps[-2:] == ["schedule", "render"], steps
+    assert not folder.exists(), "the map's folder was written"
+    assert client.endpoint.jobs == {}
+
+
+def test_a_cancel_before_a_maps_files_move_leaves_the_map_already_drawn(client, tmp_path,
+                                                                        monkeypatch):
+    """A redraw cancelled after its last step, while its thumbnails are drawn
+    and before anything is moved into place: honoured, and the five files of
+    the map drawn before are the bytes they were, with no scratch beside them."""
+    layout, folder = laid_out(client, tmp_path, monkeypatch)
+    params = {"key": KEY, "layout": layout, "date": DATE, "out": "p"}
+    assert "result" in client.call("map.build", params)
+    before = in_folder(folder)
+    assert sorted(before) == MAP_FILES
+    msg_id = client.n + 1
+    real = thumbnail.texts
+
+    def texts(*args, **kwargs):
+        cancel_from_inside(client, msg_id)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(thumbnail, "texts", texts)
+    assert client.send("map.build", {**params, "colors": {"A": "#123456"}}) == msg_id
+    answer = client.wait(msg_id)
+    assert answer.get("error", {}).get("code") == JsonRpcRequestCancelled.CODE, answer
+    assert in_folder(folder) == before, "a file of the cancelled redraw was moved into place"
+    assert client.endpoint.jobs == {}
+
+
+def test_a_cancel_once_a_maps_files_are_moving_is_too_late_and_answers_the_map(
+        client, tmp_path, monkeypatch):
+    """A cancel that arrives as the first file is moved into place is past the
+    point of no return: the moves go on, every file is the redraw's, and the
+    answer is the map with cancel_too_late."""
+    layout, folder = laid_out(client, tmp_path, monkeypatch)
+    params = {"key": KEY, "layout": layout, "date": DATE, "out": "p"}
+    assert "result" in client.call("map.build", params)
+    before = in_folder(folder)
+    msg_id = client.n + 1
+    real = pipeline._replace
+    moved: list[str] = []
+
+    def replace(src, dst):
+        if not moved:
+            cancel_from_inside(client, msg_id)
+        moved.append(Path(dst).name)
+        return real(src, dst)
+
+    monkeypatch.setattr(pipeline, "_replace", replace)
+    assert client.send("map.build", {**params, "colors": {"A": "#123456"}}) == msg_id
+    answer = client.wait(msg_id)
+    assert "result" in answer, answer
+    result = answer["result"]
+    check(result, "MapBuildResult")
+    assert result["cancel_too_late"] is True
+    assert moved[0] == f"{KEY}.positions.json" and moved[-1] == f"{KEY}.html", moved
+    after = in_folder(folder)
+    assert sorted(after) == MAP_FILES, "every file moved, and the scratch gone"
+    for name in MAP_FILES:
+        assert after[name] != before[name] and b"#123456" in after[name], name
+    assert sorted(Path(path).name for path in result["files"].values()) == MAP_FILES
+    assert client.endpoint.jobs == {}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="a foreign process is presumed alive there")
+def test_a_draw_sweeps_what_a_dead_writer_left_and_nothing_else(client, tmp_path, monkeypatch):
+    """A crash between writing a map's files and moving them leaves a scratch
+    folder named with its process: the next draw into the folder removes it.
+    This process's own, and anything that is not such a folder, stay."""
+    layout, folder = laid_out(client, tmp_path, monkeypatch)
+    folder.mkdir(parents=True)
+    mine = folder / f".{KEY}.writing-{os.getpid()}-x"
+    dead = folder / f".{KEY}.writing-999999-x"
+    for scratch in (mine, dead):
+        scratch.mkdir()
+        (scratch / f"{KEY}.html").write_text("half a page")
+    named = folder / f".{KEY}.writing-999998-y"
+    named.write_text("a file, not a scratch")
+    theirs = folder / "notes"
+    theirs.mkdir()
+    assert "result" in client.call("map.build", {"key": KEY, "layout": layout, "date": DATE,
+                                                 "out": "p"})
+    assert not dead.exists(), "a dead writer's scratch stays"
+    assert mine.is_dir() and named.is_file() and theirs.is_dir()
+    assert sorted(in_folder(folder)) == sorted([*MAP_FILES, mine.name, named.name, "notes"])
 
 
 # ---------------------------------------------------- layout tuning (issue 37)

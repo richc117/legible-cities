@@ -110,16 +110,29 @@ def write(graph: LineGraph, folder: Path, key: str, *, colors: dict[str, str] | 
           line_order: list[str] | None = None,
           strokes: dict[str, LineStroke] | None = None) -> dict[str, Path]:
     """Write both thumbnails of ``key``'s map into ``folder``, beside its
-    page, and say where, under the keys ``map.build`` answers them with."""
-    drawn = draw(graph, colors=colors, default_color=default_color, line_order=line_order,
-                 strokes=strokes)
+    page, and say where, under the keys ``map.build`` answers them with.
+    What is written is ``texts``'s, which ``map.build`` asks for instead, to
+    move into place with the map's own files (issue 80)."""
+    drawn = texts(graph, key, colors=colors, default_color=default_color,
+                  line_order=line_order, strokes=strokes)
     folder.mkdir(parents=True, exist_ok=True)
     written: dict[str, Path] = {}
     for answer, name in files_for(key).items():
         path = folder / name
-        path.write_text(drawn[answer.removeprefix("thumb_")], encoding="utf-8", newline="\n")
+        path.write_text(drawn[name], encoding="utf-8", newline="\n")
         written[answer] = path
     return written
+
+
+def texts(graph: LineGraph, key: str, *, colors: dict[str, str] | None = None,
+          default_color: str | None = None,
+          line_order: list[str] | None = None,
+          strokes: dict[str, LineStroke] | None = None) -> dict[str, str]:
+    """Both thumbnails of ``key``'s map as text, by the names ``files_for``
+    gives them, to be written UTF-8 with LF line ends: what ``write`` writes."""
+    drawn = draw(graph, colors=colors, default_color=default_color, line_order=line_order,
+                 strokes=strokes)
+    return {name: drawn[answer.removeprefix("thumb_")] for answer, name in files_for(key).items()}
 
 
 # --------------------------------------------------------------------- drawing
