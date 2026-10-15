@@ -1480,7 +1480,7 @@
       "additionalProperties": false
     },
     "ExportEncodeParams": {
-      "description": "The frames the client captured (a directory of 000000.png onwards), or its still, to the deliverable at dest with its sidecar beside it. The source is read and never touched. Both are written beside dest under .part names and moved into place once the file is whole and within the platform's limit, the file first: a cancel, a failure or a file over the limit removes the .part files and leaves dest and its sidecar as they were, an earlier export under the same name included. The move is the point of no return: a cancel after it is too late, both files are at dest, and the answer carries cancel_too_late.",
+      "description": "The frames the client captured (a directory of 000000.png onwards), or its still, to the deliverable at dest with its sidecar beside it. The source is read and never touched. Both are written beside dest under .part names and moved into place once the file is whole and within the platform's limit, the file first: a cancel, a failure or a file over the limit removes the .part files and leaves dest and its sidecar as they were, an earlier export under the same name included (only a failure of the sidecar's own move, after the file's, leaves the new file beside the old sidecar, and is answered as the failure). The move is the point of no return: a cancel after it is too late, both files are at dest, and the answer carries cancel_too_late.",
       "type": "object",
       "properties": {
         "plan": {

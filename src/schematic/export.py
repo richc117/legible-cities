@@ -1628,7 +1628,9 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
     file moved into place, and then its sidecar. A cancel, a failure or a
     file over the platform's limit removes the ``.part`` names and leaves
     ``dest`` and its sidecar as they were, a previous export under the same
-    name included (issue 79). ``committing`` is asked once both are written
+    name included (issue 79); only a failure of the sidecar's own move,
+    after the file's, leaves the new file beside the old sidecar, and is
+    raised. ``committing`` is asked once both are written
     and checked, immediately before the first move, and is the point of no
     return (issue 80): a no is a cancel, raised as ``loom.Cancelled`` with
     ``dest`` as it was; after a yes both are moved whatever is cancelled.
