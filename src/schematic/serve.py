@@ -8,13 +8,19 @@ messages on stdin and stdout, stderr for logs. Long requests stay open until
 they finish; while they run, ``job/progress`` and ``job/log`` notifications
 carry the request's id, and ``$/cancelRequest`` ends the process the request
 is waiting on (a LOOM tool, or ffmpeg), or stops a feed it is downloading
-between chunks and caches nothing, and answers it with the cancelled error.
-Work that waits on neither (``feeds.service`` reading a calendar) runs to its
-end and is answered with the same error. ``feeds.remove`` has a point of no
-return, the registry's write: a cancel before it leaves the feed registered
-with every file in place and is answered with the cancelled error; a cancel
-after it is not honoured, since the feed is already forgotten and its files
-are removed to the end, and the answer says the cancel came too late.
+between chunks and caches nothing, or stops work that starts no process at
+the boundary between two of its steps (``map.build``'s), and answers it with
+the cancelled error. Work that waits on none of these (``feeds.service``
+reading a calendar) runs to its end and is answered with the same error.
+
+A method that writes what a client sees has a point of no return,
+immediately before its first such write (issue 80): ``graph.build`` moving a
+layout into the store, ``map.build`` moving its files into place,
+``export.encode`` moving the file and its sidecar into place, ``feeds.add``
+and ``feeds.remove`` writing the registry. A cancel before it is honoured,
+with nothing written, and answered with the cancelled error; a cancel after
+it is too late: the work runs to its end, and the answer is its result with
+``cancel_too_late`` (``_job``), or its own error if it fails.
 
 Errors a person can act on are code -32000 with ``data: {kind, detail,
 hint}``: ``hint`` is the sentence the engine already raises, ``detail`` says
@@ -908,13 +914,22 @@ class EngineEndpoint(Endpoint):
                 # answer to a cancelled request is the cancelled error, never
                 # a result the client has stopped waiting for. Unless the work
                 # passed its point of no return, when what it did stands and
-                # the answer says so.
-                if job.cancelled and not job.committed:
-                    raise JsonRpcRequestCancelled()
+                # the answer is its result, saying the cancel came too late
+                # (issue 80): a client told "cancelled" takes it that nothing
+                # was written.
+                if job.cancelled:
+                    if not job.committed:
+                        raise JsonRpcRequestCancelled()
+                    log.info("cancel for request %s came after its point of no return; "
+                             "answered with what it did", msg_id)
+                    if isinstance(result, dict):
+                        result = {**result, "cancel_too_late": True}
                 return result
             except (loom.Cancelled, feeds.Interrupted):
                 # A tool ended by the cancel, or a download stopped by it
-                # (E36): the cancelled error, whatever the work was.
+                # (E36), or work that asked between its steps: the cancelled
+                # error, whatever the work was. Never raised past a point of
+                # no return, since nothing after one asks about a cancel.
                 raise JsonRpcRequestCancelled() from None
             except JsonRpcException:
                 raise
@@ -1112,21 +1127,17 @@ class EngineEndpoint(Endpoint):
         registry's write is the point of no return: a cancel before it leaves
         the feed registered and is answered with the cancelled error; one after
         it is not honoured, the files are removed to the end, and the answer
-        carries ``cancel_too_late``."""
+        carries ``cancel_too_late``, as every method's past its point does
+        (``_job``)."""
         left = _object("feeds.remove", params)
         key = _feed_key(left.pop("key", None))
         _no_extra("feeds.remove", left)
-        msg_id = self._request_id
 
         def work(job: _Job, _progress: Progress) -> dict[str, Any]:
             try:
                 feeds.remove(key, cancelled=lambda: job.cancelled, forgotten=job.commit)
             except feeds.FeedError as exc:
                 raise EngineError("feed", str(exc)) from exc
-            if job.cancelled:
-                log.info("cancel for request %s came after the feed was forgotten; "
-                         "its files were removed", msg_id)
-                return {"ok": True, "cancel_too_late": True}
             return {"ok": True}
 
         return self._job(work)

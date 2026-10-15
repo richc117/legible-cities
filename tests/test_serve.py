@@ -2067,7 +2067,8 @@ def test_a_registry_write_that_fails_answers_the_error_and_leaves_everything(cli
 def test_work_past_its_point_of_no_return_answers_for_itself_whatever_was_cancelled(client):
     """The job's own rule, apart from any method: once the work says it has done
     what a cancel cannot undo, a cancel changes neither its result nor its
-    failure into the cancelled error."""
+    failure into the cancelled error, and the result says the cancel came too
+    late (issue 80), as feeds.remove's always has."""
     endpoint = client.endpoint
     for fails in (False, True):
         endpoint._request_id = 51
@@ -2088,8 +2089,39 @@ def test_work_past_its_point_of_no_return_answers_for_itself_whatever_was_cancel
                 run()
             assert caught.value.data["hint"] == "the files would not go"
         else:
-            assert run() == {"done": True}
+            assert run() == {"done": True, "cancel_too_late": True}
         assert endpoint.jobs == {}
+    # Committed and never cancelled: the result as the work gave it.
+    endpoint._request_id = 52
+    run = endpoint._job(lambda job, _progress: job.commit_unless_cancelled() and {"done": True})
+    endpoint._request_id = None
+    assert run() == {"done": True}
+
+
+# Every method with a point of no return, and the result it answers past it.
+TOO_LATE = {"graph.build": "GraphBuildResult", "map.build": "MapBuildResult",
+            "export.encode": "ExportEncodeResult", "feeds.add": "FeedRecord",
+            "feeds.remove": "FeedsRemoveResult"}
+
+
+def test_every_result_past_a_point_of_no_return_may_say_the_cancel_came_too_late():
+    """Additive at protocol 1 (issue 80): ``cancel_too_late`` is optional and
+    only ever true, on the result of each method that writes what a client
+    sees, and on no other; the description of the protocol names each."""
+    defs = SCHEMA["$defs"]
+    for method, definition in TOO_LATE.items():
+        assert SCHEMA["methods"][method]["result"] == {"$ref": f"#/$defs/{definition}"}
+        too_late = defs[definition]["properties"]["cancel_too_late"]
+        assert too_late["const"] is True, definition
+        assert "cancel_too_late" not in defs[definition].get("required", []), definition
+        assert defs[definition]["additionalProperties"] is False, definition
+        assert method in SCHEMA["description"].split("point of no return")[1], method
+    for method, shape in SCHEMA["methods"].items():
+        definition = shape["result"]["$ref"].rsplit("/", 1)[1]
+        if method not in TOO_LATE:
+            assert "cancel_too_late" not in defs[definition].get("properties", {}), method
+    assert invalid({"ok": True, "cancel_too_late": False}, "FeedsRemoveResult")
+    assert SCHEMA["protocol"] == serve.PROTOCOL == 1
 
 
 def test_a_cancel_never_falls_between_the_look_and_the_commit():
