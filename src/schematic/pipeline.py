@@ -619,7 +619,9 @@ def _replace(src: Path, dst: Path) -> None:
     ``PermissionError``, which is how Windows refuses to move a directory
     with a file in it open: ``_SWAP_TRIES`` times, ``_SWAP_WAIT`` seconds
     apart, and then the refusal is raised to the swap's caller, which removes
-    the build as it always has. Any other error is raised at once."""
+    the build as it always has. Any other error is raised at once. A map's
+    files (``_publish``) and an export and its sidecar (``export.encode``)
+    are moved into place through it too (issue 80)."""
     for tried in range(1, _SWAP_TRIES + 1):
         try:
             os.replace(src, dst)

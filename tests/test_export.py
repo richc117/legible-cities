@@ -665,6 +665,39 @@ def test_a_re_export_that_fails_or_is_cancelled_leaves_the_export_already_there(
                                                              f"{job.filename}.json"]
 
 
+def test_a_refused_move_into_place_is_tried_again_as_the_stores_is(tmp_path, monkeypatch):
+    """Windows refuses a rename for a moment while another process holds the
+    file open (a scanner, a preview pane). The file's move and its sidecar's
+    are each refused once here, and each is tried again after the store's
+    wait (engine issue 77), so the re-export lands whole: never the new file
+    beside the old sidecar."""
+    from schematic import pipeline
+    job = export.plan("la-metro-rail", "instagram-post", quality="draft")
+    dest = tmp_path / "out" / job.filename
+    sidecar = export.sidecar_path(dest)
+    export.encode(job, _still(tmp_path / "first.png", "png"), dest)
+    again = _still(tmp_path / "again.png", "png", (320, 240))
+    paused: list[float] = []
+    monkeypatch.setattr(pipeline, "_pause", paused.append)
+    refused: list[Path] = []
+    real = os.replace
+
+    def replace(src, dst, *args, **kwargs):
+        if Path(dst) in (dest, sidecar) and Path(dst) not in refused:
+            refused.append(Path(dst))
+            raise PermissionError(13, "The process cannot access the file because it is "
+                                      "being used by another process", str(src))
+        return real(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(os, "replace", replace)
+    assert export.encode(job, again, dest) == [dest]
+    assert refused == [dest, sidecar], "the file first, then its sidecar"
+    assert paused == [pipeline._SWAP_WAIT] * 2
+    assert dest.read_bytes() == again.read_bytes()
+    assert json.loads(sidecar.read_text(encoding="utf-8"))["bytes"] == len(again.read_bytes())
+    assert _parts(dest.parent) == []
+
+
 def test_a_re_export_over_the_platforms_limit_leaves_the_export_already_there(tmp_path):
     """The issue's own case: an export at dest, then the same options again
     with a capture over Bluesky's 976,000 bytes. A JPEG the preset already

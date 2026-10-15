@@ -1625,17 +1625,18 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
 
     The file and its sidecar are written beside ``dest`` under ``.part``
     names (``part_path``) and the size is checked there; only then is the
-    file moved into place, and then its sidecar. A cancel, a failure or a
-    file over the platform's limit removes the ``.part`` names and leaves
-    ``dest`` and its sidecar as they were, a previous export under the same
-    name included (issue 79); only a failure of the sidecar's own move,
-    after the file's, leaves the new file beside the old sidecar, and is
-    raised. ``committing`` is asked once both are written
-    and checked, immediately before the first move, and is the point of no
-    return (issue 80): a no is a cancel, raised as ``loom.Cancelled`` with
-    ``dest`` as it was; after a yes both are moved whatever is cancelled.
-    Without it, the job the thread runs for, if any, is asked whether it was
-    cancelled.
+    file moved into place, and then its sidecar, each move tried again for a
+    moment while Windows refuses it, as the store's are
+    (``pipeline._replace``). A cancel, a failure or a file over the
+    platform's limit removes the ``.part`` names and leaves ``dest`` and its
+    sidecar as they were, a previous export under the same name included
+    (issue 79); only a failure of the sidecar's own move, after the file's,
+    leaves the new file beside the old sidecar, and is raised. ``committing``
+    is asked once both are written and checked, immediately before the
+    first move, and is the point of no return (issue 80): a no is a cancel,
+    raised as ``loom.Cancelled`` with ``dest`` as it was; after a yes both
+    are moved whatever is cancelled. Without it, the job the thread runs
+    for, if any, is asked whether it was cancelled.
 
     A GIF's palette is composed from the plan's theme and ``colors`` alone,
     never from the page or the frames; a plan without colours has it counted
@@ -1678,8 +1679,14 @@ def encode(job: CaptureJob, source: Path, dest: Path, *, provenance: dict | None
                 raise loom.Cancelled("export: cancelled before the file was kept")
         elif not committing():
             raise loom.Cancelled("export: cancelled before the file was kept")
-        os.replace(part, dest)
-        os.replace(sidecar_part, sidecar)
+        # Through the store's retry of a rename Windows refuses for a moment
+        # (engine issue 77): a scanner or a preview pane holding the old file
+        # or its sidecar open must not leave the new file beside the old
+        # sidecar. Imported where it is used, as ``pipeline`` imports
+        # ``describe``, so loading this module does not load the pipeline.
+        from .pipeline import _replace
+        _replace(part, dest)
+        _replace(sidecar_part, sidecar)
     except BaseException:
         for path in (part, sidecar_part):
             path.unlink(missing_ok=True)
