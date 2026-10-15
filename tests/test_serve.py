@@ -2818,15 +2818,20 @@ def test_a_cancel_once_a_maps_files_are_moving_is_too_late_and_answers_the_map(
 def test_a_draw_sweeps_what_a_dead_writer_left_and_nothing_else(client, tmp_path, monkeypatch):
     """A crash between writing a map's files and moving them leaves a scratch
     folder named with its process: the next draw into the folder removes it.
-    This process's own, and anything that is not such a folder, stay."""
+    This process's own, and anything that is not such a folder, stay. The
+    dead writer is a child already waited for, whose pid is gone, rather than
+    a number taken to be free: a live process may hold any number under
+    Linux's pid_max."""
     layout, folder = laid_out(client, tmp_path, monkeypatch)
     folder.mkdir(parents=True)
+    child = subprocess.Popen([sys.executable, "-c", ""], stdin=subprocess.DEVNULL)
+    assert child.wait(timeout=30) == 0
     mine = folder / f".{KEY}.writing-{os.getpid()}-x"
-    dead = folder / f".{KEY}.writing-999999-x"
+    dead = folder / f".{KEY}.writing-{child.pid}-x"
     for scratch in (mine, dead):
         scratch.mkdir()
         (scratch / f"{KEY}.html").write_text("half a page")
-    named = folder / f".{KEY}.writing-999998-y"
+    named = folder / f".{KEY}.writing-{child.pid}-y"
     named.write_text("a file, not a scratch")
     theirs = folder / "notes"
     theirs.mkdir()
