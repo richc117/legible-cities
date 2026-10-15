@@ -631,7 +631,7 @@ def add(source: Path | str, *, key: str | None = None, name: str | None = None,
         mode: str = "all", agency: str | None = None,
         progress: "Callable[[str, int, int | None], None] | None" = None,
         cancelled: "Callable[[], bool] | None" = None,
-        committing: "Callable[[], bool] | None" = None) -> Feed:
+        committing: Callable[[], bool] | None = None) -> Feed:
     """Add a feed a person chose, from a file or a URL, and keep it.
 
     The zip is fetched or copied into the cache, checked for the tables a
