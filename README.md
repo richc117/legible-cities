@@ -234,8 +234,8 @@ layout into the store, a map's files, an export, the feed registry) has a
 point of no return just before that write: a cancel before it is answered
 with the cancelled error and nothing a client sees has been written (a feed
 fetched whole on the way stays cached), and one after it is too late, so the
-request runs to its end and its result says `cancel_too_late`. While a layout runs, each progress report
-names the layout and `render.stage` draws the stages the run has finished, so
+request runs to its end and its result says `cancel_too_late`. While a layout runs,
+each progress report names the layout and `render.stage` draws the stages the run has finished, so
 a client can show the map as it solves. The service day is a required parameter
 of `map.build`, never picked on the way to a map; `feeds.service` is where
 a client asks for one, giving the day to scan from and the map's lines, and

@@ -5,6 +5,18 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 [semantic](https://semver.org/spec/v2.0.0.html) and each is a git tag
 (`v0.2.0`), which is how the desktop app pins the engine it runs.
 
+## [0.18.0] - 2026-10-16
+
+### Fixed
+
+- **`export.encode` no longer deletes the export a person already had** (issue 79). It wrote straight to the destination, which ffmpeg truncates as it opens it. On a failure, a cancel or a file over the platform's size limit it then removed the destination and its sidecar. So a re-export of the same options that failed took the earlier export with it, and an encode whose destination was its own source deleted the source. The file and its sidecar are now written beside the destination under `.part` names, checked, and moved into place only once whole, the file first. Each move is tried again for a moment while Windows refuses it, as a layout's are. A failure or a cancel removes the `.part` files alone; a process killed mid-encode may leave them, and the next export to the same destination writes over them. A destination that is the source, or whose sidecar or either `.part` name is, is refused before anything is written (a params error over the protocol). The bytes of every export are unchanged.
+
+### Changed
+
+- **A cancel that comes after a method has begun writing what a client sees is no longer answered as if nothing had been written** (issue 80). `graph.build`, `map.build`, `export.encode`, `feeds.add` and `feeds.remove` each have a point of no return, taken in one step with the cancel check, immediately before: a layout moved into the store (`graph.build`); the map's five files moved into place, the page last (`map.build`); the export and its sidecar moved into place (`export.encode`); the feed's zip moved into the cache and the registry written (`feeds.add`); the registry written (`feeds.remove`). A cancel before that point is answered with the cancelled error, and nothing a client sees has been written (a feed fetched whole on the way stays cached). A cancel after it is too late: the request runs to its end, and the answer is the method's result with `cancel_too_late: true`, as `feeds.remove`'s already was. `map.build` now honours a cancel between its schedule, render and animate steps, and writes nothing until everything, the thumbnails included, is drawn.
+
+The schema moved additively at protocol 1: `cancel_too_late` (optional, `const: true`) on `GraphBuildResult`, `MapBuildResult`, `ExportEncodeResult` and `FeedRecord` (`feeds.add`'s result), and the `$/cancelRequest` description now says which methods end a process, which stop between steps, and which have a point of no return. A client that cancels must now accept a result, so this is a minor version bump.
+
 ## [0.17.1] - 2026-10-14
 
 ### Fixed
