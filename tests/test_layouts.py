@@ -14,6 +14,8 @@ import json
 import os
 import re
 import shutil
+import subprocess
+import sys
 import threading
 import zipfile
 from dataclasses import replace
@@ -206,14 +208,25 @@ def test_a_cancel_during_octi_leaves_the_stored_layout_and_no_scratch(home, monk
     assert pipeline.stored(KEY) is None
 
 
+def _dead_pid() -> int:
+    """The pid of a child already waited for, so no process holds it: a
+    number taken to be free, as 999999 was, can be a live process's under a
+    64-bit pid_max on Linux. As tests/test_serve.py takes its dead writer."""
+    child = subprocess.Popen([sys.executable, "-c", ""], stdin=subprocess.DEVNULL)
+    assert child.wait(timeout=30) == 0
+    return child.pid
+
+
+@pytest.mark.skipif(os.name == "nt", reason="a foreign process is presumed alive there")
 def test_what_a_crash_leaves_is_swept_and_a_set_put_aside_comes_back(home, monkeypatch):
     FakeLoom(monkeypatch)
     first = pipeline.lay_out(KEY)
     folder = config.graphs_dir() / KEY
-    (folder / f"{first.id}.building-999999-x").mkdir()
-    (folder / f"{first.id}.building-999999-x" / "00_gtfs2graph.json").write_text("{}")
+    dead = _dead_pid()
+    (folder / f"{first.id}.building-{dead}-x").mkdir()
+    (folder / f"{first.id}.building-{dead}-x" / "00_gtfs2graph.json").write_text("{}")
     # Interrupted between the two renames: the layout sits aside, the target is gone.
-    aside = folder / f"{first.id}.old-999999"
+    aside = folder / f"{first.id}.old-{dead}"
     first.dir.rename(aside)
     assert pipeline.read_layout(KEY, first.id) is None
     pipeline.lay_out(KEY, force=True)
@@ -343,13 +356,14 @@ def test_two_builds_of_one_layout_at_once_make_one_layout(home, monkeypatch):
                     r"\(waited \d+\.\d s for another build of it\)$", heard[0]), heard
 
 
+@pytest.mark.skipif(os.name == "nt", reason="a foreign process is presumed alive there")
 def test_a_sweep_leaves_a_live_builds_scratch_alone(home, monkeypatch):
     FakeLoom(monkeypatch)
     folder = config.graphs_dir() / KEY
     folder.mkdir(parents=True)
     mine = folder / f"{'a' * 64}.building-{os.getpid()}-x"
     mine.mkdir()
-    dead = folder / f"{'b' * 64}.building-999999-x"
+    dead = folder / f"{'b' * 64}.building-{_dead_pid()}-x"
     dead.mkdir()
     pipeline.lay_out(KEY)
     assert mine.is_dir(), "this process's scratch is presumed live"
