@@ -254,14 +254,26 @@ def read_layout(key: str, layout: str) -> Layout | None:
     set back, which needs it; so a set left aside reads here as not stored
     until one of the doors is asked for its layout (engine issue 83)."""
     d = layout_dir(key, layout)
-    meta_path = d / META_FILE
-    if not meta_path.is_file() or not all((d / name).is_file() for name in STAGE_FILES.values()):
+    meta = _whole_meta(d)
+    return None if meta is None else Layout(key=key, id=layout, dir=d, meta=meta)
+
+
+def _whole_meta(folder: Path) -> dict[str, Any] | None:
+    """The meta of the set in ``folder`` if the set is whole, else None:
+    every stage file is there and the meta parses as an object. One test
+    for a set in its place (``read_layout``) and for a set put aside
+    (``_newest_back``), so a set put back is one that reads as stored. A
+    meta nested deeper than the parser goes is not whole either, and its
+    ``RecursionError`` goes no further (engine issue 83)."""
+    meta_path = folder / META_FILE
+    if not meta_path.is_file() or not all((folder / name).is_file()
+                                          for name in STAGE_FILES.values()):
         return None
     try:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return None
-    return Layout(key=key, id=layout, dir=d, meta=meta)
+    return meta if isinstance(meta, dict) else None
 
 
 def stored_layouts(key: str) -> list[Layout]:
@@ -732,12 +744,17 @@ def _put_back(key: str, layout: str) -> None:
 
 
 def _newest_back(folder: Path, layout: str) -> None:
-    """When ``layout``'s place in ``folder`` is empty, the newest set put
-    aside for it goes back (``_restored``), newest by ``_made``. Only that
-    one is tried: the others stay, for a sweep to remove once their place
-    holds a set, and a newest that cannot be moved now is tried again at the
-    next look rather than an older set put in its place. The caller holds
-    ``_lock``."""
+    """When ``layout``'s place in ``folder`` is empty, the newest whole set
+    put aside for it goes back (``_restored``): whole as ``_whole_meta`` judges
+    it, newest by ``_made``. A damaged set never goes back, however new: a
+    truncated meta's folder is as new as any, and a damaged set in the place
+    would read as not stored while the whole one beside it went to a sweep.
+    Where none is whole, nothing moves, and every one stays where it is to
+    be looked at, kept by the sweep while their place is empty. Only the
+    newest whole one is tried: the others stay, for a sweep to remove once
+    their place holds a set, and one that cannot be moved now is tried
+    again at the next look rather than an older set put in its place. The
+    caller holds ``_lock``."""
     target = folder / layout
     if target.exists():
         return
@@ -745,20 +762,23 @@ def _newest_back(folder: Path, layout: str) -> None:
         children = list(folder.iterdir())
     except OSError:
         return
-    asides = [child for child in children
-              if (kind := _leftover(child)) is not None and kind[:2] == ("old", layout)]
-    if asides:
-        _restored(max(asides, key=_made), target)
+    whole = [(child, meta) for child in children
+             if (kind := _leftover(child)) is not None and kind[:2] == ("old", layout)
+             and (meta := _whole_meta(child)) is not None]
+    if whole:
+        _restored(max(whole, key=lambda found: _made(*found))[0], target)
 
 
-def _made(aside: Path) -> tuple[float, str]:
-    """When a set put aside was made: its meta's ``made``, as a timestamp,
-    else when its folder last changed; its name breaks a tie, never its
-    pid's order as text, by which ``.old-1000`` comes before ``.old-200``."""
+def _made(aside: Path, meta: dict[str, Any]) -> tuple[float, str]:
+    """When a whole set put aside was made: its meta's ``made``, as a
+    timestamp, else when its folder last changed, also where ``made`` is no
+    time a timestamp can be had for (a ``ValueError``, or an
+    ``OverflowError`` from the platform's clock at a year such as 1); its
+    name breaks a tie, never its pid's order as text, by which ``.old-1000``
+    comes before ``.old-200``."""
     try:
-        made = json.loads((aside / META_FILE).read_text(encoding="utf-8"))["made"]
-        when = dt.datetime.fromisoformat(made).timestamp()
-    except (OSError, ValueError, KeyError, TypeError):
+        when = dt.datetime.fromisoformat(meta["made"]).timestamp()
+    except (KeyError, TypeError, ValueError, OverflowError):
         try:
             when = aside.stat().st_mtime
         except OSError:

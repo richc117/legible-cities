@@ -268,6 +268,112 @@ def test_a_sweep_puts_the_newest_set_back_and_removes_the_older(home, monkeypatc
     assert ids_under(KEY) == sorted([made.id, other.id])
 
 
+# A set that is not whole, each way ``_whole_meta`` tells: its meta cut off
+# as a crash mid-write leaves it, a stage file gone, or a meta nested deeper
+# than the parser goes, which raises a RecursionError.
+DAMAGES = ("a truncated meta", "a stage file missing", "a meta nested past the parser")
+
+
+def damage(folder: Path, how: str) -> None:
+    meta = folder / pipeline.META_FILE
+    if how == "a truncated meta":
+        meta.write_text(meta.read_text()[:20])
+    elif how == "a stage file missing":
+        (folder / pipeline.STAGE_FILES["octi"]).unlink()
+    else:
+        meta.write_text("[" * 100_000 + "]" * 100_000)
+
+
+LOOKUPS = {"stored": lambda layout: pipeline.stored(KEY),
+           "read_stored": lambda layout: (pipeline.read_stored(KEY, layout, []) or (None,))[0]}
+
+
+@pytest.mark.parametrize("door", list(LOOKUPS))
+@pytest.mark.parametrize("how", DAMAGES)
+def test_a_damaged_newest_set_aside_never_outranks_a_whole_older_one(home, monkeypatch, how,
+                                                                     door):
+    """The newer of two sets left aside is damaged. Ranked by when it was
+    made, or by when its folder changed where its meta cannot be read, it
+    would go back and read as not stored, and the whole older set beside it
+    would go to a sweep once the place held a set: a layout lost. The whole
+    one goes back; the damaged one stays aside, and nothing raises."""
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    older, newer = two_aside(made, (1000, 200), "made")
+    damage(newer, how)
+    kept = files_of(newer)
+    found = LOOKUPS[door](made.id)
+    assert found is not None and found.id == made.id
+    assert (made.dir / "which").read_text() == "older"
+    assert files_of(newer) == kept and not older.exists()
+
+
+@pytest.mark.parametrize("how", DAMAGES)
+def test_where_no_set_aside_is_whole_nothing_moves_and_a_sweep_keeps_them(home, monkeypatch,
+                                                                          how):
+    """Every set left aside for the layout is damaged: none goes into the
+    place, a lookup answers not stored without raising, and a sweep by a
+    build beside it, their writers gone, keeps every one as it was, to be
+    looked at."""
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    asides = two_aside(made, (gone(), gone()), "made")
+    for aside in asides:
+        damage(aside, how)
+    kept = {aside.name: files_of(aside) for aside in asides}
+    assert pipeline.stored(KEY) is None
+    assert pipeline.read_stored(KEY, made.id, []) is None
+    other = pipeline.lay_out(KEY, mode="tram")
+    assert not made.dir.exists()
+    assert {aside.name: files_of(aside) for aside in asides} == kept
+    assert ids_under(KEY) == sorted([other.id, *kept])
+
+
+def test_a_stored_meta_nested_past_the_parser_reads_as_not_stored(home, monkeypatch):
+    """The set in its place, its meta nested deeper than the parser goes:
+    ``read_layout``, ``stored`` and ``read_stored`` answer not stored, and
+    the RecursionError goes no further."""
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    damage(made.dir, "a meta nested past the parser")
+    assert pipeline.read_layout(KEY, made.id) is None
+    assert pipeline.stored(KEY) is None
+    assert pipeline.read_stored(KEY, made.id, []) is None
+
+
+class Overflowing:
+    """``datetime`` as a platform whose clock overflows at the year asked."""
+
+    @staticmethod
+    def fromisoformat(text: str):
+        raise OverflowError("timestamp out of range for platform time_t")
+
+
+@pytest.mark.parametrize("door", list(LOOKUPS))
+@pytest.mark.parametrize("clock", ["a made in the year 1", "a clock that overflows"])
+def test_a_made_no_timestamp_can_be_had_for_falls_back_to_the_folder(home, monkeypatch, clock,
+                                                                     door):
+    """Two whole sets left aside whose ``made`` gives no timestamp: the year
+    1 without a zone, which this platform's clock refuses with a ValueError
+    and another's with an OverflowError, which a stand-in clock raises here.
+    Neither escapes a lookup: the sets are told apart by when their folders
+    last changed, and the newer goes back."""
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    older, newer = two_aside(made, (1000, 200), "mtime")
+    for aside in (older, newer):
+        meta = json.loads((aside / pipeline.META_FILE).read_text())
+        meta["made"] = "0001-01-01T00:00:00"
+        (aside / pipeline.META_FILE).write_text(json.dumps(meta))
+    os.utime(older, (1_700_000_000, 1_700_000_000))
+    os.utime(newer, (1_800_000_000, 1_800_000_000))
+    if clock == "a clock that overflows":
+        monkeypatch.setattr(pipeline, "dt", types.SimpleNamespace(datetime=Overflowing))
+    found = LOOKUPS[door](made.id)
+    assert found is not None and found.id == made.id
+    assert (made.dir / "which").read_text() == "newer"
+
+
 @pytest.mark.parametrize("name", ["{id}.old-{pid}-backup", "{id}.old-{pid}.bak",
                                   "{id}.old-{pid}x", "{id}.older-{pid}"])
 def test_a_folder_named_like_a_set_put_aside_but_not_one_is_left_alone(
