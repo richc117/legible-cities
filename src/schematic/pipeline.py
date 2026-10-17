@@ -282,13 +282,15 @@ def stored(key: str, **overrides: Any) -> Layout | None:
     had names is migrated on the way (see ``migrate``). The meta is read
     under the lock a swap takes, so a forced re-layout's swap never finds
     it open (``read_stored``, engine issue 68); the feed's digest, which
-    can take seconds, is taken before."""
+    can take seconds, is taken before. A stored set a swap left aside is
+    put back first (``_put_back``, engine issue 83)."""
     feed = feeds.resolved(key, **overrides)
     source = feeds.get(key).zip_path
     if not source.is_file():
         return None
     inputs, layout = _address(feed, source)
     with _lock:
+        _put_back(key, layout)
         return read_layout(key, layout) or _migrated(feed, layout, inputs)
 
 
@@ -400,9 +402,11 @@ def read_stored(key: str, layout: str,
     failed the swap, and the failure removed the finished build (engine
     issue 68). Under the lock a read and a swap never overlap: the read finds
     the old set whole or the new one whole, its meta among it. Only the read
-    is held; parsing and drawing are the caller's, outside it.
+    is held; parsing and drawing are the caller's, outside it. A stored set
+    a swap left aside is put back first (``_put_back``, engine issue 83).
     """
     with _lock:
+        _put_back(key, layout)
         found = read_layout(key, layout)
         files = None if found is None else _read(found, stages)
     return None if files is None else (found, files)
@@ -465,6 +469,9 @@ def lay_out(key: str, *, force: bool = False,
         with _lock:
             in_flight = _building.get((key, layout))
             if in_flight is None:
+                # A stored set a swap left aside goes back before anything
+                # asks whether it is stored, forced or not (engine issue 83).
+                _put_back(key, layout)
                 existing = None
                 if not force:
                     existing = read_layout(key, layout) or _migrated(feed, layout, inputs)
@@ -636,9 +643,14 @@ _LEFTOVER = re.compile(r"^(?P<layout>[0-9a-f]{64})\.(?P<what>building|old)-(?P<p
 
 
 def _alive(pid: int) -> bool:
-    """Whether the process that made a scratch is still around. Where that
-    cannot be asked (Windows), a foreign process is presumed alive: a
-    leftover kept is cheaper than a build destroyed."""
+    """Whether the process that left a scratch or a set aside may still be
+    using it. This process may. Where another cannot be asked about
+    (Windows), it is presumed alive, and that is safe: what this decides is
+    only what a sweep removes -- a scratch, and a set put aside whose place
+    holds a set again -- and neither is a layout that cannot be made again,
+    so a wrong yes keeps a leftover on disk and never loses a layout. A set
+    put aside whose place is empty goes back whatever this says
+    (``_restored``, engine issue 83)."""
     if pid == os.getpid():
         return True
     if os.name == "nt":
@@ -653,23 +665,70 @@ def _alive(pid: int) -> bool:
 
 
 def _sweep(folder: Path) -> None:
-    """What a crash leaves, and only that: a scratch whose process is gone,
-    or a set put aside by one. A live build's scratch, and a set another
-    process has put aside mid-swap, are theirs. A set put aside whose target
-    is missing is the stored layout a crash interrupted between the two
-    renames, and comes back; the rest goes."""
-    for child in folder.iterdir():
+    """What a crash leaves in a feed's folder, and only that. A set put
+    aside whose place is empty goes back into it (``_restored``), whoever
+    put it aside. The rest goes only when the process that left it is gone
+    (``_alive``): a scratch, which a live build is still writing, and a set
+    put aside whose place holds a set again, which a live swap removes
+    itself. The caller holds ``_lock``."""
+    for child in list(folder.iterdir()):
         m = _LEFTOVER.match(child.name)
-        if m is None or not child.is_dir() or _alive(int(m["pid"])):
-            continue
-        if m["what"] == "building":
-            shutil.rmtree(child, ignore_errors=True)
+        if m is None or child.is_symlink() or not child.is_dir():
             continue
         target = folder / m["layout"]
-        if target.exists():
+        if m["what"] == "old" and not target.exists():
+            _restored(child, target)
+        elif not _alive(int(m["pid"])):
             shutil.rmtree(child, ignore_errors=True)
-        else:
-            os.replace(child, target)
+
+
+def _put_back(key: str, layout: str) -> None:
+    """The stored set of ``layout``, back in its place if a swap left it
+    aside and the place empty (engine issue 83): asked before the store is
+    asked whether the layout is stored (``stored``, ``read_stored``,
+    ``lay_out``), so that it is found, and a forced re-layout replaces it as
+    it would have. The caller holds ``_lock``."""
+    target = layout_dir(key, layout)
+    if target.exists():
+        return
+    try:
+        children = sorted(target.parent.iterdir())
+    except OSError:
+        return
+    for child in children:
+        m = _LEFTOVER.match(child.name)
+        if (m is not None and m["what"] == "old" and m["layout"] == layout
+                and _restored(child, target)):
+            return
+
+
+def _restored(aside: Path, target: Path) -> bool:
+    """A set a swap put aside, moved back into its empty place: True when
+    it was (engine issue 83).
+
+    A forced re-layout moves the stored set aside as ``<id>.old-<pid>``,
+    then the new set into its place. A process ended between the two -- a
+    crash, or the desktop app's ``taskkill /F`` at quit -- leaves the
+    layout aside and its place empty, and the layout reads as not stored;
+    it cannot be made again, since ``topo`` is not reproducible. So it goes
+    back whether or not its process is alive, never resting on an answer
+    Windows is not asked for (``_alive``) or a pid another process may have
+    been given since. In this process a swap holds ``_lock``, as the caller
+    does, so this never meets one between its renames. Another process's
+    swap met there loses its build: its second rename finds the place
+    taken and fails, and the stored set it was replacing stays. A build is
+    lost, never a layout.
+
+    A link or anything but a folder is left where it is, and so is a set
+    whose move is refused (``_replace`` tries again while Windows refuses
+    it): the next look tries again."""
+    if aside.is_symlink() or not aside.is_dir():
+        return False
+    try:
+        _replace(aside, target)
+    except OSError:
+        return False
+    return True
 
 
 def migrate(key: str, layout: str, inputs: dict[str, Any]) -> Layout | None:
