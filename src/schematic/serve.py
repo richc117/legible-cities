@@ -38,6 +38,7 @@ import argparse
 import datetime as dt
 import json
 import logging
+import math
 import os
 import platform
 import re
@@ -188,7 +189,41 @@ def classify(exc: BaseException) -> EngineError:
 def _object(method: str, params: Any) -> dict[str, Any]:
     if not isinstance(params, dict):
         raise invalid_params(f"{method} takes an object of parameters")
+    _doubles(params)
     return dict(params)
+
+
+def _double(value: int | float) -> bool:
+    """A number an IEEE 754 double holds: finite, and no further from zero
+    than the largest double, about 1.8e308."""
+    if isinstance(value, float):
+        return math.isfinite(value)
+    return abs(value) <= sys.float_info.max
+
+
+def _doubles(params: dict[str, Any]) -> None:
+    """Every number in the params, at any depth, one a double holds, or the
+    params error naming the first that is not (engine issue 83).
+
+    The client is JavaScript, whose JSON.parse reads a number past a
+    double's range as Infinity, and NaN and the infinities are not JSON at
+    all, though Python's json reads them. Such a number means nothing, and
+    taken as one it either passes every bound (NaN compares false with all
+    of them) or fails the server where it is turned into a float. So it is
+    refused here, before any param is judged, wherever it stands."""
+    stack: list[tuple[str, Any]] = list(params.items())
+    while stack:
+        where, value = stack.pop()
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            if not _double(value):
+                raise invalid_params(f"{where} must be a number a double holds: finite, and "
+                                     f"at most about 1.8e308 either side of zero")
+        elif isinstance(value, dict):
+            stack.extend((f"{where}.{name}", inner) for name, inner in value.items())
+        elif isinstance(value, list):
+            stack.extend((f"{where}[{i}]", inner) for i, inner in enumerate(value))
 
 
 def _no_params(method: str, params: Any) -> None:
@@ -218,9 +253,12 @@ def _registered(key: str) -> str:
     return key
 
 
-def _date(value: Any, name: str = "date") -> dt.date:
+def _date(value: Any, name: str = "date", *, required: bool = False) -> dt.date:
+    """A calendar day the params name. A null is refused, saying the day is
+    required where it is (``map.build``'s ``date``) and that it may be left
+    out where it may."""
     if value is None:
-        if name == "date":
+        if required:
             raise invalid_params(
                 "date is required: the service day to draw, as YYYY-MM-DD. The engine "
                 "never picks one, because its choice would depend on the day you asked.")
@@ -294,7 +332,7 @@ def _flag(left: dict[str, Any], name: str) -> bool:
 
 def _positive(left: dict[str, Any], name: str, default: float) -> float:
     value = left.pop(name, default)
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+    if not _number(value) or value <= 0:
         raise invalid_params(f"{name} must be a number above zero")
     return float(value)
 
@@ -580,14 +618,17 @@ def _tuning(value: Any) -> dict[str, Any]:
 # ---- the export methods' parameters: a preset, a page, the options, a plan
 
 def _number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    """A number as the params carry one: not a bool, and one a double holds
+    (``_double``), which ``_object`` has made sure of for anything sent."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and _double(value)
 
 
 def _whole(value: Any) -> bool:
     """A number with nothing after the point: what the schema's ``integer``
     takes, ``1080.0`` as well as ``1080`` (engine issue 83). A caller keeps
-    it as ``int(value)``."""
-    return _number(value) and float(value).is_integer()
+    it as ``int(value)``. An int is never turned into a float to be asked,
+    which overflows past a double's range."""
+    return _number(value) and (isinstance(value, int) or value.is_integer())
 
 
 def _preset(value: Any) -> str:
@@ -695,7 +736,7 @@ def _beat_payload(value: Any, where: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise invalid_params(f"{where} is not an object")
     left = dict(value)
-    secs = left.pop("secs", None)
+    secs = _given(left, "secs", where)
     if not _number(secs) or secs <= 0:
         raise invalid_params(f"{where} lasts no time")
     out: dict[str, Any] = {"secs": secs}
@@ -728,15 +769,27 @@ def _beat_payload(value: Any, where: str) -> dict[str, Any]:
     return out
 
 
+# The fields ``CaptureJob`` requires, in the schema's order: a plan handed
+# back without one is refused saying which is missing. test_serve holds the
+# two lists equal.
+PLAN_FIELDS = ("key", "preset", "mode", "url", "width", "height", "scale", "fps", "format",
+               "settle", "beats", "keep", "crf", "fade", "stem", "theme", "view", "storyboard",
+               "at", "notes", "caption", "clock_corner", "filename")
+
+
 def _capture_job(value: Any) -> export.CaptureJob:
     """A plan the client hands back, checked field by field before it is
-    trusted: every field ``CaptureJob`` requires, as export.plan wrote it,
-    ``colors`` alone optional, since a plan from before it read as null.
-    Whether its feed is registered is the caller's to ask, once every other
-    param is judged (``_registered``)."""
+    trusted: every field ``CaptureJob`` requires (``PLAN_FIELDS``), as
+    export.plan wrote it, ``colors`` alone optional, since a plan from
+    before it read as null. Whether its feed is registered is the caller's
+    to ask, once every other param is judged (``_registered``)."""
     if not isinstance(value, dict):
         raise invalid_params("plan must be the object export.plan answered with")
     left = dict(value)
+    for name in PLAN_FIELDS:
+        if name not in left:
+            raise invalid_params(f"plan.{name} is missing; hand the plan back as export.plan "
+                                 f"answered it")
     # The plan's own convenience, recomputed from the stem and the format,
     # and checked only as the schema holds it.
     if not isinstance(left.pop("filename", None), str):
@@ -1056,7 +1109,7 @@ class EngineEndpoint(Endpoint):
         left = _object("map.build", params)
         key = _feed_key(left.pop("key", None))
         layout = _layout(left.pop("layout", None))
-        date = _date(left.pop("date", None))
+        date = _date(left.pop("date", None), required=True)
         out = _token(left.pop("out")) if "out" in left else None
         width = _positive(left, "width", 1800.0)
         colors = _colors(left, "colors")

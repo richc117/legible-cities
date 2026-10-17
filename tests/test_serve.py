@@ -1165,7 +1165,7 @@ def test_export_plan_answers_the_caption_and_the_corner_and_refuses_the_rail(cli
     assert invalid({"plan": older, "source": "/a", "dest": "/b/x.mp4"}, "ExportEncodeParams")
     with pytest.raises(serve.JsonRpcInvalidParams, match="^plan.caption is missing"):
         serve._capture_job(older)
-    with pytest.raises(serve.JsonRpcInvalidParams, match="^plan.clock_corner must be one of"):
+    with pytest.raises(serve.JsonRpcInvalidParams, match="^plan.clock_corner is missing"):
         serve._capture_job({**older, "caption": None})
 
 

@@ -16,14 +16,26 @@ the params error, a result, or an engine error of a kind it names.
 
 Where the server refuses what the schema lets through, it is one of the
 rules the schema cannot hold, each written in a definition's description
-and named in ``SERVER_ONLY``, and nothing else. The server never accepts
-what the schema refuses.
+and named in ``SERVER_ONLY``, and nothing else; each is written here from
+that description, never by asking the engine's own check, which would
+excuse whatever that check refuses. The server never accepts what the
+schema refuses.
+
+One rule stands over the schema. A number no double holds (NaN, the
+infinities, an integer past about 1.8e308) is not one the desktop app can
+send, and NaN is not even JSON, though Python's json reads it; jsonschema
+compares such a number as Python does, where NaN passes every bound. The
+server refuses it with the params error wherever it stands, as the
+schema's top-level description says, and the test expects that whatever
+jsonschema answers (``doubles_only``).
 """
 
 from __future__ import annotations
 
 import copy
+import math
 import os
+import sys
 import tempfile
 from typing import Any, Callable, Iterator
 
@@ -109,8 +121,8 @@ BASES: dict[str, list[Any]] = {
 # a whole number written as a decimal, a negative, an empty string, a
 # string of spaces, one that is no regular expression, and empty and
 # filled arrays and objects.
-PALETTE = (None, True, 0, 7, 7.0, 7.5, -1, "", "zzz", "   ", "(", [], ["zzz"], {},
-           {"zzz": 1})
+PALETTE = (None, True, 0, 7, 7.0, 7.5, -1, 10 ** 400, float("nan"), float("inf"),
+           float("-inf"), "", "zzz", "   ", "(", [], ["zzz"], {}, {"zzz": 1})
 
 
 def resolve(node: Any) -> dict:
@@ -291,18 +303,47 @@ def _beside_a_list(method: str, params: dict) -> bool:
             and bool(params["options"].get("view") or params["options"].get("at")))
 
 
-def _beats_refused(method: str, params: dict) -> bool:
-    """export.plan's own checks of a list of beats, which StoryboardBeat's
-    description states and the schema cannot (``export.authored_beats``):
-    the first beat's view, clock and tween, the total, a card's and a
-    draw-in's."""
+def _clock(text: str) -> float:
+    hours, minutes, *seconds = (float(part) for part in text.split(":"))
+    return hours * 3600 + minutes * 60 + sum(seconds)
+
+
+def _beats_across(method: str, params: dict) -> bool:
+    """The rules across a list's beats that StoryboardBeat's description
+    states and the schema cannot hold, written from that description and
+    not by asking ``export.authored_beats``, so that a rule it adds on one
+    field, a bound the schema does not have, is not excused with them: the
+    first beat names a view, has tween 0 or none, and names at unless it
+    sweeps without hours; the beats last 90 seconds in all at most; a span's
+    first clock is before its second; a card beat lasts 1 second at least
+    and a draw_in beat 2; a list has one draw_in at most, which does not
+    sweep, and it and every beat before it are on the geographic or map
+    view, named or carried over. Asked only of params the schema accepts,
+    so every beat has its fields' types."""
     board = _a_list(method, params)
-    if board is None:
+    if not board:
         return False
-    try:
-        export.authored_beats(board)
-    except ValueError:
+    first = board[0]
+    if (first.get("view") is None or first.get("tween") not in (None, 0)
+            or (first.get("at") is None
+                and not (first.get("sweep") and first.get("hours") is None))):
         return True
+    if sum(beat["secs"] for beat in board) > 90:
+        return True
+    shown: list[str | None] = []
+    draw_ins = 0
+    for beat in board:
+        span = beat.get("span")
+        if span is not None and not _clock(span[0]) < _clock(span[1]):
+            return True
+        if beat.get("card") and beat["secs"] < 1:
+            return True
+        shown.append(beat["view"] if beat.get("view") is not None else shown[-1])
+        if beat.get("draw_in"):
+            draw_ins += 1
+            if (draw_ins > 1 or beat["secs"] < 2 or beat.get("sweep")
+                    or any(view not in ("geographic", "map") for view in shown)):
+                return True
     return False
 
 
@@ -316,7 +357,7 @@ SERVER_ONLY: dict[str, Callable[[str, Any], bool]] = {
     "text of only whitespace is refused": _only_whitespace,
     "export.encode's source and dest are absolute paths": _path_not_the_clients,
     "a list of beats stands without a view or a clock beside it": _beside_a_list,
-    "a list of beats is held to export.authored_beats": _beats_refused,
+    "the beats of a list are held to the rules across them": _beats_across,
 }
 
 
@@ -360,6 +401,22 @@ def verdict(client: Client, method: str, params: Any) -> tuple[bool | None, dict
     return None, reply
 
 
+def doubles_only(value: Any) -> bool:
+    """Whether every number in ``value``, at any depth, is one a double
+    holds: finite, and at most the largest double either side of zero."""
+    if isinstance(value, bool):
+        return True
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, int):
+        return abs(value) <= sys.float_info.max
+    if isinstance(value, dict):
+        return all(doubles_only(inner) for inner in value.values())
+    if isinstance(value, list):
+        return all(doubles_only(inner) for inner in value)
+    return True
+
+
 def test_the_server_and_the_schema_agree_on_every_methods_params(client):
     """One test over every method, so that it can also hold ``SERVER_ONLY``
     to what it is for: each rule it names is met at least once, or it is
@@ -376,7 +433,8 @@ def test_the_server_and_the_schema_agree_on_every_methods_params(client):
         def judge(where: str, params: Any) -> None:
             nonlocal tried
             tried += 1
-            schema_refuses = not validator.is_valid(params)
+            outside = not doubles_only(params)
+            schema_refuses = outside or not validator.is_valid(params)
             server_refuses, reply = verdict(client, method, params)
             if server_refuses is None:
                 disagreements.append(f"{method} {where}: the server failed: "
@@ -388,9 +446,11 @@ def test_the_server_and_the_schema_agree_on_every_methods_params(client):
             if rule is not None:
                 met.add(rule)
                 return
-            side = "the server refuses" if server_refuses else "the schema refuses"
+            side = ("the server refuses it" if server_refuses
+                    else "the server takes a number no double holds" if outside
+                    else "the schema refuses it")
             hint = (reply.get("error") or {}).get("data", {}).get("hint", "accepted")
-            disagreements.append(f"{method} {where}: {side} it ({hint})")
+            disagreements.append(f"{method} {where}: {side} ({hint})")
 
         for base in BASES[method]:
             server_refuses, reply = verdict(client, method, base)
@@ -401,5 +461,37 @@ def test_the_server_and_the_schema_agree_on_every_methods_params(client):
                 where = ".".join(str(part) for part in path)
                 shown = "left out" if value is MISSING else repr(value)
                 judge(f"{where} = {shown}", changed(base, path, value))
+    # About 9,100 when this was written: a generator that shrinks without
+    # anyone meaning it to fails here rather than passing on fewer cases.
+    assert tried > 8000, f"only {tried} cases were tried"
     assert not disagreements, f"{len(disagreements)} of {tried}:\n" + "\n".join(disagreements)
     assert met == set(SERVER_ONLY), f"never met: {sorted(set(SERVER_ONLY) - met)}"
+
+
+def test_a_field_left_out_of_a_plan_is_named_as_missing():
+    """Each field CaptureJob requires, and each a beat of it requires, left
+    out of a plan handed back: refused saying that field is missing, a
+    nullable field and any other alike, rather than what a value of it must
+    be. ``PLAN_FIELDS`` is the schema's list."""
+    required = SCHEMA["$defs"]["CaptureJob"]["required"]
+    assert list(serve.PLAN_FIELDS) == required
+    plan = _plan_dict()
+    for name in required:
+        with pytest.raises(serve.JsonRpcInvalidParams) as refused:
+            serve._capture_job({k: v for k, v in plan.items() if k != name})
+        assert str(refused.value).startswith(f"plan.{name} is missing"), refused.value
+    for name in SCHEMA["$defs"]["BeatPayload"]["required"]:
+        beat = {k: v for k, v in plan["beats"][0].items() if k != name}
+        with pytest.raises(serve.JsonRpcInvalidParams) as refused:
+            serve._capture_job({**plan, "beats": [beat, *plan["beats"][1:]]})
+        assert str(refused.value).startswith(f"plan.beats[0].{name} is missing"), refused.value
+
+
+def test_a_null_date_is_told_it_may_be_left_out_where_it_may(client):
+    """export.plan's date is optional: a null is refused saying it may be
+    left out, not with map.build's sentence that the day is required."""
+    plan = client.call("export.plan", {"key": KEY, "preset": "instagram-reel", "date": None})
+    assert plan["error"]["data"]["hint"] == ("date must be a calendar day as YYYY-MM-DD, or "
+                                             "left out"), plan
+    drawn = client.call("map.build", {"key": KEY, "layout": NO_LAYOUT, "date": None})
+    assert drawn["error"]["data"]["hint"].startswith("date is required"), drawn
