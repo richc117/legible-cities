@@ -12,11 +12,12 @@ import datetime as dt
 import hashlib
 import json
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
 
-from schematic import animate, loom, pipeline
+from schematic import animate, config, loom, pipeline, serve
 from schematic.crs import to_mercator
 from schematic.linegraph import LineGraph
 from schematic.render import Style, check_color, line_colors, render
@@ -82,6 +83,208 @@ def test_the_map_and_the_page_read_one_resolution():
     assert page.to_json()["lines"] == r.colors
 
 
+# ------------------------------------------------- the page's structure
+#
+# Issue 81. The page around its data was pinned by a hash, which moved with
+# every change to page.html, so nearly every commit that touched the snapshot
+# did so only to move it. What a client depends on is narrower, and is held here
+# instead: the page's top-level sections, the methods window.__present offers,
+# and what the page asks of a frame that hosts it -- its scripts and styles
+# inline, its images and fonts from data: URIs, and nothing fetched.
+
+# The html element's children, in order, as (tag, id): the head's elements
+# (the page is written without <head> and <body>), the header, the stage the
+# map is drawn in and an export screenshots, the overlay and the title card a
+# capture paints over it, the data, the routing and the script.
+SECTIONS = [("meta", None), ("meta", None), ("title", None), ("script", None),
+            ("style", None), ("header", None), ("main", "stage"),
+            ("div", "present-overlay"), ("div", "present-card"), ("script", "data"),
+            ("script", "routing"), ("script", None)]
+
+# The seam: everything else in the page is closed over inside its script.
+# Held here because the protocol names only the methods a client's job
+# carries; test_the_seam_holds_every_method_the_protocol_and_the_recorder_name
+# holds the protocol and bin/_record.js to this list.
+SEAM = {"advance", "seek", "setCapture", "setPlaying", "setSpeed", "setView", "setGeo",
+        "showView", "hasGeo", "setLabels", "setRoutes", "setFrame", "setTheme", "settle",
+        "bounds", "onDraw", "state", "setTrip", "setCard", "setDrawn"}
+
+# What a frame must allow the page, as Content-Security-Policy would say it.
+NEEDS = {"script-src 'unsafe-inline'", "style-src 'unsafe-inline'", "img-src data:",
+         "font-src data:"}
+
+# What a page would fetch with, or load code by.
+NETWORK = ("fetch(", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "import(")
+
+_VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+         "source", "track", "wbr"}
+
+
+class _Outline(HTMLParser):
+    """The page's top-level elements, its scripts and styles with their text,
+    and every element's attributes."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.open: list[str] = []
+        self.sections: list[tuple[str, str | None]] = []
+        self.scripts: list[tuple[dict, str]] = []
+        self.styles: list[str] = []
+        self.attrs: list[tuple[str, dict]] = []
+        self._text: list[str] | None = None
+        self._of: dict = {}
+
+    def handle_starttag(self, tag, attrs):
+        given = dict(attrs)
+        self.attrs.append((tag, given))
+        if self.open == ["html"]:
+            self.sections.append((tag, given.get("id")))
+        if tag in ("script", "style"):
+            self._text, self._of = [], given
+        if tag not in _VOID:
+            self.open.append(tag)
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style") and self._text is not None:
+            text = "".join(self._text)
+            if tag == "script":
+                self.scripts.append((self._of, text))
+            else:
+                self.styles.append(text)
+            self._text = None
+        if tag in self.open:
+            while self.open.pop() != tag:
+                pass
+
+    def handle_data(self, data):
+        if self._text is not None:
+            self._text.append(data)
+
+
+def _strip_js(js: str) -> str:
+    """``js`` with its comments and string literals blanked, so that neither a
+    brace nor a name inside one is read as code."""
+    out, i, n = [], 0, len(js)
+    while i < n:
+        if js.startswith("//", i):
+            j = js.find("\n", i)
+            j = n if j < 0 else j
+        elif js.startswith("/*", i):
+            j = js.index("*/", i + 2) + 2
+        elif js[i] in "'\"`":
+            j = i + 1
+            while j < n and js[j] != js[i]:
+                j += 2 if js[j] == "\\" else 1
+            j += 1
+        else:
+            out.append(js[i])
+            i += 1
+            continue
+        out.append(" " * (j - i))
+        i = j
+    return "".join(out)
+
+
+def _seam(script: str) -> set[str]:
+    """The names ``window.__present``'s object literal defines, at its top level."""
+    start = script.index("window.__present = {") + len("window.__present = ")
+    code = _strip_js(script[start:])
+    depth, top = 0, []
+    for ch in code:
+        if ch == "{":
+            depth += 1
+            if depth == 1:
+                continue
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        if depth == 1:
+            top.append(ch)
+    return set(re.findall(r"(?:^|,)\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*[(:]", "".join(top)))
+
+
+def _structure(page: str) -> dict:
+    """What the page is made of, as far as a client depends on it."""
+    outline = _Outline()
+    outline.feed(page)
+    outline.close()
+    code = [text for attrs, text in outline.scripts if attrs.get("type") != "application/json"]
+    seams = [_seam(text) for text in code if "window.__present = {" in text]
+    styles = outline.styles + [a["style"] for _, a in outline.attrs if "style" in a]
+    addresses = [a[k] for _, a in outline.attrs for k in ("src", "href", "xlink:href") if k in a]
+    addresses += re.findall(r"""url\(\s*["']?([^)"'\s]+)""",
+                            "\n".join(styles + [v for _, a in outline.attrs
+                                                for v in a.values() if v]))
+    needs = set()
+    if any(text.strip() for text in code):
+        needs.add("script-src 'unsafe-inline'")
+    if styles:
+        needs.add("style-src 'unsafe-inline'")
+    if any(a.startswith("data:image/") for a in addresses):
+        needs.add("img-src data:")
+    if any(a.startswith("data:font/") for a in addresses):
+        needs.add("font-src data:")
+    return {
+        "sections": outline.sections,
+        "seam": seams[0] if len(seams) == 1 else seams,
+        "needs": needs,
+        # An address with a scheme other than data: is one the page would
+        # fetch, or send a reader to; a relative one or a fragment is neither.
+        "remote": sorted({a for a in addresses if re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", a)
+                          and not a.startswith("data:")}),
+        "network": sorted({word for word in NETWORK for text in code if word in text}),
+        "loaded": sorted(f"{tag} {a.get('src') or a.get('href')}" for tag, a in outline.attrs
+                         if tag == "script" and "src" in a
+                         or tag == "link" and "stylesheet" in a.get("rel", "")),
+    }
+
+
+def _held(page: str, *, needs: set[str] = NEEDS) -> None:
+    """The page's structure is the one held above, said as a difference."""
+    found = _structure(page)
+    assert found["sections"] == SECTIONS, found["sections"]
+    assert found["seam"] == SEAM, (f"seam gained {sorted(found['seam'] - SEAM)}, "
+                                   f"lost {sorted(SEAM - found['seam'])}")
+    assert found["needs"] == needs, (f"needs gained {sorted(found['needs'] - needs)}, "
+                                     f"lost {sorted(needs - found['needs'])}")
+    assert found["network"] == [], f"the page's script fetches with {found['network']}"
+    assert found["remote"] == [], f"the page names remote addresses {found['remote']}"
+    assert found["loaded"] == [], f"the page loads {found['loaded']}"
+
+
+def _hand_made_page(tmp_path, style: Style) -> str:
+    graph = _graph([[("A", "0072bc"), ("B", None)], [("B", None), ("C", "ff0000")]])
+    drawn = render(graph, style=style, title="Testville")
+    _, page = animate.write(animate.build(drawn, graph, [], DAY), drawn.svg, tmp_path,
+                            stem="testville", name="Testville")
+    return page.read_text(encoding="utf-8")
+
+
+def test_the_page_keeps_its_sections_its_seam_and_its_sinks(tmp_path):
+    """Drawn with an embedded label face, the page needs all four sinks."""
+    _held(_hand_made_page(tmp_path, Style(themed=True, label_font="inter")))
+
+
+def test_a_page_drawn_in_the_system_face_needs_no_font(tmp_path):
+    _held(_hand_made_page(tmp_path, Style(themed=True)), needs=NEEDS - {"font-src data:"})
+
+
+def test_the_seam_holds_every_method_the_protocol_and_the_recorder_name():
+    """The protocol names the methods a client's capture job drives
+    (``--schema``), and bin/_record.js is the engine's own capture; both are
+    held to the seam the page is held to, so a method one of them names cannot
+    be renamed on the page alone."""
+    protocol = set(re.findall(r"__present\.(\w+)", json.dumps(serve.schema())))
+    recorder = (config.REPO_ROOT / "bin" / "_record.js").read_text(encoding="utf-8")
+    # The recorder also calls through an alias, `const P = window.__present`.
+    called = set(re.findall(r"__present\.(\w+)", recorder)) | set(re.findall(r"\bP\.(\w+)\(",
+                                                                              recorder))
+    assert "setTrip" in protocol and "setCapture" in called, "the names are still found"
+    assert protocol <= SEAM, sorted(protocol - SEAM)
+    assert called <= SEAM, sorted(called - SEAM)
+
+
 # --------------------------------------------------- over stored layouts
 
 def _stored(key: str) -> pipeline.Layout:
@@ -131,17 +334,16 @@ def test_a_bad_colour_is_refused_before_anything_is_written(tmp_path):
 
 
 def test_without_overrides_the_page_changes_only_by_the_missing_entries(tmp_path):
-    """The snapshot was taken from the same stored layout before E06: the SVG,
-    the page around its data and the data apart from ``lines`` hash the same,
-    and ``lines`` gains exactly the two lines the feed leaves uncoloured. Over
-    the stored stage graph, not a regeneration, because a regeneration also
-    moves geometry (app ADR-023). ``page_without_data`` is re-pinned whenever
-    ``page.html`` changes on purpose -- E24 rebuilt the line chips out of DOM
-    nodes -- and the other three hashes are the ones that must not move.
-    ``data_without_lines`` was re-pinned once, for issue 70: every map's trips
-    keep a node's hop, and 6 of Pittsburgh's 8 paths (``d``, ``gd`` and
-    ``stops``) step across a node where they cut a chord; the SVG, the page
-    around its data and ``lines`` did not move."""
+    """The snapshot was taken from the same stored layout before E06: the SVG
+    and the data apart from ``lines`` hash the same, and ``lines`` gains
+    exactly the two lines the feed leaves uncoloured. Over the stored stage
+    graph, not a regeneration, because a regeneration also moves geometry (app
+    ADR-023). ``data_without_lines`` was re-pinned once, for issue 70: every
+    map's trips keep a node's hop, and 6 of Pittsburgh's 8 paths (``d``,
+    ``gd`` and ``stops``) step across a node where they cut a chord; the SVG
+    and ``lines`` did not move. The page around its data was pinned by a hash
+    too, re-pinned whenever ``page.html`` changed on purpose; since issue 81
+    it is held by its structure instead, the hand-made page's above."""
     snapshot = json.loads((SNAPSHOTS / "pittsburgh-t.json").read_text())
     stored = _stored("pittsburgh-t")
     if stored.id != snapshot["layout"]:
@@ -152,7 +354,7 @@ def test_without_overrides_the_page_changes_only_by_the_missing_entries(tmp_path
     data = json.loads((tmp_path / "pittsburgh-t.positions.json").read_text())
     html = (tmp_path / "pittsburgh-t.html").read_text()
     assert sha(result.render.svg) == snapshot["svg"]
-    assert sha(html.replace(animate._json_for_script(data), "")) == snapshot["page_without_data"]
+    _held(html, needs=NEEDS - {"font-src data:"})
     rest = {k: v for k, v in data.items() if k != "lines"}
     assert sha(json.dumps(rest, sort_keys=True, separators=(",", ":"))) == snapshot["data_without_lines"]
     assert data["lines"] == {**snapshot["lines"], "MI": DEFAULT, "DQI": DEFAULT}
