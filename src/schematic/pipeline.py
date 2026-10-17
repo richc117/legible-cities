@@ -312,9 +312,10 @@ def stage_path(key: str, stage: str, **overrides: Any) -> Path | None:
 
 
 # The store's one lock: who builds which layout, the scratches, every move
-# of a set into, out of and aside from its place, and the reads that must
-# not overlap a move (``in_flight``, ``read_stored``, and ``lay_out``'s
-# replay of a stored set through ``_read``). A plain lock, not a re-entrant
+# of a set into, out of and aside from its place, the reads that must not
+# overlap a move (``in_flight``, ``read_stored``, and ``lay_out``'s replay of
+# a stored set through ``_read``), and a removed feed's deletion of its
+# layouts (``feeds.remove``, engine issue 83). A plain lock, not a re-entrant
 # one, so nothing done while it is held takes it again: what needs it from
 # inside and from outside has a body that assumes it held (``_migrate``,
 # ``_read``) and a door that takes it (``migrate``, ``read_stored``).
@@ -570,11 +571,14 @@ def _build(feed: feeds.Feed, layout: str, inputs: dict[str, Any],
             # In the same hold as the swap, so no reader finds the new set
             # with the old set's minutes still kept for it (engine issue 69).
             _forget_minutes(layout)
+            # And the set as stored, read in that hold too: once it ends, a
+            # removal of the feed may take the lock and delete the set
+            # (feeds.remove, engine issue 83).
+            found = read_layout(key, layout)
     except BaseException:
         _forget(key, layout)
         shutil.rmtree(scratch, ignore_errors=True)
         raise
-    found = read_layout(key, layout)
     assert found is not None
     return found
 

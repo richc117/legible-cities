@@ -765,7 +765,14 @@ def remove(key: str, *, cancelled: "Callable[[], bool] | None" = None,
             if (path.is_dir() and not path.is_symlink()
                     and path.name.endswith((".normalized", ".normalized.unpacking"))):
                 shutil.rmtree(path, ignore_errors=True)
-        shutil.rmtree(config.graphs_dir() / key, ignore_errors=True)
+        # The layouts under the store's lock, which every move of a stored
+        # set and every read of one takes (engine issue 83): never between a
+        # forced re-layout's two renames, nor while a reader holds a file of
+        # a set open, which Windows would not delete. For the deletion alone,
+        # which waits on no cancel.
+        from . import pipeline  # here, not at the top: pipeline reads this module
+        with pipeline._lock:
+            shutil.rmtree(config.graphs_dir() / key, ignore_errors=True)
 
 
 def inspect(key: str, *, anchor: "dt.date | None" = None):

@@ -1,4 +1,5 @@
-"""A stored layout is never lost to a crash (engine issue 83).
+"""A stored layout is never lost to a crash, and never deleted from under a
+move of it (engine issue 83).
 
 A forced re-layout swaps its new set in with two renames under the store's
 lock: the stored set aside as ``<id>.old-<pid>``, then the new set into its
@@ -8,6 +9,9 @@ a layout cannot be made again. On Windows ``_alive`` cannot ask whether a
 process is gone and presumes it is not, so that set was never put back: the
 project's layout read as not stored. It goes back now whoever set it aside,
 before anything asks whether the layout is stored, and in a build's sweep.
+
+``feeds.remove`` deleted a feed's layouts without the store's lock, so the
+deletion could land between a forced re-layout's two renames.
 
 LOOM is test_layouts' stand-in. Windows is simulated by handing ``pipeline``
 an ``os`` whose ``name`` is ``"nt"``, the only thing ``_alive`` asks; the
@@ -23,12 +27,16 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import types
 from pathlib import Path
 
 import pytest
 
 from test_layouts import KEY, FakeLoom, ids_under, write_timetabled_feed
+from test_render_stage import Watched
+from test_serve import Client
 
 from schematic import config, feeds, loom, pipeline
 
@@ -204,3 +212,71 @@ def test_a_live_writers_leftovers_are_left_alone(home, monkeypatch, by):
         assert (files_of(aside), files_of(scratch)) == kept
     assert ids_under(KEY) == sorted([made.id, other.id, aside.name, scratch.name])
     assert files_of(made.dir) == before
+
+
+# ---------------------------------------- feeds.remove under the store's lock
+
+MINE = "mine"
+
+
+def test_a_removal_deletes_the_layouts_only_once_a_forced_re_layouts_swap_is_done(
+        tmp_path, monkeypatch):
+    """A forced graph.build of a feed a person added is held between its
+    swap's two renames, the stored set aside and the new one not yet in
+    place, when a removal of the feed reaches the deletion of its layouts.
+    The deletion waits for the store's lock and comes after the swap: the
+    re-layout is never refused its second rename (which answered a kind
+    ``io`` error naming a path), and once both are done nothing of the
+    feed's layouts is left. The feed is forgotten before its layouts go, so
+    graph.build answers that it is not registered, or, if the deletion came
+    between the swap and its answer's read, that the layout was removed as
+    it was read."""
+    monkeypatch.setenv(config.ENV, str(tmp_path / "home"))
+    monkeypatch.delenv(loom.COMMIT_ENV, raising=False)
+    monkeypatch.delenv(loom.BIN_ENV, raising=False)
+    source = tmp_path / "mine.zip"
+    write_timetabled_feed(source)
+    feeds.add(source, key=MINE)
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(MINE)
+    folder = config.graphs_dir() / MINE
+
+    waited = threading.Event()
+    monkeypatch.setattr(pipeline, "_lock", Watched(waited))
+    in_gap, let_gap = threading.Event(), threading.Event()
+    real_replace, real_rmtree = os.replace, shutil.rmtree
+    deleted: list[list[str]] = []
+
+    def replace(src, dst):
+        real_replace(src, dst)
+        if Path(src) == made.dir and Path(dst).name.startswith(f"{made.id}.old-"):
+            in_gap.set()
+            assert let_gap.wait(30), "the test never let the swap finish"
+
+    def rmtree(path, *args, **kwargs):
+        if Path(path) == folder:
+            deleted.append(sorted(child.name for child in folder.iterdir()))
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "replace", replace)
+    monkeypatch.setattr(shutil, "rmtree", rmtree)
+    client = Client()
+    try:
+        building = client.send("graph.build", {"key": MINE, "force": True})
+        assert in_gap.wait(30), "the re-layout never reached its swap"
+        removing = client.send("feeds.remove", {"key": MINE})
+        deadline = time.monotonic() + 30
+        while not (waited.is_set() or any(m.get("id") == removing for m in client.out)):
+            assert time.monotonic() < deadline, "the removal neither waited nor answered"
+            time.sleep(0.01)
+        let_gap.set()
+        removed, built = client.wait(removing, 30), client.wait(building, 30)
+    finally:
+        let_gap.set()
+        client.endpoint.close()
+    assert removed.get("result") == {"ok": True}, removed
+    assert waited.is_set(), "the removal deleted the layouts without waiting for the store's lock"
+    assert deleted == [[made.id]], "deleted once the swap was done, its set in place"
+    assert "error" in built and built["error"]["data"]["kind"] in ("feed", "layout"), built
+    assert not folder.exists(), "nothing of the feed's layouts is left"
+    assert MINE not in feeds.all()
