@@ -1645,7 +1645,9 @@ def test_feeds_list_is_every_preset_and_what_was_added(client, home, tmp_path):
     keys = [f["key"] for f in before["feeds"]]
     assert keys == list(feeds.FEEDS)
     la = next(f for f in before["feeds"] if f["key"] == KEY)
-    assert la["source"] == "preset" and la["cached"] is True
+    # Cached where the checkout has LA's zip for ``home`` to copy, and not on
+    # a machine without the feeds, which CI is (issue 81).
+    assert la["source"] == "preset" and la["cached"] is SOURCE_ZIPS[0].exists()
     assert la["label_pattern"] == feeds.FEEDS[KEY].label_pattern
 
     src = gtfs_zip(tmp_path / "Metro de Prueba.zip")
