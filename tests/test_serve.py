@@ -637,7 +637,11 @@ def test_a_dot_or_a_trail_out_of_range_is_refused_naming_the_field(
     assert error["code"] == -32602, error
     check(error["data"], "ErrorData")
     assert error["data"]["kind"] == "params"
-    assert error["data"]["hint"].startswith(f"{name} must be from {low:g} to {high:g}"), error
+    # NaN and the infinities are refused before any field is judged, as no
+    # number a double holds, naming the field all the same (engine issue 83).
+    finite = not isinstance(value, float) or value - value == 0
+    sentence = f"must be from {low:g} to {high:g}" if finite else "must be a number a double holds"
+    assert error["data"]["hint"].startswith(f"{name} {sentence}"), error
     assert client.endpoint.jobs == {} and asked == {}
 
 
