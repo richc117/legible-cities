@@ -113,8 +113,11 @@ SEAM = {"advance", "seek", "setCapture", "setPlaying", "setSpeed", "setView", "s
 NEEDS = {"script-src 'unsafe-inline'", "style-src 'unsafe-inline'", "img-src data:",
          "font-src data:"}
 
-# What a page would fetch with, or load code by.
-NETWORK = ("fetch(", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "import(")
+# What a page would fetch with, or load code by, as patterns: a space before
+# the parenthesis is still a call.
+NETWORK = (r"\bfetch\s*\(", r"\bXMLHttpRequest\b", r"\bWebSocket\b", r"\bEventSource\b",
+           r"\bsendBeacon\b", r"\bimport\s*\(", r"\bimportScripts\b",
+           r"\bnew\s+(?:Shared)?Worker\s*\(")
 
 _VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
          "source", "track", "wbr"}
@@ -233,7 +236,8 @@ def _structure(page: str) -> dict:
         # fetch, or send a reader to; a relative one or a fragment is neither.
         "remote": sorted({a for a in addresses if re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", a)
                           and not a.startswith("data:")}),
-        "network": sorted({word for word in NETWORK for text in code if word in text}),
+        "network": sorted({pattern for pattern in NETWORK for text in code
+                           if re.search(pattern, text)}),
         "loaded": sorted(f"{tag} {a.get('src') or a.get('href')}" for tag, a in outline.attrs
                          if tag == "script" and "src" in a
                          or tag == "link" and "stylesheet" in a.get("rel", "")),
