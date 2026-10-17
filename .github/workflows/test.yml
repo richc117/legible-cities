@@ -1,0 +1,81 @@
+# The test suite, on every pull request and every push to main, and axe over
+# an animation page.
+#
+# Ubuntu, with the development extra installed from the lock. What needs
+# Docker and the LOOM image, a cached feed or a stored layout skips here as it
+# does on any machine without them: the image takes minutes to compile, and
+# the feeds are hundreds of megabytes from the agencies' own servers, which a
+# check must not depend on. What needs ffmpeg skips too; the runner has none.
+# What needs only a browser runs: the full Chromium is installed for the
+# page's own tests and for bin/audit-page. `-rs` lists every skip and why.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test
+    # Named rather than ubuntu-latest, which moves to 26.04 in November 2026:
+    # the browser's system libraries come from this release's packages.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The Python the desktop app bundles is 3.12; uv is the one uv.lock was
+      # last written with.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.10.2"
+          python-version: "3.12"
+
+      - name: Install the package and its development extra from the lock
+        run: uv sync --locked --extra dev
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      # Playwright and axe are the site's development dependencies. The full
+      # Chromium, not the headless shell: bin/audit-page and the page tests
+      # launch it as bin/_record.js does. --with-deps installs the system
+      # libraries it needs.
+      - name: Install the site's tools and the full Chromium
+        working-directory: site
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: The suite
+        run: uv run --no-sync pytest -q -rs
+
+      # The atlas's pages are generated and not committed, so axe reads a page
+      # drawn from the page tests' hand-made network: three lines, a branch,
+      # the geographic view and five trips.
+      - name: axe over a drawn page, in both themes
+        env:
+          AUDIT_DIR: ${{ runner.temp }}/audit
+        run: |
+          uv run --no-sync python -c '
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, "tests")
+          from test_site import _hand_made_page
+          _hand_made_page(Path(os.environ["AUDIT_DIR"]))
+          '
+          node bin/audit-page "$AUDIT_DIR/testville.html"
