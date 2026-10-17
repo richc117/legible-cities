@@ -696,7 +696,7 @@ def _alive(pid: int) -> bool:
     using it. This process may. Where another cannot be asked about
     (Windows), it is presumed alive, and that is safe: what this decides is
     only what a sweep removes -- a scratch, and a set put aside whose place
-    holds a set again -- and neither is a layout that cannot be made again,
+    holds a whole set again -- and neither is a layout that cannot be made again,
     so a wrong yes keeps a leftover on disk and never loses a layout. A set
     put aside whose place is empty goes back whatever this says
     (``_restored``, engine issue 83)."""
@@ -719,8 +719,10 @@ def _sweep(folder: Path) -> None:
     there are several (``_newest_back``), whoever put it aside. The rest
     goes only when the process that left it is gone (``_alive``): a scratch,
     which a live build is still writing, and a set put aside whose place
-    holds a set again, which a live swap removes itself. The caller holds
-    ``_lock``."""
+    holds a whole set again (``_whole_meta``), which a live swap removes
+    itself. One whose place is empty or holds a set that is not whole stays,
+    whatever its process: a damaged place must never cost the set beside it
+    (engine issue 83). The caller holds ``_lock``."""
     found = [(child, kind) for child in list(folder.iterdir())
              if (kind := _leftover(child)) is not None]
     for layout in sorted({layout for _child, (what, layout, _pid) in found if what == "old"}):
@@ -728,8 +730,8 @@ def _sweep(folder: Path) -> None:
     for child, (what, layout, pid) in found:
         if not child.exists():
             continue  # put back just now
-        if what == "old" and not (folder / layout).exists():
-            continue  # not put back: the next look tries again
+        if what == "old" and _whole_meta(folder / layout) is None:
+            continue  # its place is empty or damaged: the set aside may be all there is
         if not _alive(pid):
             shutil.rmtree(child, ignore_errors=True)
 

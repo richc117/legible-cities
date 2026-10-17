@@ -329,6 +329,31 @@ def test_where_no_set_aside_is_whole_nothing_moves_and_a_sweep_keeps_them(home, 
     assert ids_under(KEY) == sorted([other.id, *kept])
 
 
+@pytest.mark.parametrize("how", DAMAGES)
+@pytest.mark.parametrize("platform", ["here", "windows"])
+def test_a_whole_set_aside_survives_a_sweep_beside_a_damaged_place(home, monkeypatch, platform,
+                                                                   how):
+    """A whole set put aside, its writer gone, beside a place that holds a
+    set that is not whole. The sweep removes a set aside only once its
+    place holds a whole set again: here the aside may be all that is left
+    of the layout, so it stays as it was, and so does the damaged place.
+    Here the writer's process can be asked and is gone; on Windows it is
+    presumed alive, which kept the aside before too."""
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    aside = made.dir.with_name(f"{made.id}.old-{gone()}")
+    shutil.copytree(made.dir, aside)
+    kept = files_of(aside)
+    damage(made.dir, how)
+    place = files_of(made.dir)
+    if platform == "windows":
+        as_windows(monkeypatch)
+    other = pipeline.lay_out(KEY, mode="tram")
+    assert files_of(aside) == kept, "the whole set aside is kept"
+    assert files_of(made.dir) == place, "and the damaged place is not touched"
+    assert ids_under(KEY) == sorted([made.id, other.id, aside.name])
+
+
 def test_a_stored_meta_nested_past_the_parser_reads_as_not_stored(home, monkeypatch):
     """The set in its place, its meta nested deeper than the parser goes:
     ``read_layout``, ``stored`` and ``read_stored`` answer not stored, and
