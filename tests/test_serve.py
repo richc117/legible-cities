@@ -2616,28 +2616,24 @@ def test_after_the_swap_the_store_answers_and_the_registration_goes_first(client
     small_home(tmp_path, monkeypatch)
     FakeLoom(monkeypatch)
     seen: dict = {}
-    swap, read_layout = pipeline._swap, pipeline.read_layout
+    build = pipeline._build
 
-    def swapped(scratch, target):
-        swap(scratch, target)
-        seen["builder"] = threading.get_ident()
-
-    def read(key, layout):
-        # The build's own read of what it stored, after the swap and before
-        # lay_out's finally: the moment this test is about.
-        if seen.get("builder") == threading.get_ident() and "tail" not in seen:
-            seen["registered"] = (key, layout) in pipeline._scratches
-            seen["tail"] = client.call("render.stage", {"key": key, "layout": layout,
-                                                        "stage": "gtfs2graph"})
-        return read_layout(key, layout)
+    def built(*args, **kwargs):
+        found = build(*args, **kwargs)
+        # The build has swapped its set in, read it back in the swap's hold
+        # and let the lock go, and lay_out's finally is next: the moment
+        # this test is about.
+        seen["registered"] = (found.key, found.id) in pipeline._scratches
+        seen["tail"] = client.call("render.stage", {"key": found.key, "layout": found.id,
+                                                    "stage": "gtfs2graph"})
+        return found
 
     class Building(dict):
         def pop(self, *args):
             seen["registered at the pop"] = args[0] in pipeline._scratches
             return super().pop(*args)
 
-    monkeypatch.setattr(pipeline, "_swap", swapped)
-    monkeypatch.setattr(pipeline, "read_layout", read)
+    monkeypatch.setattr(pipeline, "_build", built)
     monkeypatch.setattr(pipeline, "_building", Building())
     layout = client.call("graph.build", {"key": KEY})["result"]["layout"]
     assert seen["registered"] is True
