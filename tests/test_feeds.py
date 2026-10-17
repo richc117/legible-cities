@@ -1091,10 +1091,11 @@ def test_a_member_the_library_will_not_read_answers_no_headways_and_the_feed_is_
         home, tmp_path, monkeypatch, raised):
     src = gtfs_zip(tmp_path / "Springfield.zip", {**GOOD, "frequencies.txt": _frequencies("T1")})
 
-    def unreadable(self, name, pwd=None):
+    # Opened, not read whole: a member is read a piece at a time (issue 81).
+    def unreadable(self, name, mode="r", pwd=None, **kwargs):
         raise raised
 
-    monkeypatch.setattr(zipfile.ZipFile, "read", unreadable)
+    monkeypatch.setattr(zipfile.ZipFile, "open", unreadable)
     feed = feeds.add(src)
     assert (feed.name, feed.headways) == ("Springfield", False)
     assert feeds.get(feed.key) == feed
