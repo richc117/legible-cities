@@ -32,10 +32,11 @@ import os
 import shutil
 import subprocess
 import threading
-import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Sequence
+
+from . import feeds
 
 IMAGE = "openschematicmaps/loom"
 Graph = dict[str, Any]
@@ -173,15 +174,20 @@ def unpacked(feed_zip: Path) -> Path:
     because two projects on one feed can lay out at once and the second must
     not remove what the first is extracting into or reading from. A cancel
     is honoured once the unpack has finished, which is seconds: it ends
-    processes, and this is not one."""
+    processes, and this is not one. The zip is unpacked within the feed's
+    limits (``feeds.unpack``, issue 81): a zip past them is refused as a
+    feed error, and its scratch goes with the refusal."""
     directory = feed_zip.with_suffix("")
     with _unpacking:
         if directory.is_dir() and directory.stat().st_mtime >= feed_zip.stat().st_mtime:
             return directory
         scratch = directory.with_name(directory.name + ".unpacking")
         shutil.rmtree(scratch, ignore_errors=True)
-        with zipfile.ZipFile(feed_zip) as zf:
-            zf.extractall(scratch)
+        try:
+            feeds.unpack(feed_zip, scratch)
+        except BaseException:
+            shutil.rmtree(scratch, ignore_errors=True)
+            raise
         shutil.rmtree(directory, ignore_errors=True)
         os.replace(scratch, directory)
         return directory

@@ -18,6 +18,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import threading
 import time
 import zipfile
@@ -33,18 +34,26 @@ import requests
 
 from . import config
 
-# How large a feed may be: its download, what any one file in its zip unpacks
-# to, and what they all unpack to together. Generous on purpose -- the largest
-# preset, the Chicago 'L', is a 100 MB download that unpacks to 433 MB, 373 MB
-# of it stop_times.txt (Oct 2026) -- and there so that a zip far larger inside
-# than out is refused with a sentence instead of taking the engine's memory:
-# read whole, a 1.5 MB zip once made the normalisation peak at 1.3 GB (issue
-# 81). A download is counted as it streams and stopped at its limit. The sizes
-# are checked from the zip's headers before anything is read, and counted
-# again as each file is read a piece at a time, because a header can lie.
+# How large a feed may be: its download, what any one of its tables unpacks
+# to, what its tables unpack to together, and how many files its zip holds.
+# Generous on purpose -- the largest preset, the Chicago 'L', is a 100 MB
+# download that unpacks to 433 MB, 373 MB of it stop_times.txt, and the most
+# files any preset's zip holds is 32 (Oct 2026) -- and there so that a zip far
+# larger inside than out is refused with a sentence instead of taking the
+# engine's memory: read whole, a 1.5 MB zip once made the normalisation peak
+# at 1.3 GB (issue 81). A download is counted as it streams and stopped at its
+# limit. The sizes are checked from the zip's headers before anything is
+# read, and counted again as each file is read a piece at a time, because a
+# header can lie.
+#
+# They bound the bytes read out of the zip and nothing else. A table within
+# them is still parsed whole into a DataFrame, and pandas holds several times
+# a table's size while it does: a 1 GB stop_times.txt is several GB resident,
+# and Chicago's 373 MB one already costs about 2.5 GB.
 MAX_DOWNLOAD_BYTES = 500_000_000
 MAX_TABLE_BYTES = 1_000_000_000
 MAX_FEED_BYTES = 2_000_000_000
+MAX_ENTRIES = 10_000
 
 # A GTFS zip is only *mostly* GTFS. Agencies drop license agreements, readmes
 # and spreadsheets in alongside the tables, and reading every .txt as CSV then
@@ -389,10 +398,6 @@ class FeedError(ValueError):
     """Something about a feed a person can act on; str() is the sentence."""
 
 
-class TooLarge(FeedError):
-    """A feed over one of the limits above; the sentence names the limit."""
-
-
 def _size(n: int) -> str:
     """A byte count as a sentence says it: 2 GB, 500 MB, 64 kB."""
     for unit, scale in (("GB", 10**9), ("MB", 10**6), ("kB", 10**3)):
@@ -401,43 +406,112 @@ def _size(n: int) -> str:
     return f"{n} bytes"
 
 
-def _too_large(what: str, member: str) -> TooLarge:
-    return TooLarge(f"{what} is too large to read: {Path(member).name} unpacks to more "
-                    f"than {_size(MAX_TABLE_BYTES)}, the most one file in a feed may")
+# What a person can do about a feed over a limit: an agency's whole-region
+# feed is the usual cause, and most publish one per operator or mode as well.
+NARROWER = "use a feed filtered to the operator you need"
 
 
-def _too_large_together(what: str) -> TooLarge:
-    return TooLarge(f"{what} is too large to read: its files unpack to more than "
-                    f"{_size(MAX_FEED_BYTES)} together, the most a feed may")
+def _too_large(what: str, member: str) -> FeedError:
+    return FeedError(f"{what} is too large to read: {Path(member).name} unpacks to more "
+                     f"than {_size(MAX_TABLE_BYTES)}, the most one file in a feed may; "
+                     f"{NARROWER}")
+
+
+def _too_large_together(what: str) -> FeedError:
+    return FeedError(f"{what} is too large to read: its files unpack to more than "
+                     f"{_size(MAX_FEED_BYTES)} together, the most a feed may; {NARROWER}")
+
+
+def _too_many(what: str) -> FeedError:
+    return FeedError(f"{what} holds more than {MAX_ENTRIES:,} files, where a feed has a few "
+                     "dozen; re-zip it with only the feed's tables")
+
+
+def _unreadable(what: str, member: str) -> FeedError:
+    return FeedError(f"{what} compresses {Path(member).name} in a way the engine cannot read "
+                     "a piece at a time; re-zip it with the standard Deflate method")
 
 
 def _is_table(name: str) -> bool:
     return name.endswith(".txt") and Path(name).stem in GTFS_TABLES
 
 
-# How a table in a feed's zip may be compressed. zipfile inflates a deflated
-# member a bounded piece at a time, but hands a bzip2 or LZMA one to a
-# decompressor with no limit, so a few hundred bytes of either can unpack to
-# gigabytes in one call, before anything here could count them. Every member
-# of every preset is deflated but one, which is stored (Oct 2026).
+# How a member of a feed's zip may be compressed to be read. zipfile inflates
+# a deflated member a bounded piece at a time, but hands a bzip2 or LZMA one
+# to a decompressor with no limit, so a few hundred bytes of either can unpack
+# to gigabytes in one call, before anything here could count them. Every
+# member of every preset is deflated but one, which is stored (Oct 2026).
 READABLE = frozenset({zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED})
 
 
+def _entries(path: Path) -> int | None:
+    """How many entries the zip's end record says it holds, or None where it
+    cannot be read here (zipfile then refuses the zip in its own words).
+
+    Read before ``ZipFile`` opens the zip, because opening it parses the
+    whole central directory into one ZipInfo per entry, about 560 bytes each:
+    a zip of empty entries is under 80 bytes an entry on disk, so a 500 MB
+    one would make several GB of them before a count could be looked at."""
+    with open(path, "rb") as fh:
+        fh.seek(0, os.SEEK_END)
+        size = fh.tell()
+        tail_size = min(size, 22 + 0xFFFF)
+        fh.seek(size - tail_size)
+        tail = fh.read(tail_size)
+        at = tail.rfind(b"PK\x05\x06")
+        if at < 0 or tail_size - at < 22:
+            return None
+        count = struct.unpack_from("<H", tail, at + 10)[0]
+        if count != 0xFFFF or at < 20 or tail[at - 20:at - 16] != b"PK\x06\x07":
+            return count
+        # A ZIP64 zip: the count is in its own end record, which the locator
+        # just before the classic one says where to find.
+        fh.seek(struct.unpack_from("<Q", tail, at - 20 + 8)[0])
+        record = fh.read(56)
+    if len(record) < 56 or record[:4] != b"PK\x06\x06":
+        return None
+    return struct.unpack_from("<Q", record, 32)[0]
+
+
 def _check_sizes(zf: zipfile.ZipFile, what: str) -> None:
-    """Refuse a zip whose headers say it unpacks past the limits, or which
-    compresses a table in a way that cannot be read a piece at a time. Reads
-    the central directory alone; ``_Counted`` holds the same limits on the
-    bytes themselves."""
+    """Refuse a zip whose headers say its tables unpack past the limits, or
+    which compresses a table the engine reads in a way that cannot be read a
+    piece at a time. Reads the central directory alone; ``_Counted`` holds
+    the same limits on the bytes themselves, and ``_reader`` the compression.
+
+    Only the tables count: a readme, a licence or a spreadsheet beside them
+    is never read, so its size is nobody's business here. The tables LOOM
+    never sees (``LOOM_SKIP``) are not read by the engine either, so their
+    compression is not judged unless something does read one."""
     total = 0
     for info in zf.infolist():
-        if _is_table(info.filename) and info.compress_type not in READABLE:
-            raise FeedError(f"{what} compresses {Path(info.filename).name} in a way the engine "
-                            "does not read; a feed's tables are read stored or deflated")
+        if not _is_table(info.filename):
+            continue
+        if Path(info.filename).stem not in LOOM_SKIP and info.compress_type not in READABLE:
+            raise _unreadable(what, info.filename)
         if info.file_size > MAX_TABLE_BYTES:
             raise _too_large(what, info.filename)
         total += info.file_size
     if total > MAX_FEED_BYTES:
         raise _too_large_together(what)
+
+
+@contextmanager
+def _opened(path: Path, what: str,
+            kind: type[zipfile.ZipFile] = zipfile.ZipFile) -> Iterator[zipfile.ZipFile]:
+    """``path``'s zip, opened once its end record says it holds no more than
+    ``MAX_ENTRIES`` files, and yielded once its directory agrees and its
+    headers are within the limits. ``ZipFile`` reads the directory by its
+    size and not by the count, so a count that lies is caught after the
+    parse, which a zip on disk -- downloaded within its limit -- bounds."""
+    count = _entries(path)
+    if count is not None and count > MAX_ENTRIES:
+        raise _too_many(what)
+    with kind(path) as zf:
+        if len(zf.filelist) > MAX_ENTRIES:
+            raise _too_many(what)
+        _check_sizes(zf, what)
+        yield zf
 
 
 # How much of a table is read at a time: the most one step of inflating it
@@ -457,7 +531,7 @@ class _Counted(io.RawIOBase):
     """One member of a feed's zip, read a piece at a time and counted, so the
     byte past a limit is a refusal whatever the zip's headers said: a header
     that understates a file, or a name the zip lists twice, cannot get more
-    read than the limits allow."""
+    read than the limits allow. Closing it closes the member."""
 
     def __init__(self, raw: IO[bytes], name: str, budget: _Budget) -> None:
         self._raw = raw
@@ -479,12 +553,55 @@ class _Counted(io.RawIOBase):
         buffer[:len(data)] = data
         return len(data)
 
+    def close(self) -> None:
+        if not self.closed:
+            self._raw.close()
+        super().close()
+
+
+def _reader(zf: zipfile.ZipFile, name: str | zipfile.ZipInfo, budget: _Budget, *,
+            opened: Callable[[zipfile.ZipInfo], IO[bytes]] | None = None) -> IO[bytes]:
+    """``name`` in ``zf``, open for reading through the count, or a refusal
+    if it is compressed in a way that cannot be read a piece at a time.
+    ``opened`` opens the member when ``zf.open`` would not do: _CountedZip's
+    own open is this."""
+    info = name if isinstance(name, zipfile.ZipInfo) else zf.getinfo(name)
+    if info.compress_type not in READABLE:
+        raise _unreadable(budget.what, info.filename)
+    raw = opened(info) if opened is not None else zf.open(info)
+    return io.BufferedReader(_Counted(raw, info.filename, budget), _PIECE)
+
 
 @contextmanager
 def _member(zf: zipfile.ZipFile, name: str, budget: _Budget) -> Iterator[IO[bytes]]:
     """``name`` in ``zf``, open for reading through the count."""
-    with zf.open(name) as raw:
-        yield io.BufferedReader(_Counted(raw, name, budget), _PIECE)
+    with _reader(zf, name, budget) as fh:
+        yield fh
+
+
+class _CountedZip(zipfile.ZipFile):
+    """A zip whose every member is read through the count and the check on
+    its compression, ``extractall``'s reads included: it opens each member
+    it writes out with ``open``, and copies it a piece at a time."""
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(path)
+        self.budget = _Budget(path.name)
+
+    def open(self, name, mode="r", pwd=None, *, force_zip64=False):  # type: ignore[override]
+        if mode != "r" or pwd is not None:
+            raise ValueError("a feed's zip is opened to be read, with no password")
+        return _reader(self, name, self.budget, opened=super().open)
+
+
+def unpack(path: Path, folder: Path) -> None:
+    """Every file in the zip at ``path`` written into ``folder``, as
+    ``ZipFile.extractall`` writes them, within the limits: the entry count
+    and the tables' headers checked first, and each file read through the
+    count, so a zip that unpacks past them is refused with nothing larger
+    than a limit written. A refusal names the zip by its file name."""
+    with _opened(path, path.name, kind=_CountedZip) as zf:
+        zf.extractall(folder)
 
 
 # --------------------------------------------------------------------------
@@ -573,8 +690,7 @@ def _check_gtfs(path: Path, what: str) -> dict[str, str]:
     Returns the member name per table stem, so the caller can read agency.txt."""
     if not zipfile.is_zipfile(path):
         raise FeedError(f"{what} is not a zip file, so it is not a GTFS feed")
-    with zipfile.ZipFile(path) as zf:
-        _check_sizes(zf, what)
+    with _opened(path, what) as zf:
         members = {Path(n).stem: n for n in zf.namelist()
                    if n.endswith(".txt") and not n.endswith("/")}
     for stem in REQUIRED_TABLES:
@@ -604,7 +720,9 @@ def _agency_name(path: Path, members: dict[str, str], what: str) -> str | None:
     try:
         with zipfile.ZipFile(path) as zf, _member(zf, member, _Budget(what)) as fh:
             df = pd.read_csv(fh, dtype=str, skipinitialspace=True)
-    except TooLarge:
+    except FeedError:
+        # A limit, refused in a sentence of its own: never taken for a table
+        # that cannot be read, which answers no name.
         raise
     except UNREADABLE:
         return None
@@ -645,7 +763,8 @@ def _publishes_headways(path: Path, members: dict[str, str], what: str) -> bool:
             if not named:
                 return False
             trips = _trip_ids(zf, members["trips"], budget)
-    except TooLarge:
+    except FeedError:
+        # A limit, never taken for a table that cannot be read (issue 81).
         raise
     except UNREADABLE:
         return False
@@ -909,7 +1028,7 @@ def _download(url: str, dest: Path, *, named: str | None = None,
     the caller says otherwise, as it does for a preset's public one."""
     named = shown(url) if named is None else named
     over = (f"{named} could not be fetched: it is larger than "
-            f"{_size(MAX_DOWNLOAD_BYTES)}, the most a feed may be to download")
+            f"{_size(MAX_DOWNLOAD_BYTES)}, the most a feed may be to download; {NARROWER}")
     # Some agencies (MARTA) return 403 to a bare requests user-agent.
     resp = None
     try:
@@ -922,7 +1041,7 @@ def _download(url: str, dest: Path, *, named: str | None = None,
         # A length the server states is believed when it is too large, and
         # never when it is not: the count below is what holds the limit.
         if total is not None and total > MAX_DOWNLOAD_BYTES:
-            raise TooLarge(over)
+            raise FeedError(over)
         done = 0
         with open(dest, "wb") as out:
             for chunk in resp.iter_content(1 << 16):
@@ -936,7 +1055,7 @@ def _download(url: str, dest: Path, *, named: str | None = None,
                     progress("download", done, total)
         if done > MAX_DOWNLOAD_BYTES:
             dest.unlink(missing_ok=True)
-            raise TooLarge(over)
+            raise FeedError(over)
     except requests.RequestException as exc:
         dest.unlink(missing_ok=True)
         # No cause carried: the traceback a failed request is logged with
@@ -1175,8 +1294,7 @@ def _normalize(feed: Feed, src: Path, dst: Path) -> Path:
         df.columns = [c.strip().lstrip("\ufeff") for c in df.columns]
         return df
 
-    with zipfile.ZipFile(src) as zin:
-        _check_sizes(zin, what)
+    with _opened(src, what) as zin:
         names = [n for n in zin.namelist()
                  if n.endswith(".txt") and Path(n).stem in GTFS_TABLES
                  and Path(n).stem not in LOOM_SKIP]
@@ -1240,8 +1358,7 @@ def tables(feed_or_key: Feed | str, *, normalized: bool = True,
     path = normalize(feed) if normalized else fetch(feed.key)
     out: dict[str, pd.DataFrame] = {}
     what = repr(feed.key)
-    with zipfile.ZipFile(path) as zf:
-        _check_sizes(zf, what)
+    with _opened(path, what) as zf:
         budget = _Budget(what)
         for name in zf.namelist():
             stem = Path(name).stem
