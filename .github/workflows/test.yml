@@ -66,11 +66,13 @@ jobs:
 
       # The atlas's pages are generated and not committed, so axe reads a page
       # drawn from the page tests' hand-made network: three lines, a branch,
-      # the geographic view and five trips.
+      # the geographic view and five trips. _hand_made_page writes it as
+      # testville.html (animate.write's stem), in the folder named here.
       - name: axe over a drawn page, in both themes
         env:
           AUDIT_DIR: ${{ runner.temp }}/audit
         run: |
+          mkdir -p "$AUDIT_DIR"
           uv run --no-sync python -c '
           import os, sys
           from pathlib import Path
