@@ -220,7 +220,7 @@
         "mode": {
           "type": "string",
           "pattern": "^[a-z0-9-]+(,[a-z0-9-]+)*$",
-          "description": "What gtfs2graph keeps of the feed (LOOM's -m): names such as tram, subway, rail, bus, ferry or all, or route_type numbers, comma-joined for several; the registry entry's when omitted."
+          "description": "What gtfs2graph keeps of the feed (LOOM's -m): names such as tram, subway, rail, bus, ferry or all, or route_type numbers, comma-joined for several; the registry entry's when omitted. A name gtfs2graph does not know is refused by the server with the params kind, which the pattern cannot say."
         },
         "agency": {
           "type": "string",
@@ -1661,12 +1661,13 @@
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 120
+          "maxLength": 120,
+          "description": "The feed's name, kept trimmed. At most 120 characters as sent, before the trim. Text of only whitespace is refused by the server."
         },
         "mode": {
           "type": "string",
           "pattern": "^[a-z0-9-]+(,[a-z0-9-]+)*$",
-          "description": "What gtfs2graph keeps of the feed (LOOM's -m); all when omitted. feeds.inspect suggests one."
+          "description": "What gtfs2graph keeps of the feed (LOOM's -m); all when omitted. feeds.inspect suggests one. A name gtfs2graph does not know is refused by the server with the params kind, which the pattern cannot say."
         },
         "agency": {
           "type": "string",

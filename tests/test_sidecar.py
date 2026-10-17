@@ -112,8 +112,10 @@ def test_the_server_keeps_an_alt_of_a_thousand_characters_whole_and_refuses_the_
     assert refusal(7) == "provenance.alt must be text"
     assert refusal(True) == "provenance.alt must be text"
     assert refusal(["a"]) == "provenance.alt must be text"
-    # Not given is not refused, here as for every other field.
-    assert serve._provenance({"alt": None}) == {}
+    # Not given is not refused, here as for every other field; a null is, as
+    # the schema refuses it, where it used to be taken for one not given
+    # (engine issue 83).
+    assert refusal(None) == "provenance.alt must be text"
     assert serve._provenance({}) == {}
 
 

@@ -980,8 +980,10 @@ def test_a_plan_with_the_flags_comes_back_through_encode_as_it_went():
     """export.encode reads a plan back field by field: the flags are read as
     the plan writes them, and anything but true or false is refused."""
     job = export.plan(KEY, "instagram-reel", page=APP_PAGE, date=DATE, storyboard=CARDED)
-    assert serve._capture_job(job.to_dict()).beats == job.beats
-    sent = job.to_dict()
+    # As export.plan answers it, with the file name beside the plan.
+    planned = {**job.to_dict(), "filename": job.filename}
+    assert serve._capture_job(planned).beats == job.beats
+    sent = dict(planned)
     sent["beats"] = [{**job.beats[0], "card": "yes"}] + list(job.beats[1:])
     with pytest.raises(JsonRpcInvalidParams):
         serve._capture_job(sent)

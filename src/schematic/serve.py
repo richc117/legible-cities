@@ -202,11 +202,20 @@ def _no_extra(method: str, left: dict[str, Any]) -> None:
 
 
 def _feed_key(value: Any) -> str:
+    """A feed key as the schema writes one. Whether it is registered is
+    asked once every param has been judged (``_registered``), so params the
+    schema refuses are refused as params whatever the key names (engine
+    issue 83)."""
     if not isinstance(value, str) or not KEY_PATTERN.fullmatch(value):
         raise invalid_params("key must be a feed key: lower-case letters, digits and hyphens")
-    if value not in feeds.all():
-        raise EngineError("feed", f"{value!r} is not a registered feed")
     return value
+
+
+def _registered(key: str) -> str:
+    """A key the params named, refused with kind ``feed`` when no feed has it."""
+    if key not in feeds.all():
+        raise EngineError("feed", f"{key!r} is not a registered feed")
+    return key
 
 
 def _date(value: Any, name: str = "date") -> dt.date:
@@ -291,9 +300,9 @@ def _positive(left: dict[str, Any], name: str, default: float) -> float:
 
 
 def _strings(left: dict[str, Any], name: str) -> list[str] | None:
-    value = left.pop(name, None)
-    if value is None:
+    if name not in left:
         return None
+    value = left.pop(name)
     if not isinstance(value, list) or not all(isinstance(s, str) for s in value):
         raise invalid_params(f"{name} must be a list of strings")
     return value
@@ -304,9 +313,9 @@ COLOR_PATTERN = re.compile(HEX_COLOR_PATTERN)
 
 def _color(left: dict[str, Any], name: str) -> str | None:
     """A colour the client chose, written ``#rrggbb``, or none."""
-    value = left.pop(name, None)
-    if value is None:
+    if name not in left:
         return None
+    value = left.pop(name)
     if not isinstance(value, str) or not COLOR_PATTERN.fullmatch(value):
         raise invalid_params(f"{name} must be a colour written #rrggbb")
     return value
@@ -314,9 +323,9 @@ def _color(left: dict[str, Any], name: str) -> str | None:
 
 def _colors(left: dict[str, Any], name: str) -> dict[str, str] | None:
     """Line label to colour, every colour written ``#rrggbb``, or none."""
-    value = left.pop(name, None)
-    if value is None:
+    if name not in left:
         return None
+    value = left.pop(name)
     if not isinstance(value, dict) or not all(
             isinstance(k, str) and isinstance(v, str) and COLOR_PATTERN.fullmatch(v)
             for k, v in value.items()):
@@ -339,9 +348,9 @@ def _lines(left: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
     does not carry is not refused, as ``colors`` does not refuse one: it
     cannot be checked without reading the layout, and a project's choices
     must survive a narrower mode. ``pipeline.run`` ignores it."""
-    value = left.pop("lines", None)
-    if value is None:
+    if "lines" not in left:
         return None
+    value = left.pop("lines")
     if not isinstance(value, dict):
         raise invalid_params("lines must be an object of line label to the line's name, "
                              "hidden, width, casing and dash")
@@ -413,12 +422,13 @@ def _label_font(left: dict[str, Any]) -> dict[str, str]:
     return {"label_font": face}
 
 
-def _style(value: Any) -> Style | None:
-    """The style a client asked the map to be drawn with, or none.
+def _style(value: Any) -> Style:
+    """The style a client asked the map to be drawn with.
 
-    None when the parameter is absent, so ``pipeline.run`` keeps its own
-    default, ``Style(themed=True)``, and every output is what it was.
-    Otherwise an object of optional fields: the eight numbers of
+    Asked only when the parameter is present: absent, ``pipeline.run`` keeps
+    its own default, ``Style(themed=True)``, and every output is what it
+    was, while a null is refused as the schema refuses it. An object of
+    optional fields: the eight numbers of
     ``render.STYLE_RANGES``, each inside its closed range, the four
     colours of ``STYLE_COLORS``, each written ``#rrggbb``, the two marker
     shapes of ``render.STYLE_SHAPES``, each one of its names (issue 74),
@@ -447,8 +457,6 @@ def _style(value: Any) -> Style | None:
     The result is built ``themed=True`` and always, as ``pipeline.run``'s
     default is: ``Style(**fields)`` alone would write literal colours where
     the page expects ``var(--map-*)``."""
-    if value is None:
-        return None
     if not isinstance(value, dict):
         raise invalid_params("style must be an object")
     left = dict(value)
@@ -575,6 +583,13 @@ def _number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _whole(value: Any) -> bool:
+    """A number with nothing after the point: what the schema's ``integer``
+    takes, ``1080.0`` as well as ``1080`` (engine issue 83). A caller keeps
+    it as ``int(value)``."""
+    return _number(value) and float(value).is_integer()
+
+
 def _preset(value: Any) -> str:
     if not isinstance(value, str) or value not in export.PRESETS:
         raise invalid_params("preset must be the name of an export preset; export.presets "
@@ -583,16 +598,21 @@ def _preset(value: Any) -> str:
 
 
 def _optional(left: dict[str, Any], name: str, ok: Callable[[Any], bool], sentence: str) -> Any:
-    value = left.pop(name, None)
-    if value is not None and not ok(value):
+    """A field a client may leave out: None when it does, else its value,
+    which ``ok`` must take. A null is a value like any other, and refused
+    with the sentence, since no field read through here is nullable in the
+    schema; it used to be taken for the field left out (engine issue 83)."""
+    if name not in left:
+        return None
+    value = left.pop(name)
+    if not ok(value):
         raise invalid_params(f"{name} {sentence}")
     return value
 
 
 def _export_options(value: Any) -> dict[str, Any]:
-    """The optional dressing of an export, as ``export.plan`` takes it."""
-    if value is None:
-        return {}
+    """The optional dressing of an export, as ``export.plan`` takes it.
+    Asked only when the parameter is present; a null is refused."""
     if not isinstance(value, dict):
         raise invalid_params("options must be an object")
     left = dict(value)
@@ -616,18 +636,21 @@ def _export_options(value: Any) -> dict[str, Any]:
     if lines is not None:
         out["lines"] = tuple(lines)
     # A name or a list of beats; the type first, since a list is not a key.
-    board = left.pop("storyboard", None)
-    if isinstance(board, list):
-        try:
-            out["storyboard"] = export.authored_beats(board)
-        except ValueError as exc:
-            raise invalid_params(str(exc)) from exc
-    elif isinstance(board, str) and board in export.STORYBOARDS:
-        out["storyboard"] = board
-    elif board is not None:
-        raise invalid_params("storyboard must be the name of a storyboard; "
-                             "export.storyboards lists them")
-    quality = _optional(left, "quality", lambda v: v in export.QUALITY,
+    if "storyboard" in left:
+        board = left.pop("storyboard")
+        if isinstance(board, list):
+            try:
+                out["storyboard"] = export.authored_beats(board)
+            except ValueError as exc:
+                raise invalid_params(str(exc)) from exc
+        elif isinstance(board, str) and board in export.STORYBOARDS:
+            out["storyboard"] = board
+        else:
+            raise invalid_params("storyboard must be the name of a storyboard; "
+                                 "export.storyboards lists them")
+    # A string first: the table is a dict, and an array or an object is not
+    # a key of one, it is a TypeError.
+    quality = _optional(left, "quality", lambda v: isinstance(v, str) and v in export.QUALITY,
                         "must be draft, standard or high")
     if quality is not None:
         out["quality"] = quality
@@ -655,7 +678,20 @@ def _caption(value: Any) -> bool:
             and bool(CAPTION_PATTERN.fullmatch(value)))
 
 
+def _given(left: dict[str, Any], name: str, where: str) -> Any:
+    """A field the schema requires, whose value may be null: taken out of
+    ``left``, or refused as missing. A plan is handed back as export.plan
+    answered it, which writes every such field (engine issue 83)."""
+    if name not in left:
+        raise invalid_params(f"{where}.{name} is missing; hand the plan back as export.plan "
+                             f"answered it")
+    return left.pop(name)
+
+
 def _beat_payload(value: Any, where: str) -> dict[str, Any]:
+    """A beat of a plan handed back: every field the plan writes, each of
+    them required and all but ``secs`` and ``sweep`` nullable, as
+    ``BeatPayload`` says; ``card`` and ``draw_in`` written only where true."""
     if not isinstance(value, dict):
         raise invalid_params(f"{where} is not an object")
     left = dict(value)
@@ -663,13 +699,20 @@ def _beat_payload(value: Any, where: str) -> dict[str, Any]:
     if not _number(secs) or secs <= 0:
         raise invalid_params(f"{where} lasts no time")
     out: dict[str, Any] = {"secs": secs}
-    out["view"] = _optional(left, "view", lambda v: v in export.VIEWS,
-                            "names a view the page lacks")
-    out["labels"] = _optional(left, "labels", lambda v: isinstance(v, bool),
-                              "must be true or false")
+    view = _given(left, "view", where)
+    if view is not None and view not in export.VIEWS:
+        raise invalid_params(f"{where}.view names a view the page lacks")
+    out["view"] = view
+    labels = _given(left, "labels", where)
+    if labels is not None and not isinstance(labels, bool):
+        raise invalid_params(f"{where}.labels must be true, false or null")
+    out["labels"] = labels
     for field in ("at", "speed", "hours", "lo", "hi", "tween"):
-        out[field] = _optional(left, field, _number, "must be a number")
-    sweep = left.pop("sweep", False)
+        number = _given(left, field, where)
+        if number is not None and not _number(number):
+            raise invalid_params(f"{where}.{field} must be a number or null")
+        out[field] = number
+    sweep = _given(left, "sweep", where)
     if not isinstance(sweep, bool):
         raise invalid_params(f"{where} has a sweep that is not true or false")
     out["sweep"] = sweep
@@ -686,11 +729,18 @@ def _beat_payload(value: Any, where: str) -> dict[str, Any]:
 
 
 def _capture_job(value: Any) -> export.CaptureJob:
-    """A plan the client hands back, checked field by field before it is trusted."""
+    """A plan the client hands back, checked field by field before it is
+    trusted: every field ``CaptureJob`` requires, as export.plan wrote it,
+    ``colors`` alone optional, since a plan from before it read as null.
+    Whether its feed is registered is the caller's to ask, once every other
+    param is judged (``_registered``)."""
     if not isinstance(value, dict):
         raise invalid_params("plan must be the object export.plan answered with")
     left = dict(value)
-    left.pop("filename", None)          # the plan's own convenience; recomputed
+    # The plan's own convenience, recomputed from the stem and the format,
+    # and checked only as the schema holds it.
+    if not isinstance(left.pop("filename", None), str):
+        raise invalid_params("plan.filename must be the file name export.plan answered with")
     key = _feed_key(left.pop("key", None))
     preset = _preset(left.pop("preset", None))
     mode = left.pop("mode", None)
@@ -703,9 +753,9 @@ def _capture_job(value: Any) -> export.CaptureJob:
     for name, low in (("width", 1), ("height", 1), ("scale", 1), ("fps", 1), ("settle", 0),
                       ("crf", 0)):
         v = left.pop(name, None)
-        if not isinstance(v, int) or isinstance(v, bool) or v < low:
+        if not _whole(v) or v < low:
             raise invalid_params(f"plan.{name} must be a whole number, {low} or more")
-        ints[name] = v
+        ints[name] = int(v)
     fmt = left.pop("format", None)
     if fmt not in ("png", "jpg", "mp4", "gif"):
         raise invalid_params("plan.format must be png, jpg, mp4 or gif")
@@ -728,21 +778,21 @@ def _capture_job(value: Any) -> export.CaptureJob:
     view = left.pop("view", None)
     if view not in export.VIEWS:
         raise invalid_params("plan.view must be one of " + ", ".join(export.VIEWS))
-    board = left.pop("storyboard", "")
+    board = left.pop("storyboard", None)
     if not isinstance(board, str) or (board and board != export.CUSTOM
                                       and board not in export.STORYBOARDS):
         raise invalid_params("plan.storyboard must be a storyboard's name, custom, or empty")
-    at = left.pop("at", None)
+    at = _given(left, "at", "plan")
     if at is not None and not _number(at):
         raise invalid_params("plan.at must be seconds, or null")
-    notes = left.pop("notes", [])
+    notes = left.pop("notes", None)
     if not isinstance(notes, list) or not all(isinstance(n, str) for n in notes):
         raise invalid_params("plan.notes must be a list of strings")
-    caption = left.pop("caption", None)
+    caption = _given(left, "caption", "plan")
     if caption is not None and not _caption(caption):
         raise invalid_params(f"plan.caption must be text of 1 to {export.CAPTION_MAX} "
                              f"characters on one line, or null")
-    corner = left.pop("clock_corner", export.DEFAULT_CORNER)
+    corner = left.pop("clock_corner", None)
     if corner not in export.CLOCK_CORNERS:
         raise invalid_params("plan.clock_corner must be one of "
                              + ", ".join(export.CLOCK_CORNERS))
@@ -784,27 +834,24 @@ def _absolute(left: dict[str, Any], name: str, *, source: Path | None = None) ->
     return path
 
 
-def _provenance(value: Any) -> dict[str, Any] | None:
-    if value is None:
-        return None
+def _provenance(value: Any) -> dict[str, Any]:
+    """What the caller knows about the map, for the sidecar. Asked only when
+    the parameter is present; a null is refused, here and in every field."""
     if not isinstance(value, dict):
         raise invalid_params("provenance must be an object")
     left = dict(value)
     out: dict[str, Any] = {}
-    date = left.pop("service_date", None)
-    if date is not None:
-        out["service_date"] = _date(date).isoformat()
+    if "service_date" in left:
+        out["service_date"] = _date(left.pop("service_date"), "service_date").isoformat()
     for name in ("trips", "stations", "lines"):
-        v = _optional(left, name,
-                      lambda x: isinstance(x, int) and not isinstance(x, bool) and x >= 0,
-                      "must be a count")
+        v = _optional(left, name, lambda x: _whole(x) and x >= 0, "must be a count")
         if v is not None:
-            out[name] = v
+            out[name] = int(v)
     caveats = _strings(left, "caveats")
     if caveats is not None:
         out["caveats"] = caveats
-    alt = left.pop("alt", None)
-    if alt is not None:
+    if "alt" in left:
+        alt = left.pop("alt")
         longest = 1000  # code points, which is what the schema's maxLength counts
         if not isinstance(alt, str):
             raise invalid_params("provenance.alt must be text")
@@ -975,6 +1022,7 @@ class EngineEndpoint(Endpoint):
         # the stages every earlier build ran with, and the id stored today.
         tuned = pipeline.stages_for(_tuning(left.pop("tuning")) if "tuning" in left else None)
         _no_extra("graph.build", left)
+        _registered(key)
 
         def work(job: _Job, progress: Progress) -> dict[str, Any]:
             # A layout made here is moved into the store at its point of no
@@ -1014,13 +1062,14 @@ class EngineEndpoint(Endpoint):
         colors = _colors(left, "colors")
         default_color = _color(left, "default_color")
         line_order = _strings(left, "line_order")
-        style = _style(left.pop("style", None))
+        style = _style(left.pop("style")) if "style" in left else None
         dot_radius = _animation_number(left, "dot_radius", animate.DOT_RADIUS_RANGE,
                                        animate.DOT_RADIUS, "SVG user units at the map's width")
         trail = _animation_number(left, "trail", animate.TRAIL_RANGE, animate.TRAIL,
                                   "seconds of playback")
         lines = _lines(left)
         _no_extra("map.build", left)
+        _registered(key)
         folder = config.out_dir() / out if out else None
 
         def thumbnails(graph: LineGraph) -> dict[str, str]:
@@ -1072,6 +1121,7 @@ class EngineEndpoint(Endpoint):
         anchor = _date(left.pop("anchor"), "anchor") if "anchor" in left else dt.date.today()
         lines = _strings(left, "lines")
         _no_extra("feeds.service", left)
+        _registered(key)
 
         def work(_job: loom.Job, _progress: Progress) -> dict[str, Any]:
             # The calendar and the trips are all the day needs; stop_times,
@@ -1107,7 +1157,10 @@ class EngineEndpoint(Endpoint):
         key = _optional(left, "key",
                         lambda v: isinstance(v, str) and bool(KEY_PATTERN.fullmatch(v)),
                         "must be a feed key: lower-case letters, digits and hyphens")
-        name = _optional(left, "name", lambda v: isinstance(v, str) and 0 < len(v.strip()) <= 120,
+        # The length as sent, which the schema counts; text of only
+        # whitespace is the server's own refusal (engine issue 83).
+        name = _optional(left, "name",
+                         lambda v: isinstance(v, str) and len(v) <= 120 and bool(v.strip()),
                          "must be text, up to 120 characters")
         overrides = _overrides(left)
         for extra in ("label_pattern", "label_strip"):
@@ -1146,6 +1199,7 @@ class EngineEndpoint(Endpoint):
         left = _object("feeds.remove", params)
         key = _feed_key(left.pop("key", None))
         _no_extra("feeds.remove", left)
+        _registered(key)
 
         def work(job: _Job, _progress: Progress) -> dict[str, Any]:
             try:
@@ -1163,6 +1217,7 @@ class EngineEndpoint(Endpoint):
         key = _feed_key(left.pop("key", None))
         anchor = _date(left.pop("anchor"), "anchor") if "anchor" in left else dt.date.today()
         _no_extra("feeds.inspect", left)
+        _registered(key)
 
         def work(_job: loom.Job, _progress: Progress) -> dict[str, Any]:
             return feeds.inspect(key, anchor=anchor).to_dict()
@@ -1193,6 +1248,7 @@ class EngineEndpoint(Endpoint):
                                      "for a description without minutes")
             date = _date(value)
         _no_extra("render.stage", left)
+        _registered(key)
 
         def work(_job: loom.Job, _progress: Progress) -> dict[str, Any]:
             svg, counts, description = _drawn_stage(key, layout, stage, width=width,
@@ -1239,7 +1295,7 @@ class EngineEndpoint(Endpoint):
         date = _date(left.pop("date")).isoformat() if "date" in left else None
         # The folder map.build wrote the page into, read for a GIF's colours.
         out = _token(left.pop("out")) if "out" in left else None
-        options = _export_options(left.pop("options", None))
+        options = _export_options(left.pop("options")) if "options" in left else {}
         _no_extra("export.plan", left)
         # Refused here rather than by export.plan, so it is the caller's
         # mistake (params) and not the export's; a still ignores a list.
@@ -1247,6 +1303,7 @@ class EngineEndpoint(Endpoint):
                 and not isinstance(options.get("storyboard", ""), str)
                 and (options.get("view") or options.get("at"))):
             raise invalid_params(export.BESIDE_A_LIST)
+        _registered(key)
         try:
             job = export.plan(key, preset, page=page, date=date, out=out, **options)
         except (KeyError, ValueError) as exc:
@@ -1263,8 +1320,10 @@ class EngineEndpoint(Endpoint):
         job = _capture_job(left.pop("plan", None))
         source = _absolute(left, "source")
         dest = _absolute(left, "dest", source=source)
-        provenance = _provenance(left.pop("provenance", None))
+        provenance = (_provenance(left.pop("provenance")) if "provenance" in left
+                      else None)
         _no_extra("export.encode", left)
+        _registered(job.key)
         if job.mode == "video" and not source.is_dir():
             raise EngineError("io", "the frames directory is not there")
         if job.mode == "still" and not source.is_file():

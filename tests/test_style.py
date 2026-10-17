@@ -216,7 +216,11 @@ def test_interchange_radius_below_station_radius_is_refused_by_hand(client):
 # ---------------------------------------------------------- what is drawn today
 
 def test_omitted_and_empty_draw_today():
-    assert serve._style(None) is None
+    # Left out, map.build passes no style and the pipeline draws its own; a
+    # null is refused, as the schema refuses it, where it used to be taken
+    # for the parameter left out (engine issue 83).
+    with pytest.raises(JsonRpcInvalidParams, match="style must be an object"):
+        serve._style(None)
     assert serve._style({}) == Style(themed=True)
     assert draw(serve._style({})) == draw(Style(themed=True))
     # Themed whatever is asked: the page's variables are in the furniture.
@@ -524,7 +528,7 @@ def test_over_a_stored_layout_a_name_and_its_numbers_write_byte_identical_maps(t
     def drawn(label: str, style: dict | None) -> str:
         folder = tmp_path / label
         result = pipeline.run("pittsburgh-t", layout=stored.id, date=day, out_dir=folder,
-                              style=serve._style(style))
+                              style=None if style is None else serve._style(style))
         written = (folder / "pittsburgh-t.svg").read_text()
         assert written == result.render.svg, label
         return written

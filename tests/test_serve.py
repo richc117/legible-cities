@@ -1149,8 +1149,9 @@ def test_export_plan_refuses_with_the_export_modules_sentences(client):
 def test_export_plan_answers_the_caption_and_the_corner_and_refuses_the_rail(client):
     """Issue 40. The reel's clock goes top right by default and the plan says
     so; bottom right there is the plan's own refusal, an export error. A plan
-    handed back without the two fields, as a client written before them
-    sends it, reads as no caption and today's corner."""
+    handed back without the two fields is refused naming the first: the
+    schema requires both, as the app's stand-in does, and the server used to
+    read such a plan as no caption and today's corner (engine issue 83)."""
     plan = client.call("export.plan", {"key": KEY, "preset": "instagram-reel"})["result"]
     check(plan, "CaptureJob")
     assert plan["clock_corner"] == "top-right" and plan["caption"] is None
@@ -1161,8 +1162,11 @@ def test_export_plan_answers_the_caption_and_the_corner_and_refuses_the_rail(cli
     job = serve._capture_job(plan)
     assert (job.caption, job.clock_corner) == (None, "top-right")
     older = {k: v for k, v in plan.items() if k not in ("caption", "clock_corner")}
-    job = serve._capture_job(older)
-    assert (job.caption, job.clock_corner) == (None, "bottom-right")
+    assert invalid({"plan": older, "source": "/a", "dest": "/b/x.mp4"}, "ExportEncodeParams")
+    with pytest.raises(serve.JsonRpcInvalidParams, match="^plan.caption is missing"):
+        serve._capture_job(older)
+    with pytest.raises(serve.JsonRpcInvalidParams, match="^plan.clock_corner must be one of"):
+        serve._capture_job({**older, "caption": None})
 
 
 def _frames(into: Path, n: int, size: int, *, noise: bool = False) -> Path:
