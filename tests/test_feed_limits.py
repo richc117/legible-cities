@@ -385,10 +385,105 @@ def test_a_zip_whose_end_record_understates_its_files_is_refused_once_parsed(hom
     raw = bytearray(src.read_bytes())
     struct.pack_into("<HH", raw, raw.rfind(b"PK\x05\x06") + 8, 7, 7)
     src.write_bytes(bytes(raw))
-    assert feeds._entries(src) == 7
+    assert feeds._end_record(src)[0] == 7
     with pytest.raises(feeds.FeedError, match="^many.zip holds more than 10,000 files"):
         feeds.add(src)
     _nothing_kept()
+
+
+def _directory_only(path, entries: int, name_length: int, *, said: int = 1):
+    """A zip that is nothing but a central directory of ``entries`` records,
+    each named ``name_length`` bytes, whose end record says it holds
+    ``said``: what zipfile parses when it opens a zip, and no more."""
+    records = b"".join(
+        struct.pack(zipfile.structCentralDir, b"PK\x01\x02", 20, 3, 20, 0, 0, 0, 0, 0, 0, 0,
+                    0, name_length, 0, 0, 0, 0, 0, 0) + f"{i:0{name_length}d}".encode()
+        for i in range(entries))
+    path.write_bytes(records + struct.pack(zipfile.structEndArchive, b"PK\x05\x06", 0, 0,
+                                           said, said, len(records), 0, 0))
+    return path
+
+
+def test_a_directory_too_long_for_its_count_is_refused_before_it_is_parsed(home, tmp_path):
+    """zipfile parses a directory by its size and never by the count in the
+    end record, so an end record that says 1 over 40,000 entries of 250-byte
+    names would still have it make 40,000 ZipInfo: the size is read first."""
+    src = _directory_only(tmp_path / "directory.zip", 40_000, 250)
+    assert feeds._end_record(src) == (1, 40_000 * 296)
+    with peak() as seen, pytest.raises(feeds.FeedError) as refused:
+        feeds.add(src)
+    assert str(refused.value) == ("directory.zip lists its files in more than 10.5 MB, where a "
+                                  "feed's list is a few kB; re-zip it with only the feed's "
+                                  "tables")
+    assert seen[0] < 1 * MB, seen[0]
+    _nothing_kept()
+
+
+def test_a_zip64_locator_pointing_anywhere_is_answered_as_a_feed_error(server, tmp_path):
+    """The classic end record's count says 0xFFFF and a ZIP64 locator before
+    it gives an offset of 2**64 - 1. zipfile never seeks there: it reads the
+    ZIP64 end record from just before the locator, and so does the engine,
+    so the answer is a feed error, never an internal one."""
+    good = gtfs_zip(tmp_path / "good.zip").read_bytes()
+    at = good.rfind(b"PK\x05\x06")
+    record = bytearray(good[at:])
+    struct.pack_into("<HH", record, 8, 0xFFFF, 0xFFFF)
+    locator = struct.pack("<4sIQI", b"PK\x06\x07", 0, 0xFFFFFFFFFFFFFFFF, 1)
+    src = tmp_path / "locator.zip"
+    src.write_bytes(good[:at] + locator + bytes(record))
+    said = ("locator.zip holds more than 10,000 files, where a feed has a few dozen; re-zip "
+            "it with only the feed's tables")
+    with pytest.raises(feeds.FeedError, match=f"^{said}$"):
+        feeds.add(src)
+    _refused(server.call("feeds.add", {"source": str(src)}), said)
+
+
+def _damaged(path):
+    """A zip whose end record is whole and whose directory is not: the first
+    entry's signature in the directory is broken."""
+    gtfs_zip(path)
+    raw = bytearray(path.read_bytes())
+    raw[raw.index(b"PK\x01\x02") + 3] = 0x09
+    path.write_bytes(bytes(raw))
+    assert zipfile.is_zipfile(path)
+    with pytest.raises(zipfile.BadZipFile):
+        zipfile.ZipFile(path)
+    return path
+
+
+def test_a_zip_whose_directory_cannot_be_read_is_refused_in_a_sentence(home, tmp_path,
+                                                                     monkeypatch):
+    """On a feed added, a preset's tables read, and a zip unpacked for
+    gtfs2graph alike: never zipfile's own BadZipFile."""
+    with pytest.raises(feeds.FeedError) as refused:
+        feeds.add(_damaged(tmp_path / "damaged.zip"))
+    assert str(refused.value) == "damaged.zip is not a zip file, so it is not a GTFS feed"
+    _nothing_kept()
+
+    _preset(monkeypatch, _damaged(tmp_path / "preset.zip"))
+    with pytest.raises(feeds.FeedError) as refused:
+        feeds.tables("t", normalized=False)
+    assert str(refused.value) == "'t' is not a zip file, so it is not a GTFS feed"
+
+    zipped = _damaged(tmp_path / "damaged.normalized.zip")
+    with pytest.raises(feeds.FeedError) as refused:
+        loom.unpacked(zipped)
+    assert str(refused.value) == ("damaged.normalized.zip is not a zip file, so it is not a "
+                                  "GTFS feed")
+    assert not (tmp_path / "damaged.normalized.unpacking").exists()
+
+
+@pytest.mark.parametrize("member", ["agency.txt", "frequencies.txt"])
+def test_the_reads_add_makes_after_its_check_hold_the_limits_themselves(tmp_path, member):
+    """_agency_name and _publishes_headways open the zip the way every other
+    reader does, so neither leans on _check_gtfs having run first."""
+    src = gtfs_zip(tmp_path / "feed.zip", {**GOOD, "frequencies.txt": _frequencies("T1")})
+    _claim(src, member, feeds.MAX_TABLE_BYTES + 1)
+    members = {"agency": "agency.txt", "frequencies": "frequencies.txt", "trips": "trips.txt"}
+    with pytest.raises(feeds.FeedError, match=f"^feed.zip is too large to read: {member} "):
+        feeds._agency_name(src, members, "feed.zip")
+    with pytest.raises(feeds.FeedError, match=f"^feed.zip is too large to read: {member} "):
+        feeds._publishes_headways(src, members, "feed.zip")
 
 
 # ------------------------------------------------- unpacked for LOOM
