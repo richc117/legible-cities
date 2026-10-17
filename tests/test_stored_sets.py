@@ -23,6 +23,7 @@ taken to be free.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import shutil
 import subprocess
@@ -212,6 +213,94 @@ def test_a_live_writers_leftovers_are_left_alone(home, monkeypatch, by):
         assert (files_of(aside), files_of(scratch)) == kept
     assert ids_under(KEY) == sorted([made.id, other.id, aside.name, scratch.name])
     assert files_of(made.dir) == before
+
+
+# ------------------------------------ which set goes back, and what is no leftover
+
+def two_aside(made: pipeline.Layout, pids: tuple[int, int], by: str) -> tuple[Path, Path]:
+    """The stored set put aside twice, by ``pids`` in that order, its place
+    empty: the second is the newer, by its meta's ``made`` or, with no
+    ``made`` in either meta, by when its folder last changed. Each says
+    which it is in a file of its own."""
+    asides = [made.dir.with_name(f"{made.id}.old-{pid}") for pid in pids]
+    for aside, which, when in zip(asides, ("older", "newer"), ("2026-10-01", "2026-10-02")):
+        shutil.copytree(made.dir, aside)
+        meta = json.loads((aside / pipeline.META_FILE).read_text())
+        if by == "made":
+            meta["made"] = f"{when}T00:00:00+00:00"
+        else:
+            del meta["made"]
+        (aside / pipeline.META_FILE).write_text(json.dumps(meta))
+        (aside / "which").write_text(which)
+    shutil.rmtree(made.dir)
+    if by == "mtime":
+        os.utime(asides[0], (1_700_000_000, 1_700_000_000))
+        os.utime(asides[1], (1_800_000_000, 1_800_000_000))
+    return asides[0], asides[1]
+
+
+@pytest.mark.parametrize("by", ["made", "mtime"])
+def test_of_two_sets_left_aside_the_newest_goes_back_not_the_first_by_name(
+        home, monkeypatch, by):
+    """Two sets left aside for one id, the newer named ``.old-200`` and the
+    older ``.old-1000``, which comes first by name: the newer goes back,
+    and the older is left aside for a sweep, which removes it once its
+    writer is gone."""
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    older, newer = two_aside(made, (1000, 200), by)
+    assert sorted([older.name, newer.name])[0] == older.name, "the older comes first by name"
+    found = pipeline.stored(KEY)
+    assert found.id == made.id
+    assert (made.dir / "which").read_text() == "newer"
+    assert older.is_dir() and not newer.exists()
+
+
+def test_a_sweep_puts_the_newest_set_back_and_removes_the_older(home, monkeypatch):
+    """The same in a build's sweep, of writers that are gone: the newer set
+    goes back, whichever comes first by name, and the older goes."""
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    first, second = sorted((gone(), gone()), key=lambda pid: f"{made.id}.old-{pid}")
+    older, newer = two_aside(made, (first, second), "made")
+    other = pipeline.lay_out(KEY, mode="tram")
+    assert (made.dir / "which").read_text() == "newer"
+    assert ids_under(KEY) == sorted([made.id, other.id])
+
+
+@pytest.mark.parametrize("name", ["{id}.old-{pid}-backup", "{id}.old-{pid}.bak",
+                                  "{id}.old-{pid}x", "{id}.older-{pid}"])
+def test_a_folder_named_like_a_set_put_aside_but_not_one_is_left_alone(
+        home, monkeypatch, name):
+    """``_leftover`` reads a name whole: a person's own copy of a set named
+    ``<id>.old-<pid>-backup`` is not a set a swap put aside. Its place empty,
+    a lookup does not move it into it, and a sweep neither moves nor removes
+    it, though its pid's process is gone."""
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    before = files_of(made.dir)
+    theirs = made.dir.with_name(name.format(id=made.id, pid=gone()))
+    made.dir.rename(theirs)
+    assert pipeline.stored(KEY) is None
+    other = pipeline.lay_out(KEY, mode="tram")
+    assert ids_under(KEY) == sorted([other.id, theirs.name])
+    assert files_of(theirs) == before
+
+
+def test_read_layout_and_stored_layouts_never_put_a_set_back(home, monkeypatch):
+    """The two reads that do not take the store's lock do not write either:
+    a set left aside reads as not stored and is not listed, and stays where
+    it is, until a door that takes the lock is asked for its layout."""
+    FakeLoom(monkeypatch)
+    made = pipeline.lay_out(KEY)
+    before = files_of(made.dir)
+    aside = made.dir.with_name(f"{made.id}.old-{gone()}")
+    made.dir.rename(aside)
+    assert pipeline.read_layout(KEY, made.id) is None
+    assert pipeline.stored_layouts(KEY) == []
+    assert files_of(aside) == before and not made.dir.exists(), "neither read wrote"
+    assert pipeline.read_stored(KEY, made.id, [])[0].id == made.id
+    assert [layout.id for layout in pipeline.stored_layouts(KEY)] == [made.id]
 
 
 # ---------------------------------------- feeds.remove under the store's lock

@@ -245,7 +245,14 @@ def layout_dir(key: str, layout: str) -> Path:
 
 
 def read_layout(key: str, layout: str) -> Layout | None:
-    """The stored layout with this id, or None when it is not there whole."""
+    """The stored layout with this id, or None when it is not there whole.
+
+    The store's own read, and only a read: the doors that look a layout up
+    (``stored``, ``read_stored``, ``lay_out``) call it under ``_lock``, once
+    they have put back a set a swap left aside (``_put_back``). It neither
+    takes the lock, which they hold and which is not re-entrant, nor puts a
+    set back, which needs it; so a set left aside reads here as not stored
+    until one of the doors is asked for its layout (engine issue 83)."""
     d = layout_dir(key, layout)
     meta_path = d / META_FILE
     if not meta_path.is_file() or not all((d / name).is_file() for name in STAGE_FILES.values()):
@@ -258,7 +265,13 @@ def read_layout(key: str, layout: str) -> Layout | None:
 
 
 def stored_layouts(key: str) -> list[Layout]:
-    """Every whole layout stored for a feed, newest first."""
+    """Every whole layout stored for a feed, newest first.
+
+    It never writes, so a test or the site can read every layout of a real
+    store through it without changing one: not even to put back a set a
+    swap left aside, which is not listed until ``stored``, ``read_stored``
+    or ``lay_out`` is asked for its layout and puts it back (engine issue
+    83)."""
     folder = config.graphs_dir() / key
     if not folder.is_dir():
         return []
@@ -643,7 +656,27 @@ def _replace(src: Path, dst: Path) -> None:
         _pause(_SWAP_WAIT)
 
 
-_LEFTOVER = re.compile(r"^(?P<layout>[0-9a-f]{64})\.(?P<what>building|old)-(?P<pid>\d+)")
+# What a build or a swap leaves beside a feed's layouts, each name read
+# whole: a build's scratch, ``<id>.building-<pid>-<suffix>`` as
+# ``tempfile.mkdtemp`` names it, and a stored set put aside, ``<id>.old-<pid>``
+# with nothing after it (engine issue 83). Anything else, a person's own
+# ``<id>.old-12-backup`` among it, is no leftover and is never moved or
+# removed.
+_SCRATCH = re.compile(r"(?P<layout>[0-9a-f]{64})\.building-(?P<pid>\d+)(?:-[a-z0-9_]+)?")
+_ASIDE = re.compile(r"(?P<layout>[0-9a-f]{64})\.old-(?P<pid>\d+)")
+
+
+def _leftover(child: Path) -> tuple[str, str, int] | None:
+    """What a child of a feed's folder is when it is a folder named as a
+    scratch or as a set put aside: (``"building"`` or ``"old"``, the layout,
+    the pid). None for anything else, a link included."""
+    for what, pattern in (("building", _SCRATCH), ("old", _ASIDE)):
+        m = pattern.fullmatch(child.name)
+        if m is not None:
+            if child.is_symlink() or not child.is_dir():
+                return None
+            return what, m["layout"], int(m["pid"])
+    return None
 
 
 def _alive(pid: int) -> bool:
@@ -669,20 +702,23 @@ def _alive(pid: int) -> bool:
 
 
 def _sweep(folder: Path) -> None:
-    """What a crash leaves in a feed's folder, and only that. A set put
-    aside whose place is empty goes back into it (``_restored``), whoever
-    put it aside. The rest goes only when the process that left it is gone
-    (``_alive``): a scratch, which a live build is still writing, and a set
-    put aside whose place holds a set again, which a live swap removes
-    itself. The caller holds ``_lock``."""
-    for child in list(folder.iterdir()):
-        m = _LEFTOVER.match(child.name)
-        if m is None or child.is_symlink() or not child.is_dir():
-            continue
-        target = folder / m["layout"]
-        if m["what"] == "old" and not target.exists():
-            _restored(child, target)
-        elif not _alive(int(m["pid"])):
+    """What a crash leaves in a feed's folder, and only that (``_leftover``).
+    A set put aside whose place is empty goes back into it, the newest where
+    there are several (``_newest_back``), whoever put it aside. The rest
+    goes only when the process that left it is gone (``_alive``): a scratch,
+    which a live build is still writing, and a set put aside whose place
+    holds a set again, which a live swap removes itself. The caller holds
+    ``_lock``."""
+    found = [(child, kind) for child in list(folder.iterdir())
+             if (kind := _leftover(child)) is not None]
+    for layout in sorted({layout for _child, (what, layout, _pid) in found if what == "old"}):
+        _newest_back(folder, layout)
+    for child, (what, layout, pid) in found:
+        if not child.exists():
+            continue  # put back just now
+        if what == "old" and not (folder / layout).exists():
+            continue  # not put back: the next look tries again
+        if not _alive(pid):
             shutil.rmtree(child, ignore_errors=True)
 
 
@@ -692,18 +728,42 @@ def _put_back(key: str, layout: str) -> None:
     asked whether the layout is stored (``stored``, ``read_stored``,
     ``lay_out``), so that it is found, and a forced re-layout replaces it as
     it would have. The caller holds ``_lock``."""
-    target = layout_dir(key, layout)
+    _newest_back(config.graphs_dir() / key, layout)
+
+
+def _newest_back(folder: Path, layout: str) -> None:
+    """When ``layout``'s place in ``folder`` is empty, the newest set put
+    aside for it goes back (``_restored``), newest by ``_made``. Only that
+    one is tried: the others stay, for a sweep to remove once their place
+    holds a set, and a newest that cannot be moved now is tried again at the
+    next look rather than an older set put in its place. The caller holds
+    ``_lock``."""
+    target = folder / layout
     if target.exists():
         return
     try:
-        children = sorted(target.parent.iterdir())
+        children = list(folder.iterdir())
     except OSError:
         return
-    for child in children:
-        m = _LEFTOVER.match(child.name)
-        if (m is not None and m["what"] == "old" and m["layout"] == layout
-                and _restored(child, target)):
-            return
+    asides = [child for child in children
+              if (kind := _leftover(child)) is not None and kind[:2] == ("old", layout)]
+    if asides:
+        _restored(max(asides, key=_made), target)
+
+
+def _made(aside: Path) -> tuple[float, str]:
+    """When a set put aside was made: its meta's ``made``, as a timestamp,
+    else when its folder last changed; its name breaks a tie, never its
+    pid's order as text, by which ``.old-1000`` comes before ``.old-200``."""
+    try:
+        made = json.loads((aside / META_FILE).read_text(encoding="utf-8"))["made"]
+        when = dt.datetime.fromisoformat(made).timestamp()
+    except (OSError, ValueError, KeyError, TypeError):
+        try:
+            when = aside.stat().st_mtime
+        except OSError:
+            when = float("-inf")
+    return when, aside.name
 
 
 def _restored(aside: Path, target: Path) -> bool:
