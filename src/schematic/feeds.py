@@ -455,43 +455,49 @@ def _is_table(name: str) -> bool:
 READABLE = frozenset({zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED})
 
 
-def _end_record(path: Path) -> tuple[int, int] | None:
-    """How many entries the zip's end records say it holds, and how many
-    bytes its central directory takes, read where zipfile reads them; None
-    where there is no end record (zipfile then refuses the zip in its words).
+# zipfile's own reading of a zip's end record: the function ZipFile runs as
+# it opens a zip, to find the directory it then parses. It is private, so a
+# test holds its name and its shape, and if it is ever gone a zip is refused
+# rather than judged by a search of the engine's own: two searches can find
+# two records, and a zip that shows the check a small directory and zipfile
+# a huge one would pass the one and be parsed whole by the other (issue 81).
+_END_RECORD = getattr(zipfile, "_EndRecData", None)
+_END_ENTRIES = getattr(zipfile, "_ECD_ENTRIES_TOTAL", None)
+_END_SIZE = getattr(zipfile, "_ECD_SIZE", None)
 
-    Read before ``ZipFile`` opens the zip, because opening it parses the whole
+
+def _not_a_zip(what: str) -> FeedError:
+    return FeedError(f"{what} is not a zip file, so it is not a GTFS feed")
+
+
+def _unchecked(what: str) -> FeedError:
+    return FeedError(f"{what} cannot be held to a feed's limits by the Python this engine runs "
+                     "on; the engine needs updating")
+
+
+def _end_record(fh: IO[bytes], what: str) -> tuple[int, int]:
+    """How many entries the zip's end record says it holds, and how many
+    bytes its central directory takes: the numbers of the very record, ZIP64
+    or not, that ZipFile will parse the directory from, because they are
+    read with zipfile's own function, from the same open file.
+
+    Read before ZipFile opens the zip, because opening it parses the whole
     directory into one ZipInfo per entry, about 560 bytes each: a zip of
     empty entries is under 80 bytes an entry on disk, so a 500 MB one would
-    make several GB of them before a count could be looked at. Where a ZIP64
-    locator sits just before the classic record, zipfile takes the numbers of
-    the ZIP64 end record that sits just before the locator, and so does this;
-    neither ever seeks to the offset the locator gives, which can be anything
-    up to 2**64 - 1."""
-    with open(path, "rb") as fh:
-        fh.seek(0, os.SEEK_END)
-        size = fh.tell()
-        tail_size = min(size, 22 + 0xFFFF)
-        fh.seek(size - tail_size)
-        tail = fh.read(tail_size)
-        at = tail.rfind(b"PK\x05\x06")
-        if at < 0 or tail_size - at < 22:
-            return None
-        count, directory = struct.unpack_from("<HI", tail, at + 10)
-        if at < 20 or tail[at - 20:at - 16] != b"PK\x06\x07":
-            return count, directory
-        start = size - tail_size + at - 20 - 56
-        if start < 0:
-            return count, directory
-        try:
-            fh.seek(start)
-            record = fh.read(56)
-        except (OverflowError, OSError, ValueError):
-            return None
-    if len(record) == 56 and record[:4] == b"PK\x06\x06":
-        entries, length = struct.unpack_from("<QQ", record, 32)
-        return entries, length
-    return count, directory
+    make several GB of them before a count could be looked at."""
+    if _END_RECORD is None or _END_ENTRIES is None or _END_SIZE is None:
+        raise _unchecked(what)
+    try:
+        record = _END_RECORD(fh)
+    except (OSError, ValueError, OverflowError, struct.error, zipfile.BadZipFile) as exc:
+        # What makes ZipFile refuse the zip too, in its own words.
+        raise _not_a_zip(what) from exc
+    if not record:
+        raise _not_a_zip(what)
+    try:
+        return int(record[_END_ENTRIES]), int(record[_END_SIZE])
+    except (IndexError, TypeError, ValueError) as exc:
+        raise _unchecked(what) from exc
 
 
 def _check_sizes(zf: zipfile.ZipFile, what: str) -> None:
@@ -519,28 +525,29 @@ def _check_sizes(zf: zipfile.ZipFile, what: str) -> None:
 
 @contextmanager
 def _opened(path: Path, what: str,
-            kind: type[zipfile.ZipFile] = zipfile.ZipFile) -> Iterator[zipfile.ZipFile]:
-    """``path``'s zip, opened once its end records say it holds no more than
+            kind: Callable[[IO[bytes]], zipfile.ZipFile] = zipfile.ZipFile,
+            ) -> Iterator[zipfile.ZipFile]:
+    """``path``'s zip, opened once its end record says it holds no more than
     ``MAX_ENTRIES`` files in a directory of no more than
     ``MAX_DIRECTORY_BYTES``, and yielded once the directory it parsed agrees
-    and its headers are within the limits. A zip that zipfile cannot open is
-    refused in the sentence a file that is no zip is."""
-    record = _end_record(path)
-    if record is not None:
-        count, directory = record
+    and its headers are within the limits. The record is read from the file
+    ZipFile is then handed, so both judge the same bytes. A zip that zipfile
+    cannot open is refused in the sentence a file that is no zip is."""
+    with open(path, "rb") as fh:
+        count, directory = _end_record(fh, what)
         if count > MAX_ENTRIES:
             raise _too_many(what)
         if directory > MAX_DIRECTORY_BYTES:
             raise _too_long(what)
-    try:
-        zf = kind(path)
-    except zipfile.BadZipFile as exc:
-        raise FeedError(f"{what} is not a zip file, so it is not a GTFS feed") from exc
-    with zf:
-        if len(zf.filelist) > MAX_ENTRIES:
-            raise _too_many(what)
-        _check_sizes(zf, what)
-        yield zf
+        try:
+            zf = kind(fh)
+        except zipfile.BadZipFile as exc:
+            raise _not_a_zip(what) from exc
+        with zf:
+            if len(zf.filelist) > MAX_ENTRIES:
+                raise _too_many(what)
+            _check_sizes(zf, what)
+            yield zf
 
 
 # How much of a table is read at a time: the most one step of inflating it
@@ -613,9 +620,9 @@ class _CountedZip(zipfile.ZipFile):
     its compression, ``extractall``'s reads included: it opens each member
     it writes out with ``open``, and copies it a piece at a time."""
 
-    def __init__(self, path: Path) -> None:
-        super().__init__(path)
-        self.budget = _Budget(path.name)
+    def __init__(self, file: IO[bytes], what: str) -> None:
+        super().__init__(file)
+        self.budget = _Budget(what)
 
     def open(self, name, mode="r", pwd=None, *, force_zip64=False):  # type: ignore[override]
         if mode != "r" or pwd is not None:
@@ -629,7 +636,7 @@ def unpack(path: Path, folder: Path) -> None:
     and the tables' headers checked first, and each file read through the
     count, so a zip that unpacks past them is refused with nothing larger
     than a limit written. A refusal names the zip by its file name."""
-    with _opened(path, path.name, kind=_CountedZip) as zf:
+    with _opened(path, path.name, kind=lambda fh: _CountedZip(fh, path.name)) as zf:
         zf.extractall(folder)
 
 
@@ -718,7 +725,7 @@ def _check_gtfs(path: Path, what: str) -> dict[str, str]:
     """The tables a feed must carry, or a FeedError saying which is missing.
     Returns the member name per table stem, so the caller can read agency.txt."""
     if not zipfile.is_zipfile(path):
-        raise FeedError(f"{what} is not a zip file, so it is not a GTFS feed")
+        raise _not_a_zip(what)
     with _opened(path, what) as zf:
         members = {Path(n).stem: n for n in zf.namelist()
                    if n.endswith(".txt") and not n.endswith("/")}

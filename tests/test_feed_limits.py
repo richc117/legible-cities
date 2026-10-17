@@ -385,22 +385,40 @@ def test_a_zip_whose_end_record_understates_its_files_is_refused_once_parsed(hom
     raw = bytearray(src.read_bytes())
     struct.pack_into("<HH", raw, raw.rfind(b"PK\x05\x06") + 8, 7, 7)
     src.write_bytes(bytes(raw))
-    assert feeds._end_record(src)[0] == 7
+    with open(src, "rb") as fh:
+        assert feeds._end_record(fh, "many.zip")[0] == 7
     with pytest.raises(feeds.FeedError, match="^many.zip holds more than 10,000 files"):
         feeds.add(src)
     _nothing_kept()
 
 
+def _directory(entries: int, name_length: int, *, last_comment: bytes = b"") -> bytes:
+    """A central directory of ``entries`` records, each named ``name_length``
+    bytes, the last carrying ``last_comment``: what zipfile parses when it
+    opens a zip. No member data is needed for that."""
+    def record(i: int, comment: bytes) -> bytes:
+        return struct.pack(zipfile.structCentralDir, b"PK\x01\x02", 20, 3, 20, 0, 0, 0, 0, 0,
+                           0, 0, 0, name_length, 0, len(comment), 0, 0, 0, 0
+                           ) + f"{i:0{name_length}d}".encode() + comment
+    return b"".join(record(i, last_comment if i == entries - 1 else b"")
+                    for i in range(entries))
+
+
+def _end(count: int, size: int, *, offset: int = 0, comment: int = 0,
+         disk_count: int | None = None) -> bytes:
+    """A classic end record: ``count`` entries in ``size`` bytes of
+    directory at ``offset``, saying its comment is ``comment`` bytes."""
+    return struct.pack(zipfile.structEndArchive, b"PK\x05\x06", 0, 0,
+                       count if disk_count is None else disk_count, count, size, offset,
+                       comment)
+
+
 def _directory_only(path, entries: int, name_length: int, *, said: int = 1):
     """A zip that is nothing but a central directory of ``entries`` records,
     each named ``name_length`` bytes, whose end record says it holds
-    ``said``: what zipfile parses when it opens a zip, and no more."""
-    records = b"".join(
-        struct.pack(zipfile.structCentralDir, b"PK\x01\x02", 20, 3, 20, 0, 0, 0, 0, 0, 0, 0,
-                    0, name_length, 0, 0, 0, 0, 0, 0) + f"{i:0{name_length}d}".encode()
-        for i in range(entries))
-    path.write_bytes(records + struct.pack(zipfile.structEndArchive, b"PK\x05\x06", 0, 0,
-                                           said, said, len(records), 0, 0))
+    ``said``."""
+    records = _directory(entries, name_length)
+    path.write_bytes(records + _end(said, len(records)))
     return path
 
 
@@ -409,7 +427,8 @@ def test_a_directory_too_long_for_its_count_is_refused_before_it_is_parsed(home,
     end record, so an end record that says 1 over 40,000 entries of 250-byte
     names would still have it make 40,000 ZipInfo: the size is read first."""
     src = _directory_only(tmp_path / "directory.zip", 40_000, 250)
-    assert feeds._end_record(src) == (1, 40_000 * 296)
+    with open(src, "rb") as fh:
+        assert feeds._end_record(fh, "directory.zip") == (1, 40_000 * 296)
     with peak() as seen, pytest.raises(feeds.FeedError) as refused:
         feeds.add(src)
     assert str(refused.value) == ("directory.zip lists its files in more than 10.5 MB, where a "
@@ -436,6 +455,145 @@ def test_a_zip64_locator_pointing_anywhere_is_answered_as_a_feed_error(server, t
     with pytest.raises(feeds.FeedError, match=f"^{said}$"):
         feeds.add(src)
     _refused(server.call("feeds.add", {"source": str(src)}), said)
+
+
+# ----------------------------------------- one end record, zipfile's
+#
+# The numbers the limits judge come from the end record zipfile itself will
+# parse the directory from (feeds._end_record runs zipfile's own reading of
+# it, on the file ZipFile is then handed). A search of the engine's own could
+# find another record than zipfile does, show the check a small directory,
+# and leave zipfile to parse a huge one. Each zip below hides 40,000 entries
+# of 250-byte names, 11.8 MB of directory, behind something else.
+
+HIDDEN = 40_000
+LONG = ("lists its files in more than 10.5 MB, where a feed's list is a few kB; re-zip it "
+        "with only the feed's tables")
+MANY = ("holds more than 10,000 files, where a feed has a few dozen; re-zip it with only "
+        "the feed's tables")
+
+
+def _refused_unparsed(src, said: str) -> None:
+    """``feeds.add`` refuses ``src`` with ``said`` and never parses the
+    hidden directory: 40,000 ZipInfo would be some 38 MB."""
+    with peak() as seen, pytest.raises(feeds.FeedError) as refused:
+        feeds.add(src)
+    assert str(refused.value) == f"{src.name} {said}"
+    assert seen[0] < 1 * MB, seen[0]
+    _nothing_kept()
+
+
+def test_the_signature_inside_the_end_records_own_numbers_hides_nothing(home, tmp_path):
+    """The record's two counts are 0x4B50 and 0x0605, so its own bytes spell
+    PK\\x05\\x06 again 8 bytes in. zipfile takes the record (it ends the
+    file, with no comment); a search for the last signature would take the
+    one inside it, find no whole record there and judge nothing."""
+    records = _directory(HIDDEN, 250)
+    src = tmp_path / "inside.zip"
+    src.write_bytes(records + _end(0x0605, len(records), disk_count=0x4B50))
+    assert src.read_bytes().rfind(b"PK\x05\x06") == len(records) + 8
+    _refused_unparsed(src, LONG)
+
+
+def test_a_zip64_record_just_outside_the_last_64_kb_hides_nothing(home, tmp_path):
+    """A 65,535-byte comment puts the classic record at the very start of the
+    window zipfile searches, and the ZIP64 locator just before it, outside.
+    zipfile reads the locator there and takes the ZIP64 record's 40,000
+    entries; the classic record says one."""
+    records = _directory(HIDDEN, 250)
+    end64 = struct.pack(zipfile.structEndArchive64, b"PK\x06\x06", 44, 45, 45, 0, 0,
+                        HIDDEN, HIDDEN, len(records), 0)
+    locator = struct.pack(zipfile.structEndArchive64Locator, b"PK\x06\x07", 0,
+                          len(records), 1)
+    src = tmp_path / "zip64.zip"
+    src.write_bytes(records + end64 + locator + _end(1, 46, comment=0xFFFF) + b"x" * 0xFFFF)
+    _refused_unparsed(src, MANY)
+
+
+def test_a_fake_end_record_in_the_comment_is_the_one_zipfile_reads(home, tmp_path):
+    """The comment is a whole end record saying one entry in 46 bytes, and it
+    ends the file. zipfile reads that one, as the check does, and so never
+    reaches the real directory: the zip is refused as no zip, unparsed."""
+    records = _directory(HIDDEN, 250)
+    src = tmp_path / "comment.zip"
+    src.write_bytes(records + _end(HIDDEN, len(records), comment=22) + _end(1, 46))
+    _refused_unparsed(src, "is not a zip file, so it is not a GTFS feed")
+
+
+def test_a_fake_end_record_earlier_in_the_tail_is_not_the_one_read(home, tmp_path):
+    """A record saying one entry, inside the last directory entry's comment,
+    sits before the real record; both zipfile and the check read the last."""
+    records = _directory(HIDDEN, 250, last_comment=_end(1, 46))
+    src = tmp_path / "earlier.zip"
+    src.write_bytes(records + _end(1, len(records)))
+    _refused_unparsed(src, LONG)
+
+
+def test_a_comment_length_past_the_end_of_the_file_hides_nothing(home, tmp_path):
+    """zipfile does not hold the comment's length to what follows the record,
+    so a record saying 5,000 bytes of comment with none after it is still
+    the one it parses from."""
+    records = _directory(HIDDEN, 250)
+    src = tmp_path / "overshoot.zip"
+    src.write_bytes(records + _end(1, len(records), comment=5000))
+    _refused_unparsed(src, LONG)
+
+
+def test_bytes_before_a_zip_change_nothing_either_way(home, tmp_path):
+    """A zip after other bytes, as a self-extracting archive is: a feed is
+    still added and read, and a hidden directory still refused."""
+    junk = b"#!/bin/sh\nexit 0\n" + bytes(4096)
+    records = _directory(HIDDEN, 250)
+    hidden = tmp_path / "prefixed-hidden.zip"
+    hidden.write_bytes(junk + records + _end(1, len(records), offset=0))
+    _refused_unparsed(hidden, LONG)
+
+    src = tmp_path / "prefixed.zip"
+    src.write_bytes(junk + gtfs_zip(tmp_path / "plain.zip").read_bytes())
+    feed = feeds.add(src)
+    assert "stop_times" in feeds.tables(feed, normalized=False)
+
+
+def test_the_signature_in_a_feeds_bytes_is_no_end_record(home, tmp_path):
+    """PK\\x05\\x06 in a stored table near the end of the zip is data, not a
+    record: the feed is added. In the zip's own comment it is a record to
+    zipfile, which then cannot open the zip; the engine refuses it in a
+    sentence of its own, from whatever numbers that record holds."""
+    tables = {**GOOD, "feed_info.txt": "feed_publisher_name\nPK\x05\x06 Transit\n"}
+    feed = feeds.add(gtfs_zip(tmp_path / "data.zip", tables))
+    assert feeds.tables(feed, normalized=False)["feed_info"].iloc[0, 0] == "PK\x05\x06 Transit"
+
+    src = gtfs_zip(tmp_path / "commented.zip")
+    with zipfile.ZipFile(src, "a") as z:
+        z.comment = b"made with PK\x05\x06 tools, as a comment may say"
+    with pytest.raises(zipfile.BadZipFile):
+        zipfile.ZipFile(src)
+    with pytest.raises(feeds.FeedError, match="^commented.zip "):
+        feeds.add(src)
+
+
+def test_zipfiles_end_record_reader_is_there_and_reads_what_zipfile_parses(tmp_path):
+    """The check leans on zipfile's private _EndRecData: held here, so a
+    Python that renames it fails this test rather than every feed."""
+    assert feeds._END_RECORD is zipfile._EndRecData
+    for entries in (len(GOOD), 70_000):
+        src = _many(tmp_path / f"{entries}.zip", entries)
+        with open(src, "rb") as fh:
+            count, size = feeds._end_record(fh, src.name)
+        with zipfile.ZipFile(src) as zf:
+            assert count == len(zf.filelist) == entries
+            assert size == sum(46 + len(i.orig_filename.encode()) + len(i.extra)
+                               + len(i.comment) for i in zf.filelist)
+
+
+def test_without_zipfiles_reader_a_zip_is_refused_not_judged_another_way(home, tmp_path,
+                                                                        monkeypatch):
+    monkeypatch.setattr(feeds, "_END_RECORD", None)
+    with pytest.raises(feeds.FeedError) as refused:
+        feeds.add(gtfs_zip(tmp_path / "small.zip"))
+    assert str(refused.value) == ("small.zip cannot be held to a feed's limits by the Python "
+                                  "this engine runs on; the engine needs updating")
+    _nothing_kept()
 
 
 def _damaged(path):
