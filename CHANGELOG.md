@@ -11,6 +11,10 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 - **Dependabot proposes the Python packages' updates here** (`.github/dependabot.yml`; the desktop app's issue 472): one pull request a week for every package in `uv.lock`, the transitive ones included, since the app ships the lock. A bump is made on `main` by relocking, never by merging the pull request on GitHub, which would reach one remote of two. Until now the only automatic signal was the app's own pip entry, whose pull requests could never land there.
 
+### Changed
+
+- **The lock moves the packages the engine ships with**: pandas 3.0.5 to 3.0.6, numpy 2.5.3 to 2.5.4, certifi 2026.7.22 to 2026.10.19, charset-normalizer 3.5.1 to 3.5.2, idna 3.19 to 3.20 and tzdata 2026.3 to 2026.5; python-dateutil, requests, urllib3, python-lsp-jsonrpc, six and ujson stay where they were. The development and notebooks extras moved too, and the desktop app ships this lock. The suite passes unchanged.
+
 ## [0.19.0] - 2026-10-23
 
 ### Fixed
