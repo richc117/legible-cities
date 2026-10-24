@@ -1,0 +1,35 @@
+# Dependency updates for the engine's Python packages. Alerts come from the
+# repository's security settings; this file is the other half - pull
+# requests that propose the upgrade.
+#
+# The desktop app ships this lock: its runtime is `uv.lock` at the pinned
+# tag, exported and hashed there, and never bumped on its own (the app's
+# ADR-057). So a package moves here first, then in a release, then in the
+# app's pin, and this is where a bump has to be proposed.
+#
+# Never merge one of these on GitHub: `main` is committed locally and pushed
+# to two remotes, so a merge made here reaches only one of them. Make the
+# bump on `main` with `uv lock --upgrade-package <name>`, run the suite,
+# and push both; Dependabot closes its pull request once the lock already
+# has the version.
+version: 2
+
+updates:
+  - package-ecosystem: uv
+    directory: "/"
+    schedule:
+      interval: weekly
+    # Every package in the lock, not only those `pyproject.toml` names: the
+    # app ships the transitive ones too (urllib3 arrives through requests,
+    # numpy and tzdata through pandas).
+    allow:
+      - dependency-type: all
+    # One pull request a week for all of them. The lock resolves the extras
+    # as well, and jupyterlab's tree alone would otherwise take every open
+    # slot from the few packages the app ships.
+    groups:
+      python:
+        patterns: ["*"]
+    labels: ["type:chore"]
+    commit-message:
+      prefix: "deps"

@@ -24,6 +24,12 @@ first, and `tests/test_serve.py` holds the server to it. Anything the desktop
 app needs from the pipeline is a change here, versioned and tagged, never a
 copy over there.
 
+The desktop app ships this repository's `uv.lock`, so a Python package moves
+here first. Dependabot proposes the updates (`.github/dependabot.yml`), and
+its pull requests are a signal, not a merge: make the bump on `main` with
+`uv lock --upgrade-package <name>`, run the suite, and push both remotes.
+Dependabot closes its pull request once the lock has the version.
+
 ## Before you push
 
 This is a public repository, so two scanners run on every commit and again

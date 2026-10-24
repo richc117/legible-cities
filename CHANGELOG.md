@@ -7,6 +7,10 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 ## [Unreleased]
 
+### Added
+
+- **Dependabot proposes the Python packages' updates here** (`.github/dependabot.yml`; the desktop app's issue 472): one pull request a week for every package in `uv.lock`, the transitive ones included, since the app ships the lock. A bump is made on `main` by relocking, never by merging the pull request on GitHub, which would reach one remote of two. Until now the only automatic signal was the app's own pip entry, whose pull requests could never land there.
+
 ## [0.19.0] - 2026-10-23
 
 ### Fixed
