@@ -373,14 +373,20 @@ def build_trip_path(net: RouteNetwork, nodes: list[str], label: str,
             if hop is None:
                 return None
             borrowed += 1
+        if not hop:
+            # Two calls at one node: no track between them. The stop is where
+            # the walk is (still 0 before the first track, which is where the
+            # path will begin), so the walk has nothing to ride.
+            stop_lengths.append(run)
+            if geo:
+                gstop_lengths.append(grun)
+            continue
         cursor = nodes[i - 1]
         if not points:
-            first = _oriented(hop[0][1], cursor) if hop else None
-            points.append(first[0] if first else (0.0, 0.0))
+            points.append(_oriented(hop[0][1], cursor)[0])
             stop_lengths.append(0.0)
             if geo:
-                gfirst = _geo_oriented(hop[0][1], cursor, geo) if hop else None
-                gpoints.append(gfirst[0] if gfirst else (0.0, 0.0))
+                gpoints.append(_geo_oriented(hop[0][1], cursor, geo)[0])
                 gstop_lengths.append(0.0)
         for nxt, tp in hop:
             run += _ride(points, _oriented(tp, cursor), hops)

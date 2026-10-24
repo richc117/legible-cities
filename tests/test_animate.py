@@ -177,6 +177,52 @@ def test_asked_for_no_hop_the_trip_cuts_the_chord():
     assert (kept.points, kept.stop_lengths) == (cut.points, cut.stop_lengths)
 
 
+# ------------------------------------------ a trip at one node (issue 78)
+
+
+def _twinned(drawn, shift=(0.0, 100.0)):
+    """A geographic layer whose every track is the drawn one moved by ``shift``,
+    so a point of the twin is told from a point of the drawing by where it is."""
+    return animate.GeoLayer(tracks={
+        tp.element_id: [(x + shift[0], y + shift[1]) for x, y in tp.points]
+        for tp in drawn.tracks.values()})
+
+
+def test_a_trip_whose_first_two_calls_are_at_one_node_starts_on_its_track():
+    """A line whose first stop is listed twice: the hop between the calls is
+    empty, and the path used to begin at the canvas corner, (0, 0), with the
+    train there through its first stop. It begins at the first track instead,
+    the first two stops are 0 and the third is the run to n1, in the drawing
+    and in the geographic twin."""
+    drawn = render(_hopton(), labels=False)
+    net = animate.RouteNetwork.build(drawn)
+    twin = _twinned(drawn)
+    track = drawn.track("X", "n0", "n1")
+    once = animate.build_trip_path(net, ["n0", "n1"], "X", geo=twin)
+    twice = animate.build_trip_path(net, ["n0", "n0", "n1"], "X", geo=twin)
+    assert twice.points[0] == track.points[0] != (0.0, 0.0)
+    assert twice.points == once.points
+    assert twice.stop_lengths == pytest.approx([0.0, 0.0, polyline_length(track.points)])
+    assert twice.geo_points[0] == twin.tracks[track.element_id][0] != (0.0, 0.0)
+    assert twice.geo_points == once.geo_points
+    assert twice.geo_stop_lengths == pytest.approx(
+        [0.0, 0.0, polyline_length(twin.tracks[track.element_id])])
+    assert len(twice.stop_lengths) == len(twice.geo_stop_lengths) == 3
+
+
+def test_a_trip_that_stays_at_one_node_is_not_routed():
+    net = animate.RouteNetwork.build(render(_hopton(), labels=False))
+    assert animate.build_trip_path(net, ["n0", "n0", "n0"], "X") is None
+
+
+def test_a_node_listed_twice_later_in_a_trip_holds_its_stop():
+    """An empty hop after the trip has begun adds a stop at the same distance."""
+    net = animate.RouteNetwork.build(render(_hopton(), labels=False))
+    tp = animate.build_trip_path(net, ["n0", "n1", "n1", "n2"], "X")
+    assert tp.stop_lengths[1] == tp.stop_lengths[2] > 0
+    assert len(tp.stop_lengths) == 4 and tp.stop_lengths[3] > tp.stop_lengths[2]
+
+
 def _places(samples, tracks) -> list[tuple[float, float]]:
     """Where each of a train's samples is along a run of tracks laid end to end
     in the order it rides them: the distance from the run's start to the
