@@ -372,7 +372,9 @@ def build_trip_path(net: RouteNetwork, nodes: list[str], label: str,
             hop = net.shortest(ANY, nodes[i - 1], node)
             if hop is None:
                 return None
-            borrowed += 1
+            if hop:
+                # An empty hop has no track to borrow.
+                borrowed += 1
         if not hop:
             # Two calls at one node: no track between them. The stop is where
             # the walk is (still 0 before the first track, which is where the

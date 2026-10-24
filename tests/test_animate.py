@@ -19,6 +19,7 @@ from schematic import animate
 from schematic.linegraph import Edge, Line, LineGraph, Node
 from schematic.offsets import point_at, polyline_length
 from schematic.render import Style, line_strokes, render
+from schematic.schedule import Call, Trip
 
 DAY = dt.date(2026, 9, 10)
 
@@ -188,26 +189,52 @@ def _twinned(drawn, shift=(0.0, 100.0)):
         for tp in drawn.tracks.values()})
 
 
-def test_a_trip_whose_first_two_calls_are_at_one_node_starts_on_its_track():
-    """A line whose first stop is listed twice: the hop between the calls is
-    empty, and the path used to begin at the canvas corner, (0, 0), with the
-    train there through its first stop. It begins at the first track instead,
-    the first two stops are 0 and the third is the run to n1, in the drawing
-    and in the geographic twin."""
+@pytest.mark.parametrize("hops", [True, False])
+@pytest.mark.parametrize("repeats", [1, 2])
+def test_a_trip_whose_first_two_calls_are_at_one_node_starts_on_its_track(repeats, hops):
+    """A line whose first stop is listed twice (or three times): the hop
+    between the calls is empty, and the path used to begin at the canvas
+    corner, (0, 0), with the train there through its first stop. It begins at
+    the first track instead, every stop before the first track is 0 and the
+    last is the run to n1, in the drawing and in the geographic twin, with or
+    without the node's hop kept."""
     drawn = render(_hopton(), labels=False)
     net = animate.RouteNetwork.build(drawn)
     twin = _twinned(drawn)
     track = drawn.track("X", "n0", "n1")
-    once = animate.build_trip_path(net, ["n0", "n1"], "X", geo=twin)
-    twice = animate.build_trip_path(net, ["n0", "n0", "n1"], "X", geo=twin)
+    once = animate.build_trip_path(net, ["n0", "n1"], "X", geo=twin, hops=hops)
+    nodes = ["n0"] * (repeats + 1) + ["n1"]
+    twice = animate.build_trip_path(net, nodes, "X", geo=twin, hops=hops)
     assert twice.points[0] == track.points[0] != (0.0, 0.0)
     assert twice.points == once.points
-    assert twice.stop_lengths == pytest.approx([0.0, 0.0, polyline_length(track.points)])
+    assert twice.stop_lengths == pytest.approx(
+        [0.0] * (repeats + 1) + [polyline_length(track.points)])
     assert twice.geo_points[0] == twin.tracks[track.element_id][0] != (0.0, 0.0)
     assert twice.geo_points == once.geo_points
     assert twice.geo_stop_lengths == pytest.approx(
-        [0.0, 0.0, polyline_length(twin.tracks[track.element_id])])
-    assert len(twice.stop_lengths) == len(twice.geo_stop_lengths) == 3
+        [0.0] * (repeats + 1) + [polyline_length(twin.tracks[track.element_id])])
+    assert len(twice.stop_lengths) == len(twice.geo_stop_lengths) == len(nodes)
+
+
+def test_the_page_data_of_such_a_trip_starts_on_its_track_with_a_stop_a_call():
+    """Through ``animate.build``, which writes the page's data: the path's
+    ``d`` and the twin's ``gd`` do not start at the origin, and ``stops`` and
+    ``gstops`` each have an entry for every call."""
+    graph = _hopton()
+    drawn = render(graph, labels=False)
+    nodes = ["n0", "n0", "n1", "n2"]
+    trip = Trip("x", "X", "", [Call(n, n, 7 * 3600 + k * 120, 7 * 3600 + k * 120 + 20)
+                               for k, n in enumerate(nodes)])
+    built = animate.build(drawn, graph, [trip], dt.date(2026, 1, 5), geo=_twinned(drawn))
+    assert built.unrouted == [] and len(built.paths) == 1
+    path = built.paths[0]
+    first = drawn.track("X", "n0", "n1").points[0]
+    assert path["d"].startswith(f"M{first[0]:.1f} {first[1]:.1f}L")
+    assert path["gd"].startswith(f"M{first[0]:.1f} {first[1] + 100:.1f}L")
+    assert not path["d"].startswith("M0.0 0.0") and not path["gd"].startswith("M0.0 0.0")
+    assert len(path["stops"]) == len(path["gstops"]) == len(nodes)
+    assert path["stops"][:2] == path["gstops"][:2] == [0.0, 0.0]
+    assert path["stops"] == sorted(path["stops"])
 
 
 def test_a_trip_that_stays_at_one_node_is_not_routed():
@@ -426,3 +453,21 @@ def test_the_pipeline_keeps_the_hop_on_every_map(stand, tmp_path):  # noqa: F811
         assert kept.path_d() != cut.path_d()
         assert any(p["route"] == "A" and p["d"] == kept.path_d() for p in data["paths"])
     assert [p["d"] for p in styled[2]["paths"]] != [p["d"] for p in plain[2]["paths"]]
+
+
+def test_an_empty_hop_from_the_fallback_over_any_line_borrows_nothing():
+    """n3 is Y's alone: X's own graph lacks it, so a trip of X's that calls
+    there twice asks the walk over any line, which finds the node and answers
+    an empty hop. Nothing is borrowed for that hop (the run to n1 is, and is
+    counted once, where it was counted twice), and the path begins on the
+    track, not at the origin."""
+    drawn = render(_hopton(), labels=False)
+    net = animate.RouteNetwork.build(drawn)
+    assert net.shortest("X", "n3", "n3") is None and net.shortest(animate.ANY, "n3", "n3") == []
+    tp = animate.build_trip_path(net, ["n3", "n3", "n1"], "X")
+    assert tp.borrowed_hops == 1
+    assert tp.points[0] != (0.0, 0.0)
+    assert tp.stop_lengths[:2] == [0.0, 0.0] and tp.stop_lengths[2] > 0
+    # A node listed twice later in the trip, off the line, is no more borrowed.
+    later = animate.build_trip_path(net, ["n1", "n3", "n3"], "X")
+    assert later.borrowed_hops == 1
