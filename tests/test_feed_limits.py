@@ -440,9 +440,15 @@ def test_a_directory_too_long_for_its_count_is_refused_before_it_is_parsed(home,
 
 def test_a_zip64_locator_pointing_anywhere_is_answered_as_a_feed_error(server, tmp_path):
     """The classic end record's count says 0xFFFF and a ZIP64 locator before
-    it gives an offset of 2**64 - 1. zipfile never seeks there: it reads the
-    ZIP64 end record from just before the locator, and so does the engine,
-    so the answer is a feed error, never an internal one."""
+    it gives an offset of 2**64 - 1. Whatever zipfile does with that, the
+    answer is a feed error, never an internal one, and one of two sentences.
+
+    Up to CPython 3.12.11, zipfile read the ZIP64 end record from just before
+    the locator, never seeking to the offset, found none there and kept the
+    classic record's count: the count refusal. From 3.12.12 (CVE-2025-8291) it
+    checks the offset against where the ZIP64 record must be and raises
+    BadZipFile, which the engine answers as it answers a file that is no zip.
+    The desktop app's Python has the check, so that is the sentence it ships."""
     good = gtfs_zip(tmp_path / "good.zip").read_bytes()
     at = good.rfind(b"PK\x05\x06")
     record = bytearray(good[at:])
@@ -450,10 +456,15 @@ def test_a_zip64_locator_pointing_anywhere_is_answered_as_a_feed_error(server, t
     locator = struct.pack("<4sIQI", b"PK\x06\x07", 0, 0xFFFFFFFFFFFFFFFF, 1)
     src = tmp_path / "locator.zip"
     src.write_bytes(good[:at] + locator + bytes(record))
-    said = ("locator.zip holds more than 10,000 files, where a feed has a few dozen; re-zip "
-            "it with only the feed's tables")
-    with pytest.raises(feeds.FeedError, match=f"^{said}$"):
+    sentences = {
+        "locator.zip holds more than 10,000 files, where a feed has a few dozen; re-zip it "
+        "with only the feed's tables",
+        "locator.zip is not a zip file, so it is not a GTFS feed",
+    }
+    with pytest.raises(feeds.FeedError) as refused:
         feeds.add(src)
+    said = str(refused.value)
+    assert said in sentences, said
     _refused(server.call("feeds.add", {"source": str(src)}), said)
 
 
