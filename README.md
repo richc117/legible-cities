@@ -330,10 +330,11 @@ stylesheet's rules for it.
 Video exports are reproducible: the page's clock is stepped by hand, one frame
 at a time, so running the same command twice renders the same frames.
 `tests/test_determinism.py` captures a short clip twice and compares it frame by
-frame. Stills are not — the page is left running in real time for a moment
-before a still is captured, so its clock, and the trains with it, land somewhere
-slightly different each run. `notebooks/06_export_assets.ipynb` walks through
-it.
+frame. Stills are reproducible too: the recorder stops the page's clock before
+it waits for the page to settle and then sets it to the still's time (`--at`,
+else 07:00), so the trains land in the same place every run, and the same test
+file holds the recorder to that order. `notebooks/06_export_assets.ipynb` walks
+through it.
 
 `bin/theme-thumbnails <folder>` writes the two pictures of the map's themes the
 desktop app chooses by (`theme-warm-dark.svg`, `theme-sepia.svg`), drawn from a
