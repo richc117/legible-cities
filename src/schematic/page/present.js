@@ -81,10 +81,15 @@
   // the frame and the counter's strip below it (engine issue 85), so the frame
   // is the window less the strip: the boot script at the top of the page puts
   // the strip's height on the root only when it takes the address's, and
-  // without one this is 0.
+  // without one the window's height is used as it always was. A window no
+  // taller than its strip is taken as a pixel tall rather than dividing by
+  // nothing or less.
   var strip = Number(document.documentElement.getAttribute("data-strip")) || 0;
+  var frameHeight = function () {
+    return strip ? Math.max(1, innerHeight - strip) : innerHeight;
+  };
   function fit() {
-    P.setFrame((fixed || (innerWidth / (innerHeight - strip))) / below, top, margin);
+    P.setFrame((fixed || (innerWidth / frameHeight())) / below, top, margin);
   }
   fit();
   if (!fixed) addEventListener("resize", fit);

@@ -109,16 +109,21 @@ def test_nothing_drawn_over_the_stage_reads_the_viewports_height():
     assert [s.strip() for s in left] == ["height: 100vh",
                                          "--frame-h: calc(100vh - var(--strip))"], left
     js = PRESENT_JS.read_text(encoding="utf-8")
-    assert "innerWidth / (innerHeight - strip)" in js
-    assert js.count("innerHeight") == 1
+    assert "return strip ? Math.max(1, innerHeight - strip) : innerHeight;" in js
+    assert "innerWidth / frameHeight()" in js
+    assert js.count("innerHeight") == 2
 
 
 # --------------------------------------------------------------- the page, drawn
 
-# One browser. Each case opens its address in a fresh context at its size,
-# stops the clock at 07:00 and settles as the recorder does, then takes `shots`
-# screenshots of the whole viewport, a twelfth of a second of clock between
-# them, each with the counter as state() said it just before the shot.
+# One browser. Each case opens its address in a fresh context at its size (and
+# its device scale and forced colours, where it names them), stops the clock at
+# 07:00 and settles as the recorder does, reads the root, the stage, the strip
+# and what the overlay and the card computed, counts what each call adds to
+# state().draws, then takes `shots` screenshots of the whole viewport, a
+# twelfth of a second of clock between them, each with the counter as state()
+# said it just before the shot, and last does each of `acts` in turn, with
+# what it added to the count and a shot after it.
 DRIVE = r"""
 const { chromium } = require(process.argv[1]);
 const job = JSON.parse(process.argv[2]);
@@ -128,6 +133,8 @@ const job = JSON.parse(process.argv[2]);
   try {
     for (const c of job.cases) {
       const ctx = await browser.newContext({ viewport: { width: c.width, height: c.height },
+                                             deviceScaleFactor: c.scale || 1,
+                                             forcedColors: c.forced ? "active" : "none",
                                              reducedMotion: "no-preference" });
       const page = await ctx.newPage();
       const problems = [];
@@ -145,7 +152,16 @@ const job = JSON.parse(process.argv[2]);
         const root = document.documentElement, stage = document.getElementById("stage");
         const strip = document.getElementById("present-strip");
         const r = strip && strip.getBoundingClientRect();
+        const px = (sel, prop) => parseFloat(getComputedStyle(document.querySelector(sel))[prop]);
         return {
+          vmin: Math.min(innerWidth, innerHeight) / 100,
+          computed: {
+            "name top": px("#present-overlay .name", "top"),
+            "name left": px("#present-overlay .name", "left"),
+            "name font-size": px("#present-overlay .name", "fontSize"),
+            "time bottom": px("#present-overlay .time", "bottom"),
+            "card words top": px("#present-card .words", "top"),
+          },
           attr: root.getAttribute("data-strip"),
           prop: root.style.getPropertyValue("--strip"),
           stage: stage.getBoundingClientRect().height,
@@ -163,6 +179,7 @@ const job = JSON.parse(process.argv[2]);
           ["advance", () => window.__present.advance(1 / 12)],
           ["seek", () => window.__present.seek(window.__present.state().now)],
           ["settle", () => window.__present.settle()],
+          ["setCard", () => window.__present.setCard(window.__present.state().card)],
           ["state", () => window.__present.state()]]) {
         await page.evaluate(call);
         const after = await count();
@@ -176,6 +193,19 @@ const job = JSON.parse(process.argv[2]);
         const draws = await count();
         const png = await page.screenshot({ type: "png", animations: "allow" });
         seen.shots.push({ draws, png: png.toString("base64") });
+      }
+      const ACTS = {
+        "card on": () => window.__present.setCard(true),
+        "card off": () => window.__present.setCard(false),
+        "theme sepia": () => window.__present.setTheme("sepia"),
+      };
+      seen.acts = [];
+      for (const name of c.acts || []) {
+        const was = await count();
+        await page.evaluate(ACTS[name]);
+        const draws = await count();
+        const png = await page.screenshot({ type: "png", animations: "allow" });
+        seen.acts.push({ name, added: draws - was, draws, png: png.toString("base64") });
       }
       seen.problems = problems;
       out.push(seen);
@@ -196,7 +226,7 @@ def _drive(cases: list[dict]) -> list[dict]:
     seen = json.loads(done.stdout)
     assert all(not s["problems"] for s in seen), [s["problems"] for s in seen]
     for s in seen:
-        for shot in s["shots"]:
+        for shot in s["shots"] + s["acts"]:
             shot["image"] = Image.open(io.BytesIO(base64.b64decode(shot["png"]))).convert("RGB")
     return seen
 
@@ -207,8 +237,11 @@ def _with(url: str, **more: str) -> str:
 
 @needs_browser
 def test_the_counter_rises_by_one_a_draw_and_the_strip_says_it(tmp_path):
-    """Each call that draws adds one to ``state().draws`` and reading the
-    state adds none, with the strip and without it. With it, the stage is the
+    """Each of these calls draws once and adds one to ``state().draws``,
+    setCard among them, and reading the state adds none, with the strip and
+    without it. (A call can draw more than once, settle() with a font to refit
+    or setRoutes with lines hidden, so a capture compares the strip with the
+    count it reads after its step, never with one more than before it.) With it, the stage is the
     viewport less the strip, the strip is the viewport's foot across its whole
     width in 32 blocks, every block's middle is pure black or pure white, and
     the strip in each shot says the count state() gave just before it."""
@@ -220,7 +253,7 @@ def test_the_counter_rises_by_one_a_draw_and_the_strip_says_it(tmp_path):
     ])
     for s in (plain, striped):
         assert s["steps"] == [["advance", 1], ["advance", 1], ["seek", 1], ["settle", 1],
-                              ["state", 0]], s["steps"]
+                              ["setCard", 1], ["state", 0]], s["steps"]
     assert striped["attr"] == str(STRIP) and striped["prop"] == f"{STRIP}px"
     assert striped["stage"] == striped["inner"] - STRIP == 320
     assert striped["strip"] == {"top": 320, "height": STRIP, "left": 0, "width": 320,
@@ -236,6 +269,49 @@ def test_the_counter_rises_by_one_a_draw_and_the_strip_says_it(tmp_path):
             assert image.getpixel((x, y)) in ((0, 0, 0), (255, 255, 255)), (block, shot["draws"])
     # The plain page's foot is the map's ground, which says no number.
     assert read_strip(plain["shots"][0]["image"], STRIP) is None
+
+
+@needs_browser
+def test_setCard_draws_and_setTheme_does_not(tmp_path):
+    """Putting the card up or taking it down changes the frame, so it draws,
+    and the strip in the shot after it says the count it moved to; the card
+    is in that shot and gone from the next. setTheme changes the frame
+    without drawing, which is why a capture sets it before its step."""
+    page = _page(tmp_path)
+    url = export.url_for(KEY, export.PRESETS["linkedin-gif"], page=page, date=DATE)
+    seen, = _drive([{"url": _with(url, strip=str(STRIP)), "width": 320,
+                     "height": 320 + STRIP, "shots": 1,
+                     "acts": ["card on", "card off", "theme sepia"]}])
+    before = seen["shots"][0]
+    on, off, sepia = seen["acts"]
+    assert [(a["name"], a["added"]) for a in seen["acts"]] == [
+        ("card on", 1), ("card off", 1), ("theme sepia", 0)]
+    for shot in (before, on, off):
+        assert read_strip(shot["image"], STRIP) == shot["draws"] % (1 << BITS), shot["draws"]
+    frame = (0, 0, 320, 320)
+    differs = lambda a, b: ImageChops.difference(a["image"].crop(frame),
+                                                 b["image"].crop(frame)).getbbox() is not None
+    assert differs(before, on) and not differs(before, off), "the card did not cut in and out"
+    assert differs(off, sepia), "setTheme did not change the frame"
+
+
+@needs_browser
+def test_the_strip_reads_at_twice_the_scale_and_under_forced_colours(tmp_path):
+    """A capture at a device scale of 2 reads the strip at its middle as at 1,
+    and a system that forces its own colours (Windows' high contrast) leaves
+    the strip black and white rather than painting it over."""
+    page = _page(tmp_path)
+    url = _with(export.url_for(KEY, export.PRESETS["linkedin-gif"], page=page, date=DATE),
+                strip=str(STRIP))
+    double, forced = _drive([
+        {"url": url, "width": 320, "height": 320 + STRIP, "shots": 2, "scale": 2},
+        {"url": url, "width": 320, "height": 320 + STRIP, "shots": 2, "forced": True},
+    ])
+    for shot in double["shots"]:
+        assert shot["image"].size == (640, 2 * (320 + STRIP))
+        assert read_strip(shot["image"], STRIP, scale=2) == shot["draws"] % (1 << BITS)
+    for shot in forced["shots"]:
+        assert read_strip(shot["image"], STRIP) == shot["draws"] % (1 << BITS)
 
 
 def _cases(page: str) -> list[tuple[str, str, int, int, bool]]:
@@ -285,14 +361,24 @@ def test_an_address_the_page_does_not_take_sets_nothing(tmp_path):
     page = _page(tmp_path)
     url = export.url_for(KEY, export.PRESETS["linkedin-gif"], page=page, date=DATE)
     values = ["", "0", "-4", "abc", "1.5", "12px", "257", "0024", " 24"]
-    cases = [{"url": url, "width": 320, "height": 320, "shots": 0}]
-    cases += [{"url": _with(url, strip=v), "width": 320, "height": 320, "shots": 0}
+    # Wider than tall in one, taller than wide in the other, so vmin is
+    # neither side's by accident.
+    sizes = [(400, 280), (280, 400)]
+    cases = [{"url": url, "width": w, "height": h, "shots": 0} for w, h in sizes]
+    cases += [{"url": _with(url, strip=v), "width": 400, "height": 280, "shots": 0}
               for v in values]
-    cases.append({"url": page + "?strip=24", "width": 320, "height": 320, "shots": 0})
+    cases.append({"url": page + "?strip=24", "width": 400, "height": 280, "shots": 0})
     seen = _drive(cases)
+    # What the overlay and the card lay out by, in vmin of the viewport, as
+    # the stylesheet wrote them before the strip existed.
+    insets = {"name top": 4.2, "name left": 5, "name font-size": 3.4, "time bottom": 4.2,
+              "card words top": 4.2}
     for case, s in zip(cases, seen, strict=True):
         assert (s["attr"], s["prop"], s["strip"]) == (None, "", None), case["url"]
         assert s["stage"] == s["inner"] or "present=1" not in case["url"], case["url"]
+        want = {k: round(v * s["vmin"], 2) for k, v in insets.items()}
+        got = {k: round(v, 2) for k, v in s["computed"].items()}
+        assert got == want, case["url"]
     # The edge of what it takes.
     edge = _drive([{"url": _with(url, strip=v), "width": 320, "height": 320 + int(v),
                     "shots": 1} for v in ("1", "256")])

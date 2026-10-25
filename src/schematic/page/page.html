@@ -373,8 +373,9 @@ __SOCIAL__
   #present-strip {
     position: fixed; left: 0; right: 0; bottom: 0; height: var(--strip);
     z-index: 20; display: flex; background: #000; pointer-events: none;
+    forced-color-adjust: none;     /* a high-contrast system must not blank it */
   }
-  #present-strip span { flex: 1 1 0; background: #000; }
+  #present-strip span { flex: 1 1 0; background: #000; forced-color-adjust: none; }
   #present-strip span.on { background: #fff; }
 
   #present-overlay {
@@ -3045,10 +3046,15 @@ __SOCIAL__
     onDraw(fn) { onDraw = fn; },
     // `trip` is null, or what setTrip last answered; `changePenalty` is the
     // stops a change costs a trip. `card` is whether the title card is up and
-    // `drawn` the share of the network showing, 1 when it is whole. `draws` is
-    // how many times the page has drawn since it loaded, one more for every
-    // advance, seek, settle and every other call that draws; under `strip`
-    // the strip shows it modulo 65536 (engine issue 85).
+    // `drawn` the share of the network showing, 1 when it is whole. `draws`
+    // counts the calls of draw() since the page loaded, and under `strip` the
+    // strip shows it modulo 65536 (engine issue 85). A call can draw more than
+    // once (settle() with a font refit, setRoutes with lines hidden), so a
+    // capture reads it after its step and compares the strip with it for
+    // equality, never predicting one more. setTheme changes the picture
+    // without drawing, so a capture sets the theme before its step. The count
+    // is not the same from run to run, so a capture crops the strip away
+    // before it compares two captures' frames.
     state() {
       return { now: now, clock: fmt(now), shown: shown, mode: mode,
                view: view, str: str, geo: geo, box: lastBox.slice(),
@@ -3064,8 +3070,9 @@ __SOCIAL__
     setTrip(from, to) { return setTrip(from, to); },
     // The title card over the frame, or none: the city, the network, the
     // service day and the caption the address carries, on a scrim of the
-    // ground. It cuts in and out.
-    setCard(on) { setCard(on); },
+    // ground. It cuts in and out, and draws, so the count in state().draws
+    // and the strip move with the picture.
+    setCard(on) { setCard(on); draw(); },
     // The network drawn in to a fraction from 0 to 1, held to that range: 0 is
     // the bare ground, 1 the map with nothing of the draw-in left on it.
     setDrawn(fraction) { setDrawn(fraction); },

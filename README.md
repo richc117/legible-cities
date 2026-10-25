@@ -321,8 +321,11 @@ number from 1 to 256 reserves a band that many pixels tall at the foot of the
 window, below the map, and the page draws in it how many times it has drawn
 (`window.__present.state().draws`, modulo 65536) as 32 black and white blocks,
 two a bit. The map, the title, the clock and the card lay out in the window
-less the band, so the frame above it is the frame a capture without it takes.
-`page/page.html` documents the encoding beside the stylesheet's rules for it.
+less the band, so the frame above it matches a capture without it, within the
+suite's tolerance. A capture reads the count after its step and compares for
+equality, and crops the band before comparing frames, since the count differs
+from run to run. `page/page.html` documents the encoding beside the
+stylesheet's rules for it.
 
 Video exports are reproducible: the page's clock is stepped by hand, one frame
 at a time, so running the same command twice renders the same frames.
