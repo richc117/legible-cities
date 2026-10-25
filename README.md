@@ -316,6 +316,14 @@ site/dist/maps/cdmx-metro.html?present=1&controls=1        # with the switcher
 never sets it: in presentation mode anything on screen is captured into the
 frame, so a visible control would be baked into the video.
 
+`strip=<px>` is for a capture that wants to prove each frame fresh: a whole
+number from 1 to 256 reserves a band that many pixels tall at the foot of the
+window, below the map, and the page draws in it how many times it has drawn
+(`window.__present.state().draws`, modulo 65536) as 32 black and white blocks,
+two a bit. The map, the title, the clock and the card lay out in the window
+less the band, so the frame above it is the frame a capture without it takes.
+`page/page.html` documents the encoding beside the stylesheet's rules for it.
+
 Video exports are reproducible: the page's clock is stepped by hand, one frame
 at a time, so running the same command twice renders the same frames.
 `tests/test_determinism.py` captures a short clip twice and compares it frame by

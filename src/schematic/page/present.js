@@ -77,9 +77,14 @@
 
   // With no frame given -- someone opening this in a browser to present from,
   // rather than an export asking for a specific aspect -- fill the window, and
-  // keep filling it when the window changes.
+  // keep filling it when the window changes. Under `strip=<px>` the window is
+  // the frame and the counter's strip below it (engine issue 85), so the frame
+  // is the window less the strip: the boot script at the top of the page puts
+  // the strip's height on the root only when it takes the address's, and
+  // without one this is 0.
+  var strip = Number(document.documentElement.getAttribute("data-strip")) || 0;
   function fit() {
-    P.setFrame((fixed || (innerWidth / innerHeight)) / below, top, margin);
+    P.setFrame((fixed || (innerWidth / (innerHeight - strip))) / below, top, margin);
   }
   fit();
   if (!fixed) addEventListener("resize", fit);

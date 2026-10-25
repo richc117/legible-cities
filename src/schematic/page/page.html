@@ -25,6 +25,16 @@ __SOCIAL__
     // before any script runs, rather than reformatting a painted page.
     if (q.get("present") === "1") {
       document.documentElement.setAttribute("data-present", "");
+      // `strip=<px>` (engine issue 85): a band of that many CSS pixels below
+      // the stage, where the frame counter is drawn for a capture to read
+      // back. A whole number from 1 to 256, in present mode only; anything
+      // else is as though the address did not carry it, and then nothing on
+      // the page is set and nothing moves.
+      var strip = q.get("strip");
+      if (strip && /^[1-9][0-9]{0,2}$/.test(strip) && +strip <= 256) {
+        document.documentElement.setAttribute("data-strip", strip);
+        document.documentElement.style.setProperty("--strip", strip + "px");
+      }
     }
   })();
 </script>
@@ -292,7 +302,8 @@ __SOCIAL__
      place assumes the clock's default corner; the atlas's Presentation link
      never sets another. */
   :root[data-present][data-controls] header {
-    display: block; position: fixed; top: 4.2vmin; right: 5vmin; left: auto;
+    display: block; position: fixed; left: auto;
+    top: calc(4.2 * var(--vmin, 1vmin)); right: calc(5 * var(--vmin, 1vmin));
     z-index: 12; background: none; border: 0; padding: 0;
   }
   :root[data-present][data-controls] header .bar > *:not(.segmented),
@@ -331,14 +342,49 @@ __SOCIAL__
   :root[data-present] #stage.scrollable-right { -webkit-mask-image: none; mask-image: none; }
   :root[data-present] #stage svg { width: 100%; height: 100%; }
 
+  /* The frame counter's strip (engine issue 85), on `strip=<px>` in present
+     mode only. A capture cannot tell from the page's script that the frame it
+     took was painted after the step it asked for, because the script is always
+     current; only pixels can. So the page reserves a band of the address's
+     height at the viewport's foot, below the stage, and draws there how many
+     times draw() has run, for the capture to read back out of the same image
+     and then crop away. The capture's viewport is the frame's height plus the
+     strip, and the stage and everything over it lay out in the frame's height
+     alone: every rule of the stage, the overlay, the card and the controls
+     that would read the viewport reads --frame-h for 100vh and --vmin for
+     1vmin, which are those units themselves unless the strip is asked for.
+     Without it no attribute is set, no element is made and nothing moves.
+
+     The counter is state().draws modulo 65536, as sixteen bits from the most
+     significant, left to right, two blocks a bit across the whole width, so 32
+     blocks of equal width: white then black for a 1, black then white for a 0.
+     Pure #000 and #fff, which colour management cannot turn into the wrong
+     number, and every pair has one of each, so a strip that is not there, or a
+     page that drew none, reads as no number at all rather than as 0. Read each
+     block at its middle, (i + 0.5) / 32 of the width across and half the
+     strip's height down; anything over half brightness is white. */
+  :root[data-strip] {
+    --frame-h: calc(100vh - var(--strip));
+    --vmin: min(1vw, calc(var(--frame-h) / 100));
+  }
+  :root[data-present][data-strip] #stage { height: var(--frame-h); }
+  :root[data-strip] #present-overlay, :root[data-strip] #present-card,
+  :root[data-strip] #present-safe { bottom: var(--strip); }
+  #present-strip {
+    position: fixed; left: 0; right: 0; bottom: 0; height: var(--strip);
+    z-index: 20; display: flex; background: #000; pointer-events: none;
+  }
+  #present-strip span { flex: 1 1 0; background: #000; }
+  #present-strip span.on { background: #fff; }
+
   #present-overlay {
     position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: none; padding: 4.2vmin 5vmin;
+    display: none; padding: calc(4.2 * var(--vmin, 1vmin)) calc(5 * var(--vmin, 1vmin));
   }
   :root[data-present] #present-overlay { display: block; }
   #present-overlay .name {
-    position: absolute; left: 5vmin; top: 4.2vmin;
-    font-size: 3.4vmin; line-height: 1.25; color: var(--text);
+    position: absolute; left: calc(5 * var(--vmin, 1vmin)); top: calc(4.2 * var(--vmin, 1vmin));
+    font-size: calc(3.4 * var(--vmin, 1vmin)); line-height: 1.25; color: var(--text);
   }
   #present-overlay .name b { display: block; font-weight: 700; }
   #present-overlay .name span { display: block; color: var(--muted); font-weight: 400; }
@@ -347,8 +393,9 @@ __SOCIAL__
      weight. */
   #present-overlay .name .when { font-size: 0.72em; margin-top: 0.35em; }
   #present-overlay .time {
-    position: absolute; right: 5vmin; bottom: 4.2vmin;
-    font-size: 4.6vmin; font-variant-numeric: tabular-nums; color: var(--text);
+    position: absolute; right: calc(5 * var(--vmin, 1vmin)); bottom: calc(4.2 * var(--vmin, 1vmin));
+    font-size: calc(4.6 * var(--vmin, 1vmin)); font-variant-numeric: tabular-nums;
+    color: var(--text);
   }
   #present-overlay [hidden] { display: none; }
   /* Everything below acts only on an attribute present.js sets when the
@@ -359,36 +406,37 @@ __SOCIAL__
      name does. The block stops short of the far edge, or of a top-right clock
      (11.5vmin wide) by 2vmin, so 80 characters wrap to two lines at most. */
   #present-overlay[data-caption] .name .caption { font-size: 0.72em; margin-top: 0.35em; }
-  #present-overlay[data-caption] .name { max-width: calc(100vw - 10vmin); }
-  #present-overlay[data-corner="top-right"] .name { max-width: calc(100vw - 23.5vmin); }
+  #present-overlay[data-caption] .name { max-width: calc(100vw - 10 * var(--vmin, 1vmin)); }
+  #present-overlay[data-corner="top-right"] .name { max-width: calc(100vw - 23.5 * var(--vmin, 1vmin)); }
   /* The clock's other three corners, on the same insets as its own. */
-  #present-overlay[data-corner^="top"] .time { top: 4.2vmin; bottom: auto; }
-  #present-overlay[data-corner$="left"] .time { left: 5vmin; right: auto; }
+  #present-overlay[data-corner^="top"] .time { top: calc(4.2 * var(--vmin, 1vmin)); bottom: auto; }
+  #present-overlay[data-corner$="left"] .time { left: calc(5 * var(--vmin, 1vmin)); right: auto; }
   /* A platform's own interface over the frame (export.SAFE_ZONES, as
      fractions on the address). The stage keeps the top zone as bare ground and
      the map is laid out in the part below it; the name and a top clock sit on
      their usual inset below the zone, and nothing sits nearer a side than its
      side zone. In present mode --map-bg is transparent, so the reserved band
      is the same ground as the rest of the frame. */
-  :root[data-present][data-zones] #stage { padding-top: calc(var(--zone-top, 0) * 100vh); }
+  :root[data-present][data-zones] #stage { padding-top: calc(var(--zone-top, 0) * var(--frame-h, 100vh)); }
   :root[data-zones] #present-overlay {
-    --zone-inset: max(5vmin, round(up, calc(var(--zone-side, 0) * 100vw), 1px));
+    --zone-inset: max(5 * var(--vmin, 1vmin), round(up, calc(var(--zone-side, 0) * 100vw), 1px));
   }
   :root[data-zones] #present-overlay .name {
-    top: calc(var(--zone-top, 0) * 100vh + 4.2vmin); left: var(--zone-inset);
+    top: calc(var(--zone-top, 0) * var(--frame-h, 100vh) + 4.2 * var(--vmin, 1vmin));
+    left: var(--zone-inset);
   }
   :root[data-zones] #present-overlay[data-caption] .name {
     max-width: calc(100vw - 2 * var(--zone-inset));
   }
   :root[data-zones] #present-overlay[data-corner="top-right"] .name {
-    max-width: calc(100vw - 2 * var(--zone-inset) - 13.5vmin);
+    max-width: calc(100vw - 2 * var(--zone-inset) - 13.5 * var(--vmin, 1vmin));
   }
   :root[data-zones] #present-overlay .time { right: var(--zone-inset); }
   :root[data-zones] #present-overlay[data-corner$="left"] .time {
     left: var(--zone-inset); right: auto;
   }
   :root[data-zones] #present-overlay[data-corner^="top"] .time {
-    top: calc(var(--zone-top, 0) * 100vh + 4.2vmin);
+    top: calc(var(--zone-top, 0) * var(--frame-h, 100vh) + 4.2 * var(--vmin, 1vmin));
   }
   /* Where the platform's own UI sits. A preview aid only -- the exporter draws
      this into a separate file and never into a deliverable. */
@@ -408,14 +456,15 @@ __SOCIAL__
   #present-card { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
   #present-card .scrim { position: absolute; inset: 0; background: var(--bg); opacity: 0.75; }
   #present-card .words {
-    position: absolute; top: 4.2vmin; bottom: 4.2vmin; left: 5vmin; right: 5vmin;
+    position: absolute; top: calc(4.2 * var(--vmin, 1vmin)); bottom: calc(4.2 * var(--vmin, 1vmin));
+    left: calc(5 * var(--vmin, 1vmin)); right: calc(5 * var(--vmin, 1vmin));
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; text-wrap: balance; overflow-wrap: break-word; color: var(--text);
   }
   #present-card .words > * { display: block; max-width: 100%; }
-  #present-card .city { font-size: 11vmin; font-weight: 700; line-height: 1.15; }
-  #present-card .network { font-size: 7vmin; line-height: 1.15; }
-  #present-card .day, #present-card .caption { font-size: 5.6vmin; line-height: 1.3; }
+  #present-card .city { font-size: calc(11 * var(--vmin, 1vmin)); font-weight: 700; line-height: 1.15; }
+  #present-card .network { font-size: calc(7 * var(--vmin, 1vmin)); line-height: 1.15; }
+  #present-card .day, #present-card .caption { font-size: calc(5.6 * var(--vmin, 1vmin)); line-height: 1.3; }
   /* The gap is one line of the caption's own. */
   #present-card .caption { margin-top: 1.3em; }
   #present-card[hidden], #present-card [hidden] { display: none; }
@@ -423,9 +472,9 @@ __SOCIAL__
      bottom zone, whichever reaches higher (--zone-floor, which present.js
      works out from the address). */
   :root[data-zones] #present-card .words {
-    --card-inset: max(5vmin, round(up, calc(var(--zone-side, 0) * 100vw), 1px));
-    top: calc(var(--zone-top, 0) * 100vh + 4.2vmin);
-    bottom: calc(var(--zone-floor, 0) * 100vh + 4.2vmin);
+    --card-inset: max(5 * var(--vmin, 1vmin), round(up, calc(var(--zone-side, 0) * 100vw), 1px));
+    top: calc(var(--zone-top, 0) * var(--frame-h, 100vh) + 4.2 * var(--vmin, 1vmin));
+    bottom: calc(var(--zone-floor, 0) * var(--frame-h, 100vh) + 4.2 * var(--vmin, 1vmin));
     left: var(--card-inset); right: var(--card-inset);
   }
   /* The overlay's name and clock say what the card says, so they give way to it. */
@@ -540,6 +589,7 @@ __SOCIAL__
   const present = params.get("present") === "1";
   let capture = false;    // true while an exporter is stepping the clock itself
   let shown = 0;          // trains actually drawn last frame; capture asserts on it
+  let draws = 0;          // how many times draw() has run; state().draws (issue 85)
   let onDraw = null;      // present mode's overlay, called at the end of draw()
   let rafId = null;       // so a capture can cancel a frame that is already queued
   // The draw-in's two facts, here because advance(), setMode() and setCapture()
@@ -549,6 +599,30 @@ __SOCIAL__
   // Snapping the tweens is right for someone who asked not to be moved, and
   // wrong for a capture, where it would turn every transition into a hard cut.
   const reduced = !present && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // The frame counter's strip (engine issue 85; the stylesheet has the
+  // encoding): made only where the boot script took the address's `strip`,
+  // which it does in present mode alone, and written by draw() as it ends.
+  const STRIP_BITS = 16;
+  let stripBlocks = null;
+  if (present && document.documentElement.hasAttribute("data-strip")) {
+    const strip = document.createElement("div");
+    strip.id = "present-strip";
+    strip.setAttribute("aria-hidden", "true");
+    stripBlocks = [];
+    for (let i = 0; i < 2 * STRIP_BITS; i++) {
+      stripBlocks.push(strip.appendChild(document.createElement("span")));
+    }
+    document.body.appendChild(strip);
+  }
+  function stamp() {
+    const n = draws % (1 << STRIP_BITS);
+    for (let b = 0; b < STRIP_BITS; b++) {
+      const one = (n >> (STRIP_BITS - 1 - b)) & 1;
+      stripBlocks[2 * b].classList.toggle("on", one === 1);
+      stripBlocks[2 * b + 1].classList.toggle("on", one === 0);
+    }
+  }
 
   // ---------------------------------------------------------------- geometry
   const vb = svg.getAttribute("viewBox").split(/\s+/).map(Number);
@@ -1563,6 +1637,7 @@ __SOCIAL__
   }
 
   function draw() {
+    draws++;
     const m = ease(view), sf = ease(str), gf = ease(geo);
     if (fadeDirty) { applyFade(); fadeDirty = false; }
     if (dirty) {
@@ -1631,6 +1706,7 @@ __SOCIAL__
     if (scrub.getAttribute("aria-valuetext") !== when) scrub.setAttribute("aria-valuetext", when);
     // The word is appended in CSS so a phone can hide it and keep the number.
     count.textContent = shown;
+    if (stripBlocks) stamp();
     // Present mode's overlay redraws here rather than on its own rAF loop: a
     // capture steps the clock by hand, and a separate loop would not be
     // guaranteed to run between a step and its screenshot.
@@ -2969,13 +3045,16 @@ __SOCIAL__
     onDraw(fn) { onDraw = fn; },
     // `trip` is null, or what setTrip last answered; `changePenalty` is the
     // stops a change costs a trip. `card` is whether the title card is up and
-    // `drawn` the share of the network showing, 1 when it is whole.
+    // `drawn` the share of the network showing, 1 when it is whole. `draws` is
+    // how many times the page has drawn since it loaded, one more for every
+    // advance, seek, settle and every other call that draws; under `strip`
+    // the strip shows it modulo 65536 (engine issue 85).
     state() {
       return { now: now, clock: fmt(now), shown: shown, mode: mode,
                view: view, str: str, geo: geo, box: lastBox.slice(),
                viewName: viewName(), labels: labelsOn, theme: themeName(),
                trip: tripCopy(), changePenalty: CHANGE_PENALTY,
-               card: carded, drawn: drawnNow() };
+               card: carded, drawn: drawnNow(), draws: draws };
     },
     // A trip between two stations, by the ids map.build's `stations` lists:
     // everything keyed to a line it does not ride fades and every station
