@@ -3051,8 +3051,9 @@ __SOCIAL__
     // strip shows it modulo 65536 (engine issue 85). A call can draw more than
     // once (settle() with a font refit, setRoutes with lines hidden), so a
     // capture reads it after its step and compares the strip with it for
-    // equality, never predicting one more. setTheme changes the picture
-    // without drawing, so a capture sets the theme before its step. The count
+    // equality, never predicting one more. Only calls that draw move the
+    // count; others (setTheme, setLabels, setView) can change the picture
+    // without drawing, so a capture makes every change before its step. The count
     // is not the same from run to run, so a capture crops the strip away
     // before it compares two captures' frames.
     state() {
@@ -3071,7 +3072,9 @@ __SOCIAL__
     // The title card over the frame, or none: the city, the network, the
     // service day and the caption the address carries, on a scrim of the
     // ground. It cuts in and out, and draws, so the count in state().draws
-    // and the strip move with the picture.
+    // and the strip move with the picture. Called first in a beat, it repeats
+    // the last draw, which is why the extra draw changes no pixel: a caller
+    // that put the card up after its step would get a frame drawn twice.
     setCard(on) { setCard(on); draw(); },
     // The network drawn in to a fraction from 0 to 1, held to that range: 0 is
     // the bare ground, 1 the map with nothing of the draw-in left on it.

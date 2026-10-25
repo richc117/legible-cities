@@ -324,7 +324,9 @@ two a bit. The map, the title, the clock and the card lay out in the window
 less the band, so the frame above it matches a capture without it, within the
 suite's tolerance. A capture reads the count after its step and compares for
 equality, and crops the band before comparing frames, since the count differs
-from run to run. `page/page.html` documents the encoding beside the
+from run to run. Only calls that draw move the count; others (`setTheme`,
+`setLabels`, `setView`) can change the picture without drawing, so a capture
+makes every change before its step. `page/page.html` documents the encoding beside the
 stylesheet's rules for it.
 
 Video exports are reproducible: the page's clock is stepped by hand, one frame

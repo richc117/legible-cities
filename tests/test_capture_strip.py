@@ -289,8 +289,10 @@ def test_setCard_draws_and_setTheme_does_not(tmp_path):
     for shot in (before, on, off):
         assert read_strip(shot["image"], STRIP) == shot["draws"] % (1 << BITS), shot["draws"]
     frame = (0, 0, 320, 320)
-    differs = lambda a, b: ImageChops.difference(a["image"].crop(frame),
-                                                 b["image"].crop(frame)).getbbox() is not None
+
+    def differs(a: dict, b: dict) -> bool:
+        diff = ImageChops.difference(a["image"].crop(frame), b["image"].crop(frame))
+        return max(band[1] for band in diff.getextrema()) > DRIFT
     assert differs(before, on) and not differs(before, off), "the card did not cut in and out"
     assert differs(off, sepia), "setTheme did not change the frame"
 
