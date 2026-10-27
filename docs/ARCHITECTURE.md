@@ -81,8 +81,12 @@ writes a `.json` sidecar beside it.
   unpacked into a folder beside it (`loom.unpacked`).
 
 The native binaries carry no version of their own, so the host says which LOOM
-commit they are in `SCHEMATIC_LOOM_COMMIT`. It is part of every layout's id and
-`engine.info` reports it.
+commit they are in `SCHEMATIC_LOOM_COMMIT`. `loom.commit()` reads that variable
+under both backends, `engine.info` reports it, and it is part of every layout's
+id. With Docker and the variable unset, the id carries `null`: the image's
+`LOOM_REF` is never read, so rebuilding the image at another ref keeps every
+id. A layout stored with the variable set is found by `pipeline.stored` only
+while it is set to the same value.
 
 Either way every tool has a timeout (`loom.TIMEOUT`, thirty minutes), its
 stderr streams to the request's log, a cancel ends it, and a tool with no
@@ -98,10 +102,16 @@ that sets the variable after import is seen.
 <home>/
   data/feeds/
     <key>.zip                        the feed as fetched, or as a person added it
+    <key>.zip.part                   a download by feeds.fetch in progress
+    .adding-<pid>-<tid>.zip          a feed being added by feeds.add, before it is checked
     <key>.normalized.zip             the copy LOOM and the schedule read
     <key>.<token>.normalized.zip     a copy normalised with overrides (another agency, mode or labels)
-    <key>.normalized/                that copy unpacked, for the native backend
+    <key>.normalized.tmp             a normalised copy being written
+    <key>.normalized/                the copy unpacked, for the native backend
+    <key>.<token>.normalized/        a variant's copy unpacked
+    <key>.normalized.unpacking/      an unpack in progress
     user-feeds.json                  the feeds a person added
+    user-feeds.json.<pid>-<tid>.part the registry being rewritten
   data/graphs/<key>/
     <id>/                            one stored layout:
       00_gtfs2graph.json  01_topo.json  02_loom.json  03_octi.json  .meta.json
@@ -117,8 +127,11 @@ What is code stays on `config.REPO_ROOT` whatever the home is: the recorder
 (`export.RECORDER`) and the site's folders. `bin/export` writes its files to a
 `legible-cities` folder on the Desktop and never into the repository.
 
-Writes are whole or not at all. A download goes to a `.part` beside the zip and
-is moved into place. A normalised copy is written to a `.tmp` beside it. A
+Writes are whole or not at all. A preset's download (`feeds.fetch`) goes to a
+`.part` beside the zip, and a feed a person adds (`feeds.add`) to an `.adding-`
+staging file, and each is moved into place. The registry is written to a
+`.part` of the writer's own and moved over `user-feeds.json`. An unpack for the
+native backend goes into an `.unpacking` folder first. A normalised copy is written to a `.tmp` beside it. A
 layout is written into its `.building-` scratch and moved into place. A map's
 files are written into a `.<key>.writing-<pid>-` scratch inside the output
 folder and moved in one by one, the page last. A leftover named with a process
@@ -130,8 +143,9 @@ touched (`pipeline._leftover`).
 
 **A layout is computed once and stored. Nothing re-runs it implicitly.** Its id
 is the sha256 of exactly what went into it (`pipeline.layout_inputs`): the
-feed's bytes, the mode, the agency, the two label options, the LOOM commit and
-every stage's arguments. No version and no date. The same inputs name the same
+feed's key and its bytes, the mode, the agency, the two label options, the LOOM
+commit (`SCHEMATIC_LOOM_COMMIT`, or null) and every stage's arguments. The
+bytes are the zip's as fetched, not the normalised copy's. No version and no date. The same inputs name the same
 id before anything runs; a different input names a new layout beside the old
 one.
 
@@ -241,9 +255,16 @@ In rough dependency order.
 (`__SVG__`, `__DATA__`, `__ROUTING__`, `__PRESENT__` and the rest) in one pass
 that never reads what it has written. `present.js` is inlined at `__PRESENT__`.
 The result is one file: its scripts and styles are inline, its images and fonts
-are `data:` URIs, and it fetches nothing, because an export opens it over
-`file://` and the site serves it from a subpath. `tests/test_colors.py` holds
-the page to that structure.
+are `data:` URIs, and its script fetches nothing, because an export opens it
+over `file://` and the site serves it from a subpath. `tests/test_colors.py`
+holds the page to that structure.
+
+One exception, which draws nothing: a page built with `icons=` (`pipeline.run`;
+the site passes its favicon folder) carries three `<link rel="icon">` tags
+there, `__ICONS__` in the template, and a browser requests them. A page from
+`map.build` is built without, and `__ICONS__` is empty. The full Chromium
+requests a site page's icons even when capturing, and under `file://` they are
+not there, so `bin/_record.js` ignores that one failure.
 
 The data is JSON inside a `<script>` element. A browser ends that element at
 the first `</script` whatever the JSON means, so the characters that could end
@@ -257,7 +278,7 @@ protocol and `bin/_record.js` name.
 
 | Method | What it does |
 |---|---|
-| `advance(dt)` | Steps the clock by `dt` seconds and draws. |
+| `advance(dt)` | Steps playback by `dt` seconds and draws: the clock by `dt × speed` while playing and not drawing in, and every tween by `dt`. |
 | `seek(sec)` | Sets the clock, held to the day's bounds, and draws. |
 | `bounds()` | `{t0, t1}`: when the day's first trip starts and its last ends, in seconds. |
 | `setPlaying(on)`, `setSpeed(x)` | Playback, as the header's controls set it. |
@@ -282,10 +303,13 @@ Two rules hold the seam together:
 - **`setView` and `setGeo` are independent axes.** `bin/_record.js` raises the
   geographic axis and then names a view, so a `setView` that lowered it would
   break every geographic export. `showView` is the call that sets both.
-- **A duration of zero snaps; an omitted one eases.** An explicit duration runs
-  a timed tween, `0` lands at once (how `present.js` sets the opening state and
-  a capture lands frame 0), and no duration eases at the page's own rate, as a
-  click does. A transition that has gone instant is the first place to look.
+- **Durations mean different things on the two axes.** On both, a positive
+  duration runs a timed tween. `setGeo` snaps on `0` and eases at the page's
+  own rate when the duration is left out; a transition that has gone instant
+  is the first place to look. `setView`, and the layout axis of `showView`,
+  only set a target: `0` and no duration both ease. What lands a state at once
+  is `settle()`, which snaps every tween to its target; `present.js` sets the
+  opening view and then calls it.
 
 `draws` counts the page's draws since it loaded. A call can draw more than once,
 and some calls (`setTheme`, `setLabels`, `setView`) change the picture without
@@ -504,13 +528,16 @@ its zip may hold at most 10,000 files in a central directory of at most about
 10.5 MB. A download is counted as it streams and stopped at the limit. The sizes
 are read from the zip's headers before anything is opened, then counted again as
 each file is read 64 kB at a time, because a header can lie. A table compressed
-with bzip2 or LZMA is refused when it would be read. These bound the bytes read
+with bzip2 or LZMA is refused when the zip is opened (`feeds._check_sizes`); a
+table in `LOOM_SKIP`, which the engine never reads, is judged only if
+something reads it. These bound the bytes read
 out of a zip, not the memory pandas takes once a table is parsed, which is
 several times the table's size.
 
 **Timeouts.** Each LOOM tool has thirty minutes (`loom.TIMEOUT`). A download's
-connection and each read wait up to 180 seconds. ffmpeg, the recorder and
-`rsvg-convert` have no timeout of their own; a cancel ends ffmpeg.
+connection and each read wait up to 180 seconds. ffmpeg, ffprobe (`export._duration`),
+the recorder and `rsvg-convert` have no timeout of their own; a cancel ends
+ffmpeg.
 
 **A GIF's plan** reads the positions file beside its page for the line colours,
 at most 32 MB.

@@ -71,9 +71,9 @@ uv run python -c "from pathlib import Path; from schematic import pipeline; pipe
 (`bin/build-site` builds it too, with the whole site, and redraws the site's
 committed link-preview card on the way.)
 
-The tests that run LOOM through the runner's own stand-in tools are shebang
-scripts, so on Windows they skip, and the spawn path there is exercised only
-by the desktop app's tests. The one that holds the native binaries against the
+The LOOM runner's own tests (`tests/test_loom.py`) drive stand-in tools that
+are shebang scripts, so on Windows they skip, and the spawn path there is
+exercised only by the desktop app's tests. The one that holds the native binaries against the
 Docker image needs `SCHEMATIC_LOOM_BIN` naming them as well, and prints its
 comparison under `-s`.
 
@@ -85,8 +85,8 @@ site's tools and the full Chromium, `pytest -q -rs`, and then
 `bin/audit-page` (axe, in both themes) over a page drawn from the tests'
 hand-made network.
 
-It does **not** have Docker or the LOOM image, any real feed, any stored
-layout, or ffmpeg. Everything that needs one of those skips there: every test
+It does **not** have the LOOM image, any real feed, any stored layout, or
+ffmpeg. Everything that needs one of those skips there: every test
 that lays out or draws a real network, the LOOM backend tests, the
 determinism capture over the LA page, and the encodes. A change to any of
 those is checked only by running the suite where they are.
@@ -100,12 +100,17 @@ A change to the feeds, the LOOM runner, the layout store, the schedule, the
 renderer, the animation or the server touches code CI cannot exercise on real
 data. Before committing one:
 
-1. Build the LOOM image and store the three layouts above.
+1. Build the LOOM image and store the three layouts above, with
+   `SCHEMATIC_HOME` unset: a few tests look for a stored layout under the
+   repository's own `data/` whatever the home is.
 2. Run the whole suite with `-rs`, and check the skip list holds nothing but
-   what your machine genuinely lacks. `tests/test_pipeline.py`,
-   `tests/test_loom.py`, `tests/test_serve.py`, `tests/test_cdmx.py`,
-   `tests/test_theming.py`, `tests/test_geographic.py` and
-   `tests/test_colors.py` are the ones that should no longer skip.
+   what your machine genuinely lacks. In `tests/test_pipeline.py`,
+   `tests/test_cdmx.py`, `tests/test_theming.py`, `tests/test_geographic.py`,
+   `tests/test_colors.py`, `tests/test_loom.py` and `tests/test_serve.py`,
+   nothing should skip for want of the image, a feed or a layout any more.
+   Some of their tests still skip for reasons of their own: the native
+   binaries (`SCHEMATIC_LOOM_BIN`), ffmpeg, a site built with New York, or a
+   POSIX system.
 3. If the page or the export changed, install the site's tools and ffmpeg and
    build the LA page, so that `tests/test_determinism.py`,
    `tests/test_capture_strip.py`, `tests/test_overlay.py`,
@@ -116,10 +121,16 @@ data. Before committing one:
    dropped labels. A count that moved is a regression until you can say why.
    On Los Angeles the unrouted and borrowed-track counts should be zero.
 
-A layout is never re-run implicitly, so a change to what goes into one (the
-stage arguments, the normalisation, the mode) names new layouts beside the
-stored ones. Lay the feeds out again (`pipeline.run(key, force=True)`, or
-delete `data/graphs/<key>/`) when you need the change reflected.
+A layout is never re-run implicitly. A change to what its id hashes (the
+stage arguments, the mode, the agency, the label options, the LOOM commit)
+names new layouts beside the stored ones. A change to anything else on the way
+to a layout, the LOOM runner or the normalisation among them, names none: lay
+the feeds out again with `pipeline.run(key, force=True)`, or delete
+`data/graphs/<key>/`. After a change to the normalisation, also delete
+`data/feeds/<key>*.normalized.zip`, because a forced layout reuses a
+normalised copy that is newer than its zip. The id carries
+`SCHEMATIC_LOOM_COMMIT`'s value, so a layout stored with it set is found only
+while it is set to the same value.
 
 ## Run
 
@@ -142,7 +153,8 @@ the change to what it asks.
 
 ## Changes
 
-Commit to `main`; the history is the record, so the message says why. A
+A contributor opens a pull request; the maintainer commits to `main`.
+Either way the history is the record, so the message says why. A
 change to the JSON-RPC protocol is a change to `schematic/protocol/v1.json`
 first, and `tests/test_serve.py` holds the server to it. Anything the desktop
 app needs from the pipeline is a change here, versioned and tagged, never a
@@ -161,8 +173,9 @@ listed in the README's Licence section, as the icons and the fonts are.
 
 The desktop app ships this repository's `uv.lock`, so a Python package moves
 here first. Dependabot proposes the updates (`.github/dependabot.yml`), and
-its pull requests are a signal, not a merge: make the bump on `main` with
-`uv lock --upgrade-package <name>`, run the suite, and push both remotes.
+its pull requests are a signal, not a merge: the maintainer makes the bump on
+`main` with `uv lock --upgrade-package <name>`, runs the suite, and pushes
+both remotes.
 Dependabot closes its pull request once the lock has the version.
 
 ## Before you push
@@ -186,7 +199,7 @@ a reason beside it.
 
 ## Releasing
 
-The desktop app pins the engine by git tag and refuses to run against any
+Releasing is the maintainer's. The desktop app pins the engine by git tag and refuses to run against any
 other, so a tag is a promise about what `engine.info` will say.
 
 1. Bump `__version__` in `src/schematic/__init__.py` and `version` in
