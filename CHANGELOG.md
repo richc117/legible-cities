@@ -7,6 +7,8 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-27
+
 ### Added
 
 - **`docs/ARCHITECTURE.md`, and a `CONTRIBUTING.md` a stranger can set up from** (issue 16). The architecture is the pipeline's stages and what each takes and makes, the cache under the home, a map of the modules, the page's seam (`window.__present` and the presentation-mode parameters), the JSON-RPC server, the determinism rule, the traps that are about code, the feed quirks the code handles, and the limits. `CONTRIBUTING.md` now says how to set up, test and run, what CI runs and skips, and which tests to run locally before a change to the pipeline. Two test docstrings that pointed at notes kept outside the repository, or at a command that does not run the pipeline, point at the right place. No code changed.
