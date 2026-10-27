@@ -108,7 +108,7 @@ PAGE = serve.schema()["page"]
 
 # The seam: everything else in the page is closed over inside its script.
 # test_the_seam_holds_every_method_the_protocol_and_the_recorder_name holds
-# the protocol's prose and bin/_record.js to this list too.
+# the protocol's prose, bin/_record.js and present.js to this list too.
 SEAM = set(PAGE["seam"])
 
 # What a frame must allow the page, as Content-Security-Policy would say it:
@@ -324,17 +324,25 @@ def test_a_page_drawn_in_the_system_face_needs_no_font(tmp_path):
 
 def test_the_seam_holds_every_method_the_protocol_and_the_recorder_name():
     """The protocol names the methods a client's capture job drives
-    (``--schema``), and bin/_record.js is the engine's own capture; both are
-    held to the seam the page is held to, so a method one of them names cannot
-    be renamed on the page alone."""
+    (``--schema``), bin/_record.js is the engine's own capture, and
+    present.js is the page's presentation mode, inlined into it and driving
+    it through the same seam; all three are held to the seam the page is held
+    to, so a method one of them names cannot be renamed on the page alone."""
     protocol = set(re.findall(r"__present\.(\w+)", json.dumps(serve.schema())))
     recorder = (config.REPO_ROOT / "bin" / "_record.js").read_text(encoding="utf-8")
     # The recorder also calls through an alias, `const P = window.__present`.
     called = set(re.findall(r"__present\.(\w+)", recorder)) | set(re.findall(r"\bP\.(\w+)\(",
                                                                               recorder))
+    # So does present.js, `var P = window.__present`, and it tests one method
+    # before calling it (`P.hasGeo && P.hasGeo()`), so any use counts.
+    script = (Path(animate.__file__).parent / "page" / "present.js").read_text(encoding="utf-8")
+    presented = set(re.findall(r"__present\.(\w+)", script)) | set(re.findall(r"\bP\.(\w+)",
+                                                                               script))
     assert "setTrip" in protocol and "setCapture" in called, "the names are still found"
+    assert {"setFrame", "onDraw"} <= presented, "present.js's names are still found"
     assert protocol <= SEAM, sorted(protocol - SEAM)
     assert called <= SEAM, sorted(called - SEAM)
+    assert presented <= SEAM, f"present.js calls {sorted(presented - SEAM)}, not on the seam"
 
 
 def test_every_seam_method_says_its_arguments_as_a_list_by_position():

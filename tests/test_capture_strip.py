@@ -351,13 +351,17 @@ def test_the_seams_answers_are_what_the_schema_says(tmp_path):
     """The parity test the protocol has for its methods' params, aimed at the
     page's seam: what each call answers on a page validates against the
     ``result`` the schema's ``page.seam`` gives it, a found trip, a trip that
-    is not there and the state of each among them, and the page's arguments
-    are the ones its ``params`` allow."""
+    is not there and the state of each among them, and a duration of null,
+    and the page's arguments are the ones its ``params`` allow."""
     seam = serve.schema()["page"]["seam"]
     defs = serve.schema()["$defs"]
     calls = [("bounds", []), ("state", []), ("setTheme", ["sepia"]), ("setTrip", [None]),
              ("hasGeo", []), ("setTrip", ["n0", "n5"]), ("state", []),
-             ("setTrip", ["n0", "nowhere"]), ("state", []), ("setTrip", [None]), ("state", [])]
+             ("setTrip", ["n0", "nowhere"]), ("state", []), ("setTrip", [None]), ("state", []),
+             # A duration of null, as bin/_record.js and the desktop app send a
+             # beat's tween, is one left out.
+             ("setGeo", [False, None]), ("setView", ["linear", None]), ("state", []),
+             ("showView", ["map", None]), ("state", [])]
     done = subprocess.run(["node", "-e", ANSWERS, str(PLAYWRIGHT),
                            json.dumps({"url": _page(tmp_path), "calls": calls})],
                           capture_output=True, text=True, timeout=120)
@@ -379,6 +383,8 @@ def test_the_seams_answers_are_what_the_schema_says(tmp_path):
     assert answers[6]["trip"] == found and found["changes"] == 1
     assert nowhere["legs"] is None and nowhere["reason"] and answers[8]["trip"] == nowhere
     assert answers[9] is None and answers[10]["trip"] is None
+    assert answers[11] is False and answers[13]["mode"] == "linear"
+    assert answers[15]["mode"] == "map" and answers[15]["viewName"] == "map"
 
 
 def _cases(page: str) -> list[tuple[str, str, int, int, bool]]:
