@@ -254,6 +254,27 @@ def pipes(home):
 
 # -------------------------------------------------------------------- schema
 
+# The keywords the desktop app's type generator knows inside a type (its
+# scripts/protocol.ts, `KNOWN`); any other stops its build, naming the path.
+APP_KEYWORDS = {"$ref", "type", "properties", "required", "items", "oneOf", "enum", "const",
+                "description", "minimum", "maximum", "exclusiveMinimum", "pattern", "format",
+                "default", "additionalProperties", "minLength", "minItems", "maxItems",
+                "uniqueItems", "prefixItems", "maxLength"}
+
+
+def _type_nodes(node: dict, path: str):
+    """``node`` and every schema below it, by path, without following a $ref."""
+    yield path, node
+    for name, child in node.get("properties", {}).items():
+        yield from _type_nodes(child, f"{path}.properties.{name}")
+    for key in ("items", "additionalProperties"):
+        if isinstance(node.get(key), dict):
+            yield from _type_nodes(node[key], f"{path}.{key}")
+    for key in ("prefixItems", "oneOf"):
+        for i, child in enumerate(node.get(key, [])):
+            yield from _type_nodes(child, f"{path}.{key}[{i}]")
+
+
 def test_schema_is_a_valid_schema_and_names_every_method():
     Draft202012Validator.check_schema(SCHEMA)
     assert SCHEMA["protocol"] == serve.PROTOCOL
@@ -261,6 +282,37 @@ def test_schema_is_a_valid_schema_and_names_every_method():
     assert sorted(SCHEMA["methods"]) == sorted(endpoint.methods)
     endpoint.close()
     assert sorted(SCHEMA["notifications"]) == ["$/cancelRequest", "job/log", "job/progress"]
+    # Engine issue 84: ``page`` says the animation page's seam, each method's
+    # arguments and answer a schema the app's generator types, and every
+    # definition they reach is one it can type too, with every $ref resolving.
+    # tests/test_colors.py holds the page itself to the seam and the policy.
+    page = SCHEMA["page"]
+    assert set(page) == {"description", "seam", "requires", "fetches"}
+    queue = []
+    for name, method in page["seam"].items():
+        assert set(method) <= {"since", "description", "params", "result"}, name
+        for part in ("params", "result"):
+            Draft202012Validator.check_schema(method[part])
+            queue.append((f"page.seam.{name}.{part}", method[part]))
+    reached, unknown, dangling = set(), [], []
+    while queue:
+        path, node = queue.pop()
+        for at, child in _type_nodes(node, path):
+            unknown += [f"{at}: {key}" for key in sorted(set(child) - APP_KEYWORDS)]
+            ref = child.get("$ref")
+            if ref is None:
+                continue
+            name = ref.removeprefix("#/$defs/")
+            if ref == name or name not in SCHEMA["$defs"]:
+                dangling.append(f"{at}: {ref}")
+            elif name not in reached:
+                reached.add(name)
+                queue.append((f"$defs.{name}", SCHEMA["$defs"][name]))
+    assert not unknown, unknown
+    assert not dangling, dangling
+    assert {"PageState", "PageBounds", "PageTrip", "PageLeg", "PageMode", "View"} <= reached
+    assert all(isinstance(entry, str) for entry in page["requires"])
+    assert page["fetches"] is False
 
 
 def test_the_schema_names_both_thumbnails_as_files_every_map_build_answers():

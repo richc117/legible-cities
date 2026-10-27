@@ -29,9 +29,11 @@ import re
 import subprocess
 from pathlib import Path
 
+import jsonschema
+from jsonschema import Draft202012Validator
 from PIL import Image, ImageChops
 
-from schematic import export
+from schematic import export, serve
 from test_overlay import DATE, KEY, PLAYWRIGHT, SENTENCE, _page, needs_browser
 
 PAGE = Path(export.__file__).parent / "page" / "page.html"
@@ -314,6 +316,69 @@ def test_the_strip_reads_at_twice_the_scale_and_under_forced_colours(tmp_path):
         assert read_strip(shot["image"], STRIP, scale=2) == shot["draws"] % (1 << BITS)
     for shot in forced["shots"]:
         assert read_strip(shot["image"], STRIP) == shot["draws"] % (1 << BITS)
+
+
+# Each call in turn on one page, with what it answered (engine issue 84).
+ANSWERS = r"""
+const { chromium } = require(process.argv[1]);
+const job = JSON.parse(process.argv[2]);
+(async () => {
+  const browser = await chromium.launch({ channel: "chromium" });
+  try {
+    const page = await browser.newPage({ viewport: { width: 400, height: 400 } });
+    const problems = [];
+    page.on("pageerror", e => problems.push(e.message));
+    await page.goto(job.url, { waitUntil: "load" });
+    await page.waitForFunction(() => window.__present && window.__present.state);
+    const answers = [];
+    for (const [name, args] of job.calls) {
+      const answer = await page.evaluate(([name, args]) => {
+        const got = window.__present[name](...args);
+        return got === undefined ? null : got;
+      }, [name, args]);
+      answers.push([name, args, answer]);
+    }
+    console.log(JSON.stringify({ answers, problems }));
+  } finally {
+    await browser.close();
+  }
+})().catch(e => { console.error(String(e.message).split("\n")[0]); process.exit(1); });
+"""
+
+
+@needs_browser
+def test_the_seams_answers_are_what_the_schema_says(tmp_path):
+    """The parity test the protocol has for its methods' params, aimed at the
+    page's seam: what each call answers on a page validates against the
+    ``result`` the schema's ``page.seam`` gives it, a found trip, a trip that
+    is not there and the state of each among them, and the page's arguments
+    are the ones its ``params`` allow."""
+    seam = serve.schema()["page"]["seam"]
+    defs = serve.schema()["$defs"]
+    calls = [("bounds", []), ("state", []), ("setTheme", ["sepia"]), ("setTrip", [None]),
+             ("hasGeo", []), ("setTrip", ["n0", "n5"]), ("state", []),
+             ("setTrip", ["n0", "nowhere"]), ("state", []), ("setTrip", [None]), ("state", [])]
+    done = subprocess.run(["node", "-e", ANSWERS, str(PLAYWRIGHT),
+                           json.dumps({"url": _page(tmp_path), "calls": calls})],
+                          capture_output=True, text=True, timeout=120)
+    assert done.returncode == 0, done.stderr
+    seen = json.loads(done.stdout)
+    assert seen["problems"] == []
+    for name, args, answer in seen["answers"]:
+        method = seam[name]
+        jsonschema.validate(args, {**method["params"], "$defs": defs}, cls=Draft202012Validator)
+        jsonschema.validate(answer, {**method["result"], "$defs": defs},
+                            cls=Draft202012Validator)
+    answers = [answer for _, _, answer in seen["answers"]]
+    # The answers are the page's own, not only of the right shape.
+    assert answers[2] is True and answers[3] is None and answers[4] is False
+    assert answers[1]["theme"] == "warm-dark" and answers[6]["theme"] == "sepia"
+    found, nowhere = answers[5], answers[7]
+    assert [(leg["line"], leg["board"], leg["alight"]) for leg in found["legs"]] == [
+        ("A", "n0", "n2"), ("B", "n2", "n5")]
+    assert answers[6]["trip"] == found and found["changes"] == 1
+    assert nowhere["legs"] is None and nowhere["reason"] and answers[8]["trip"] == nowhere
+    assert answers[9] is None and answers[10]["trip"] is None
 
 
 def _cases(page: str) -> list[tuple[str, str, int, int, bool]]:

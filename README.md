@@ -447,7 +447,14 @@ loaded in presentation mode inside an iframe, driven through the same
 `window.__present` seam the exporter uses. Nothing about a city is drawn twice,
 and the view switcher under a figure in the essay is the switcher on the running
 map. The page reads the shared theme key before paint, so an embed that loads
-halfway down the page arrives in the right colours.
+halfway down the page arrives in the right colours. The seam is part of the
+protocol: `--schema` lists every method of `window.__present` under
+`page.seam`, with its arguments, its answer and the first engine version
+whose page has it, and the tests hold the page to exactly that list. What a
+frame that hosts the page must allow is stated there too, as `page.requires`
+(`script-src 'unsafe-inline'`, `style-src 'unsafe-inline'`, `img-src data:`,
+and `font-src data:` for a map drawn in an embedded face) with
+`page.fetches` false, since the page is one file that fetches nothing.
 
 ## Adding a city
 

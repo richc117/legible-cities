@@ -101,17 +101,33 @@ SECTIONS = [("meta", None), ("meta", None), ("title", None), ("script", None),
             ("div", "present-overlay"), ("div", "present-card"), ("script", "data"),
             ("script", "routing"), ("script", None)]
 
-# The seam: everything else in the page is closed over inside its script.
-# Held here because the protocol names only the methods a client's job
-# carries; test_the_seam_holds_every_method_the_protocol_and_the_recorder_name
-# holds the protocol and bin/_record.js to this list.
-SEAM = {"advance", "seek", "setCapture", "setPlaying", "setSpeed", "setView", "setGeo",
-        "showView", "hasGeo", "setLabels", "setRoutes", "setFrame", "setTheme", "settle",
-        "bounds", "onDraw", "state", "setTrip", "setCard", "setDrawn"}
+# The seam and the host policy are the protocol's (engine issue 84): `--schema`
+# says them under `page`, and the page is held to what it says, so a method
+# added to one and not the other fails with its name.
+PAGE = serve.schema()["page"]
 
-# What a frame must allow the page, as Content-Security-Policy would say it.
-NEEDS = {"script-src 'unsafe-inline'", "style-src 'unsafe-inline'", "img-src data:",
-         "font-src data:"}
+# The seam: everything else in the page is closed over inside its script.
+# test_the_seam_holds_every_method_the_protocol_and_the_recorder_name holds
+# the protocol's prose and bin/_record.js to this list too.
+SEAM = set(PAGE["seam"])
+
+# What a frame must allow the page, as Content-Security-Policy would say it:
+# the most a page may need, since one drawn in the system face embeds no font.
+NEEDS = set(PAGE["requires"])
+
+# How each requirement is found in a page: from its script's code, its styles
+# (stylesheets and style attributes) and the addresses it names. A
+# requirement the schema states with no detector here fails
+# test_the_schema_requires_only_what_the_page_can_be_seen_to_need rather than
+# passing unchecked.
+DETECTORS = {
+    "script-src 'unsafe-inline'": lambda code, styles, addresses: any(t.strip() for t in code),
+    "style-src 'unsafe-inline'": lambda code, styles, addresses: bool(styles),
+    "img-src data:": lambda code, styles, addresses: any(a.startswith("data:image/")
+                                                         for a in addresses),
+    "font-src data:": lambda code, styles, addresses: any(a.startswith("data:font/")
+                                                          for a in addresses),
+}
 
 # What a page would fetch with, or load code by, as patterns: a space before
 # the parenthesis is still a call.
@@ -188,8 +204,9 @@ def _strip_js(js: str) -> str:
     return "".join(out)
 
 
-def _seam(script: str) -> set[str]:
-    """The names ``window.__present``'s object literal defines, at its top level."""
+def _seam_top(script: str) -> str:
+    """The top level of ``window.__present``'s object literal, its methods'
+    bodies left out, with comments and strings blanked."""
     start = script.index("window.__present = {") + len("window.__present = ")
     code = _strip_js(script[start:])
     depth, top = 0, []
@@ -204,7 +221,30 @@ def _seam(script: str) -> set[str]:
                 break
         if depth == 1:
             top.append(ch)
-    return set(re.findall(r"(?:^|,)\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*[(:]", "".join(top)))
+    return "".join(top)
+
+
+def _seam(script: str) -> set[str]:
+    """The names ``window.__present``'s object literal defines, at its top level."""
+    return set(re.findall(r"(?:^|,)\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*[(:]", _seam_top(script)))
+
+
+def _seam_arity(script: str) -> tuple[dict[str, int], dict[str, str]]:
+    """Each method's count of parameters, as its shorthand definition
+    (``name(a, b) {``) lists them, and apart the methods whose list holds
+    something other than plain names: a default, a rest or a pattern would
+    make the count a judgement, and the page has none of them."""
+    arity, odd = {}, {}
+    for name, listed in re.findall(r"(?:^|,)\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(([^)]*)\)",
+                                   _seam_top(script)):
+        params = [p.strip() for p in listed.split(",")]
+        if params and params[-1] == "":
+            params.pop()                       # a trailing comma, or no parameters
+        if all(re.fullmatch(r"[A-Za-z_$][\w$]*", p) for p in params):
+            arity[name] = len(params)
+        else:
+            odd[name] = listed.strip()
+    return arity, odd
 
 
 def _structure(page: str) -> dict:
@@ -213,24 +253,20 @@ def _structure(page: str) -> dict:
     outline.feed(page)
     outline.close()
     code = [text for attrs, text in outline.scripts if attrs.get("type") != "application/json"]
-    seams = [_seam(text) for text in code if "window.__present = {" in text]
+    present = [text for text in code if "window.__present = {" in text]
+    seams = [_seam(text) for text in present]
     styles = outline.styles + [a["style"] for _, a in outline.attrs if "style" in a]
     addresses = [a[k] for _, a in outline.attrs for k in ("src", "href", "xlink:href") if k in a]
     addresses += re.findall(r"""url\(\s*["']?([^)"'\s]+)""",
                             "\n".join(styles + [v for _, a in outline.attrs
                                                 for v in a.values() if v]))
-    needs = set()
-    if any(text.strip() for text in code):
-        needs.add("script-src 'unsafe-inline'")
-    if styles:
-        needs.add("style-src 'unsafe-inline'")
-    if any(a.startswith("data:image/") for a in addresses):
-        needs.add("img-src data:")
-    if any(a.startswith("data:font/") for a in addresses):
-        needs.add("font-src data:")
+    needs = {need for need, seen in DETECTORS.items() if seen(code, styles, addresses)}
+    arity, odd = _seam_arity(present[0]) if len(present) == 1 else ({}, {})
     return {
         "sections": outline.sections,
         "seam": seams[0] if len(seams) == 1 else seams,
+        "arity": arity,
+        "odd": odd,
         "needs": needs,
         # An address with a scheme other than data: is one the page would
         # fetch, or send a reader to; a relative one or a fragment is neither.
@@ -250,11 +286,23 @@ def _held(page: str, *, needs: set[str] = NEEDS) -> None:
     assert found["sections"] == SECTIONS, found["sections"]
     assert found["seam"] == SEAM, (f"seam gained {sorted(found['seam'] - SEAM)}, "
                                    f"lost {sorted(SEAM - found['seam'])}")
+    # Each method takes as many arguments as the schema's maxItems allows.
+    assert not found["odd"], f"a parameter list that is not plain names: {found['odd']}"
+    assert set(found["arity"]) == found["seam"], (
+        f"not defined as methods, so their parameters cannot be counted: "
+        f"{sorted(found['seam'] - set(found['arity']))}")
+    wrong = sorted((name, count, PAGE["seam"][name]["params"].get("maxItems"))
+                   for name, count in found["arity"].items()
+                   if count != PAGE["seam"][name]["params"].get("maxItems"))
+    assert not wrong, f"(method, the page's parameters, the schema's maxItems) differ: {wrong}"
+    assert found["needs"] <= NEEDS, (
+        f"the page needs {sorted(found['needs'] - NEEDS)}, which page.requires does not state")
     assert found["needs"] == needs, (f"needs gained {sorted(found['needs'] - needs)}, "
                                      f"lost {sorted(needs - found['needs'])}")
-    assert found["network"] == [], f"the page's script fetches with {found['network']}"
-    assert found["remote"] == [], f"the page names remote addresses {found['remote']}"
-    assert found["loaded"] == [], f"the page loads {found['loaded']}"
+    if not PAGE["fetches"]:
+        assert found["network"] == [], f"the page's script fetches with {found['network']}"
+        assert found["remote"] == [], f"the page names remote addresses {found['remote']}"
+        assert found["loaded"] == [], f"the page loads {found['loaded']}"
 
 
 def _hand_made_page(tmp_path, style: Style) -> str:
@@ -287,6 +335,35 @@ def test_the_seam_holds_every_method_the_protocol_and_the_recorder_name():
     assert "setTrip" in protocol and "setCapture" in called, "the names are still found"
     assert protocol <= SEAM, sorted(protocol - SEAM)
     assert called <= SEAM, sorted(called - SEAM)
+
+
+def test_every_seam_method_says_its_arguments_as_a_list_by_position():
+    """A call's arguments are a tuple: ``minItems`` those it must give,
+    ``maxItems`` all of them, which the page's parameters are held to above,
+    and a type for each position up to ``maxItems``; a method that takes none
+    is an empty list of nulls."""
+    wrong = []
+    for name, method in PAGE["seam"].items():
+        params = method["params"]
+        least, most = params.get("minItems", 0), params.get("maxItems")
+        typed = len(params["prefixItems"]) if "prefixItems" in params else 0
+        if params.get("type") != "array" or not isinstance(most, int):
+            wrong.append((name, "not a list with a maxItems"))
+        elif not least <= most <= typed:
+            wrong.append((name, f"minItems {least}, maxItems {most}, {typed} typed"))
+        elif typed == 0 and params.get("items") != {"type": "null"}:
+            wrong.append((name, "no arguments, but not a list of nulls"))
+        if not re.fullmatch(r"\d+\.\d+\.\d+", method.get("since", "")):
+            wrong.append((name, f"since {method.get('since')!r} is not a version"))
+    assert not wrong, wrong
+
+
+def test_the_schema_requires_only_what_the_page_can_be_seen_to_need():
+    """Every directive page.requires states is one the structure above knows
+    how to find in a page, so none is stated without being checked."""
+    assert set(PAGE["requires"]) <= set(DETECTORS), sorted(set(PAGE["requires"]) - set(DETECTORS))
+    assert len(PAGE["requires"]) == len(NEEDS), "a directive stated twice"
+    assert PAGE["fetches"] in (True, False)
 
 
 # --------------------------------------------------- over stored layouts

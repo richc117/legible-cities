@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Legible Cities engine protocol, version 1",
-  "description": "JSON-RPC 2.0 over stdin/stdout with Content-Length framing. `methods` maps each request to the schema of its params and result; `notifications` maps each notification to the schema of its params. Long requests (graph.build, map.build, export.encode, feeds.service, feeds.inspect, feeds.add, feeds.remove, render.stage) stay open until done and send job/progress and job/log carrying the request's id meanwhile. $/cancelRequest stops a long request in one of three ways, and it is then answered with the cancelled error (-32800): it ends the process the request is waiting on (a LOOM tool in graph.build, ffmpeg in export.encode); it stops work that starts no process at the boundary between two of its steps (graph.build between its tools, map.build after each of its schedule, render and animate steps); and work that waits on neither runs to its end and is answered with the same error (feeds.service, feeds.inspect and render.stage, which write nothing a client sees). A feed a long request downloads stops at the cancel, between chunks or once it has arrived, and nothing of it is cached; on a server that has stopped sending, the cancel waits for the next chunk or the read timeout. The methods that write what a client sees have a point of no return, immediately before the first such write: graph.build moving a layout into the store, map.build moving its files into place, export.encode moving the file and then its sidecar into place, feeds.add moving its zip into the cache and then writing the registry, feeds.remove writing the registry. A cancel before it is honoured as above, and nothing a client sees has been written, except that a feed fetched whole on the way stays cached, with its normalised copy; a cancel after it is too late: the request runs to its end and is answered with its result, carrying `cancel_too_late: true`, or with its own error if it fails, and what the result names was written. A client that cancels one of these must accept a result. The export methods are the two halves of an export a client cannot do itself: export.plan describes one and writes nothing; besides the feed registry, a GIF's plan reads the positions file beside its page (at most 32 MB), for its line colours, export.encode turns the frames the client captured into the file; there is no export.capture, because the desktop app captures for itself. Errors a person can act on are code -32000 with `data` of the ErrorData shape; bad parameters are -32602 with the same shape and kind `params`. A number anywhere in a request's params is one a double holds: NaN, the infinities and a number past about 1.8e308 either side of zero are refused with the params kind, whatever a field's bounds say.",
+  "description": "JSON-RPC 2.0 over stdin/stdout with Content-Length framing. `methods` maps each request to the schema of its params and result; `notifications` maps each notification to the schema of its params. `page` describes the animation page map.build writes, as a host drives it in a frame rather than over JSON-RPC. Long requests (graph.build, map.build, export.encode, feeds.service, feeds.inspect, feeds.add, feeds.remove, render.stage) stay open until done and send job/progress and job/log carrying the request's id meanwhile. $/cancelRequest stops a long request in one of three ways, and it is then answered with the cancelled error (-32800): it ends the process the request is waiting on (a LOOM tool in graph.build, ffmpeg in export.encode); it stops work that starts no process at the boundary between two of its steps (graph.build between its tools, map.build after each of its schedule, render and animate steps); and work that waits on neither runs to its end and is answered with the same error (feeds.service, feeds.inspect and render.stage, which write nothing a client sees). A feed a long request downloads stops at the cancel, between chunks or once it has arrived, and nothing of it is cached; on a server that has stopped sending, the cancel waits for the next chunk or the read timeout. The methods that write what a client sees have a point of no return, immediately before the first such write: graph.build moving a layout into the store, map.build moving its files into place, export.encode moving the file and then its sidecar into place, feeds.add moving its zip into the cache and then writing the registry, feeds.remove writing the registry. A cancel before it is honoured as above, and nothing a client sees has been written, except that a feed fetched whole on the way stays cached, with its normalised copy; a cancel after it is too late: the request runs to its end and is answered with its result, carrying `cancel_too_late: true`, or with its own error if it fails, and what the result names was written. A client that cancels one of these must accept a result. The export methods are the two halves of an export a client cannot do itself: export.plan describes one and writes nothing; besides the feed registry, a GIF's plan reads the positions file beside its page (at most 32 MB), for its line colours, export.encode turns the frames the client captured into the file; there is no export.capture, because the desktop app captures for itself. Errors a person can act on are code -32000 with `data` of the ErrorData shape; bad parameters are -32602 with the same shape and kind `params`. A number anywhere in a request's params is one a double holds: NaN, the infinities and a number past about 1.8e308 either side of zero are refused with the params kind, whatever a field's bounds say.",
   "protocol": 1,
   "methods": {
     "engine.info": { "params": { "$ref": "#/$defs/NoParams" }, "result": { "$ref": "#/$defs/EngineInfo" } },
@@ -24,6 +24,33 @@
     "job/progress": { "$ref": "#/$defs/JobProgress" },
     "job/log": { "$ref": "#/$defs/JobLog" },
     "$/cancelRequest": { "$ref": "#/$defs/CancelParams" }
+  },
+  "page": {
+    "description": "The animation page map.build writes, as a host drives it: the methods of its window.__present object (`seam`), each as a positional argument list and an answer, and what a frame that hosts it must allow (`requires`). The page is one self-contained file: inline script and style, images and fonts as data: URIs, and it fetches nothing (`fetches`). A method's `since` is the first engine version whose page has it; a page lacking one is older than that version. A method that answers nothing answers null here, and one that answers a promise is said as the value it resolves with.",
+    "seam": {
+      "advance": { "since": "0.1.0", "description": "Step the page by dt seconds and draw: the clock moves dt times the speed while it plays and the network is not drawing in, and the morphs and fades move by dt.", "params": { "type": "array", "prefixItems": [ { "type": "number", "description": "seconds" } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } },
+      "seek": { "since": "0.1.0", "description": "Set the clock, in seconds of the service day, held to the span bounds() answers, and draw.", "params": { "type": "array", "prefixItems": [ { "type": "number", "description": "seconds" } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } },
+      "setCapture": { "since": "0.1.0", "description": "Stop the page's own frame loop, so a capture steps the clock by hand, or start it again; while a capture runs, a trip leaves the map whole and the network is never drawn in for reduced motion.", "params": { "type": "array", "prefixItems": [ { "type": "boolean" } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } },
+      "setPlaying": { "since": "0.1.0", "description": "Play or pause the clock, as the page's Play button does.", "params": { "type": "array", "prefixItems": [ { "type": "boolean" } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } },
+      "setSpeed": { "since": "0.1.0", "description": "Seconds of the service day a second of advance() moves the clock by.", "params": { "type": "array", "prefixItems": [ { "type": "number" } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } },
+      "setView": { "since": "0.1.0", "description": "The layout alone: the map, its rows or the time chart, leaving the geographic axis where it is.", "params": { "type": "array", "prefixItems": [ { "$ref": "#/$defs/PageMode" }, { "type": "number", "description": "seconds; omitted eases, 0 snaps" } ], "minItems": 1, "maxItems": 2 }, "result": { "type": "null" } },
+      "setGeo": { "since": "0.1.0", "description": "The geographic axis alone, leaving the layout where it is.", "params": { "type": "array", "prefixItems": [ { "type": "boolean" }, { "type": "number", "description": "seconds; omitted eases, 0 snaps" } ], "minItems": 1, "maxItems": 2 }, "result": { "type": "boolean", "description": "false on a page built without the geographic geometry, and nothing changes" } },
+      "showView": { "since": "0.1.0", "description": "Both axes at once, by the view's public name, as the page's own buttons do.", "params": { "type": "array", "prefixItems": [ { "$ref": "#/$defs/View" }, { "type": "number", "description": "seconds; omitted eases, 0 snaps" } ], "minItems": 1, "maxItems": 2 }, "result": { "type": "null" } },
+      "hasGeo": { "since": "0.1.0", "description": "Whether the page carries the geographic geometry.", "params": { "type": "array", "maxItems": 0, "items": { "type": "null" } }, "result": { "type": "boolean" } },
+      "setLabels": { "since": "0.1.0", "description": "Show or hide the station names.", "params": { "type": "array", "prefixItems": [ { "type": "boolean" } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } },
+      "setRoutes": { "since": "0.1.0", "description": "Show only the lines named, fit the box to them, and answer a trip on show again without the rest.", "params": { "type": "array", "prefixItems": [ { "oneOf": [ { "type": "null" }, { "type": "array", "items": { "type": "string" } } ], "description": "line labels to keep; null shows every line, and an empty list hides every one" } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } },
+      "setFrame": { "since": "0.1.0", "description": "Pad the box to an aspect and draw.", "params": { "type": "array", "prefixItems": [ { "type": "number", "description": "aspect, width over height; 0 for none" }, { "type": "number", "description": "the share of the added height taken above the network; 0.5 until one is given" }, { "type": "number", "description": "room around the network once the aspect is reached, as a share of the box; 0 until one is given" } ], "minItems": 1, "maxItems": 3 }, "result": { "type": "null" } },
+      "setTheme": { "since": "0.11.0", "description": "Change the page's theme in place, without drawing; nothing calls it on load.", "params": { "type": "array", "prefixItems": [ { "type": "string", "enum": [ "warm-dark", "sepia" ] } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "boolean", "description": "false for a name the page does not know, and nothing changes" } },
+      "settle": { "since": "0.1.0", "description": "Snap every tween to its target and draw, so a still never catches a transition halfway.", "params": { "type": "array", "maxItems": 0, "items": { "type": "null" } }, "result": { "type": "null", "description": "a promise that resolves, with nothing, once every face the page declares has loaded; the snap itself is done before it returns" } },
+      "bounds": { "since": "0.1.0", "description": "The span of the service day the page's trips run over.", "params": { "type": "array", "maxItems": 0, "items": { "type": "null" } }, "result": { "$ref": "#/$defs/PageBounds" } },
+      "onDraw": { "since": "0.1.0", "description": "Call a function after each draw, in place of the last one given.", "params": { "type": "array", "prefixItems": [ { "type": "object", "additionalProperties": true, "description": "a function, called after each draw; not JSON, and not callable across a frame, so a host that drives the page from another process never uses it" } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } },
+      "state": { "since": "0.1.0", "description": "What the page is showing.", "params": { "type": "array", "maxItems": 0, "items": { "type": "null" } }, "result": { "$ref": "#/$defs/PageState" } },
+      "setTrip": { "since": "0.13.0", "description": "Show a trip between two stations, or the whole network again; answers what state() then says of it.", "params": { "type": "array", "prefixItems": [ { "oneOf": [ { "type": "null" }, { "type": "string" } ], "description": "a station id from map.build's stations, or null to show the whole network" }, { "type": "string", "description": "a station id from map.build's stations" } ], "minItems": 1, "maxItems": 2 }, "result": { "$ref": "#/$defs/PageTrip" } },
+      "setCard": { "since": "0.15.0", "description": "The title card over the frame, or none; it cuts in and out, and draws.", "params": { "type": "array", "prefixItems": [ { "type": "boolean" } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } },
+      "setDrawn": { "since": "0.15.0", "description": "The network drawn in to a fraction, held to 0 to 1: 0 is the bare ground, 1 the map with nothing of the draw-in left on it.", "params": { "type": "array", "prefixItems": [ { "type": "number", "minimum": 0, "maximum": 1 } ], "minItems": 1, "maxItems": 1 }, "result": { "type": "null" } }
+    },
+    "requires": [ "script-src 'unsafe-inline'", "style-src 'unsafe-inline'", "img-src data:", "font-src data:" ],
+    "fetches": false
   },
   "$defs": {
     "RequestId": {
@@ -2131,6 +2158,86 @@
         "building": { "const": true, "description": "The layout is being laid out and is not stored: ask again at the next job/progress report. Absent from the refusal of a layout that is neither stored nor building." }
       },
       "required": ["kind", "detail", "hint"],
+      "additionalProperties": false
+    },
+    "PageMode": {
+      "description": "A layout the page's setView takes and its state() reports: the map, the map unfolded into a row per line, or the time chart.",
+      "enum": ["map", "linear", "string"]
+    },
+    "PageBounds": {
+      "description": "What the page's bounds() answers: the first and the last second of the service day its trips run over.",
+      "type": "object",
+      "properties": {
+        "t0": { "type": "number", "description": "Seconds after the service day's midnight." },
+        "t1": { "type": "number", "description": "Seconds after the service day's midnight; past midnight stays past midnight." }
+      },
+      "required": ["t0", "t1"],
+      "additionalProperties": false
+    },
+    "PageState": {
+      "description": "What the page's state() answers: what it is showing.",
+      "type": "object",
+      "properties": {
+        "now": { "type": "number", "description": "The clock, in seconds of the service day." },
+        "clock": { "type": "string", "pattern": "^[0-9]{2}:[0-9]{2}( \\+1d)?$", "description": "The clock as the page shows it, HH:MM, with ` +1d` past midnight." },
+        "shown": { "type": "integer", "minimum": 0, "description": "The trains the last draw placed." },
+        "mode": { "$ref": "#/$defs/PageMode" },
+        "view": { "type": "number", "description": "Where the layout is between the map, 0, and the rows, 1; between the two while it morphs." },
+        "str": { "type": "number", "description": "Where the layout is between the network, 0, and the time chart, 1." },
+        "geo": { "type": "number", "description": "Where the map is between the schematic, 0, and the geographic, 1." },
+        "box": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "number", "description": "x" },
+            { "type": "number", "description": "y" },
+            { "type": "number", "description": "width" },
+            { "type": "number", "description": "height" }
+          ],
+          "minItems": 4, "maxItems": 4,
+          "description": "The box the map was last drawn in, as the SVG's viewBox says it."
+        },
+        "viewName": { "$ref": "#/$defs/View", "description": "The view showView would be given to reach what is showing." },
+        "labels": { "type": "boolean", "description": "Whether the station names are shown." },
+        "theme": { "enum": ["warm-dark", "sepia"] },
+        "trip": { "$ref": "#/$defs/PageTrip", "description": "What setTrip last answered, as the lines now shown find it." },
+        "changePenalty": { "type": "integer", "minimum": 0, "description": "The stops a change costs a trip." },
+        "card": { "type": "boolean", "description": "Whether the title card is up." },
+        "drawn": { "type": "number", "minimum": 0, "maximum": 1, "description": "The share of the network showing; 1 when it is whole." },
+        "draws": { "type": "integer", "minimum": 0, "description": "The calls of the page's draw since it loaded; the strip shows it modulo 65536." }
+      },
+      "required": ["now", "clock", "shown", "mode", "view", "str", "geo", "box", "viewName", "labels", "theme", "trip", "changePenalty", "card", "drawn", "draws"],
+      "additionalProperties": false
+    },
+    "PageTrip": {
+      "description": "What the page's setTrip answers and its state() reports as `trip`: null when no trip is asked for, else the trip between two stations, with its legs, or with `legs` null and the reason there is none, the map left whole.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string", "description": "The station asked from." },
+            "to": { "oneOf": [{ "type": "string" }, { "type": "null" }], "description": "The station asked to; null when none was given." },
+            "legs": { "oneOf": [{ "type": "array", "items": { "$ref": "#/$defs/PageLeg" } }, { "type": "null" }], "description": "The legs from `from` to `to`, or null when no trip joins them." },
+            "changes": { "type": "integer", "minimum": 0, "description": "One fewer than the legs; 0 when there are none." },
+            "reason": { "oneOf": [{ "type": "string" }, { "type": "null" }], "description": "Why there is no trip, or the caveat a trip found carries; absent from a trip found without one." },
+            "hidden": { "type": "array", "items": { "type": "string" }, "description": "The lines hidden on the page, which the trip was found without; absent when none is." }
+          },
+          "required": ["from", "to", "legs", "changes"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PageLeg": {
+      "description": "One leg of a trip the page found: a line boarded at one station and left at another, by the ids map.build's stations lists.",
+      "type": "object",
+      "properties": {
+        "line": { "type": "string", "description": "The line's label, verbatim." },
+        "towards": { "type": "string", "description": "The station at the end of the line it is heading for." },
+        "board": { "type": "string" },
+        "alight": { "type": "string" },
+        "stops": { "type": "integer", "minimum": 1, "description": "Stops after boarding, the alighting one included." }
+      },
+      "required": ["line", "towards", "board", "alight", "stops"],
       "additionalProperties": false
     }
   }
