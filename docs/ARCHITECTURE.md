@@ -127,17 +127,31 @@ What is code stays on `config.REPO_ROOT` whatever the home is: the recorder
 (`export.RECORDER`) and the site's folders. `bin/export` writes its files to a
 `legible-cities` folder on the Desktop and never into the repository.
 
-Writes are whole or not at all. A preset's download (`feeds.fetch`) goes to a
+Writes are whole or not at all. A download by `feeds.fetch` (a preset's, or
+again for a feed a person added by address whose zip has gone) goes to a
 `.part` beside the zip, and a feed a person adds (`feeds.add`) to an `.adding-`
 staging file, and each is moved into place. The registry is written to a
 `.part` of the writer's own and moved over `user-feeds.json`. An unpack for the
-native backend goes into an `.unpacking` folder first. A normalised copy is written to a `.tmp` beside it. A
-layout is written into its `.building-` scratch and moved into place. A map's
-files are written into a `.<key>.writing-<pid>-` scratch inside the output
-folder and moved in one by one, the page last. A leftover named with a process
-that has gone is swept on the next build (on Windows, where another process
-cannot be asked about, it is kept); a name that only looks like one is never
-touched (`pipeline._leftover`).
+native backend goes into an `.unpacking` folder first. A normalised copy is
+written to a `.tmp` beside it. A layout is written into its `.building-`
+scratch and moved into place. A map's files are written into a
+`.<key>.writing-<pid>-` scratch inside the output folder and moved in one by
+one, the page last.
+
+What a killed process leaves behind is cleared in three ways:
+
+- **Swept.** Only the layout store's and the maps' scratches are. A build
+  sweeps a feed's `.building-` scratches and its `.old-` sets whose place holds
+  a whole set again (`pipeline._sweep`, with `_leftover` reading each name
+  whole, so a name that only looks like one is never touched). A map's write
+  sweeps the `.writing-` scratches in its folder (`pipeline._sweep_writes`).
+  Each is swept only when the process named in it has gone; on Windows, where
+  another process cannot be asked about, it is kept.
+- **Overwritten next time.** A `.part` download, a `.tmp` normalised copy and
+  an `.unpacking` folder have fixed names, and the next attempt replaces them.
+- **Never removed.** An `.adding-<pid>-<tid>.zip` and a
+  `user-feeds.json.<pid>-<tid>.part` are named for their writer, so nothing
+  reuses or removes them.
 
 ## Layouts, and the determinism rule
 
@@ -260,8 +274,8 @@ over `file://` and the site serves it from a subpath. `tests/test_colors.py`
 holds the page to that structure.
 
 One exception, which draws nothing: a page built with `icons=` (`pipeline.run`;
-the site passes its favicon folder) carries three `<link rel="icon">` tags
-there, `__ICONS__` in the template, and a browser requests them. A page from
+the site passes its favicon folder) carries three icon links there (two
+`rel="icon"` and one `rel="apple-touch-icon"`), `__ICONS__` in the template, and a browser requests them. A page from
 `map.build` is built without, and `__ICONS__` is empty. The full Chromium
 requests a site page's icons even when capturing, and under `file://` they are
 not there, so `bin/_record.js` ignores that one failure.

@@ -101,8 +101,10 @@ renderer, the animation or the server touches code CI cannot exercise on real
 data. Before committing one:
 
 1. Build the LOOM image and store the three layouts above, with
-   `SCHEMATIC_HOME` unset: a few tests look for a stored layout under the
-   repository's own `data/` whatever the home is.
+   `SCHEMATIC_HOME` unset: `tests/test_serve.py`'s `needs_la_layout` looks for
+   the stored LA layout under the repository's own `data/graphs/` whatever the
+   home is, and `tests/test_inspection.py` looks for cached feeds under its
+   `data/feeds/`.
 2. Run the whole suite with `-rs`, and check the skip list holds nothing but
    what your machine genuinely lacks. In `tests/test_pipeline.py`,
    `tests/test_cdmx.py`, `tests/test_theming.py`, `tests/test_geographic.py`,
@@ -126,9 +128,15 @@ stage arguments, the mode, the agency, the label options, the LOOM commit)
 names new layouts beside the stored ones. A change to anything else on the way
 to a layout, the LOOM runner or the normalisation among them, names none: lay
 the feeds out again with `pipeline.run(key, force=True)`, or delete
-`data/graphs/<key>/`. After a change to the normalisation, also delete
-`data/feeds/<key>*.normalized.zip`, because a forced layout reuses a
-normalised copy that is newer than its zip. The id carries
+`data/graphs/<key>/`. After a change to the normalisation code, or an edit to
+a preset's entry in `feeds.py` (its `agency`, `label_pattern` or
+`label_strip`), also delete `data/feeds/<key>*.normalized.zip`. An edited
+entry does move the id, but the normalised copy is named by how a build
+differs from the entry as it now is, so the edited preset maps to the same
+`<key>.normalized.zip`. That copy is reused while it is no older than its zip,
+and the new layout would be built from the old filter and labels without a
+word. Only a per-build override (`graph.build`'s `mode`, `agency`, `label_pattern` or `label_strip`)
+gets a copy of its own. The id carries
 `SCHEMATIC_LOOM_COMMIT`'s value, so a layout stored with it set is found only
 while it is set to the same value.
 
