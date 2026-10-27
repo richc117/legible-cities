@@ -1,8 +1,9 @@
 """End-to-end invariants on the LA Metro rail map.
 
 These need the LOOM Docker image and the cached feed, so they skip cleanly on a
-machine that has not run the pipeline yet. Run ``python -m schematic`` (or the
-notebooks) once to populate ``data/`` and they light up.
+machine that has not run the pipeline yet. Run ``bin/run-all la-metro-rail`` (or
+the notebooks) once to populate ``data/`` and they light up; CONTRIBUTING.md has
+the rest.
 """
 
 import datetime as dt

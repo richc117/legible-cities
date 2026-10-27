@@ -1,12 +1,136 @@
 # Contributing
 
-The README's Setup section gets you a working checkout: `uv venv && uv pip
-install -e ".[dev,notebooks]"`, Docker for LOOM, `pytest` for the tests. The
-tests that run LOOM need Docker and the image and skip without them; the one
-that holds the native binaries against the image needs `SCHEMATIC_LOOM_BIN`
-naming them as well, and prints its comparison under `-s`. The runner's own
-tests drive stand-in tools that are shebang scripts, so on Windows they skip
-and the spawn path there is exercised only by the desktop app's tests.
+`docs/ARCHITECTURE.md` is how the engine is put together: the pipeline's
+stages, the cache, a map of the modules, the page's seam, the JSON-RPC server,
+the determinism rule and the traps. Read it before changing any of those.
+
+## Set up
+
+You need Python 3.12 or later and git. [uv](https://docs.astral.sh/uv/) is the
+easy way; plain `pip` works too.
+
+```bash
+git clone https://github.com/richc117/legible-cities
+cd legible-cities
+uv sync --locked --extra dev        # a .venv with the package and the test tools, as uv.lock pins them
+```
+
+Without uv:
+
+```bash
+python3.12 -m venv .venv
+.venv/bin/pip install -e ".[dev]"   # the same packages, at the newest versions pyproject.toml allows
+```
+
+The `notebooks` extra adds JupyterLab and matplotlib, for `notebooks/`.
+
+That is enough to run the suite. Three more things light up more of it:
+
+- **Docker and the LOOM image**, for anything that lays a feed out:
+  `docker build -t openschematicmaps/loom docker/`. It compiles LOOM, which
+  takes a few minutes. The native binaries are the other way to run LOOM; the
+  README's Setup section says how.
+- **Node 22 and the site's tools**, for the tests that drive the page in a
+  browser: `cd site && npm ci && npx playwright install chromium` (on Linux,
+  `--with-deps` as well, for the browser's system libraries). It is the full
+  Chromium on purpose, never the headless shell: their rasterisers differ.
+- **ffmpeg and ffprobe on `PATH`**, for the encode tests.
+
+## Test
+
+```bash
+uv run pytest -q -rs                # or .venv/bin/python -m pytest -q -rs
+```
+
+`-rs` lists every test that skipped and why. A test skips, rather than fails,
+when what it needs is not there: Docker and the image, a feed already
+downloaded, a layout already stored, a page already built, Playwright, ffmpeg,
+or a POSIX system. So a green run on a fresh checkout says nothing about the
+skipped half; read the list.
+
+To fill in the data the skipped tests need, run the pipeline once. With Docker
+and the image:
+
+```bash
+uv run bin/run-all la-metro-rail pittsburgh-t cdmx-metro
+```
+
+That downloads the three feeds under `data/feeds/`, stores a layout for each
+under `data/graphs/`, and writes their maps to `out/`. Most of the real-data
+tests read Los Angeles, the colour snapshot reads Pittsburgh, and
+`tests/test_cdmx.py` reads Mexico City. `bin/run-all` with no argument does all
+22, and a few tests read New York or Metra when they are there.
+
+The browser tests in `tests/test_determinism.py` also need the LA page built
+where the site keeps its maps, which is gitignored:
+
+```bash
+uv run python -c "from pathlib import Path; from schematic import pipeline; pipeline.run('la-metro-rail', out_dir=Path('site/src/maps'))"
+```
+
+(`bin/build-site` builds it too, with the whole site, and redraws the site's
+committed link-preview card on the way.)
+
+The tests that run LOOM through the runner's own stand-in tools are shebang
+scripts, so on Windows they skip, and the spawn path there is exercised only
+by the desktop app's tests. The one that holds the native binaries against the
+Docker image needs `SCHEMATIC_LOOM_BIN` naming them as well, and prints its
+comparison under `-s`.
+
+### What CI runs, and what it does not
+
+`.github/workflows/test.yml` runs on every pull request and every push to
+`main`, on Ubuntu 24.04 with Python 3.12: `uv sync --locked --extra dev`, the
+site's tools and the full Chromium, `pytest -q -rs`, and then
+`bin/audit-page` (axe, in both themes) over a page drawn from the tests'
+hand-made network.
+
+It does **not** have Docker or the LOOM image, any real feed, any stored
+layout, or ffmpeg. Everything that needs one of those skips there: every test
+that lays out or draws a real network, the LOOM backend tests, the
+determinism capture over the LA page, and the encodes. A change to any of
+those is checked only by running the suite where they are.
+
+`gitleaks.yml` and `preflight.yml` scan every push and pull request too; see
+"Before you push".
+
+### Before a change to the pipeline
+
+A change to the feeds, the LOOM runner, the layout store, the schedule, the
+renderer, the animation or the server touches code CI cannot exercise on real
+data. Before committing one:
+
+1. Build the LOOM image and store the three layouts above.
+2. Run the whole suite with `-rs`, and check the skip list holds nothing but
+   what your machine genuinely lacks. `tests/test_pipeline.py`,
+   `tests/test_loom.py`, `tests/test_serve.py`, `tests/test_cdmx.py`,
+   `tests/test_theming.py`, `tests/test_geographic.py` and
+   `tests/test_colors.py` are the ones that should no longer skip.
+3. If the page or the export changed, install the site's tools and ffmpeg and
+   build the LA page, so that `tests/test_determinism.py`,
+   `tests/test_capture_strip.py`, `tests/test_overlay.py`,
+   `tests/test_export.py` and `tests/test_gif_palette.py` run too, and run
+   `node bin/audit-page out/la-metro-rail.html`.
+4. Run `bin/run-all` over every feed and compare its table with the one before
+   your change: stations, lines, trips, unrouted trips, matched stops and
+   dropped labels. A count that moved is a regression until you can say why.
+   On Los Angeles the unrouted and borrowed-track counts should be zero.
+
+A layout is never re-run implicitly, so a change to what goes into one (the
+stage arguments, the normalisation, the mode) names new layouts beside the
+stored ones. Lay the feeds out again (`pipeline.run(key, force=True)`, or
+delete `data/graphs/<key>/`) when you need the change reflected.
+
+## Run
+
+```python
+from schematic import pipeline
+print(pipeline.run("la-metro-rail").summary())
+```
+
+`python -m schematic.serve` runs the JSON-RPC server on stdin and stdout, and
+`python -m schematic.serve --schema` prints the protocol. The README's Use and
+Making assets sections cover the rest of `bin/`.
 
 ## Issues
 
@@ -23,6 +147,17 @@ change to the JSON-RPC protocol is a change to `schematic/protocol/v1.json`
 first, and `tests/test_serve.py` holds the server to it. Anything the desktop
 app needs from the pipeline is a change here, versioned and tagged, never a
 copy over there.
+
+A commit message has a subject in the imperative ("Refuse a feed over the
+size limit"), under 72 characters, and a body that says why: what was wrong
+or missing, and what is true now. A `Co-Authored-By` trailer is welcome where
+someone, or a tool, wrote part of the change. Leave out any trailer or link
+that points at a tool's session. A change a person would notice gets a line
+in `CHANGELOG.md` under `[Unreleased]`.
+
+Contributions are made under the repository's licence, GPL-3.0-or-later
+(`LICENSE`). Anything copied in from elsewhere keeps its own terms and is
+listed in the README's Licence section, as the icons and the fonts are.
 
 The desktop app ships this repository's `uv.lock`, so a Python package moves
 here first. Dependabot proposes the updates (`.github/dependabot.yml`), and

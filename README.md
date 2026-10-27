@@ -400,6 +400,10 @@ dangling-reference error.
 
 ## Design notes
 
+These are the headlines. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) is the
+whole of how the engine is put together, for a contributor, and
+`CONTRIBUTING.md` says how to set up and run the tests.
+
 **Measure octilinearity by length, not by segment count.** LOOM writes six
 decimal places, which leaves a scatter of metre-scale stubs at station nodes
 whose angles are rounding noise — over half the segments are under 30 m.

@@ -7,8 +7,8 @@ Python by design, and the storyboard tests only read the beats.
 
 Deliberately *pixel* comparison, not a digest. What is reproducible is the
 content; the PNG container is not always identical between runs, and a hash
-would fail on a difference nobody can see. See "Compare pixels, not hashes" in
-CLAUDE.md.
+would fail on a difference nobody can see. See "Comparing two renders" in
+docs/ARCHITECTURE.md.
 
 The still path used to be the exception: the page was left running in real
 time for `settle` milliseconds before the shot, so its clock landed wherever

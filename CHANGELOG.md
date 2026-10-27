@@ -7,6 +7,10 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 ## [Unreleased]
 
+### Added
+
+- **`docs/ARCHITECTURE.md`, and a `CONTRIBUTING.md` a stranger can set up from** (issue 16). The architecture is the pipeline's stages and what each takes and makes, the cache under the home, a map of the modules, the page's seam (`window.__present` and the presentation-mode parameters), the JSON-RPC server, the determinism rule, the traps that are about code, the feed quirks the code handles, and the limits. `CONTRIBUTING.md` now says how to set up, test and run, what CI runs and skips, and which tests to run locally before a change to the pipeline. Two test docstrings that pointed at notes kept outside the repository, or at a command that does not run the pipeline, point at the right place. No code changed.
+
 ### Fixed
 
 - **`bin/preflight --message-file` no longer calls clean a file it could not read** (issue 88). Given a path that did not exist, or a folder, it printed grep's errors and then "commit message clean", and exited 0, against its own rule that nothing it could not read is called clean. It now refuses a missing or unreadable file, and a search that fails, with a sentence and exit 1, as the desktop app's copy does. A test holds it.
