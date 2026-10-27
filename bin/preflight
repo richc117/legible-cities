@@ -73,14 +73,28 @@ why_closing() {
 if [ -n "$msgfile" ]; then
   # 0. A commit message being written, read from the file git is about to
   #    use. One file, so grep prints line numbers without a path prefix.
-  found=$(grep -nE "$pattern" -- "$msgfile" || true)
+  #    What could not be read is never called clean (issue 88): a missing
+  #    or unreadable file, or a search that failed, is refused.
+  if ! [ -f "$msgfile" ] || ! [ -r "$msgfile" ]; then
+    echo "preflight: this commit message could not be read (it is not a file that can be opened), so it was not scanned." >&2
+    exit 1
+  fi
+  found=$(grep -nE "$pattern" -- "$msgfile")
+  if [ $? -gt 1 ]; then
+    echo "preflight: this commit message could not be searched, so it was not scanned." >&2
+    exit 1
+  fi
   if [ -n "$found" ]; then
     echo "preflight: this commit message contains something that must not be public:" >&2
     echo "$found" >&2
     echo "preflight: edit the message; nothing has been committed." >&2
     exit 1
   fi
-  shut=$(grep -niE "$closing" -- "$msgfile" || true)
+  shut=$(grep -niE "$closing" -- "$msgfile")
+  if [ $? -gt 1 ]; then
+    echo "preflight: this commit message could not be searched, so it was not scanned." >&2
+    exit 1
+  fi
   if [ -n "$shut" ]; then
     echo "preflight: this commit message closes an issue by number:" >&2
     echo "$shut" >&2

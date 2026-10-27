@@ -7,6 +7,10 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 ## [Unreleased]
 
+### Fixed
+
+- **`bin/preflight --message-file` no longer calls clean a file it could not read** (issue 88). Given a path that did not exist, or a folder, it printed grep's errors and then "commit message clean", and exited 0, against its own rule that nothing it could not read is called clean. It now refuses a missing or unreadable file, and a search that fails, with a sentence and exit 1, as the desktop app's copy does. A test holds it.
+
 ## [0.20.0] - 2026-10-25
 
 ### Added
