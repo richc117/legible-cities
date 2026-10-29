@@ -1688,7 +1688,7 @@ def test_over_pipes_progress_and_cancellation(pipes, home):
 
 # ------------------------------------------------------------- the registry
 
-from test_feeds import GOOD, gtfs_zip  # the fixture zip the feed tests build
+from test_feeds import GOOD, gtfs_zip, stand_in  # the fixture zip, the network's stand-in
 
 
 def test_feeds_list_is_every_preset_and_what_was_added(client, home, tmp_path):
@@ -1806,7 +1806,7 @@ def test_feeds_add_by_url_reports_the_bytes_and_a_cancel_leaves_nothing(client, 
                 time.sleep(0.005)
                 yield self.content[i:i + 32]
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     msg_id = client.send("feeds.add", {"source": "https://example.test/gtfs.zip",
                                        "key": "remote", "name": "Remote"})
     result = client.wait(msg_id)["result"]
@@ -1850,7 +1850,7 @@ def test_a_failed_add_from_a_keyed_address_tells_nobody_the_key(client, home, mo
         raise feeds.requests.HTTPError(f"403 Client Error: Forbidden for url: {url}",
                                        response=Answer())
 
-    monkeypatch.setattr(feeds.requests, "get", get)
+    stand_in(monkeypatch, get)
     # The module's home is shared, so other tests' feeds may be in it.
     before = sorted(feeds.all())
     # The level the engine logs at unless SCHEMATIC_LOG says otherwise. At
@@ -2424,7 +2424,7 @@ def test_a_long_request_reports_a_presets_download_and_a_cancel_keeps_nothing(cl
             for i in range(0, len(payload), 32):
                 yield payload[i:i + 32]
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     endpoint = client.endpoint
 
     endpoint._request_id = 51
@@ -2440,7 +2440,7 @@ def test_a_long_request_reports_a_presets_download_and_a_cancel_keeps_nothing(cl
     endpoint._request_id = 52
 
     def cancelled_midway(job, _progress):
-        original = feeds.requests.get
+        original = feeds._session().get  # the stand-in set above
 
         def get(url, **kw):
             response = original(url, **kw)
@@ -2454,7 +2454,7 @@ def test_a_long_request_reports_a_presets_download_and_a_cancel_keeps_nothing(cl
             response.iter_content = iter_content
             return response
 
-        monkeypatch.setattr(feeds.requests, "get", get)
+        stand_in(monkeypatch, get)
         return feeds.fetch("t")
 
     run = endpoint._job(cancelled_midway)
@@ -2535,7 +2535,7 @@ def test_job_progress_names_the_layout_of_every_stage_report(client, tmp_path, m
             for i in range(0, len(payload), 256):
                 yield payload[i:i + 256]
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     FakeLoom(monkeypatch)
 
     def heard(method: str, params: dict) -> tuple[dict, list[tuple[str, str | None]]]:

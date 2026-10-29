@@ -13,6 +13,7 @@ from unittest import mock
 import pytest
 
 from schematic import config, export, feeds, pipeline, site
+from test_feeds import StandInSession
 
 
 @pytest.fixture
@@ -74,7 +75,8 @@ def test_fetch_downloads_under_the_home_and_nowhere_else(home):
     resp = mock.Mock(content=payload, headers={"Content-Length": str(len(payload))})
     resp.raise_for_status = mock.Mock()
     resp.iter_content = lambda size: iter([payload])
-    with mock.patch.object(feeds.requests, "get", return_value=resp) as get:
+    get = mock.Mock(return_value=resp)
+    with mock.patch.object(feeds, "_session", lambda: StandInSession(get)):
         path = feeds.fetch("la-metro-rail")
     get.assert_called_once()
     assert path == home / "data" / "feeds" / "la-metro-rail.zip"

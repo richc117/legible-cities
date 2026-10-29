@@ -1,30 +1,37 @@
 """A feed download reaches only public hosts, at every hop.
 
 A feed is published on a public host, and a download never reaches this
-machine or its network. ``feeds._download`` follows redirects itself, never
-through ``requests``, and judges every hop before asking for it, the first included:
-the host as urllib3 parses the address ``requests`` prepares, and every
-address the resolver gives for it. A refusal is a ``FeedError`` (kind
-``feed`` over the protocol) in the desktop app's own sentence, names the
-address only as ``shown`` does, and keeps nothing.
+machine or its network. ``feeds._download`` follows redirects itself, in one
+session, and judges every hop, the first included: ``_check_hop`` refuses a
+wrong scheme, ``localhost`` and a literal local address before anything is
+asked, and the connection itself resolves the host, refuses if any address
+is local, and connects to the addresses it judged. A refusal is a
+``FeedError`` (kind ``feed`` over the protocol) in the desktop app's own
+sentence, names the address only as ``shown`` does, and keeps nothing.
 
-Offline, as every download test is: ``requests.get`` is a stand-in that
-follows redirects itself unless told not to, as ``requests`` does, and
-``socket.getaddrinfo`` answers what each test says (``conftest.py`` resolves
-the reserved test names publicly by default).
+These run the real ``requests`` and urllib3 stack, offline:
+``socket.getaddrinfo`` answers what each test says, and
+``socket.socket.connect`` records the address it was asked to dial and
+connects instead to a small HTTP server on the loopback, which answers by the
+request's Host header. So what is judged here is what was dialled.
 """
 
+import ipaddress
 import socket
+import threading
 import traceback
-from urllib.parse import urljoin
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from conftest import PUBLIC
 from schematic import config, feeds
-from test_feeds import gtfs_zip, home  # noqa: F401 - home is a fixture
+from test_feeds import gtfs_zip, home, stand_in  # noqa: F401 - home is a fixture
 
 SENTENCE = feeds.LOCAL_HOST
+assert SENTENCE == ("Use an address on a public host; a feed cannot be fetched from this "
+                    "machine or its network.")
+NOT_FETCHABLE = "the address is not one that can be fetched"
 
 
 def v4(*octets: int) -> str:
@@ -33,76 +40,114 @@ def v4(*octets: int) -> str:
     return ".".join(map(str, octets))
 
 
+# Public addresses (example.com's and the like); nothing connects to them.
+PUBLIC, PUBLIC_2 = "93.184.215.14", "151.101.1.1"
 # One address in each private range the preflight scan guards.
 RFC1918_172, RFC1918_192 = v4(172, 16, 0, 9), v4(192, 168, 0, 10)
 SHARED = v4(100, 64, 0, 1)                    # RFC 6598: carrier NAT, overlay networks
-assert SENTENCE == ("Use an address on a public host; a feed cannot be fetched from this "
-                    "machine or its network.")
 
 
-class Answer:
-    """One response: a status, a ``Location`` for a redirect, a body."""
+# -------------------------------------------------------------- the network
 
-    def __init__(self, status: int = 200, location: str | None = None, body: bytes = b""):
-        self.status_code = status
-        self.headers = ({"Location": location} if location is not None
-                        else {"Content-Length": str(len(body))})
-        self.body = body
-        self.read = False
-        self.closed = False
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
 
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            raise feeds.requests.HTTPError(f"{self.status_code}", response=self)
-
-    def iter_content(self, size):
-        self.read = True
-        for i in range(0, len(self.body), size):
-            yield self.body[i:i + size]
-
-    def close(self):
-        self.closed = True
-
-
-def serve(monkeypatch, routes: dict[str, Answer]) -> list[str]:
-    """``requests.get`` over ``routes``, and the list of every address it was
-    asked for or went to. Like ``requests``, it follows a redirect itself
-    unless ``allow_redirects=False``; an address with no route is a server
-    that cannot be reached."""
-    asked: list[str] = []
-
-    def get(url, **kw):
-        while True:
-            asked.append(url)
-            if url not in routes:
-                raise feeds.requests.ConnectionError(f"no route to {url}")
-            answer = routes[url]
-            if answer.status_code in feeds.REDIRECTS and kw.get("allow_redirects", True):
-                url = urljoin(url, answer.headers["Location"])
-                continue
-            return answer
-
-    monkeypatch.setattr(feeds.requests, "get", get)
-    return asked
+    def do_GET(self):
+        net = self.server.net
+        # A proxy is sent the whole address; a host, its path and a Host header.
+        at = (self.path[len("http://"):] if self.path.startswith("http://")
+              else self.headers.get("Host", "") + self.path)
+        net.seen.append({"at": at, "auth": self.headers.get("Authorization"),
+                         "cookie": self.headers.get("Cookie")})
+        status, headers, body = net.routes.get(at, (404, {}, b"not here"))
+        self.send_response(status)
+        for name, value in headers.items():
+            self.send_header(name, value)
+        if isinstance(body, int):              # a body that size, counted as it goes
+            self.send_header("Content-Length", str(body))
+            self.end_headers()
+            written = 0
+            try:
+                while written < body:
+                    self.wfile.write(b"\0" * (1 << 16))
+                    written += 1 << 16
+            except OSError:
+                pass
+            finally:
+                net.written.append(written)
+            return
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
 
-def resolve(monkeypatch, names: dict[str, list[str]]) -> list[str]:
-    """``socket.getaddrinfo`` answering ``names`` with their addresses, both
-    families as they come, and every other host as before; the list of the
-    hosts it was asked about."""
-    before = socket.getaddrinfo
-    heard: list[str] = []
+class Net:
+    """The stand-in network: ``names`` the resolver's answers per host (a
+    list of rounds, the last repeated), ``routes`` what the server answers
+    per ``host/path``, and what happened: ``resolved``, ``dialled``, ``seen``."""
 
-    def getaddrinfo(host, port, *args, **kwargs):
-        heard.append(host)
-        if host in names:
+    def __init__(self):
+        self.names: dict[str, list[list[str]]] = {}
+        self.routes: dict[str, tuple[int, dict, bytes | int]] = {}
+        self.resolved: list[str] = []
+        self.dialled: list[tuple[str, int]] = []
+        self.seen: list[dict] = []
+        self.written: list[int] = []
+
+    def resolve(self, host: str, *rounds: list[str]) -> None:
+        self.names[host] = list(rounds)
+
+    def route(self, at: str, status: int = 200, headers: dict | None = None,
+              body: bytes | int = b"") -> None:
+        self.routes[at] = (status, headers or {}, body)
+
+    def redirect(self, at: str, location: str, status: int = 302) -> None:
+        self.route(at, status, {"Location": location})
+
+
+@pytest.fixture
+def net(monkeypatch, tmp_path):
+    net = Net()
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    server.net = net
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, args=(0.02,), daemon=True)
+    thread.start()
+
+    real_getaddrinfo, real_connect = socket.getaddrinfo, socket.socket.connect
+
+    def getaddrinfo(host, port_, family=0, type=0, proto=0, flags=0):
+        net.resolved.append(host)
+        if host in net.names:
+            rounds = net.names[host]
+            addresses = rounds.pop(0) if len(rounds) > 1 else rounds[0]
             return [(socket.AF_INET6 if ":" in a else socket.AF_INET, socket.SOCK_STREAM,
-                     socket.IPPROTO_TCP, "", (a, port, 0, 0) if ":" in a else (a, port))
-                    for a in names[host]]
-        return before(host, port, *args, **kwargs)
+                     socket.IPPROTO_TCP, "", (a, port_, 0, 0) if ":" in a else (a, port_))
+                    for a in addresses]
+        # A literal only, never a lookup: nothing here reaches a resolver.
+        return real_getaddrinfo(host, port_, family, type, proto, flags | socket.AI_NUMERICHOST)
+
+    def connect(sock, address):
+        net.dialled.append(tuple(address[:2]))
+        if sock.family != socket.AF_INET:
+            raise ConnectionRefusedError("only the IPv4 loopback answers here")
+        return real_connect(sock, ("127.0.0.1", port))
 
     monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
-    return heard
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    # No proxy and no .netrc but the ones a test names, whatever this machine has.
+    for name in ("http_proxy", "https_proxy", "all_proxy", "no_proxy"):
+        monkeypatch.delenv(name, raising=False)
+        monkeypatch.delenv(name.upper(), raising=False)
+    monkeypatch.setattr(feeds.requests.utils, "getproxies", urllib.request.getproxies_environment)
+    monkeypatch.setattr(feeds.requests.utils, "proxy_bypass",
+                        urllib.request.proxy_bypass_environment)
+    monkeypatch.setenv("NETRC", str(tmp_path / "no-netrc"))
+    yield net
+    server.shutdown()
+    server.server_close()
 
 
 def zip_bytes(tmp_path) -> bytes:
@@ -116,16 +161,20 @@ def nothing_kept() -> None:
     assert left == [], left
 
 
-def refused(url: str) -> str:
+def refused(url: str, **kw) -> str:
     with pytest.raises(feeds.FeedError) as caught:
-        feeds.add(url)
+        feeds.add(url, **kw)
     assert caught.value.__cause__ is None and caught.value.__suppress_context__
     return str(caught.value)
 
 
+def local(url: str) -> str:
+    return f"{feeds.shown(url)} could not be fetched. {SENTENCE}"
+
+
 # ------------------------------------------------------------ the first hop
 
-@pytest.mark.parametrize("url", [
+LITERALS = [
     "http://127.0.0.1/gtfs.zip",
     "http://127.1.2.3:8080/gtfs.zip",
     "http://10.1.2.3/gtfs.zip",
@@ -136,8 +185,6 @@ def refused(url: str) -> str:
     "http://0.0.0.0/gtfs.zip",
     "http://224.0.0.1/gtfs.zip",
     "http://240.0.0.1/gtfs.zip",
-    "http://0x7f.1/gtfs.zip",                  # 127.0.0.1, as the resolver reads it
-    "http://2130706433/gtfs.zip",              # 127.0.0.1 as one number
     "http://localhost/gtfs.zip",
     "http://LOCALHOST./gtfs.zip",
     "http://feeds.localhost/gtfs.zip",
@@ -151,11 +198,45 @@ def refused(url: str) -> str:
     "http://[::ffff:a00:1]/gtfs.zip",          # IPv4-mapped 10.0.0.1, in hex
     "http://[::10.0.0.1]/gtfs.zip",            # IPv4-compatible
     "http://[64:ff9b::a00:1]/gtfs.zip",        # NAT64's 10.0.0.1
-])
-def test_a_first_address_on_this_machine_or_its_network_is_refused(home, monkeypatch, url):
-    asked = serve(monkeypatch, {})
-    assert refused(url) == f"{feeds.shown(url)} could not be fetched. {SENTENCE}"
-    assert asked == [], "nothing was asked for"
+]
+
+
+@pytest.mark.parametrize("url", LITERALS)
+def test_a_first_address_on_this_machine_or_its_network_is_refused_unasked(home, net, url):
+    assert refused(url) == local(url)
+    assert net.dialled == [] and net.seen == [], "nothing was dialled"
+    nothing_kept()
+
+
+def _scheme_only(url: str) -> str:
+    """``_check_hop`` without its refusals: what the connection meets alone."""
+    return feeds.parse_url(feeds.requests.Request("GET", url).prepare().url).scheme
+
+
+@pytest.mark.parametrize("url", LITERALS)
+def test_the_connection_refuses_a_local_address_on_its_own(home, net, monkeypatch, url):
+    """Without the early check, the connection's own rule still holds."""
+    monkeypatch.setattr(feeds, "_check_hop", _scheme_only)
+    net.resolve("localhost", ["127.0.0.1", "::1"])
+    net.resolve("localhost.", ["127.0.0.1"])
+    net.resolve("feeds.localhost", ["127.0.0.1"])
+    assert refused(url) == local(url)
+    assert net.dialled == []
+    nothing_kept()
+
+
+@pytest.mark.parametrize("url", ["http://0x7f.1/gtfs.zip", "http://2130706433/gtfs.zip"])
+def test_a_number_the_resolver_reads_as_a_local_address_is_refused(home, net, url):
+    """127.0.0.1, written as the resolver still reads it: not a literal to
+    ``ipaddress``, so it is the connection's to judge."""
+    host = url.split("/")[2]
+    try:
+        socket.getaddrinfo(host, 80, 0, socket.SOCK_STREAM)
+    except socket.gaierror:
+        pytest.skip(f"this platform's resolver does not read {host!r} as a number")
+    net.resolved.clear()
+    assert refused(url) == local(url)
+    assert net.resolved == [host] and net.dialled == []
     nothing_kept()
 
 
@@ -169,65 +250,107 @@ def test_a_first_address_on_this_machine_or_its_network_is_refused(home, monkeyp
     [PUBLIC, RFC1918_172],                     # any one of them is enough
     ["2606:4700::1111", "fe80::1"],
 ])
-def test_a_public_looking_name_that_resolves_here_is_refused(home, monkeypatch, addresses):
-    url = "https://feeds.example.test/gtfs.zip"
-    asked = serve(monkeypatch, {})
-    heard = resolve(monkeypatch, {"feeds.example.test": addresses})
-    assert refused(url) == f"{url} could not be fetched. {SENTENCE}"
-    assert heard == ["feeds.example.test"], "the name was resolved, once"
-    assert asked == []
+def test_a_public_looking_name_that_resolves_here_is_refused(home, net, addresses):
+    url = "http://feeds.example.test/gtfs.zip"
+    net.resolve("feeds.example.test", addresses)
+    assert refused(url) == local(url)
+    assert net.resolved == ["feeds.example.test"], "resolved once"
+    assert net.dialled == [], "and never dialled"
     nothing_kept()
 
 
-@pytest.mark.parametrize("addresses", [
-    [PUBLIC],
-    ["2606:4700::1111", PUBLIC],
-    ["::ffff:8.8.8.8"],
-    # What DNS64 answers for an IPv4-only host on an IPv6-only network.
-    ["64:ff9b::808:808"],
+@pytest.mark.parametrize("address,public", [
+    (PUBLIC, True),
+    ("2606:4700::1111", True),
+    ("::ffff:8.8.8.8", True),
+    ("64:ff9b::808:808", True),                # what DNS64 answers for an IPv4-only host
+    ("64:ff9b::a00:1", False),
+    ("::ffff:127.0.0.1", False),
+    ("::8.8.8.8", False),                      # IPv4-compatible: ::/8 is reserved
 ])
-def test_a_name_that_resolves_publicly_is_fetched(home, monkeypatch, tmp_path, addresses):
-    url = "https://feeds.example.test/gtfs.zip"
+def test_which_addresses_are_public(address, public):
+    assert feeds._is_local_address(ipaddress.ip_address(address)) is not public
+
+
+def test_a_public_name_is_fetched_from_the_address_it_resolved_to(home, net, tmp_path):
     payload = zip_bytes(tmp_path)
-    asked = serve(monkeypatch, {url: Answer(body=payload)})
-    resolve(monkeypatch, {"feeds.example.test": addresses})
-    assert feeds.add(url, key="public").zip_path.read_bytes() == payload
-    assert asked == [url]
+    net.resolve("feeds.example.test", [PUBLIC])
+    net.route("feeds.example.test/gtfs.zip", body=payload)
+    feed = feeds.add("http://feeds.example.test/gtfs.zip", key="public")
+    assert feed.zip_path.read_bytes() == payload
+    assert net.resolved == ["feeds.example.test"]
+    assert net.dialled == [(PUBLIC, 80)]
 
 
-def test_the_host_judged_is_the_one_requests_connects_to(home, monkeypatch, tmp_path):
+def test_a_name_that_rebinds_after_its_check_is_never_dialled_at_its_new_address(
+        home, net, tmp_path):
+    """DNS rebinding: public the first time it is asked, the machine itself
+    every time after. The connection judges the addresses it dials and dials
+    the ones it judged, so the name is resolved once and nothing reaches the
+    loopback."""
+    payload = zip_bytes(tmp_path)
+    net.resolve("feeds.example.test", [PUBLIC], ["127.0.0.1"])
+    net.route("feeds.example.test/gtfs.zip", body=payload)
+    feeds.add("http://feeds.example.test/gtfs.zip", key="rebound")
+    assert net.resolved == ["feeds.example.test"]
+    assert net.dialled == [(PUBLIC, 80)]
+
+
+def test_a_name_that_rebinds_between_two_hops_is_refused_at_the_second(home, net):
+    url = "http://feeds.example.test/gtfs.zip"
+    net.resolve("feeds.example.test", [PUBLIC], ["127.0.0.1"])
+    net.redirect("feeds.example.test/gtfs.zip", "/current.zip")
+    assert refused(url) == local(url)
+    assert net.dialled == [(PUBLIC, 80)], "one connection, to the public address"
+    assert [s["at"] for s in net.seen] == ["feeds.example.test/gtfs.zip"]
+    nothing_kept()
+
+
+def test_a_trailing_dot_is_resolved_as_it_was_written(home, net, tmp_path):
+    """As urllib3 resolves it: the dot kept for the lookup, and dropped from
+    the Host header (and from TLS's name)."""
+    payload = zip_bytes(tmp_path)
+    net.resolve("feeds.example.test.", [PUBLIC])
+    net.route("feeds.example.test/gtfs.zip", body=payload)
+    feeds.add("http://feeds.example.test./gtfs.zip", key="dotted")
+    assert net.resolved == ["feeds.example.test."]
+    assert net.dialled == [(PUBLIC, 80)]
+
+
+def test_the_host_judged_is_the_one_dialled_whatever_the_backslash(home, net, tmp_path):
     """However an address is written, the host judged is the one urllib3
-    reads from the address ``requests`` prepares, which is the one it
-    connects to: here a backslash before ``@``."""
+    reads from the address ``requests`` prepares, which is the one dialled:
+    here a backslash before ``@``, either way round."""
     payload = zip_bytes(tmp_path)
     url = "http://127.0.0.1\\@feeds.example.test/gtfs.zip"
-    serve(monkeypatch, {})
-    assert refused(url) == f"{feeds.shown(url)} could not be fetched. {SENTENCE}"
+    assert refused(url) == local(url)
+    assert net.dialled == []
 
     url = "http://feeds.example.test\\@127.0.0.1/gtfs.zip"
-    prepared = feeds.requests.Request("GET", url).prepare().url
-    asked = serve(monkeypatch, {url: Answer(body=payload)})
-    heard = resolve(monkeypatch, {})
+    net.resolve("feeds.example.test", [PUBLIC])
+    net.route("feeds.example.test/%5C@127.0.0.1/gtfs.zip", body=payload)
     feeds.add(url, key="slashed")
-    assert asked == [url]
-    assert heard == ["feeds.example.test"], prepared
+    assert net.resolved == ["feeds.example.test"]
+    assert net.dialled == [(PUBLIC, 80)]
 
 
-def test_a_name_that_does_not_resolve_cannot_be_reached_and_asks_nothing(home, monkeypatch):
-    def unknown(host, port, *args, **kwargs):
-        raise socket.gaierror(socket.EAI_NONAME, "nodename nor servname provided")
-
-    asked = serve(monkeypatch, {})
-    monkeypatch.setattr(socket, "getaddrinfo", unknown)
-    url = "https://nowhere.example.test/gtfs.zip"
+def test_a_name_that_does_not_resolve_cannot_be_reached_and_dials_nothing(home, net):
+    url = "http://nowhere.example.test/gtfs.zip"
     assert refused(url) == f"{url} could not be fetched: the server could not be reached"
-    assert asked == []
+    assert net.resolved == ["nowhere.example.test"] and net.dialled == []
     nothing_kept()
 
 
 # ---------------------------------------------------------------- redirects
 
-FIRST = "https://feeds.example.test/gtfs.zip"
+FIRST = "http://feeds.example.test/gtfs.zip"
+
+
+@pytest.fixture
+def public(net):
+    for host in ("feeds.example.test", "mirror.example.test", "cdn.example.test"):
+        net.resolve(host, [PUBLIC])
+    return net
 
 
 @pytest.mark.parametrize("location", [
@@ -237,126 +360,287 @@ FIRST = "https://feeds.example.test/gtfs.zip"
     "http://[::ffff:10.0.0.1]/internal.zip",
     "http://169.254.169.254/latest/meta-data/",
     "//localhost/internal.zip",                # scheme-relative
-    "https://inside.example.test/internal.zip",  # a name that resolves here
+    "http://inside.example.test/internal.zip",  # a name that resolves here
+    "http://feeds.example.test\\@127.0.0.1/internal.zip",
 ])
-def test_a_redirect_to_this_machine_or_its_network_is_refused_before_it_is_asked(
-        home, monkeypatch, tmp_path, location):
-    payload = zip_bytes(tmp_path)
-    target = urljoin(FIRST, location)
-    asked = serve(monkeypatch, {FIRST: Answer(302, location), target: Answer(body=payload)})
-    resolve(monkeypatch, {"inside.example.test": ["10.0.0.7"]})
-    assert refused(FIRST) == f"{FIRST} could not be fetched. {SENTENCE}"
-    assert asked == [FIRST], "the redirect was not followed"
+def test_a_redirect_to_this_machine_or_its_network_is_refused_before_it_is_dialled(
+        home, public, location):
+    public.resolve("inside.example.test", ["10.0.0.7"])
+    public.redirect("feeds.example.test/gtfs.zip", location)
+    assert refused(FIRST) == local(FIRST)
+    assert public.dialled == [(PUBLIC, 80)], "only the first hop was dialled"
+    assert [s["at"] for s in public.seen] == ["feeds.example.test/gtfs.zip"]
     nothing_kept()
 
 
-def test_a_redirect_to_another_scheme_is_refused(home, monkeypatch):
-    asked = serve(monkeypatch, {FIRST: Answer(302, "file:///etc/passwd")})
-    assert refused(FIRST) == (f"{FIRST} could not be fetched: "
-                              "the address is not one that can be fetched")
-    assert asked == [FIRST]
+@pytest.mark.parametrize("location", [
+    "file:///etc/passwd",
+    "http://[::1/internal.zip",                # an unclosed bracket: urlsplit refuses it
+    # A netloc that changes under NFKC normalisation (U+FF20, a full-width @),
+    # sent as UTF-8 as servers send it: urlsplit refuses it too.
+    "http://evil\uff20feeds.example.test/x.zip".encode().decode("latin1"),
+])
+def test_a_redirect_to_an_address_that_cannot_be_fetched_says_so_and_nothing_more(
+        home, public, location):
+    public.redirect("feeds.example.test/gtfs.zip", location)
+    with pytest.raises(feeds.FeedError) as caught:
+        feeds.add(FIRST)
+    assert str(caught.value) == f"{FIRST} could not be fetched: {NOT_FETCHABLE}"
+    assert caught.value.__cause__ is None and caught.value.__suppress_context__
+    printed = "".join(traceback.format_exception(caught.value))
+    assert "evil" not in printed and "passwd" not in printed and "::1" not in printed
+    assert public.dialled == [(PUBLIC, 80)]
     nothing_kept()
 
 
-def test_a_relative_redirect_on_a_public_host_is_followed(home, monkeypatch, tmp_path):
+KEYED = "http://feeduser:pa\uff20ss@feeds.example.test/gtfs.zip?api_key=S3CRET"
+KEYED_SECRETS = ("feeduser", "pa\uff20ss", "\uff20", "S3CRET", "NFKC", "latin-1")
+
+
+def _refused_quietly(url: str) -> None:
+    with pytest.raises(feeds.FeedError) as caught:
+        feeds.add(url)
+    assert str(caught.value) == ("http://<redacted>@feeds.example.test/gtfs.zip?api_key="
+                                 f"<redacted> could not be fetched: {NOT_FETCHABLE}")
+    assert caught.value.__cause__ is None and caught.value.__suppress_context__
+    printed = "".join(traceback.format_exception(caught.value))
+    for secret in KEYED_SECRETS:
+        assert secret not in printed, f"{secret!r} is in {printed!r}"
+    nothing_kept()
+
+
+def test_an_address_whose_user_information_urlsplit_refuses_is_refused_quietly(
+        home, public):
+    """User information that changes under NFKC normalisation (U+FF20, a
+    full-width @), followed by a redirect: ``requests`` cannot send it as
+    Basic credentials, which are Latin-1, and says so in an exception of its
+    own, which is never the sentence."""
+    public.redirect("feeds.example.test/gtfs.zip?api_key=S3CRET", "/current/gtfs.zip")
+    _refused_quietly(KEYED)
+    assert public.dialled == []
+
+
+def test_that_address_with_a_netrc_present_is_refused_quietly(
+        home, public, monkeypatch, tmp_path):
+    """With a .netrc present, ``requests`` would also look the host up with
+    ``urlparse`` on the address as given, whose refusal names the netloc
+    whole: the address is refused as quietly."""
+    netrc = tmp_path / "netrc"
+    netrc.write_text("")
+    monkeypatch.setenv("NETRC", str(netrc))
+    public.redirect("feeds.example.test/gtfs.zip?api_key=S3CRET", "/current/gtfs.zip")
+    _refused_quietly(KEYED)
+    assert public.dialled == []
+
+
+def test_a_redirect_is_resolved_against_the_address_as_it_was_sent():
+    """Never against the address as given, which urlsplit may refuse with
+    the netloc in its message. ``requests`` refuses such an address before
+    its first hop (above), so this is the function alone."""
+    given = KEYED
+    answer = Answer("http://feeduser:pa%EF%BC%A0ss@feeds.example.test/gtfs.zip?api_key=S3CRET",
+                    302, "current/gtfs.zip")
+    assert feeds._redirect_target(answer, given) == (
+        "http://feeduser:pa%EF%BC%A0ss@feeds.example.test/current/gtfs.zip")
+
+
+def test_a_relative_redirect_on_a_public_host_is_followed(home, public, tmp_path):
     payload = zip_bytes(tmp_path)
-    moved = "https://feeds.example.test/current/gtfs.zip?v=2"
-    asked = serve(monkeypatch, {FIRST: Answer(302, "current/gtfs.zip?v=2"),
-                                moved: Answer(body=payload)})
-    heard = resolve(monkeypatch, {})
+    public.redirect("feeds.example.test/gtfs.zip", "current/gtfs.zip?v=2")
+    public.route("feeds.example.test/current/gtfs.zip?v=2", body=payload)
     feed = feeds.add(FIRST, key="relative")
-    assert asked == [FIRST, moved]
-    assert heard == ["feeds.example.test", "feeds.example.test"], "every hop was resolved"
+    assert [s["at"] for s in public.seen] == ["feeds.example.test/gtfs.zip",
+                                              "feeds.example.test/current/gtfs.zip?v=2"]
     assert feed.url == FIRST, "the record keeps the address given"
     assert feed.zip_path.read_bytes() == payload
 
 
-def test_a_public_chain_is_followed_and_only_the_last_body_is_read(home, monkeypatch, tmp_path):
+def test_an_encoded_location_is_followed_as_requests_would_send_it(home, public, tmp_path):
     payload = zip_bytes(tmp_path)
-    second = "https://mirror.example.test/feeds/gtfs.zip"
-    third = "https://cdn.example.test/a/b/gtfs.zip"
-    hops = {FIRST: Answer(301, second), second: Answer(302, third),
-            third: Answer(body=payload)}
-    asked = serve(monkeypatch, hops)
-    heard = resolve(monkeypatch, {})
+    public.redirect("feeds.example.test/gtfs.zip", "/féed s.zip".encode().decode("latin1"))
+    public.route("feeds.example.test/f%C3%A9ed%20s.zip", body=payload)
+    assert feeds.add(FIRST, key="encoded").zip_path.read_bytes() == payload
+
+
+def test_a_public_chain_is_followed_and_every_hop_dialled_where_it_resolved(
+        home, public, tmp_path):
+    payload = zip_bytes(tmp_path)
+    public.resolve("mirror.example.test", [PUBLIC_2])
+    public.redirect("feeds.example.test/gtfs.zip", "http://mirror.example.test/g.zip", 301)
+    public.redirect("mirror.example.test/g.zip", "http://cdn.example.test/a/b/g.zip", 302)
+    public.route("cdn.example.test/a/b/g.zip", body=payload)
     feed = feeds.add(FIRST, key="chained")
-    assert asked == [FIRST, second, third]
-    assert heard == ["feeds.example.test", "mirror.example.test", "cdn.example.test"]
     assert feed.zip_path.read_bytes() == payload
-    assert not hops[FIRST].read and not hops[second].read, "a redirect's body is not read"
-    assert hops[FIRST].closed and hops[second].closed and hops[third].closed
+    assert public.resolved == ["feeds.example.test", "mirror.example.test", "cdn.example.test"]
+    assert public.dialled == [(PUBLIC, 80), (PUBLIC_2, 80), (PUBLIC, 80)]
 
 
-def test_a_preset_whose_host_redirects_as_the_mtas_did_downloads(home, monkeypatch, tmp_path):
-    """web.mta.info's old address answers 302 from https down to http on its
-    own host, then 301 to the MTA's bucket on S3 (as it did in Oct 2026):
-    three public hops, so the preset downloads."""
+def test_a_redirects_own_body_is_never_read(home, public, tmp_path):
+    """``requests`` reads a redirect's body whole even when told not to
+    follow it; a download reads none of it, however large it says it is."""
     payload = zip_bytes(tmp_path)
-    old = "https://web.mta.info/developers/data/nyct/subway/google_transit.zip"
-    down = "http://web.mta.info/developers/data/nyct/subway/google_transit.zip"
-    bucket = "http://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip"
-    monkeypatch.setitem(feeds.FEEDS, "t", feeds.Feed(key="t", name="T", url=old))
-    asked = serve(monkeypatch, {old: Answer(302, down), down: Answer(301, bucket),
-                                bucket: Answer(body=payload)})
-    heard = resolve(monkeypatch, {"web.mta.info": ["23.10.1.1"],
-                                  "rrgtfsfeeds.s3.amazonaws.com": ["52.216.1.1",
-                                                                   "2600:1fa0:80a4::1"]})
-    assert feeds.fetch("t").read_bytes() == payload
-    assert asked == [old, down, bucket]
-    assert heard == ["web.mta.info", "web.mta.info", "rrgtfsfeeds.s3.amazonaws.com"]
+    public.route("feeds.example.test/gtfs.zip", 302, {"Location": "/g.zip"}, body=64 << 20)
+    public.route("feeds.example.test/g.zip", body=payload)
+    feeds.add(FIRST, key="unread")
+    for _ in range(200):
+        if public.written:
+            break
+        threading.Event().wait(0.05)
+    assert public.written and public.written[0] < 16 << 20, public.written
 
 
-def test_ten_redirects_are_followed_and_the_eleventh_is_too_many(home, monkeypatch, tmp_path):
+def test_cookies_carry_across_the_hops(home, public, tmp_path):
     payload = zip_bytes(tmp_path)
-    hops = [f"https://feeds.example.test/{i}.zip" for i in range(12)]
-
-    routes = {hops[i]: Answer(302, hops[i + 1]) for i in range(10)}
-    routes[hops[10]] = Answer(body=payload)
-    asked = serve(monkeypatch, routes)
-    feeds.add(hops[0], key="ten")
-    assert asked == hops[:11]
-
-    routes = {hops[i]: Answer(302, hops[i + 1]) for i in range(11)}
-    routes[hops[11]] = Answer(body=payload)
-    asked = serve(monkeypatch, routes)
-    assert refused(hops[0]) == f"{hops[0]} could not be fetched: it redirected too many times"
-    assert asked == hops[:11], "the eleventh redirect was asked for and not followed"
+    public.route("feeds.example.test/gtfs.zip", 302,
+                 {"Location": "/g.zip", "Set-Cookie": "token=abc; Path=/"})
+    public.route("feeds.example.test/g.zip", body=payload)
+    feeds.add(FIRST, key="cookies")
+    assert [s["cookie"] for s in public.seen] == [None, "token=abc"]
 
 
-def test_a_refusal_names_the_address_without_its_secrets_or_the_hops(home, monkeypatch):
-    keyed = "https://someone:pw@feeds.example.test/gtfs.zip?api_key=S3CRET#tok"
-    serve(monkeypatch, {keyed: Answer(302, "http://127.0.0.1/x.zip?token=T0KEN")})
+def test_credentials_go_on_to_the_same_host_and_never_to_another(home, public, tmp_path):
+    """``requests``' own rule (``Session.should_strip_auth``)."""
+    payload = zip_bytes(tmp_path)
+    public.redirect("feeds.example.test/a.zip", "http://feeds.example.test/b.zip")
+    public.redirect("feeds.example.test/b.zip", "http://cdn.example.test/c.zip")
+    public.route("cdn.example.test/c.zip", body=payload)
+    feeds.add("http://someone:pw@feeds.example.test/a.zip", key="authed")
+    sent = [s["auth"] for s in public.seen]
+    assert sent[0] and sent[0].startswith("Basic ")
+    assert sent == [sent[0], sent[0], None]
+
+
+def test_ten_redirects_are_followed_and_the_eleventh_is_too_many(home, public, tmp_path):
+    payload = zip_bytes(tmp_path)
+    hops = [f"feeds.example.test/{i}.zip" for i in range(12)]
+    for i in range(10):
+        public.redirect(hops[i], f"/{i + 1}.zip")
+    public.route(hops[10], body=payload)
+    feeds.add(f"http://{hops[0]}", key="ten")
+    assert [s["at"] for s in public.seen] == hops[:11]
+
+    public.seen.clear()
+    public.redirect(hops[10], "/11.zip")
+    public.route(hops[11], body=payload)
+    assert refused(f"http://{hops[0]}") == (f"http://{hops[0]} could not be fetched: "
+                                            "it redirected too many times")
+    assert [s["at"] for s in public.seen] == hops[:11], "the eleventh was not followed"
+
+
+def test_each_hop_asks_whether_to_stop_first(home, public):
+    public.redirect("feeds.example.test/gtfs.zip", "/g.zip")
+    asked = []
+    with pytest.raises(feeds.Interrupted):
+        feeds.add(FIRST, cancelled=lambda: asked.append(1) or len(asked) > 1)
+    assert [s["at"] for s in public.seen] == ["feeds.example.test/gtfs.zip"]
+    nothing_kept()
+
+
+def test_a_refusal_names_the_address_without_its_secrets_or_the_hops(home, public):
+    keyed = "http://someone:pw@feeds.example.test/gtfs.zip?api_key=S3CRET#tok"
+    public.redirect("feeds.example.test/gtfs.zip?api_key=S3CRET",
+                    "http://127.0.0.1/x.zip?token=T0KEN")
     with pytest.raises(feeds.FeedError) as caught:
         feeds.add(keyed)
-    said = str(caught.value)
-    assert said == ("https://<redacted>@feeds.example.test/gtfs.zip?api_key=<redacted>"
-                    f"#<redacted> could not be fetched. {SENTENCE}")
+    assert str(caught.value) == ("http://<redacted>@feeds.example.test/gtfs.zip?api_key="
+                                 f"<redacted>#<redacted> could not be fetched. {SENTENCE}")
     printed = "".join(traceback.format_exception(caught.value))
     for secret in ("S3CRET", "someone", "pw@", "tok", "T0KEN", "127.0.0.1"):
         assert secret not in printed, f"{secret!r} is in {printed!r}"
     nothing_kept()
 
 
-def test_a_presets_cached_zip_is_kept_when_a_forced_fetch_is_refused(home, monkeypatch):
-    """Nothing is written, so nothing is lost either: a refused hop leaves
-    the cache as it was."""
-    url = "https://feeds.example.test/t.zip"
-    monkeypatch.setitem(feeds.FEEDS, "t", feeds.Feed(key="t", name="T", url=url))
+def test_a_presets_cached_zip_is_kept_when_a_forced_fetch_is_refused(home, public, monkeypatch):
+    """Nothing is written, so nothing is lost either."""
+    monkeypatch.setitem(feeds.FEEDS, "t", feeds.Feed(key="t", name="T", url=FIRST))
     zipped = feeds.get("t").zip_path
     zipped.parent.mkdir(parents=True, exist_ok=True)
     zipped.write_bytes(b"cached")
-    serve(monkeypatch, {url: Answer(307, "http://10.0.0.1/t.zip")})
+    public.redirect("feeds.example.test/gtfs.zip", "http://10.0.0.1/t.zip", 307)
     with pytest.raises(feeds.FeedError, match="a feed cannot be fetched from this machine"):
         feeds.fetch("t", force=True)
     assert zipped.read_bytes() == b"cached"
     assert sorted(p.name for p in zipped.parent.iterdir()) == ["t.zip"]
 
 
+# ------------------------------------------------------------ http and https
+
+class Answer:
+    """A response for the stand-in session, where a test needs https."""
+
+    def __init__(self, url: str, status: int = 200, location: str | None = None,
+                 body: bytes = b""):
+        self.url = url
+        self.status_code = status
+        self.headers = ({"Location": location} if location is not None
+                        else {"Content-Length": str(len(body))})
+        self.body = body
+
+    def raise_for_status(self):
+        pass
+
+    def iter_content(self, size):
+        yield self.body
+
+    def close(self):
+        pass
+
+
+def answering(monkeypatch, answers: dict[str, Answer]) -> list[str]:
+    asked: list[str] = []
+    stand_in(monkeypatch, lambda url, **kw: asked.append(url) or answers[url])
+    return asked
+
+
+def test_an_http_hop_after_an_https_one_is_refused(home, monkeypatch):
+    first = "https://feeds.example.test/gtfs.zip"
+    down = "http://feeds.example.test/gtfs.zip"
+    asked = answering(monkeypatch, {first: Answer(first, 302, down)})
+    assert refused(first) == (f"{first} could not be fetched. Use an address that stays on "
+                              "https; it redirected to an unencrypted address.")
+    assert asked == [first]
+    nothing_kept()
+
+
+def test_an_https_hop_after_an_http_one_is_followed(home, monkeypatch, tmp_path):
+    payload = zip_bytes(tmp_path)
+    first = "http://feeds.example.test/gtfs.zip"
+    up = "https://feeds.example.test/gtfs.zip"
+    asked = answering(monkeypatch, {first: Answer(first, 301, up), up: Answer(up, body=payload)})
+    assert feeds.add(first, key="upgraded").zip_path.read_bytes() == payload
+    assert asked == [first, up]
+
+
+# ------------------------------------------------------------------ proxies
+
+def test_through_a_proxy_the_proxy_resolves_and_a_local_proxy_is_allowed(
+        home, net, monkeypatch, tmp_path):
+    """A proxy in the environment is the person's own choice, and on some
+    networks the only resolver of outside names: nothing resolves the feed's
+    host here, and the proxy, on this machine, is dialled."""
+    payload = zip_bytes(tmp_path)
+    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:3128")
+    net.route("feeds.example.test/gtfs.zip", body=payload)
+    feeds.add("http://feeds.example.test/gtfs.zip", key="proxied")
+    assert "feeds.example.test" not in net.resolved
+    assert net.dialled == [("127.0.0.1", 3128)]
+
+
+@pytest.mark.parametrize("url", ["http://localhost/gtfs.zip", "http://10.1.2.3/gtfs.zip",
+                                 "http://[::ffff:127.0.0.1]/gtfs.zip"])
+def test_through_a_proxy_localhost_and_a_local_literal_are_still_refused(
+        home, net, monkeypatch, url):
+    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:3128")
+    assert refused(url) == local(url)
+    assert net.dialled == []
+    nothing_kept()
+
+
 # --------------------------------------------------------- over the protocol
 
-def test_over_the_protocol_a_refusal_is_a_feed_error_with_the_sentence(home, monkeypatch):
+def test_over_the_protocol_a_refusal_is_a_feed_error_with_the_sentence(home, public):
     from test_serve import Client, check
-    serve(monkeypatch, {FIRST: Answer(302, f"http://{RFC1918_192}/router.zip")})
+    public.redirect("feeds.example.test/gtfs.zip", f"http://{RFC1918_192}/router.zip")
     client = Client()
     try:
         error = client.wait(client.send("feeds.add", {"source": FIRST}))["error"]
@@ -364,5 +648,5 @@ def test_over_the_protocol_a_refusal_is_a_feed_error_with_the_sentence(home, mon
         client.endpoint.close()
     check(error["data"], "ErrorData")
     assert error["data"]["kind"] == "feed"
-    assert error["data"]["hint"] == f"{FIRST} could not be fetched. {SENTENCE}"
+    assert error["data"]["hint"] == local(FIRST)
     nothing_kept()

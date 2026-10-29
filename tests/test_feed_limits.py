@@ -21,7 +21,8 @@ from contextlib import contextmanager
 import pytest
 
 from schematic import config, feeds, loom, pipeline, sample_thumbnails
-from test_feeds import GOOD, _frequencies, gtfs_zip, home  # noqa: F401 - home is a fixture
+from test_feeds import (GOOD, _frequencies, gtfs_zip,  # noqa: F401 - home is a fixture
+                        home, stand_in)
 from test_layouts import FakeLoom
 from test_serve import DATE, KEY as LA, Client, small_home
 
@@ -257,7 +258,7 @@ def test_every_preset_as_cached_is_within_the_limits():
 
 
 def _endless(monkeypatch, *, length: str | None = None, chunks: int = 100):
-    """``requests.get`` answering with ``chunks`` pieces of 64 kB, and a list
+    """A download's session answering with ``chunks`` pieces of 64 kB, and a list
     counting the pieces it was asked for."""
     pulled = []
 
@@ -272,7 +273,7 @@ def _endless(monkeypatch, *, length: str | None = None, chunks: int = 100):
                 pulled.append(1)
                 yield b"\0" * (1 << 16)
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     return pulled
 
 

@@ -152,7 +152,7 @@ def test_agency_filter_cascades_through_references(home, tmp_path):
 #
 # Feeds a person added: kept beside the zips, checked before they are kept,
 # and gone with their files when removed. Nothing here touches the network:
-# a URL is answered by a stand-in for requests.get.
+# a URL is answered by a stand-in for the download's session (``stand_in``).
 
 import json
 import os
@@ -185,6 +185,23 @@ def gtfs_zip(path, tables=GOOD, *, folder=""):
 def home(monkeypatch, tmp_path):
     monkeypatch.setenv(config.ENV, str(tmp_path))
     return tmp_path
+
+
+class StandInSession(feeds.requests.Session):
+    """A download's session whose ``get`` is ``answer(url, **kw)``: what a
+    test puts in place of the network. The rest is ``requests``' own."""
+
+    def __init__(self, answer):
+        super().__init__()
+        self.answer = answer
+
+    def get(self, url, **kw):
+        return self.answer(url, **kw)
+
+
+def stand_in(monkeypatch, answer) -> None:
+    """Every download's session answered by ``answer(url, **kw)``."""
+    monkeypatch.setattr(feeds, "_session", lambda: StandInSession(answer))
 
 
 def test_a_feed_round_trips_through_json():
@@ -253,7 +270,7 @@ def test_add_from_a_url_downloads_once_and_keeps_the_url(home, tmp_path, monkeyp
             for i in range(0, len(self.content), size):
                 yield self.content[i:i + size]
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: calls.append(url) or Response())
+    stand_in(monkeypatch, lambda url, **kw: calls.append(url) or Response())
     feed = feeds.add("https://example.test/gtfs.zip")
     assert feed.url == "https://example.test/gtfs.zip"
     assert calls == ["https://example.test/gtfs.zip"]
@@ -274,7 +291,7 @@ def test_a_page_that_is_not_a_zip_is_refused(home, monkeypatch):
         def iter_content(self, size):
             yield self.content
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     with pytest.raises(feeds.FeedError, match="did not return a zip"):
         feeds.add("https://example.test/oops")
     assert not feeds.user_file().exists()
@@ -575,7 +592,7 @@ def test_add_reports_the_download_and_the_check_and_stops_when_asked(home, tmp_p
             for i in range(0, len(self.content), 64):
                 yield self.content[i:i + 64]
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     seen = []
     feeds.add("https://example.test/gtfs.zip", key="seen",
               progress=lambda stage, done, total: seen.append((stage, done, total)))
@@ -610,7 +627,7 @@ def test_a_cancel_after_the_download_leaves_no_feed(home, tmp_path, monkeypatch)
             for i in range(0, len(payload), 64):
                 yield payload[i:i + 64]
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     stages = []
     with pytest.raises(feeds.Interrupted):
         feeds.add("https://example.test/gtfs.zip", key="late",
@@ -670,7 +687,7 @@ def _preset(monkeypatch, payload: bytes, *, chunk: int = 64):
             for i in range(0, len(payload), chunk):
                 yield payload[i:i + chunk]
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: gets.append(url) or Response())
+    stand_in(monkeypatch, lambda url, **kw: gets.append(url) or Response())
     return gets
 
 
@@ -694,9 +711,12 @@ def test_a_cancelled_fetch_keeps_nothing_and_the_next_downloads_afresh(home, tmp
     payload = gtfs_zip(tmp_path / "remote.zip").read_bytes()
     gets = _preset(monkeypatch, payload)
     asked = []
-    with feeds.watched(None, lambda: asked.append(1) or len(asked) > 1):
+    # Asked by fetch, before the hop, then before each chunk: a yes at the
+    # first chunk is a cancel in the middle of the download.
+    with feeds.watched(None, lambda: asked.append(1) or len(asked) > 2):
         with pytest.raises(feeds.Interrupted):
             feeds.fetch("t")
+    assert gets == ["https://example.test/t.zip"], "the download had begun"
     assert sorted(p.name for p in config.feeds_dir().iterdir()) == [], "no zip and no .part"
 
     # Outside a request nothing is watched, and the feed is fetched whole.
@@ -736,7 +756,7 @@ def test_a_download_that_fails_midway_leaves_no_part_file(home, tmp_path, monkey
             yield payload[:64]
             raise OSError("connection reset")
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     with feeds.watched(None, None):
         with pytest.raises(OSError):
             feeds.fetch("t")
@@ -815,7 +835,7 @@ def test_a_refused_page_names_the_address_without_its_key(home, monkeypatch):
         def iter_content(self, size):
             yield b"<html>not found</html>"
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     with pytest.raises(feeds.FeedError) as refused:
         feeds.add(KEYED)
     said = str(refused.value)
@@ -848,7 +868,7 @@ def test_a_failed_download_says_why_in_our_words_and_carries_no_cause(home, monk
         assert url == KEYED, "the fetch itself asks for the whole address"
         raise raised()
 
-    monkeypatch.setattr(feeds.requests, "get", get)
+    stand_in(monkeypatch, get)
     with pytest.raises(feeds.FeedError) as refused:
         feeds.add(KEYED)
     said = str(refused.value)
@@ -886,7 +906,7 @@ def test_a_keyed_address_is_kept_whole_to_fetch_and_named_from_its_path(home, tm
         def iter_content(self, size):
             yield payload
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     feed = feeds.add("https://example.test/feeds/Springfield.zip?api_key=S3CRET")
     assert feed.url == "https://example.test/feeds/Springfield.zip?api_key=S3CRET"
     assert (feed.name, feed.key) == ("Springfield", "springfield")
@@ -905,7 +925,7 @@ def test_a_missing_table_names_the_address_without_its_key(home, tmp_path, monke
         def iter_content(self, size):
             yield payload
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     with pytest.raises(feeds.FeedError, match="has no stops.txt") as refused:
         feeds.add(KEYED)
     _says_nothing_secret(str(refused.value))
@@ -921,7 +941,7 @@ def test_a_presets_refusal_names_its_public_address_whole(home, monkeypatch):
     def get(asked, **kw):
         raise feeds.requests.ConnectionError(f"Max retries exceeded with url: {asked}")
 
-    monkeypatch.setattr(feeds.requests, "get", get)
+    stand_in(monkeypatch, get)
     with pytest.raises(feeds.FeedError) as refused:
         feeds.fetch("t")
     assert str(refused.value) == f"{url} could not be fetched: the server could not be reached"
@@ -942,7 +962,7 @@ def test_a_persons_feed_fetched_again_names_its_address_without_its_key(home, tm
         def iter_content(self, size):
             yield payload
 
-    monkeypatch.setattr(feeds.requests, "get", lambda url, **kw: Response())
+    stand_in(monkeypatch, lambda url, **kw: Response())
     feed = feeds.add(KEYED, key="mine")
     feed.zip_path.unlink()
 
@@ -950,7 +970,7 @@ def test_a_persons_feed_fetched_again_names_its_address_without_its_key(home, tm
         assert asked == KEYED
         raise _http_error(403)
 
-    monkeypatch.setattr(feeds.requests, "get", get)
+    stand_in(monkeypatch, get)
     with pytest.raises(feeds.FeedError) as refused:
         feeds.fetch("mine")
     assert "could not be fetched: the server answered 403 Forbidden" in str(refused.value)
