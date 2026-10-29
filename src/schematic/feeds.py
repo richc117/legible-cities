@@ -14,10 +14,12 @@ import builtins
 import datetime as dt
 import hashlib
 import io
+import ipaddress
 import json
 import os
 import re
 import shutil
+import socket
 import struct
 import threading
 import time
@@ -27,10 +29,11 @@ from http import HTTPStatus
 from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 from typing import IO, Any, Callable, Iterator
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import pandas as pd
 import requests
+from urllib3.util import parse_url
 
 from . import config
 
@@ -895,6 +898,123 @@ def _why(exc: Exception) -> str:
     return f"the request failed ({type(exc).__name__})"
 
 
+# --------------------------------------------------------------------------
+# Where a download may go
+# --------------------------------------------------------------------------
+#
+# A feed is published on a public host, and a download never reaches this
+# machine or the network around it. The engine judges every hop itself, the
+# first included, rather than leave it to whoever handed it the address, and
+# judges it as ``requests`` will connect to it: the host as urllib3 parses
+# the prepared address, and every address the resolver gives for that host.
+#
+# The limit: the name is resolved here and again when ``requests`` connects,
+# and a resolver that answers differently the second time (DNS rebinding)
+# gets past the check. Closing that means connecting to the address that was
+# checked, while still sending the name for TLS and the Host header, which
+# ``requests`` has no simple way to do. A proxy named in the environment
+# resolves the name itself, and is the person's own choice.
+
+# How many redirects one download follows. ``requests``' own default is 30;
+# the presets' longest chain is two (Oct 2026).
+MAX_REDIRECTS = 10
+REDIRECTS = frozenset({301, 302, 303, 307, 308})
+
+# The desktop app's own sentence for a local host (``FEED_REFUSALS.localHost``).
+LOCAL_HOST = ("Use an address on a public host; a feed cannot be fetched from this "
+              "machine or its network.")
+
+# NAT64's well-known prefix (RFC 6052): a gateway translates 64:ff9b::/96 to
+# the IPv4 address in its last 32 bits, on the gateway's own network, and on
+# an IPv6-only network DNS64 answers every IPv4-only host with one of these.
+_NAT64 = ipaddress.IPv6Network("64:ff9b::/96")
+
+
+class _LocalHost(Exception):
+    """A hop that reaches this machine or its network; ``_download`` says so."""
+
+
+def _is_local_address(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Whether ``ip``, or the IPv4 address an IPv6 one carries, is the
+    machine's or its network's rather than one on the public internet."""
+    candidates: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = [ip]
+    if isinstance(ip, ipaddress.IPv6Address):
+        carried = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+        if ip.ipv4_mapped is not None:
+            # The IPv4 address itself, to the socket that connects to it.
+            candidates = [ip.ipv4_mapped]
+        elif ip in _NAT64:
+            # Judged as the IPv4 address the gateway reaches: ``ipaddress``
+            # calls the prefix reserved, which would refuse every IPv4-only
+            # host on a DNS64 network.
+            candidates = [carried]
+        elif int(ip) >> 32 == 0:
+            # IPv4-compatible (::a.b.c.d): both are judged.
+            candidates.append(carried)
+    # ``is_global`` is the widest test (it also refuses the shared address
+    # space of RFC 6598, which carrier NAT and overlay networks use), but
+    # it calls IPv4 multicast and IPv6's old site-local fec0::/10 global, so
+    # each kind is asked by name as well.
+    return any(not a.is_global or a.is_loopback or a.is_private or a.is_link_local
+               or a.is_unspecified or a.is_multicast or a.is_reserved
+               or getattr(a, "is_site_local", False)
+               for a in candidates)
+
+
+def _check_hop(url: str) -> None:
+    """Refuse ``url`` unless ``requests`` would fetch it over http or https
+    from a public host: raises a ``requests`` exception for an address that
+    cannot be fetched or a host that does not resolve, and ``_LocalHost``
+    for a host that is, or resolves to, this machine or its network."""
+    # As ``requests.get`` prepares it, and parsed by the parser its
+    # connection pool reads the host with, so what is judged is what connects.
+    prepared = requests.Request("GET", url).prepare().url or ""
+    try:
+        parsed = parse_url(prepared)
+    except ValueError:
+        raise requests.exceptions.InvalidURL() from None
+    if parsed.scheme not in ("http", "https"):
+        raise requests.exceptions.InvalidSchema()
+    host = (parsed.host or "").strip("[]").rstrip(".").lower()
+    if not host:
+        raise requests.exceptions.InvalidURL()
+    if host == "localhost" or host.endswith(".localhost"):
+        raise _LocalHost()
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        # Both families: requests tries every address the resolver gives.
+        answers = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except (OSError, UnicodeError):
+        raise requests.ConnectionError() from None
+    if not answers:
+        raise requests.ConnectionError()
+    for *_, sockaddr in answers:
+        try:
+            ip = ipaddress.ip_address(sockaddr[0])
+        except ValueError:
+            raise _LocalHost() from None
+        if _is_local_address(ip):
+            raise _LocalHost()
+
+
+def _redirect_target(resp: Any, current: str) -> str | None:
+    """Where ``resp`` redirects to, resolved against ``current`` as
+    ``requests`` resolves it, or None when it is not a redirect."""
+    status = getattr(resp, "status_code", None)
+    if not isinstance(status, int) or status not in REDIRECTS:
+        return None
+    location = (getattr(resp, "headers", None) or {}).get("Location")
+    if not isinstance(location, str) or not location:
+        return None
+    # The header arrives as Latin-1 and is usually UTF-8 (requests'
+    # ``get_redirect_target`` does the same).
+    try:
+        location = location.encode("latin1").decode("utf8")
+    except UnicodeError:
+        pass
+    return urljoin(current, location)
+
+
 class Interrupted(Exception):
     """An add(), a remove() or a download stopped because its caller asked: an
     add or a download kept nothing, and a remove left the feed as it was."""
@@ -1061,16 +1181,35 @@ def _download(url: str, dest: Path, *, named: str | None = None,
     it, or a FeedError; a page that is not a zip is refused and removed, and
     so is a download past ``MAX_DOWNLOAD_BYTES``, stopped at the limit.
     ``named`` is how a refusal names the address: without its secrets unless
-    the caller says otherwise, as it does for a preset's public one."""
+    the caller says otherwise, as it does for a preset's public one.
+
+    Redirects are followed here, up to ``MAX_REDIRECTS``, and never by
+    ``requests``: every hop, the first included, is checked before it is
+    asked for (``_check_hop``), and one that reaches this machine or its
+    network is refused before a byte is written. A redirect's own body is
+    never read."""
     named = shown(url) if named is None else named
     over = (f"{named} could not be fetched: it is larger than "
             f"{_size(MAX_DOWNLOAD_BYTES)}, the most a feed may be to download; {NARROWER}")
-    # Some agencies (MARTA) return 403 to a bare requests user-agent.
     resp = None
     try:
-        resp = requests.get(url, timeout=180, stream=True, headers={
-            "User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)",
-        })
+        current, hops = url, 0
+        while True:
+            _check_hop(current)
+            # Some agencies (MARTA) return 403 to a bare requests user-agent.
+            resp = requests.get(current, timeout=180, stream=True, allow_redirects=False,
+                                headers={
+                                    "User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)",
+                                })
+            target = _redirect_target(resp, current)
+            if target is None:
+                break
+            resp.close()
+            resp = None
+            hops += 1
+            if hops > MAX_REDIRECTS:
+                raise requests.TooManyRedirects()
+            current = target
         resp.raise_for_status()
         length = resp.headers.get("Content-Length") if hasattr(resp, "headers") else None
         total = int(length) if length and str(length).isdigit() else None
@@ -1092,6 +1231,9 @@ def _download(url: str, dest: Path, *, named: str | None = None,
         if done > MAX_DOWNLOAD_BYTES:
             dest.unlink(missing_ok=True)
             raise FeedError(over)
+    except _LocalHost:
+        dest.unlink(missing_ok=True)
+        raise FeedError(f"{named} could not be fetched. {LOCAL_HOST}") from None
     except requests.RequestException as exc:
         dest.unlink(missing_ok=True)
         # No cause carried: the traceback a failed request is logged with
