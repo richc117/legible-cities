@@ -7,6 +7,8 @@ Changelog](https://keepachangelog.com/en/1.1.0/); the versions are
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-10-28
+
 ### Fixed
 
 - **A feed download stays on public hosts, at every redirect.** A feed download is now refused when its address, or any redirect it follows, reaches this machine or its network, including through a name that resolves there. The engine follows a download's redirects itself, at most ten, and checks each one, including the address it connects to; a refusal says "Use an address on a public host; a feed cannot be fetched from this machine or its network.", names the address without its secrets, and keeps nothing. A host written as a number in any of the forms resolvers and proxies accept is judged as each of them reads it. A proxy set in the environment is still used; a name sent through one is refused when it resolves here to this machine or its network, and is sent on when it does not resolve here. The presets download as before.
