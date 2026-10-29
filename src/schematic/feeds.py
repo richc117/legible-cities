@@ -934,11 +934,17 @@ def _why(exc: Exception) -> str:
 # ``requests`` sends to it and it resolves the name, through a
 # ``ProxyManager`` whose pools are urllib3's own, so the connection check
 # does not apply there and ``_check_hop`` is the only guard. It refuses
-# ``localhost`` and numbers as ever, and resolves a name here too, best
+# ``localhost``, numbers and a bracketed host it cannot read, as ever, and
+# resolves a name here too, best
 # effort: a local answer is refused, and a name that does not resolve here
 # goes on to the proxy, since on some networks only the proxy resolves
-# outside names. What the proxy's own resolver answers, then or later
-# (rebinding at the proxy), is out of this engine's reach.
+# outside names. That stops a name that resolves locally for everyone; it
+# does not stop one whose owner runs its own DNS and answers this machine
+# and the proxy differently, and what the proxy's resolver answers, then or
+# later (rebinding at the proxy), is out of this engine's reach. The lookup
+# can delay a hop on a network where only the proxy resolves, and is not
+# cancellable while it waits. The proxies are decided once per hop, and the
+# check and the request use the same mapping.
 #
 # Not covered: NAT64 with a prefix the network's operator chose (RFC 6052's
 # network-specific prefix) instead of the well-known 64:ff9b::/96. Such an
@@ -1060,20 +1066,30 @@ def _numeric_readings(name: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6A
     return readings
 
 
-def _proxy_for(session: requests.Session, url: str) -> str | None:
-    """The proxy ``session`` sends ``url`` through, chosen as ``requests``
-    chooses it (the session's proxies merged with the environment's)."""
-    proxies = session.merge_environment_settings(url, {}, None, None, None)["proxies"]
-    return requests.utils.select_proxy(url, proxies)
+def _proxies_for(session: requests.Session, url: str) -> dict[str, str | None]:
+    """The proxies to send ``url`` with, pinned: the one ``requests`` would
+    choose (the session's proxies merged with the environment's, through
+    ``select_proxy``) under ``url``'s scheme, or None under every key it
+    looks at, which ``requests`` reads as going straight out (its
+    ``merge_setting`` drops a None after the environment's ``setdefault``).
+    The hop is judged and sent with this one mapping, so the two cannot
+    choose differently."""
+    merged = session.merge_environment_settings(url, {}, None, None, None)["proxies"]
+    chosen = requests.utils.select_proxy(url, merged)
+    pinned: dict[str, str | None] = {"http": None, "https": None, "all": None}
+    if chosen is not None:
+        pinned[urlsplit(url).scheme] = chosen
+    return pinned
 
 
-def _check_hop(url: str, session: requests.Session) -> str:
-    """``url``'s scheme, once it is one a download may ask for: raises a
-    ``requests`` exception for an address that cannot be fetched, and
-    ``_LocalHost`` for ``localhost``, for a number any reader takes for a
-    local address, and, where ``session`` sends ``url`` through a proxy,
-    for a name that resolves here to one. A name that goes straight out is
-    resolved by its connection alone, which judges what it dials."""
+def _check_hop(url: str, session: requests.Session) -> tuple[str, dict[str, str | None]]:
+    """``url``'s scheme and the proxies to send it with (``_proxies_for``),
+    once it is an address a download may ask for: raises a ``requests``
+    exception for an address that cannot be fetched, and ``_LocalHost`` for
+    ``localhost``, for a number any reader takes for a local address, and,
+    where the hop goes through a proxy, for a name that resolves here to
+    one. A name that goes straight out is resolved by its connection alone,
+    which judges what it dials."""
     # As ``requests`` prepares it, and parsed by the parser its connection
     # pool reads the host with, so what is judged is what connects.
     prepared = requests.Request("GET", url).prepare().url or ""
@@ -1083,6 +1099,7 @@ def _check_hop(url: str, session: requests.Session) -> str:
         raise requests.exceptions.InvalidURL() from None
     if parsed.scheme not in ("http", "https"):
         raise requests.exceptions.InvalidSchema()
+    bracketed = (parsed.host or "").startswith("[")
     host = (parsed.host or "").strip("[]").lower()
     if not host:
         raise requests.exceptions.InvalidURL()
@@ -1094,18 +1111,29 @@ def _check_hop(url: str, session: requests.Session) -> str:
     readings = _numeric_readings(name)
     if any(_is_local_address(ip) for ip in readings):
         raise _LocalHost()
-    if readings or _proxy_for(session, prepared) is None:
-        return parsed.scheme
+    if bracketed and not readings:
+        # urllib3 takes some bracketed hosts nothing here can read (an IPv4
+        # tail with a leading zero, ``[::ffff:010.0.0.1]``): refused unjudged
+        # rather than sent on to a proxy that may read them its own way.
+        raise requests.exceptions.InvalidURL()
+    proxies = _proxies_for(session, prepared)
+    if readings or proxies[parsed.scheme] is None:
+        return parsed.scheme, proxies
     # Through a proxy, which resolves the name itself: resolved here as well,
     # best effort. A local answer is refused and public ones go on; a name
     # that does not resolve here goes on too, since on some networks the
-    # proxy is the only resolver of outside names. What the proxy's own
-    # resolver answers, then or later (rebinding at the proxy), is out of reach.
+    # proxy is the only resolver of outside names. This stops a name that
+    # resolves locally for everyone (a private record, a 127.0.0.1 wildcard
+    # service); it does not stop one whose owner runs its DNS and answers
+    # this machine and the proxy differently, nor what the proxy's resolver
+    # answers later (rebinding at the proxy). The lookup can also hold a hop
+    # for the resolver's own timeout on a network where only the proxy
+    # resolves, and a cancel is not heard until it returns.
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
     try:
         answers = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except (OSError, UnicodeError):
-        return parsed.scheme
+        return parsed.scheme, proxies
     for *_, sockaddr in answers:
         try:
             ip = ipaddress.ip_address(sockaddr[0])
@@ -1113,7 +1141,7 @@ def _check_hop(url: str, session: requests.Session) -> str:
             raise _LocalHost() from None
         if _is_local_address(ip):
             raise _LocalHost()
-    return parsed.scheme
+    return parsed.scheme, proxies
 
 
 def _connect_checked(conn: HTTPConnection) -> socket.socket:
@@ -1439,7 +1467,7 @@ def _download(url: str, dest: Path, *, named: str | None = None,
             # Only what reads the address is asked about a ValueError: one
             # from a caller's callback, or a bug, is not an unreadable address.
             try:
-                scheme = _check_hop(current, session)
+                scheme, proxies = _check_hop(current, session)
                 if secure and scheme != "https":
                     raise _Downgraded()
                 secure = secure or scheme == "https"
@@ -1448,7 +1476,7 @@ def _download(url: str, dest: Path, *, named: str | None = None,
                 if carried is not None:
                     headers["Authorization"] = carried
                 resp = session.get(current, timeout=180, stream=True, allow_redirects=False,
-                                   headers=headers)
+                                   headers=headers, proxies=proxies)
                 target = _redirect_target(resp, current)
                 if target is None:
                     break
@@ -1471,7 +1499,9 @@ def _download(url: str, dest: Path, *, named: str | None = None,
             current = target
         resp.raise_for_status()
         length = resp.headers.get("Content-Length") if hasattr(resp, "headers") else None
-        total = int(length) if length and str(length).isdigit() else None
+        # ASCII digits only: "²".isdigit() is true, and int() refuses it.
+        text = str(length) if length else ""
+        total = int(text) if text.isascii() and text.isdigit() else None
         # A length the server states is believed when it is too large, and
         # never when it is not: the count below is what holds the limit.
         if total is not None and total > MAX_DOWNLOAD_BYTES:

@@ -215,9 +215,10 @@ def test_a_first_address_on_this_machine_or_its_network_is_refused_unasked(home,
     nothing_kept()
 
 
-def _scheme_only(url: str, session) -> str:
+def _scheme_only(url: str, session):
     """``_check_hop`` without its refusals: what the connection meets alone."""
-    return feeds.parse_url(feeds.requests.Request("GET", url).prepare().url).scheme
+    prepared = feeds.requests.Request("GET", url).prepare().url
+    return feeds.parse_url(prepared).scheme, feeds._proxies_for(session, prepared)
 
 
 @pytest.mark.parametrize("url", LITERALS)
@@ -245,6 +246,41 @@ NUMBERS = ["http://2130706433/gtfs.zip", "http://0x7f.1/gtfs.zip", "http://127.1
 def test_a_number_any_reader_takes_for_a_local_address_is_refused(home, net, url):
     assert refused(url) == local(url)
     assert net.resolved == [] and net.dialled == []
+    nothing_kept()
+
+
+@pytest.mark.parametrize("readers", ["as they are", "none of them"])
+@pytest.mark.parametrize("proxied", [False, True])
+def test_a_bracketed_host_nothing_here_can_read_is_refused_unjudged(
+        home, net, monkeypatch, request, proxied, readers):
+    """urllib3 takes ``[::ffff:010.0.0.1]``; ``ipaddress`` refuses the
+    leading zero, and so may the resolver, so there may be nothing to judge
+    it by, and a proxy might read it its own way. On this Python
+    ``urllib.parse`` refuses the bracket itself while ``requests`` prepares
+    the address, and macOS's resolver reads it as ::ffff:10.0.0.1; "none of
+    them" takes both away (an older ``urlsplit``, a resolver that reads no
+    number), so the engine's own refusal is what is left."""
+    import urllib.parse
+    # urlsplit keeps its answers: none parsed under the patch below may
+    # outlive this test, nor one from before reach it.
+    clear = getattr(urllib.parse.urlsplit, "cache_clear", lambda: None)
+    clear()
+    request.addfinalizer(clear)
+    if readers == "none of them":
+        real = socket.getaddrinfo
+
+        def no_numbers(host, port, family=0, type=0, proto=0, flags=0):
+            if flags & socket.AI_NUMERICHOST:
+                raise socket.gaierror(socket.EAI_NONAME, "not a number here")
+            return real(host, port, family, type, proto, flags)
+
+        monkeypatch.setattr(socket, "getaddrinfo", no_numbers)
+        monkeypatch.setattr(urllib.parse, "_check_bracketed_host", lambda host: None)
+    if proxied:
+        monkeypatch.setenv("HTTP_PROXY", PROXY)
+    url = "http://[::ffff:010.0.0.1]/gtfs.zip"
+    assert refused(url) == f"{url} could not be fetched: {NOT_FETCHABLE}"
+    assert net.dialled == []
     nothing_kept()
 
 
@@ -694,6 +730,41 @@ def test_through_a_proxy_localhost_and_a_local_number_are_still_refused(
     nothing_kept()
 
 
+def _environment_moves_after_the_check(monkeypatch, proxy: str | None) -> None:
+    """Each hop's check runs as ever, and then the environment's proxy
+    changes before the request is made."""
+    check = feeds._check_hop
+
+    def checked(url, session):
+        answer = check(url, session)
+        if proxy is None:
+            monkeypatch.delenv("HTTP_PROXY", raising=False)
+        else:
+            monkeypatch.setenv("HTTP_PROXY", proxy)
+        return answer
+
+    monkeypatch.setattr(feeds, "_check_hop", checked)
+
+
+def test_the_proxy_the_check_judged_is_the_one_dialled(home, net, monkeypatch, tmp_path):
+    payload = zip_bytes(tmp_path)
+    monkeypatch.setenv("HTTP_PROXY", PROXY)
+    net.resolve("feeds.example.test", [PUBLIC])
+    net.route("feeds.example.test/gtfs.zip", body=payload)
+    _environment_moves_after_the_check(monkeypatch, "http://127.0.0.1:3129")
+    feeds.add("http://feeds.example.test/gtfs.zip", key="pinned")
+    assert net.dialled == [("127.0.0.1", 3128)]
+
+
+def test_a_hop_the_check_judged_direct_goes_direct(home, net, monkeypatch, tmp_path):
+    payload = zip_bytes(tmp_path)
+    net.resolve("feeds.example.test", [PUBLIC])
+    net.route("feeds.example.test/gtfs.zip", body=payload)
+    _environment_moves_after_the_check(monkeypatch, PROXY)
+    feeds.add("http://feeds.example.test/gtfs.zip", key="direct")
+    assert net.dialled == [(PUBLIC, 80)]
+
+
 @pytest.mark.parametrize("url", NUMBERS)
 def test_through_a_proxy_a_number_is_refused_whatever_this_systems_resolver_reads(
         home, net, monkeypatch, url):
@@ -735,6 +806,21 @@ def test_a_valueerror_from_a_callback_is_not_taken_for_an_unreadable_address(
         feeds.add(FIRST, progress=progress)
     assert type(caught.value) is ValueError
     nothing_kept()
+
+
+@pytest.mark.parametrize("length", ["\u00b2", "\u0661\u0662", "12a", "-1"])
+def test_a_length_that_is_not_ascii_digits_is_not_believed(home, monkeypatch, tmp_path, length):
+    """A superscript two passes ``str.isdigit`` and ``int`` refuses it: a
+    length that is not ASCII digits is taken for no length at all, and the
+    count holds the limit as ever."""
+    payload = zip_bytes(tmp_path)
+    heard = []
+    answer = Answer(FIRST, body=payload)
+    answer.headers = {"Content-Length": length}
+    answering(monkeypatch, {FIRST: answer})
+    feed = feeds.add(FIRST, key="odd", progress=lambda stage, done, total: heard.append(total))
+    assert feed.zip_path.read_bytes() == payload
+    assert heard and set(heard) == {None}
 
 
 # --------------------------------------------------------------------- https
