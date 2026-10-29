@@ -918,7 +918,9 @@ def _why(exc: Exception) -> str:
 #
 # - ``_check_hop``, before a hop is asked for, on the address as ``requests``
 #   prepares it and urllib3 parses it: the scheme, ``localhost`` by name, and
-#   a literal address. It is the early, clear refusal and resolves nothing.
+#   a host that is a number, read every way a resolver or a proxy may read
+#   it. It is the early, clear refusal, and looks nothing up for a name that
+#   goes straight out.
 # - The connection itself (``_CheckedConnection``), which is what makes the
 #   rule hold. It resolves the host as urllib3 does, refuses to connect if
 #   any address the resolver gives is local, and connects to the addresses
@@ -929,11 +931,14 @@ def _why(exc: Exception) -> str:
 #
 # A proxy named in the environment (or in the system's settings, which
 # ``requests`` also reads on macOS and Windows) is the person's own choice:
-# ``requests`` sends to it and it resolves the name, through a ``ProxyManager`` whose
-# pools are urllib3's own, so the connection check does not apply there, and
-# nothing here resolves a name that goes through a proxy (on a network where
-# only the proxy resolves outside names, that would fail every feed).
-# ``_check_hop`` still refuses ``localhost`` and a literal local address.
+# ``requests`` sends to it and it resolves the name, through a
+# ``ProxyManager`` whose pools are urllib3's own, so the connection check
+# does not apply there and ``_check_hop`` is the only guard. It refuses
+# ``localhost`` and numbers as ever, and resolves a name here too, best
+# effort: a local answer is refused, and a name that does not resolve here
+# goes on to the proxy, since on some networks only the proxy resolves
+# outside names. What the proxy's own resolver answers, then or later
+# (rebinding at the proxy), is out of this engine's reach.
 #
 # Not covered: NAT64 with a prefix the network's operator chose (RFC 6052's
 # network-specific prefix) instead of the well-known 64:ff9b::/96. Such an
@@ -966,6 +971,15 @@ class _Downgraded(Exception):
     """A hop over http after one over https; ``_download`` says so."""
 
 
+class _Unreadable(Exception):
+    """An address refused below ``requests``' own exceptions: a netloc that
+    changes under NFKC normalisation or an unclosed IPv6 bracket
+    (``urllib.parse``, on a redirect or in the .netrc lookup), credentials
+    that are not Latin-1 (Basic authentication). Their text can hold part
+    of the address, user information included, so ``_download`` says only
+    that it cannot be fetched."""
+
+
 def _is_local_address(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     """Whether ``ip``, or the IPv4 address an IPv6 one carries, is the
     machine's or its network's rather than one on the public internet."""
@@ -993,11 +1007,73 @@ def _is_local_address(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool
                for a in candidates)
 
 
-def _check_hop(url: str) -> str:
+def _classic_ipv4(name: str, *, octal: bool = True) -> ipaddress.IPv4Address | None:
+    """``name`` as the classic ``inet_aton`` reads a number, and the WHATWG
+    URL parser and many proxies with it: one to four parts, each decimal,
+    octal after a leading 0, or hex after 0x, the last filling the bytes
+    left (``127.1``, ``0177.0.0.1``, ``0x7f.1``, ``2130706433``); else None.
+    ``octal=False`` reads a leading 0 as decimal, as macOS's resolver does."""
+    parts = name.split(".")
+    if not 1 <= len(parts) <= 4:
+        return None
+    values = []
+    for part in parts:
+        if re.fullmatch(r"0x[0-9a-f]*", part):
+            values.append(int(part[2:] or "0", 16))
+        elif octal and re.fullmatch(r"0[0-7]*", part):
+            values.append(int(part, 8))
+        elif re.fullmatch(r"[1-9][0-9]*" if octal else r"[0-9]+", part):
+            values.append(int(part))
+        else:
+            return None
+    *head, last = values
+    if any(v > 255 for v in head) or last >= 256 ** (4 - len(head)):
+        return None
+    return ipaddress.IPv4Address(sum(v << (8 * (3 - i)) for i, v in enumerate(head)) + last)
+
+
+def _numeric_readings(name: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    """Every address ``name`` reads as when it is a number: to ``ipaddress``,
+    to this system's resolver without a lookup (``AI_NUMERICHOST``, which
+    never queries DNS), and to the classic ``inet_aton`` with a leading 0
+    read as octal and as decimal, since a proxy may read it any of these
+    ways (macOS takes ``0177.0.0.1`` for 177.0.0.1, glibc and the WHATWG
+    parser for 127.0.0.1). Empty when it is a name."""
+    readings: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
+    try:
+        readings.append(ipaddress.ip_address(name))
+    except ValueError:
+        pass
+    try:
+        answers = socket.getaddrinfo(name, None, flags=socket.AI_NUMERICHOST)
+    except (OSError, UnicodeError):
+        answers = []
+    for *_, sockaddr in answers:
+        try:
+            readings.append(ipaddress.ip_address(sockaddr[0]))
+        except ValueError:
+            pass
+    for octal in (True, False):
+        classic = _classic_ipv4(name, octal=octal)
+        if classic is not None:
+            readings.append(classic)
+    return readings
+
+
+def _proxy_for(session: requests.Session, url: str) -> str | None:
+    """The proxy ``session`` sends ``url`` through, chosen as ``requests``
+    chooses it (the session's proxies merged with the environment's)."""
+    proxies = session.merge_environment_settings(url, {}, None, None, None)["proxies"]
+    return requests.utils.select_proxy(url, proxies)
+
+
+def _check_hop(url: str, session: requests.Session) -> str:
     """``url``'s scheme, once it is one a download may ask for: raises a
     ``requests`` exception for an address that cannot be fetched, and
-    ``_LocalHost`` for ``localhost`` or a literal local address. Resolves
-    nothing; the connection judges what a name resolves to."""
+    ``_LocalHost`` for ``localhost``, for a number any reader takes for a
+    local address, and, where ``session`` sends ``url`` through a proxy,
+    for a name that resolves here to one. A name that goes straight out is
+    resolved by its connection alone, which judges what it dials."""
     # As ``requests`` prepares it, and parsed by the parser its connection
     # pool reads the host with, so what is judged is what connects.
     prepared = requests.Request("GET", url).prepare().url or ""
@@ -1010,17 +1086,33 @@ def _check_hop(url: str) -> str:
     host = (parsed.host or "").strip("[]").lower()
     if not host:
         raise requests.exceptions.InvalidURL()
-    # The trailing dot goes for this comparison alone: the connection
+    # The trailing dot goes for these judgements alone: the connection
     # resolves the name as it was written.
     name = host.rstrip(".")
     if name == "localhost" or name.endswith(".localhost"):
         raise _LocalHost()
-    try:
-        literal = ipaddress.ip_address(host)
-    except ValueError:
-        return parsed.scheme
-    if _is_local_address(literal):
+    readings = _numeric_readings(name)
+    if any(_is_local_address(ip) for ip in readings):
         raise _LocalHost()
+    if readings or _proxy_for(session, prepared) is None:
+        return parsed.scheme
+    # Through a proxy, which resolves the name itself: resolved here as well,
+    # best effort. A local answer is refused and public ones go on; a name
+    # that does not resolve here goes on too, since on some networks the
+    # proxy is the only resolver of outside names. What the proxy's own
+    # resolver answers, then or later (rebinding at the proxy), is out of reach.
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        answers = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except (OSError, UnicodeError):
+        return parsed.scheme
+    for *_, sockaddr in answers:
+        try:
+            ip = ipaddress.ip_address(sockaddr[0])
+        except ValueError:
+            raise _LocalHost() from None
+        if _is_local_address(ip):
+            raise _LocalHost()
     return parsed.scheme
 
 
@@ -1344,26 +1436,33 @@ def _download(url: str, dest: Path, *, named: str | None = None,
         while True:
             if cancelled is not None and cancelled():
                 raise Interrupted()
-            scheme = _check_hop(current)
-            if secure and scheme != "https":
-                raise _Downgraded()
-            secure = secure or scheme == "https"
-            # Some agencies (MARTA) return 403 to a bare requests user-agent.
-            headers = {"User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)"}
-            if carried is not None:
-                headers["Authorization"] = carried
-            resp = session.get(current, timeout=180, stream=True, allow_redirects=False,
-                               headers=headers)
-            target = _redirect_target(resp, current)
-            if target is None:
-                break
-            # The credentials a hop sent go on to the next only where
-            # ``requests`` would send them: the same host, scheme and port.
-            sent = getattr(resp, "request", None)
-            carried = (getattr(sent, "headers", None) or {}).get("Authorization")
-            if carried is not None and session.should_strip_auth(
-                    getattr(sent, "url", None) or current, target):
-                carried = None
+            # Only what reads the address is asked about a ValueError: one
+            # from a caller's callback, or a bug, is not an unreadable address.
+            try:
+                scheme = _check_hop(current, session)
+                if secure and scheme != "https":
+                    raise _Downgraded()
+                secure = secure or scheme == "https"
+                # Some agencies (MARTA) return 403 to a bare requests user-agent.
+                headers = {"User-Agent": "OpenSchematicMaps/0.1 (+https://github.com/)"}
+                if carried is not None:
+                    headers["Authorization"] = carried
+                resp = session.get(current, timeout=180, stream=True, allow_redirects=False,
+                                   headers=headers)
+                target = _redirect_target(resp, current)
+                if target is None:
+                    break
+                # The credentials a hop sent go on to the next only where
+                # ``requests`` would send them: the same host, scheme and port.
+                sent = getattr(resp, "request", None)
+                carried = (getattr(sent, "headers", None) or {}).get("Authorization")
+                if carried is not None and session.should_strip_auth(
+                        getattr(sent, "url", None) or current, target):
+                    carried = None
+            except requests.RequestException:
+                raise                          # InvalidURL is a ValueError too
+            except ValueError:
+                raise _Unreadable() from None
             resp.close()
             resp = None
             hops += 1
@@ -1391,30 +1490,21 @@ def _download(url: str, dest: Path, *, named: str | None = None,
         if done > MAX_DOWNLOAD_BYTES:
             dest.unlink(missing_ok=True)
             raise FeedError(over)
-    except FeedError:
-        # A FeedError is a ValueError, and this one is already the sentence.
-        raise
     except _LocalHost:
         dest.unlink(missing_ok=True)
         raise FeedError(f"{named} could not be fetched. {LOCAL_HOST}") from None
     except _Downgraded:
         dest.unlink(missing_ok=True)
         raise FeedError(f"{named} could not be fetched. {DOWNGRADE}") from None
+    except _Unreadable:
+        dest.unlink(missing_ok=True)
+        raise FeedError(f"{named} could not be fetched: "
+                        "the address is not one that can be fetched") from None
     except requests.RequestException as exc:
         dest.unlink(missing_ok=True)
         # No cause carried: the traceback a failed request is logged with
         # would print the exception's own text, which names the address whole.
         raise FeedError(f"{named} could not be fetched: {_why(exc)}") from None
-    except ValueError:
-        # Some addresses are refused below ``requests``' own exceptions: a
-        # netloc that changes under NFKC normalisation or an unclosed IPv6
-        # bracket (``urllib.parse``, on a redirect or in the .netrc lookup),
-        # credentials that are not Latin-1 (Basic authentication). Their
-        # text can hold part of the address, user information included, so
-        # neither it nor the exception travels.
-        dest.unlink(missing_ok=True)
-        raise FeedError(f"{named} could not be fetched: "
-                        "the address is not one that can be fetched") from None
     finally:
         # A cancelled download's connection goes now, not at collection. A
         # cancel is asked between chunks, so on a server that has stopped

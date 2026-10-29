@@ -17,7 +17,10 @@ request's Host header. So what is judged here is what was dialled.
 """
 
 import ipaddress
+import shutil
 import socket
+import ssl
+import subprocess
 import threading
 import traceback
 import urllib.request
@@ -94,6 +97,8 @@ class Net:
         self.dialled: list[tuple[str, int]] = []
         self.seen: list[dict] = []
         self.written: list[int] = []
+        # Where a dial to a port goes instead of the plain server (https's).
+        self.ports: dict[int, int] = {}
 
     def resolve(self, host: str, *rounds: list[str]) -> None:
         self.names[host] = list(rounds)
@@ -119,6 +124,8 @@ def net(monkeypatch, tmp_path):
     real_getaddrinfo, real_connect = socket.getaddrinfo, socket.socket.connect
 
     def getaddrinfo(host, port_, family=0, type=0, proto=0, flags=0):
+        if flags & socket.AI_NUMERICHOST:      # a number or nothing: no lookup to record
+            return real_getaddrinfo(host, port_, family, type, proto, flags)
         net.resolved.append(host)
         if host in net.names:
             rounds = net.names[host]
@@ -133,7 +140,7 @@ def net(monkeypatch, tmp_path):
         net.dialled.append(tuple(address[:2]))
         if sock.family != socket.AF_INET:
             raise ConnectionRefusedError("only the IPv4 loopback answers here")
-        return real_connect(sock, ("127.0.0.1", port))
+        return real_connect(sock, ("127.0.0.1", net.ports.get(address[1], port)))
 
     monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
     monkeypatch.setattr(socket.socket, "connect", connect)
@@ -208,7 +215,7 @@ def test_a_first_address_on_this_machine_or_its_network_is_refused_unasked(home,
     nothing_kept()
 
 
-def _scheme_only(url: str) -> str:
+def _scheme_only(url: str, session) -> str:
     """``_check_hop`` without its refusals: what the connection meets alone."""
     return feeds.parse_url(feeds.requests.Request("GET", url).prepare().url).scheme
 
@@ -225,19 +232,40 @@ def test_the_connection_refuses_a_local_address_on_its_own(home, net, monkeypatc
     nothing_kept()
 
 
-@pytest.mark.parametrize("url", ["http://0x7f.1/gtfs.zip", "http://2130706433/gtfs.zip"])
-def test_a_number_the_resolver_reads_as_a_local_address_is_refused(home, net, url):
-    """127.0.0.1, written as the resolver still reads it: not a literal to
-    ``ipaddress``, so it is the connection's to judge."""
-    host = url.split("/")[2]
-    try:
-        socket.getaddrinfo(host, 80, 0, socket.SOCK_STREAM)
-    except socket.gaierror:
-        pytest.skip(f"this platform's resolver does not read {host!r} as a number")
-    net.resolved.clear()
+# 127.0.0.1 as a resolver or a proxy may still read it: not a literal to
+# ``ipaddress``. macOS's resolver reads 0177.0.0.1 as 177.0.0.1, glibc's and
+# the WHATWG parser as 127.0.0.1; it is refused for either.
+NUMBERS = ["http://2130706433/gtfs.zip", "http://0x7f.1/gtfs.zip", "http://127.1/gtfs.zip",
+           "http://0177.0.0.1/gtfs.zip", "http://127.0.0.1./gtfs.zip",
+           "http://0x7f.0.0.0x1/gtfs.zip", "http://012.0.0.1/gtfs.zip",
+           "http://010.0.0.1/gtfs.zip"]               # 8.0.0.1 in octal, 10.0.0.1 in decimal
+
+
+@pytest.mark.parametrize("url", NUMBERS)
+def test_a_number_any_reader_takes_for_a_local_address_is_refused(home, net, url):
     assert refused(url) == local(url)
-    assert net.resolved == [host] and net.dialled == []
+    assert net.resolved == [] and net.dialled == []
     nothing_kept()
+
+
+@pytest.mark.parametrize("name,read", [
+    ("2130706433", "127.0.0.1"), ("0x7f.1", "127.0.0.1"), ("127.1", "127.0.0.1"),
+    ("0177.0.0.1", "127.0.0.1"), ("1.2.3", "1.2.0.3"), ("0x5d.0270.0xd7.14", PUBLIC),
+    ("08.0.0.1", None), ("1.2.3.4.5", None), ("256.1.1.1", None), ("1.16777216", None),
+    ("feeds.example.test", None),
+])
+def test_how_the_classic_reader_takes_a_number(name, read):
+    got = feeds._classic_ipv4(name)
+    assert (str(got) if got is not None else None) == read
+
+
+@pytest.mark.parametrize("name,read", [
+    ("0177.0.0.1", "177.0.0.1"), ("010.0.0.1", "10.0.0.1"), ("08.0.0.1", "8.0.0.1"),
+    ("0x7f.1", "127.0.0.1"), ("1.2.3.4.5", None),
+])
+def test_how_the_classic_reader_takes_a_number_read_as_decimal(name, read):
+    got = feeds._classic_ipv4(name, octal=False)
+    assert (str(got) if got is not None else None) == read
 
 
 @pytest.mark.parametrize("addresses", [
@@ -613,26 +641,148 @@ def test_an_https_hop_after_an_http_one_is_followed(home, monkeypatch, tmp_path)
 
 # ------------------------------------------------------------------ proxies
 
-def test_through_a_proxy_the_proxy_resolves_and_a_local_proxy_is_allowed(
+PROXY = "http://127.0.0.1:3128"
+
+
+def test_through_a_proxy_a_public_name_is_sent_and_a_local_proxy_is_allowed(
         home, net, monkeypatch, tmp_path):
-    """A proxy in the environment is the person's own choice, and on some
-    networks the only resolver of outside names: nothing resolves the feed's
-    host here, and the proxy, on this machine, is dialled."""
+    """A proxy in the environment is the person's own choice: a name that
+    resolves here to public addresses is sent to it, and the proxy, on this
+    machine, is dialled."""
     payload = zip_bytes(tmp_path)
-    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:3128")
+    monkeypatch.setenv("HTTP_PROXY", PROXY)
+    net.resolve("feeds.example.test", [PUBLIC])
     net.route("feeds.example.test/gtfs.zip", body=payload)
     feeds.add("http://feeds.example.test/gtfs.zip", key="proxied")
-    assert "feeds.example.test" not in net.resolved
+    # The name resolved here, best effort, then the proxy's own address,
+    # resolved by urllib3 to connect to it.
+    assert net.resolved == ["feeds.example.test", "127.0.0.1"]
+    assert net.dialled == [("127.0.0.1", 3128)]
+    assert [s["at"] for s in net.seen] == ["feeds.example.test/gtfs.zip"]
+
+
+def test_through_a_proxy_a_name_that_does_not_resolve_here_is_sent_to_the_proxy(
+        home, net, monkeypatch, tmp_path):
+    """On some networks only the proxy resolves outside names."""
+    payload = zip_bytes(tmp_path)
+    monkeypatch.setenv("HTTP_PROXY", PROXY)
+    net.route("feeds.example.test/gtfs.zip", body=payload)
+    feeds.add("http://feeds.example.test/gtfs.zip", key="proxied")
+    assert net.resolved == ["feeds.example.test", "127.0.0.1"]
     assert net.dialled == [("127.0.0.1", 3128)]
 
 
+@pytest.mark.parametrize("addresses", [["127.0.0.1"], ["10.0.0.7"], [PUBLIC, "fd12::7"],
+                                       ["::ffff:127.0.0.1"]])
+def test_through_a_proxy_a_name_that_resolves_here_to_a_local_address_is_refused(
+        home, net, monkeypatch, addresses):
+    url = "http://feeds.example.test/gtfs.zip"
+    monkeypatch.setenv("HTTP_PROXY", PROXY)
+    net.resolve("feeds.example.test", addresses)
+    assert refused(url) == local(url)
+    assert net.dialled == [], "the proxy was not asked"
+    nothing_kept()
+
+
 @pytest.mark.parametrize("url", ["http://localhost/gtfs.zip", "http://10.1.2.3/gtfs.zip",
-                                 "http://[::ffff:127.0.0.1]/gtfs.zip"])
-def test_through_a_proxy_localhost_and_a_local_literal_are_still_refused(
+                                 "http://[::ffff:127.0.0.1]/gtfs.zip"] + NUMBERS)
+def test_through_a_proxy_localhost_and_a_local_number_are_still_refused(
         home, net, monkeypatch, url):
-    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:3128")
+    monkeypatch.setenv("HTTP_PROXY", PROXY)
     assert refused(url) == local(url)
     assert net.dialled == []
+    nothing_kept()
+
+
+@pytest.mark.parametrize("url", NUMBERS)
+def test_through_a_proxy_a_number_is_refused_whatever_this_systems_resolver_reads(
+        home, net, monkeypatch, url):
+    """A system whose resolver reads no number at all (and resolves no name):
+    the engine's own readings still refuse each, since the proxy reads it as
+    it will."""
+    def nothing(host, port, *args, **kwargs):
+        raise socket.gaierror(socket.EAI_NONAME, "nodename nor servname provided")
+
+    monkeypatch.setenv("HTTP_PROXY", PROXY)
+    monkeypatch.setattr(socket, "getaddrinfo", nothing)
+    assert refused(url) == local(url)
+    assert net.dialled == []
+    nothing_kept()
+
+
+def test_a_redirect_through_a_proxy_to_a_name_that_resolves_here_is_refused(
+        home, net, monkeypatch):
+    url = "http://feeds.example.test/gtfs.zip"
+    monkeypatch.setenv("HTTP_PROXY", PROXY)
+    net.resolve("feeds.example.test", [PUBLIC])
+    net.resolve("inside.example.test", ["10.0.0.7"])
+    net.redirect("feeds.example.test/gtfs.zip", "http://inside.example.test/x.zip")
+    assert refused(url) == local(url)
+    assert [s["at"] for s in net.seen] == ["feeds.example.test/gtfs.zip"]
+    nothing_kept()
+
+
+# ------------------------------------------------------- what is not an address
+
+def test_a_valueerror_from_a_callback_is_not_taken_for_an_unreadable_address(
+        home, public, tmp_path):
+    public.route("feeds.example.test/gtfs.zip", body=zip_bytes(tmp_path))
+
+    def progress(stage, done, total):
+        raise ValueError("the caller's own")
+
+    with pytest.raises(ValueError, match="the caller's own") as caught:
+        feeds.add(FIRST, progress=progress)
+    assert type(caught.value) is ValueError
+    nothing_kept()
+
+
+# --------------------------------------------------------------------- https
+
+@pytest.fixture
+def tls(net, tmp_path, monkeypatch):
+    """An https server on the loopback whose certificate names
+    feeds.example.test alone, trusted through REQUESTS_CA_BUNDLE; a dial to
+    port 443 goes to it."""
+    openssl = shutil.which("openssl")
+    if openssl is None:
+        pytest.skip("no openssl to make a certificate with")
+    cert, key = tmp_path / "cert.pem", tmp_path / "key.pem"
+    subprocess.run([openssl, "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                    "-keyout", str(key), "-out", str(cert), "-days", "2",
+                    "-subj", "/CN=feeds.example.test",
+                    "-addext", "subjectAltName=DNS:feeds.example.test"],
+                   check=True, capture_output=True, timeout=60)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert, key)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    server.net = net
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    net.ports[443] = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, args=(0.02,), daemon=True)
+    thread.start()
+    monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(cert))
+    yield net
+    server.shutdown()
+    server.server_close()
+
+
+def test_https_is_verified_against_the_name_while_the_checked_address_is_dialled(
+        home, tls, tmp_path):
+    payload = zip_bytes(tmp_path)
+    tls.resolve("feeds.example.test", [PUBLIC])
+    tls.route("feeds.example.test/gtfs.zip", body=payload)
+    feed = feeds.add("https://feeds.example.test/gtfs.zip", key="secure")
+    assert feed.zip_path.read_bytes() == payload
+    assert tls.dialled == [(PUBLIC, 443)]
+
+
+def test_https_to_a_name_the_certificate_does_not_carry_is_refused(home, tls):
+    url = "https://other.example.test/gtfs.zip"
+    tls.resolve("other.example.test", [PUBLIC])
+    assert refused(url) == f"{url} could not be fetched: a secure connection could not be made"
+    assert tls.dialled == [(PUBLIC, 443)] and tls.seen == []
     nothing_kept()
 
 
