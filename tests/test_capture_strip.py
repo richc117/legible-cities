@@ -126,9 +126,32 @@ def test_nothing_drawn_over_the_stage_reads_the_viewports_height():
 # twelfth of a second of clock between them, each with the counter as state()
 # said it just before the shot, and last does each of `acts` in turn, with
 # what it added to the count and a shot after it.
+#
+# Every shot is taken as `shoot` takes it (engine issue 89). A browser that
+# composites in software, as Chromium does on a runner with no GPU, gets two
+# things wrong without it. A shot taken straight after a call can come out
+# with the strip's own paint unfinished: the frame above it current, the band
+# black from some block on, which reads as no number at all. Waiting for the
+# paint, two animation frames as the desktop app waits before every capture,
+# mends that. And after a step the browser may paint again only the part of
+# a tile the step changed, which leaves an edge that did not move up to
+# sixteen levels off the same edge painted whole, so one frame taken in two
+# contexts differs by more than the suite's tolerance. Repainting the whole
+# viewport first, the body's ground changed and put back with a paint after
+# each, makes every shot of a frame paint it the same way. Neither changes the
+# picture or the count.
 DRIVE = r"""
 const { chromium } = require(process.argv[1]);
 const job = JSON.parse(process.argv[2]);
+const painted = page => page.evaluate(() => new Promise(
+  done => requestAnimationFrame(() => requestAnimationFrame(done))));
+const shoot = async page => {
+  await page.evaluate(() => { document.body.style.backgroundColor = "rgb(1, 2, 3)"; });
+  await painted(page);
+  await page.evaluate(() => { document.body.style.backgroundColor = ""; });
+  await painted(page);
+  return page.screenshot({ type: "png", animations: "allow" });
+};
 (async () => {
   const browser = await chromium.launch({ channel: "chromium" });
   const out = [];
@@ -193,7 +216,7 @@ const job = JSON.parse(process.argv[2]);
       for (let i = 0; i < c.shots; i++) {
         if (i) await page.evaluate(() => window.__present.advance(1 / 12));
         const draws = await count();
-        const png = await page.screenshot({ type: "png", animations: "allow" });
+        const png = await shoot(page);
         seen.shots.push({ draws, png: png.toString("base64") });
       }
       const ACTS = {
@@ -206,7 +229,7 @@ const job = JSON.parse(process.argv[2]);
         const was = await count();
         await page.evaluate(ACTS[name]);
         const draws = await count();
-        const png = await page.screenshot({ type: "png", animations: "allow" });
+        const png = await shoot(page);
         seen.acts.push({ name, added: draws - was, draws, png: png.toString("base64") });
       }
       seen.problems = problems;
